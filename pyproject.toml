@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill-manager"
+version = "1.0.0"
+description = "A professional tool for managing reusable agent skills across repositories."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "customtkinter",
+    "tkinterdnd2",
+    "pyyaml",
+    "pywinstyles",
+]
+
+[project.scripts]
+skill-manager = "skill_manager.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["skill_manager*"]
