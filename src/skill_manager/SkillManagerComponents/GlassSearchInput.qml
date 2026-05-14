@@ -30,47 +30,8 @@ TextField {
             color: Theme.secondaryLabel
             visible: control.text === ""
         }
-
-        Button {
-            id: clearButton
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            width: 24
-            height: 24
-            visible: control.text !== ""
-            flat: true
-            padding: 0
-
-            contentItem: Text {
-                text: "×"
-                font.pixelSize: 18
-                color: Theme.secondaryLabel
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                opacity: clearButton.hovered ? 1.0 : 0.7
-            }
-
-            background: Rectangle {
-                color: clearButton.hovered ? Theme.glassHover : "transparent"
-                radius: width / 2
-            }
-
-            onClicked: {
-                control.text = ""
-                control.forceActiveFocus()
-            }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Clear search"
-            ToolTip.text: "Clear search"
-            ToolTip.visible: hovered
-        }
     }
     
     leftPadding: text === "" ? 40 : 12
-    rightPadding: control.text === "" ? 12 : 36
-
-    Accessible.role: Accessible.EditableText
-    Accessible.name: "Search skills"
+    rightPadding: 12
 }
