@@ -14,6 +14,10 @@ Button {
     
     Layout.fillWidth: true
     Layout.preferredHeight: 40
+
+    ToolTip.visible: control.hovered && control.collapsed
+    ToolTip.text: control.labelText
+    ToolTip.delay: 400
     
     contentItem: RowLayout {
         spacing: 12
