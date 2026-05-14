@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from datetime import datetime
@@ -369,7 +370,8 @@ def run_version_command(command):
         return ""
 
     try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
+        args = shlex.split(command)
+        result = subprocess.run(args, shell=False, capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return ""
 
