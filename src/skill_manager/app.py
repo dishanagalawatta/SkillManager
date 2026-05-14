@@ -1305,22 +1305,30 @@ class AppController(QObject):
                 # We'll build a map of source skills by name/folder
                 source_map = {s["folder_name"]: s for s in source_skills}
                 
+                # Pre-index target skills for faster lookup
+                target_skill_maps = []
+                for p in target_projects:
+                    target_skill_maps.append({
+                        "project_label": p["project_label"],
+                        "skills_map": {s["folder_name"]: s for s in p["skills"]}
+                    })
+
                 # For each source skill, check its status in each target
                 for folder_name, source_skill in source_map.items():
                     item_targets = []
                     item_status = "up_to_date"
                     
-                    for p in target_projects:
-                        target_skill = next((s for s in p["skills"] if s["folder_name"] == folder_name), None)
+                    for tm in target_skill_maps:
+                        target_skill = tm["skills_map"].get(folder_name)
                         if target_skill:
                             item_targets.append({
-                                "name": p["project_label"],
+                                "name": tm["project_label"],
                                 "status": "up_to_date"
                             })
                         else:
                             item_status = "missing"
                             item_targets.append({
-                                "name": p["project_label"],
+                                "name": tm["project_label"],
                                 "status": "missing"
                             })
                     
