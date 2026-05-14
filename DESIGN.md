@@ -1,12 +1,8 @@
-# Skill Manager - Liquid Glass Design Guide
+# Skill Manager - Solid Matte & Liquid Glass Design Guide
 
 ## Design Intent
 
-Skill Manager should feel like an immersive Apple desktop utility for the Liquid Glass era: vibrant, layered, and deeply translucent. The app is a productivity tool for discovering, copying, updating, and organizing reusable agent skills across repositories. The interface prioritizes a "floating" aesthetic where functional components are segmented into frosted glass panels (pills) over a richly blurred, multi-tonal window background.
-
-This document is the project reference for future UI changes. It translates the Apple Human Interface Guidelines skill notes in `.agent/skills/` and Apple's current Liquid Glass material guidance into concrete direction for this Python desktop app.
-
-Liquid Glass is the core design language. In CustomTkinter/Tkinter, this is achieved through full-window translucency (acrylic/mica-style effects), deeply blurred background materials, and floating frosted glass "pills" for distinct UI sections. The design embraces transparency and decorative shine to create a premium, futuristic workspace.
+Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-developer tools. It balances the depth of Apple's Liquid Glass with the stability of solid, deeply-tinted materials. The interface prioritizes a "Hybrid Forest" palette—using dark emerald and pine tones—to create a premium, focused workspace. While functional components (pills) maintain frosted translucency, the main window background utilizes solid, non-transparent colors to ensure consistent visual fidelity across all OS configurations and display scales.
 
 ## Product Context
 
@@ -27,16 +23,15 @@ The Liquid Glass redesign must not move or weaken these workflows:
 - **Updates:** Manage source and target project directories, drag/drop paths, reorder sources, run folder updates, manage configured skill update commands, run update checks, and sync linked project targets after successful source updates.
 - **Essentials and manuals:** Treat Essentials and manual references as first-class selectable items wherever the Quick Copy workflow shows project skills.
 
-## Liquid Glass Principles Applied
+## Solid Matte & Glass Principles
 
-Apple's current material guidance defines Liquid Glass as a functional layer for controls and navigation that floats above content. Skill Manager extends this by treating all logical UI sections as floating glass cards over a vibrant, blurred background:
+The redesign treats the UI as a series of high-contrast, rounded containers floating over a stable, solid base:
 
-- **Immersive Translucency:** The entire window uses a deeply blurred, multi-tonal material (similar to macOS Sonoma/Ventura desktop wallpapers) as its base.
-- **Segmented "Pills":** Both functional areas (toolbars, sidebars) and content areas (skill lists, preview panes) are encapsulated in rounded, frosted glass panels that appear to float above the background.
-- **Glass for Everything:** Content tree rows, table headers, and detail text sit inside these floating glass containers. The containers provide the necessary blur and tint for legibility.
-- **Vibrant Visual Hierarchy:** Use transparency and blur levels to create depth. Higher-level containers (like sidebars or active dialogs) should have stronger frosting or distinct tinting.
-- **Inner Reflection Borders:** Glass panels use a bright, 1px inner reflection border (hairline) to define edges and simulate the physical properties of thick glass.
-- **Respect accessibility settings:** Provide solid opaque fallbacks for reduced transparency modes, ensuring the "pill" structure and hierarchy remain clear even without glass effects.
+- **Solid Matte Foundation:** The primary window utilizes a solid, deeply-tinted material (e.g., `#0E1210` in Dark Mode) instead of full-window transparency. This provides a robust, professional feel and eliminates "glowing" or "leaking" artifacts from the desktop wallpaper.
+- **Glass-Pill Components:** Functional sections (toolbars, sidebars) and content areas remain encapsulated in "frosted glass" pills. These pills use subtle alpha-blending or distinct tinting (`#1A201E`) to stand out against the matte background.
+- **Synchronized Rounding:** All primary containers and the main window frame use a **12px corner radius**. This value is strictly synchronized with the Windows 11 native DWM corner preference (`DWMWCP_ROUND`) to ensure perfectly aligned shadows and borders.
+- **Inner Reflection Borders:** Components use 1px solid tinted borders (`#2D3531`) to define edges. These act as "reflection" points that give the UI a layered, physical presence without relying on heavy gradients.
+- **Premium Micro-Animations:** Interaction is enhanced with subtle 150ms transitions on hover and focus states, making the matte surfaces feel "alive" and responsive.
 
 ## HIG Principles Applied
 
@@ -116,32 +111,30 @@ Layering rules:
 
 Prefer a vibrant, multi-tonal palette that leverages translucency. Use bright, high-contrast accents and crisp inner reflection borders for glass edges.
 
-| Token | Light | Dark | Usage |
+| Token | Light (Matte) | Dark (Matte) | Usage |
 |---|---:|---:|---|
-| `--window-bg-blur` | `Vibrant Blur` | `Vibrant Blur` | Immersive multi-tonal background |
-| `--glass-pill` | `rgba(255,255,255,0.45)` | `rgba(44,44,46,0.45)` | Frosted pill containers (Layer 2) |
-| `--glass-active` | `rgba(255,255,255,0.65)` | `rgba(60,60,62,0.65)` | Highly vibrant glass (Layer 3) |
-| `--glass-border` | `rgba(255,255,255,0.80)` | `rgba(255,255,255,0.25)` | 1px bright inner reflection edge |
-| `--glass-shadow` | `rgba(0,0,0,0.18)` | `rgba(0,0,0,0.45)` | Elevation and depth shadow |
-| `--separator` | `rgba(0,0,0,0.15)` | `rgba(255,255,255,0.15)` | Hairline dividers inside glass |
-| `--label` | `#000000` | `#FFFFFF` | Primary text (high contrast) |
-| `--secondary-label` | `rgba(0,0,0,0.60)` | `rgba(255,255,255,0.60)` | Secondary text and hints |
-| `--accent` | `#007AFF` | `#0A84FF` | Selection, primary active state |
+| `--app-bg` | `#F5FAF8` | `#0E1210` | Primary application background |
+| `--glass-pill` | `#FFFFFF` | `#1A201E` | Frosted pill containers (Layer 2) |
+| `--glass-hover` | `rgba(0,0,0,0.05)`| `rgba(255,255,255,0.08)`| Hover state for pill items |
+| `--glass-border` | `#DDE5E1` | `#2D3531` | 1px Solid border (Reflection edge) |
+| `--glass-shadow` | `rgba(0,0,0,0.12)` | `rgba(0,0,0,0.40)` | Depth and elevation shadow |
+| `--separator` | `rgba(0,0,0,0.10)` | `rgba(255,255,255,0.10)` | Hairline dividers |
+| `--label` | `#1A1C1B` | `#F0F5F2` | Primary text (Forest tint) |
+| `--secondary-label`| `rgba(0,0,0,0.55)` | `rgba(255,255,255,0.55)`| Secondary text and hints |
+| `--accent` | `#00A36C` | `#10B981` | Emerald/Pine active state |
 | `--success` | `#34C759` | `#32D74B` | Completed / Success indicator |
 | `--danger` | `#FF3B30` | `#FF453A` | Destructive / Remove actions |
 
 Do not use blue-purple gradients for ordinary UI chrome. The existing logo gradient can remain in the app icon and about/branding surfaces only.
 
-### Glass Fallbacks In Current Toolkit
+### Glass Fallbacks In PySide6/QML
 
-CustomTkinter/Tkinter does not provide native Apple Liquid Glass. Implement the approximation through tokens and disciplined styling:
+PySide6 with Qt Quick/QML provides native support for true alpha blending and hardware-accelerated transparency. The previous limitations of CustomTkinter no longer apply:
 
-- Use semi-transparent-looking colors where supported, but keep text contrast first.
-- If real transparency is unavailable or inconsistent on Windows, use solid blended colors from `--glass-bg-strong`.
-- Simulate depth with a 1px light border, internal spacing, and a very subtle shadow where the toolkit supports it.
-- Use rounded rectangular shells for toolbars, popovers, toasts, and sidebars; avoid rounded cards for every row.
-- Keep all text-heavy glass surfaces at strong opacity.
-- Provide a reduced-transparency mode that maps all glass tokens to opaque content surfaces.
+- **Native Mica/Acrylic:** Use `pywinstyles` or native Qt 6.8+ APIs to apply system materials directly to the `QWindow`.
+- **True Alpha Blending:** All QML components support real-time transparency over the native backdrop.
+- **Hardware Acceleration:** QML uses the GPU for rendering, ensuring smooth transitions and blur effects.
+- **Accessibility:** Continue to provide high-contrast and reduced-transparency modes by mapping QML properties to solid colors via the `Theme.qml` singleton.
 
 ### Typography
 
@@ -168,11 +161,11 @@ Avoid large bold text inside dense panels. Keep text left-aligned. Dense list an
 
 ### Corners, Borders, And Materials
 
-- Functional glass shells: `14px` to `18px` radius, depending on size.
-- Main content surfaces: `10px` to `12px` radius if framed.
-- Buttons and fields: `6px` to `8px` radius.
-- Repeated row/list items: prefer separators and selection backgrounds over card stacks.
-- Borders: use 1px separators or glass hairlines, not heavy outlines.
+- Functional glass shells / Main Window: `12px` (Standardized for OS synchronization).
+- Main content surfaces: `10px` to `12px`.
+- Buttons and fields: `20px` (Pill style) or `8px` (Compact).
+- Repeated row/list items: prefer separators and selection backgrounds.
+- Borders: use 1px solid tinted hairlines (`#2D3531`).
 - Shadows: use lightly and only for functional floating layers, toasts, popovers, and dialogs.
 - Motion: use short, purposeful fades or small translations only when they clarify state. Honor reduced motion by removing movement.
 
@@ -456,21 +449,17 @@ Icon direction:
 
 Current UI entry points:
 
-- `src/skill_manager/app.py` owns the main window, top-level layout, tabs, tree views, and workflow controls.
-- `src/skill_manager/gui/styles.py` owns current theme tokens and should become the central Liquid Glass token source.
-- `src/skill_manager/gui/dialogs.py` owns add/edit skill dialogs and should follow the dialog rules above.
+- `src/skill_manager/app.py` initializes the PySide6 `QGuiApplication` and QML engine.
+- `src/skill_manager/qml/` contains the declarative UI components (Pills, Sidebar, Views).
+- `src/skill_manager/qml/Theme.qml` (Singleton) owns the Liquid Glass tokens and opaque fallbacks.
 
 Recommended phased implementation:
 
-1. Update `styles.py` with Liquid Glass tokens, opaque fallbacks, light/dark appearance support, semantic status colors, and shared button/list constants.
-2. Restyle current `CTkTabview` UI in place before changing navigation architecture.
-3. Normalize toolbar/action row spacing in Library and Quick Copy using glass-like toolbar groups.
-4. Restyle `ttk.Treeview` rows, headings, selected states, category rows, and focus outlines.
-5. Add reduced-transparency and increased-contrast token mappings.
-6. Replace loud destructive filled buttons with neutral/destructive text styling where practical.
-7. Keep toasts and hover quick peek popovers aligned with the glass material rules.
-8. Add keyboard shortcuts and context menus for key Library and Quick Copy commands.
-9. Convert top-level tabs into a sidebar shell only after the current workflows are visually stable.
+1. Setup `Theme.qml` with Liquid Glass tokens (alpha-enabled) and semantic status colors.
+2. Build `GlassPill.qml` and `Sidebar.qml` as the foundational design system.
+3. Migrate `Quick Copy` and `Library` views to QML, binding to the existing Python core via `QObject` signals and slots.
+4. Integrate native Windows 11 Mica effects using the `Qt.Window` material flags or helper libraries.
+5. Add reduced-transparency and increased-contrast logic to the `Theme` singleton.
 
 Implementation constraints:
 
@@ -493,17 +482,18 @@ Implementation constraints:
 Use this checklist when implementing the Liquid Glass redesign:
 
 - [ ] The app opens to an immersive, vibrant, and fully translucent workspace.
-- [ ] The window background utilizes a deeply blurred, multi-tonal material (Layer 0).
-- [ ] All logical UI sections are encapsulated in floating frosted glass pills (Layer 2) with 1px bright inner reflection borders.
-- [ ] Gaps between stacked pills allow the vibrant background to remain visible.
-- [ ] Light and dark appearances use the high-translucency semantic tokens.
+- [ ] The window background utilizes a **Solid Matte** deeply-tinted material (e.g., #0E1210).
+- [ ] The main window and primary containers use a **synchronized 12px radius** for OS-level shadow alignment.
+- [ ] All functional UI sections are encapsulated in floating frosted glass pills (Layer 2) with 1px solid tinted borders.
+- [ ] Gaps between stacked pills allow the primary background to remain visible.
+- [ ] Light and dark appearances use the validated hex-based Solid Matte tokens.
 - [ ] Reduced-transparency and increased-contrast fallbacks preserve the "pill-stacked" hierarchy.
 - [ ] The Quick Copy view follows the modular stack of context, configuration, essentials, and manual input pills.
 - [ ] The Skill Inspector is persistent and updates immediately on selection.
 - [ ] Tree rows and list items sit directly on the frosted glass material.
 - [ ] Buttons use vibrant fills (Primary) or tinted glass backgrounds (Secondary/Destructive).
 - [ ] Search fields filter instantly and show helpful empty states within their glass containers.
-- [ ] UI text is highly legible against the blurred materials.
+- [ ] UI text is highly legible against the solid matte and blurred materials.
 - [ ] No merging of stacked pills into single flat panels occurs.
 
 ## Reference Skill Mapping
@@ -529,6 +519,14 @@ This guide uses the local HIG skill files as follows:
 | `.agent/skills/hig-project-context/SKILL.md` | Product/platform/context framing for future HIG decisions |
 
 ## External Design References
+
+- Apple Human Interface Guidelines: Materials, especially Liquid Glass vs. standard materials.
+- Apple Developer Documentation: Adopting Liquid Glass.
+- Apple Developer Documentation: Liquid Glass technology overview.
+face Guidelines: Materials, especially Liquid Glass vs. standard materials.
+- Apple Developer Documentation: Adopting Liquid Glass.
+- Apple Developer Documentation: Liquid Glass technology overview.
+ernal Design References
 
 - Apple Human Interface Guidelines: Materials, especially Liquid Glass vs. standard materials.
 - Apple Developer Documentation: Adopting Liquid Glass.

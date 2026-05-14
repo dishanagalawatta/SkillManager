@@ -1,0 +1,51 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import App 1.0
+
+Item {
+    id: root
+    width: parent.width
+    height: 36
+    
+    property string sectionName: ""
+    property bool isCollapsed: AppController.skillModel.isCategoryCollapsed(sectionName)
+
+    Rectangle {
+        anchors.fill: parent
+        color: mouseAreaSection.containsMouse ? Theme.glassHover : "transparent"
+        radius: Theme.radiusSmall
+        anchors.margins: 2
+    }
+
+    RowLayout {
+        anchors.fill: parent
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        spacing: 8
+
+        Text {
+            text: root.isCollapsed ? "›" : "⌄"
+            font.pixelSize: 14
+            color: Theme.secondaryLabel
+            opacity: 0.8
+        }
+
+        Text {
+            Layout.fillWidth: true
+            text: root.sectionName
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
+            font.weight: Font.Bold
+            color: root.sectionName === "Essentials" ? "#FFD700" : Theme.secondaryLabel
+            opacity: 0.8
+        }
+    }
+
+    MouseArea {
+        id: mouseAreaSection
+        anchors.fill: parent
+        hoverEnabled: true
+        onClicked: Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
+    }
+}

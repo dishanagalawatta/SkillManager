@@ -15,6 +15,7 @@ def normalize_skill_source_config(data):
         "source_type": str(detected.get("source_type") or "auto").strip(),
         "repository_url": str(detected.get("repository_url") or "").strip(),
         "local_path": str(detected.get("local_path") or "").strip(),
+        "clone_path": str(detected.get("clone_path") or "").strip(),
         "package_name": str(detected.get("package_name") or "").strip(),
         "install_args": str(detected.get("install_args") or "").strip(),
         "update_command": str(detected.get("update_command") or "").strip(),
@@ -116,6 +117,7 @@ def run_skill_source_update(source, output_callback=None):
 
     # Post-update: Move skills from installation script output if applicable
     if local_path:
+        _emit(output_callback, f"[DEBUG] Relocating skills from output to: {local_path}")
         _relocate_skills_from_output(captured_output, local_path, output_callback)
 
     if source.get("verify_command"):
@@ -137,68 +139,129 @@ def run_skill_source_update(source, output_callback=None):
     return source
 
 
+def _relocate_path_internal(src_path, dest_base, output_callback):
+    """Internal helper to move a single directory to dest_base."""
+    dest_path = dest_base / src_path.name
+    try:
+        if dest_path.exists():
+            if dest_path.resolve() == src_path.resolve():
+                return False
+            if dest_path.is_dir():
+                _emit(output_callback, f"Cleaning up existing folder at {dest_path}...")
+                shutil.rmtree(dest_path)
+            else:
+                dest_path.unlink()
+        
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        _emit(output_callback, f"Relocating {src_path.name} -> {dest_path}...")
+        shutil.move(str(src_path), str(dest_path))
+        
+        # Cleanup empty parent directories (like .agents/skills)
+        _cleanup_empty_parents(src_path)
+        return True
+    except Exception as e:
+        _emit(output_callback, f"Relocation failed for {src_path}: {e}")
+        return False
+
+
 def _relocate_skills_from_output(captured_output, target_local_path, output_callback):
     """Parses output log for installed paths and moves those folders to target_local_path."""
+    if not target_local_path:
+        _emit(output_callback, "[DEBUG] Relocation skipped: No target local_path configured.")
+        return
+
     dest_base = Path(os.path.expanduser(target_local_path))
     
     # regex to find paths like ~\.agents\skills\caveman or C:\Users\...\.agents\skills\caveman
-    # Supports ✓ prefix, handles spaces and common path characters.
-    # We look for ~ or drive letter + colon.
-    path_regex = re.compile(r'(?:✓\s*)?([~A-Za-z]:?[\\/][^\s│]+[a-zA-Z0-9_.-]+)')
+    # Supports ✓ prefix, handles "Installed to" text, spaces and common path characters.
+    # We look for common path starters and capture until end of line or specific delimiters.
+    path_regex = re.compile(r'(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.\\[^…\n\r]+|~[^…\n\r]+)')
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     
+    _emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for installation paths...")
     detected_paths = set()
     for line in captured_output:
         clean_line = ansi_escape.sub('', line)
+        # Search for paths after specific keywords to handle spaces correctly
+        match_found = False
         for match in path_regex.finditer(clean_line):
             raw_path = match.group(1).strip()
             # Expand ~ and normalize
-            expanded = Path(os.path.expanduser(raw_path)).resolve()
-            if expanded.is_dir():
-                detected_paths.add(expanded)
+            try:
+                # Remove trailing ellipsis or common terminal artifacts
+                raw_path = re.sub(r'[…\s│]+$', '', raw_path).strip()
+                expanded = Path(os.path.expanduser(raw_path)).resolve()
+                if expanded.is_dir():
+                    detected_paths.add(expanded)
+                    _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
+                    match_found = True
+            except Exception:
+                continue
+        
+        if not match_found:
+            # Fallback for lines without keywords but containing absolute paths
+            fallback_regex = re.compile(r'([a-zA-Z]:[\\/][^\s│]+[a-zA-Z0-9_.-]+)')
+            for match in fallback_regex.finditer(clean_line):
+                raw_path = match.group(1).strip()
+                try:
+                    expanded = Path(os.path.expanduser(raw_path)).resolve()
+                    if expanded.is_dir():
+                        detected_paths.add(expanded)
+                        _emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
+                except Exception:
+                    continue
 
     if not detected_paths:
+        _emit(output_callback, "[DEBUG] No installation paths detected in output. Please ensure the tool is installing skills to a visible directory.")
         return
 
+    _emit(output_callback, f"[DEBUG] Total unique paths found: {len(detected_paths)}")
+    _emit(output_callback, f"[DEBUG] Relocating to target: {dest_base}")
     relocated_count = 0
     for src_path in sorted(detected_paths):
         # We only want to move folders that are NOT already in the destination
-        if src_path.parts[:len(dest_base.parts)] == dest_base.parts:
+        try:
+            if src_path.resolve() == dest_base.resolve():
+                continue
+            if str(dest_base.resolve()) in str(src_path.resolve()):
+                # Already inside destination
+                continue
+        except Exception:
             continue
             
-        # Target path inside the user's source folder
-        # We use the folder name of the installed skill
-        dest_path = dest_base / src_path.name
-        
-        try:
-            if dest_path.exists():
-                if dest_path.resolve() == src_path.resolve():
-                    continue
-                if dest_path.is_dir():
-                    _emit(output_callback, f"Cleaning up existing folder at {dest_path}...")
-                    shutil.rmtree(dest_path)
-                else:
-                    dest_path.unlink()
-            
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            _emit(output_callback, f"Relocating {src_path.name} -> {dest_path}...")
-            shutil.move(str(src_path), str(dest_path))
-            relocated_count += 1
-            
-            # Cleanup empty parent directories (like .agents/skills)
-            _cleanup_empty_parents(src_path)
-            
-        except Exception as e:
-            _emit(output_callback, f"Relocation failed for {src_path}: {e}")
+        # Check if this is a container directory (like 'skills' or 'agents')
+        # If it is, we move its contents individually to avoid nested 'skills/skills'
+        if src_path.name.lower() in ("skills", "agents", ".agents"):
+            _emit(output_callback, f"Processing container: {src_path.name}")
+            try:
+                for child in src_path.iterdir():
+                    if child.is_dir() and not child.name.startswith('.'):
+                        if _relocate_path_internal(child, dest_base, output_callback):
+                            relocated_count += 1
+                # Cleanup the now-empty container
+                _cleanup_empty_parents(src_path / "dummy")
+            except Exception as e:
+                _emit(output_callback, f"Failed to iterate container {src_path}: {e}")
+        else:
+            if _relocate_path_internal(src_path, dest_base, output_callback):
+                relocated_count += 1
 
     if relocated_count > 0:
-        _emit(output_callback, f"Successfully relocated {relocated_count} folders from install script output.")
+        _emit(output_callback, f"Successfully relocated {relocated_count} folders.")
+    else:
+        _emit(output_callback, "[DEBUG] No folders were moved (maybe already in destination or empty).")
+
         
         # Handle .skill-lock.json, skills-lock.json and manifest
         # The source lockfile is typically in the parent of the skills folder (e.g. ~/.agent/.skill-lock.json)
         # The target lockfile should be in the parent of the target local_path (e.g. C:/.../.agent/.skill-lock.json)
         unique_source_roots = {p.parent.parent for p in detected_paths}
         target_root = dest_base.parent
+        
+        # If target_root is project root, use the dedicated data folder to keep root clean
+        if target_root.resolve() == Path.cwd().resolve():
+            from skill_manager.core.config import DATA_DIR
+            target_root = DATA_DIR
         
         for src_root in unique_source_roots:
             for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
@@ -237,13 +300,13 @@ def _merge_and_move_lockfile(source_lock, target_lock, output_callback):
         # Target exists, we must merge
         _emit(output_callback, f"Merging lockfile -> {target_lock}...")
         try:
-            with open(target_lock, "r", encoding="utf-8") as f:
+            with open(target_lock, "r", encoding="utf-8-sig") as f:
                 target_data = json.load(f)
         except (json.JSONDecodeError, OSError):
             target_data = {}
             
         try:
-            with open(source_lock, "r", encoding="utf-8") as f:
+            with open(source_lock, "r", encoding="utf-8-sig") as f:
                 source_data = json.load(f)
         except (json.JSONDecodeError, OSError):
             source_data = {}
@@ -316,23 +379,39 @@ def run_version_command(command):
 
 
 def _run_repository_update(source, output_callback):
+    """
+    Clones or pulls a git repository.
+
+    Supports two modes:
+    - Standard: `local_path` is used for both the git checkout and as the relocation base.
+    - Staged: `clone_path` is used for the git checkout; `local_path` is the relocation target.
+      After a successful clone/pull, `clone_path` is emitted into output so that
+      `_relocate_skills_from_output` can detect it and move skills into `local_path`.
+    """
     repository_url = source.get("repository_url")
     local_path = source.get("local_path")
-    if not repository_url or not local_path:
-        raise ValueError("Configure either an update command or both repository URL and local path.")
+    clone_path = source.get("clone_path") or local_path
 
-    path = Path(os.path.expanduser(local_path))
+    if not repository_url:
+        raise ValueError("Configure a repository_url for git sources.")
+    if not clone_path:
+        raise ValueError("Configure either local_path or clone_path for git sources.")
+
+    path = Path(os.path.expanduser(clone_path))
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
         _run_process(["git", "-C", str(path), "pull", "--ff-only"], output_callback)
-        return
+    elif path.exists() and any(path.iterdir()):
+        raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _emit(output_callback, f"Cloning {repository_url} into {path}...")
+        _run_process(["git", "clone", repository_url, str(path)], output_callback)
 
-    if path.exists() and any(path.iterdir()):
-        raise ValueError(f"Local path exists but is not an empty git checkout: {path}")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _emit(output_callback, f"Cloning {repository_url} into {path}...")
-    _run_process(["git", "clone", repository_url, str(path)], output_callback)
+    # Emit clone_path into output so _relocate_skills_from_output can detect it
+    # when clone_path differs from local_path (staged mode).
+    if clone_path != local_path:
+        _emit(output_callback, f"Installed to {path}")
 
 
 def _run_npm_update(source, output_callback):
@@ -409,16 +488,30 @@ def _run_process(command, output_callback, shell=False):
         shell=shell,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
         text=True,
         encoding="utf-8",
         errors="replace",
         bufsize=1,
     )
+    last_emit_time = 0
+    import time
+
     if process.stdout is not None:
         for line in process.stdout:
             line_clean = line.strip()
             if line_clean:
-                _emit(output_callback, line_clean)
+                # Always print to terminal for visibility
+                print(f"[PROCESS] {line_clean}")
+                
+                # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
+                is_progress = bool(re.search(r'\d+%', line_clean))
+                current_time = time.time()
+                
+                if not is_progress or (current_time - last_emit_time > 0.5):
+                    _emit(output_callback, line_clean)
+                    if is_progress:
+                        last_emit_time = current_time
 
     process.wait()
     if process.returncode != 0:
@@ -442,6 +535,9 @@ def _resolve_process_command(command, shell=False):
 
 
 def _emit(output_callback, message):
+    # Print to terminal for debugging and visibility
+    if message.startswith("[DEBUG]") or message.startswith("[ERROR]") or "Relocating" in message or "Success" in message:
+        print(message)
     if output_callback:
         output_callback(message)
 

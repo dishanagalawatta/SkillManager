@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 
 
-def copy_skill_folders_to_targets(skills, targets):
+def copy_skill_folders_to_targets(skills, targets, update_only=False):
     result = {
         "copied": 0,
         "merged": 0,
@@ -40,6 +40,11 @@ def copy_skill_folders_to_targets(skills, targets):
 
             destination_path = target_path / folder_name
             existed = destination_path.exists()
+            
+            if update_only and not existed:
+                # Skip skills that don't already exist in the target when update_only is True
+                continue
+
             try:
                 target_path.mkdir(parents=False, exist_ok=True)
                 shutil.copytree(source_path, destination_path, dirs_exist_ok=True)

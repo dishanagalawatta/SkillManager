@@ -1,0 +1,21 @@
+module SkillManagerComponents
+singleton Theme 1.0 Theme.qml
+GlassPill 1.0 GlassPill.qml
+Sidebar 1.0 Sidebar.qml
+SidebarButton 1.0 SidebarButton.qml
+TopBar 1.0 TopBar.qml
+TopBarButton 1.0 TopBarButton.qml
+CategoryHeader 1.0 CategoryHeader.qml
+GlassSearchInput 1.0 GlassSearchInput.qml
+SkillItem 1.0 SkillItem.qml
+SkillInspector 1.0 SkillInspector.qml
+FilterPill 1.0 FilterPill.qml
+GlassDropdown 1.0 GlassDropdown.qml
+GlassToggleButton 1.0 GlassToggleButton.qml
+CustomTitleBar 1.0 CustomTitleBar.qml
+FrostOverlay 1.0 FrostOverlay.qml
+
+CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml
+SourceEditDialog 1.0 dialogs/SourceEditDialog.qml
+ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
+FolderPickerNative 1.0 dialogs/FolderPickerNative.qml

@@ -12,32 +12,29 @@ DATA_DIR_ENV = "SKILL_MANAGER_DATA_DIR"
 CONFIG_FILENAME = "config.json"
 SKILL_LIBRARY_CACHE_FILENAME = "skill_library_index.json"
 SKILL_LIBRARY_ARCHIVE_FILENAME = "skill_library_archive.json"
+SKILL_LIBRARY_ESSENTIALS_FILENAME = "skill_library_essentials.json"
 SKILL_LIBRARY_CLIPBOARD_FILENAME = "skill_library_clipboard.json"
 QUICK_COPY_FILENAME = "quick_copy.json"
+SKILLS_LOCK_FILENAME = "skills-lock.json"
 LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME = "project_skill_clipboard.json"
 DATA_FILENAMES = (
     CONFIG_FILENAME,
     SKILL_LIBRARY_CACHE_FILENAME,
     SKILL_LIBRARY_ARCHIVE_FILENAME,
+    SKILL_LIBRARY_ESSENTIALS_FILENAME,
     SKILL_LIBRARY_CLIPBOARD_FILENAME,
     QUICK_COPY_FILENAME,
+    SKILLS_LOCK_FILENAME,
 )
 
 def get_app_data_dir() -> Path:
     """Returns the platform-specific directory for application data."""
     override = os.environ.get(DATA_DIR_ENV)
     if override:
-        app_dir = Path(override).expanduser()
-    elif sys.platform == 'win32':
-        base_dir = Path(os.environ.get('APPDATA', '~')).expanduser()
-        app_dir = base_dir / APP_NAME
-    elif sys.platform == 'darwin':
-        base_dir = Path('~/Library/Application Support').expanduser()
-        app_dir = base_dir / APP_NAME
-    else:
-        base_dir = Path('~/.config').expanduser()
-        app_dir = base_dir / APP_NAME
-
+        return Path(override).expanduser()
+    
+    # Use local data folder by default for professional look
+    app_dir = Path.cwd() / "data"
     app_dir.mkdir(parents=True, exist_ok=True)
     return app_dir
 
@@ -82,8 +79,10 @@ DATA_DIR = get_app_data_dir()
 CONFIG_FILE = resolve_data_file(CONFIG_FILENAME)
 SKILL_LIBRARY_CACHE_FILE = resolve_data_file(SKILL_LIBRARY_CACHE_FILENAME)
 SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(SKILL_LIBRARY_ARCHIVE_FILENAME)
+SKILL_LIBRARY_ESSENTIALS_FILE = resolve_data_file(SKILL_LIBRARY_ESSENTIALS_FILENAME)
 SKILL_LIBRARY_CLIPBOARD_FILE = resolve_data_file(SKILL_LIBRARY_CLIPBOARD_FILENAME)
 QUICK_COPY_FILE = resolve_data_file(QUICK_COPY_FILENAME)
+SKILLS_LOCK_FILE = resolve_data_file(SKILLS_LOCK_FILENAME)
 SKILL_LIBRARY_CACHE_VERSION = 8
 
 class ConfigManager:

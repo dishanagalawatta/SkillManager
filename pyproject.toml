@@ -9,10 +9,17 @@ description = "A professional tool for managing reusable agent skills across rep
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "customtkinter",
-    "tkinterdnd2",
+    "PySide6",
     "pyyaml",
     "pywinstyles",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-qt",
+    "pytest-cov",
+    "pytest-asyncio",
 ]
 
 [project.scripts]

@@ -6,6 +6,103 @@ from pathlib import Path
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Path"}
 
 
+def _resolve_resilient_path(path_str):
+    """Try to resolve a path, being resilient to .agent vs .agents pluralization mismatches."""
+    if not path_str:
+        return Path()
+        
+    path = Path(os.path.expanduser(str(path_str).strip()))
+    try:
+        if path.exists():
+            return path.resolve()
+    except OSError:
+        pass
+    
+    # Try swapping .agent <-> .agents
+    s = str(path)
+    # Normalize slashes for detection but keep original for replacement to avoid breaking windows paths more than needed
+    s_norm = s.replace("\\", "/")
+    
+    alt_s = None
+    if "/.agent/" in s_norm:
+        alt_s = s.replace("/.agent/", "/.agents/").replace("\\.agent\\", "\\.agents\\")
+    elif "/.agents/" in s_norm:
+        alt_s = s.replace("/.agents/", "/.agent/").replace("\\.agents\\", "\\.agent\\")
+    elif s_norm.endswith("/.agent"):
+        alt_s = s + "s"
+    elif s_norm.endswith("/.agents"):
+        alt_s = s[:-1]
+        
+    if alt_s:
+        alt_path = Path(alt_s)
+        try:
+            if alt_path.exists():
+                return alt_path.resolve()
+        except OSError:
+            pass
+
+    return path
+
+
+def discover_source_skills(sources, parse_skill_md, categorize_skill, build_search_text):
+    """Discover skills from master source folders (config['sources']).
+
+    Returns a flat list of skill dicts, each tagged with ``is_source=True``.
+    Deduplicates by resolved path so the same folder listed twice is only
+    scanned once.
+
+    Args:
+        sources: Iterable of source folder paths (from config["sources"]).
+        parse_skill_md: Callable(path) -> dict with skill metadata.
+        categorize_skill: Callable(name, description) -> category string.
+        build_search_text: Callable(skill_dict) -> search text string.
+
+    Returns:
+        List[dict] — one entry per discovered skill.
+    """
+    skills = []
+    seen_sources = set()
+
+    for source in sources:
+        resolved_source = _resolve_resilient_path(source)
+        if not resolved_source or not resolved_source.is_dir():
+            continue
+
+        source_key = os.path.normcase(str(resolved_source))
+        if source_key in seen_sources:
+            continue
+        seen_sources.add(source_key)
+
+        for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
+            if not child.is_dir():
+                continue
+            skill_md_path = child / "SKILL.md"
+            if not skill_md_path.is_file():
+                continue
+
+            skill_data = parse_skill_md(str(skill_md_path))
+            if not skill_data.get("name"):
+                skill_data["name"] = child.name
+            skill_data["folder_name"] = child.name
+            skill_data["local_path"] = str(child)
+            skill_data["skill_md_path"] = str(skill_md_path)
+            skill_data["source_path"] = str(resolved_source)
+            skill_data["target_path"] = str(resolved_source)  # source IS the target for library items
+            skill_data["project_label"] = "Master Library"
+            skill_data["project_root"] = str(resolved_source)
+            skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
+            skill_data["is_source"] = True
+            skill_data.setdefault("metadata", {})
+            skill_data["category"] = categorize_skill(
+                skill_data.get("name", ""),
+                _classification_text(skill_data),
+            )
+            skill_data["search_text"] = build_search_text(skill_data)
+            skills.append(skill_data)
+
+    return skills
+
+
 def discover_project_skills(targets, parse_skill_md, categorize_skill, build_search_text, target_aliases=None):
     if target_aliases is None:
         target_aliases = {}
@@ -13,17 +110,12 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
     seen_targets = set()
 
     for target in targets:
-        target_path = Path(os.path.expanduser(str(target or "").strip()))
-        if not str(target_path):
-            continue
-
-        try:
-            resolved_target = target_path.resolve()
-        except OSError:
+        resolved_target = _resolve_resilient_path(target)
+        if not resolved_target or not resolved_target.is_dir():
             continue
 
         target_key = os.path.normcase(str(resolved_target))
-        if target_key in seen_targets or not resolved_target.is_dir():
+        if target_key in seen_targets:
             continue
         seen_targets.add(target_key)
 
@@ -116,13 +208,43 @@ def project_label(target_path, target_aliases=None, original_target=None):
 
 
 def format_project_skill_reference(skill, client_format):
+    is_command = skill.get("is_command", False)
+    local_path = Path(skill.get("local_path", ""))
+    
+    if is_command:
+        # For commands, we want the path relative to the project root
+        project_root = skill.get("project_root")
+        if not project_root:
+            # Fallback: try to find manuals/ in the path
+            try:
+                manual_idx = local_path.parts.index("manuals")
+                relative_path = "/".join(local_path.parts[manual_idx:])
+            except ValueError:
+                relative_path = local_path.name
+        else:
+            try:
+                relative_path = local_path.relative_to(project_root).as_posix()
+            except ValueError:
+                relative_path = local_path.name
+        
+        if client_format == "Codex":
+            name = skill.get("name") or local_path.name
+            return f"[${name}]({relative_path})"
+        if client_format == "Antigravity":
+            return f"/{relative_path}"
+        if client_format == "Gemini CLI":
+            return f"@{relative_path}"
+        return relative_path
+
     if client_format == "Codex":
-        name = skill.get("name") or Path(skill.get("local_path", "")).name
+        name = skill.get("name") or local_path.name
         path = skill.get("skill_md_path") or ""
         return f"[${name}]({path})"
     
     relative_path = project_skill_relative_path(skill)
-    if client_format in {"Gemini CLI", "Antigravity"}:
+    if client_format == "Antigravity":
+        return f"/{relative_path}"
+    if client_format == "Gemini CLI":
         return f"@{relative_path}"
     return relative_path
 
@@ -222,7 +344,7 @@ def _delete_validation_error(source_path, target_path):
 
 def _project_root_for_target(target_path):
     parts = target_path.parts
-    for marker in (".agent", ".codex", ".gemini"):
+    for marker in (".agent", ".agents", ".codex", ".gemini"):
         if marker in parts:
             marker_index = parts.index(marker)
             if marker_index > 0:

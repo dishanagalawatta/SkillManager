@@ -54,6 +54,14 @@ class ConfigManagerTests(unittest.TestCase):
                 json.dumps({"client_format": "Codex", "skill_sets": {}}),
                 encoding="utf-8",
             )
+            (workspace / "skill_library_essentials.json").write_text(
+                json.dumps({"essentials": []}),
+                encoding="utf-8",
+            )
+            (workspace / "skills-lock.json").write_text(
+                json.dumps({"version": 1, "skills": {}}),
+                encoding="utf-8",
+            )
 
             os.chdir(workspace)
             config = self._reload_config(data_dir)

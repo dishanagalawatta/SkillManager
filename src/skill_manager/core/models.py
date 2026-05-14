@@ -1,0 +1,496 @@
+from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Property, Signal, Slot
+import re
+from skill_manager.core.search import SearchEngine
+
+
+class SkillModel(QAbstractListModel):
+    NameRole = Qt.UserRole + 1
+    CategoryRole = Qt.UserRole + 2
+    DescriptionRole = Qt.UserRole + 3
+    PathRole = Qt.UserRole + 4
+    ProjectRole = Qt.UserRole + 5
+    IsEssentialRole = Qt.UserRole + 6
+    IsSelectedRole = Qt.UserRole + 7
+    SearchTextRole = Qt.UserRole + 8
+    IsArchivedRole = Qt.UserRole + 9
+    IsCollectionRole = Qt.UserRole + 10
+    SectionRole = Qt.UserRole + 11
+    RawContentRole = Qt.UserRole + 12
+    BodyContentRole = Qt.UserRole + 13
+    RiskRole = Qt.UserRole + 14
+    SourceRole = Qt.UserRole + 15
+    DateRole = Qt.UserRole + 16
+    IsCollapsedRole = Qt.UserRole + 17
+    IsCommandRole = Qt.UserRole + 18
+    ClientRole = Qt.UserRole + 19
+
+    filterChanged = Signal()
+    showArchivedChanged = Signal()
+    categoryFilterChanged = Signal()
+    collectionFilterChanged = Signal()
+    projectFilterChanged = Signal()
+    selectedCountChanged = Signal()
+    collapsedCategoriesChanged = Signal()
+    showCommandsChanged = Signal()
+    showEssentialsChanged = Signal()
+    isSourceOnlyChanged = Signal()
+    clientFilterChanged = Signal()
+    userSelectionChanged = Signal()
+
+    def __init__(self, parent=None, config=None):
+        super().__init__(parent)
+        self._all_skills = []
+        self._filtered_skills = []
+        self._filter_text = ""
+        self._show_archived = False
+        self._category_filter = ""
+        self._collection_filter = False
+        self._project_filter = ""
+        self._client_filter = ""
+        self._show_commands = True
+        self._show_essentials = True
+        self._is_source_only = None # None = All, True = Sources, False = Projects
+        self._config = config
+        self._collapsed_categories = set()
+        self._search_engine = None
+
+        
+        if self._config:
+            self._collapsed_categories = set(self._config.get("collapsed_categories", []))
+            self._show_archived = self._config.get("show_archived", False)
+            self._category_filter = self._config.get("category_filter", "")
+            self._collection_filter = self._config.get("collection_filter", False)
+            self._project_filter = self._config.get("project_filter", "")
+            self._client_filter = self._config.get("client_format", "")
+            self._show_commands = self._config.get("show_commands", True)
+            self._show_essentials = self._config.get("show_essentials", True)
+            self._is_source_only = self._config.get("is_source_only", None)
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._filtered_skills)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or index.row() >= len(self._filtered_skills):
+            return None
+        
+        skill = self._filtered_skills[index.row()]
+        
+        if role == self.NameRole:
+            return skill.get("name", "")
+        elif role == self.CategoryRole:
+            return skill.get("category", "")
+        elif role == self.DescriptionRole:
+            return skill.get("description", "")
+        elif role == self.PathRole:
+            return skill.get("local_path", "")
+        elif role == self.ProjectRole:
+            return skill.get("project_label", "")
+        elif role == self.IsEssentialRole:
+            return skill.get("is_essential", False)
+        elif role == self.IsSelectedRole:
+            return skill.get("is_selected", False)
+        elif role == self.IsArchivedRole:
+            return skill.get("is_archived", False)
+        elif role == self.IsCollectionRole:
+            return skill.get("is_bundle", False)
+        elif role == self.SectionRole:
+            if skill.get("is_command", False):
+                return skill.get("category", "Custom Commands") or "Custom Commands"
+            if skill.get("is_essential", False):
+                return "Essentials"
+            if skill.get("is_bundle", False):
+                return "Collections"
+            return skill.get("category", "General")
+        elif role == self.RawContentRole:
+            return skill.get("raw_content", "")
+        elif role == self.BodyContentRole:
+            return skill.get("body_content", "")
+        elif role == self.RiskRole:
+            return skill.get("risk", "Unknown")
+        elif role == self.SourceRole:
+            return skill.get("source", "Unknown")
+        elif role == self.DateRole:
+            return skill.get("date", "Unknown")
+        elif role == self.IsCollapsedRole:
+            section = self.data(index, self.SectionRole)
+            return section in self._collapsed_categories
+        elif role == self.IsCommandRole:
+            return skill.get("is_command", False)
+        elif role == self.ClientRole:
+            return skill.get("client", "")
+        
+        return None
+
+    def roleNames(self):
+        return {
+            self.NameRole: b"name",
+            self.CategoryRole: b"category",
+            self.DescriptionRole: b"description",
+            self.PathRole: b"path",
+            self.ProjectRole: b"project",
+            self.IsEssentialRole: b"isEssential",
+            self.IsSelectedRole: b"isSelected",
+            self.SearchTextRole: b"searchText",
+            self.IsArchivedRole: b"isArchived",
+            self.IsCollectionRole: b"isCollection",
+            self.SectionRole: b"sectionName",
+            self.RawContentRole: b"rawContent",
+            self.BodyContentRole: b"bodyContent",
+            self.RiskRole: b"risk",
+            self.SourceRole: b"source",
+            self.DateRole: b"date",
+            self.IsCollapsedRole: b"isCollapsed",
+            self.IsCommandRole: b"isCommand",
+            self.ClientRole: b"client"
+        }
+
+    @Property(str, notify=filterChanged)
+    def filterText(self):
+        return self._filter_text
+
+    @filterText.setter
+    def filterText(self, value):
+        if self._filter_text != value:
+            self._filter_text = value
+            self._apply_filter()
+            self.filterChanged.emit()
+
+    @Property(bool, notify=showArchivedChanged)
+    def showArchived(self):
+        return self._show_archived
+
+    @showArchived.setter
+    def showArchived(self, value):
+        if self._show_archived != value:
+            self._show_archived = value
+            self._apply_filter()
+            self._save_filters()
+            self.showArchivedChanged.emit()
+
+    @Property(str, notify=categoryFilterChanged)
+    def categoryFilter(self):
+        return self._category_filter
+
+    @categoryFilter.setter
+    def categoryFilter(self, value):
+        if self._category_filter != value:
+            self._category_filter = value
+            self._apply_filter()
+            self._save_filters()
+            self.categoryFilterChanged.emit()
+
+    @Property(bool, notify=collectionFilterChanged)
+    def collectionFilter(self):
+        return self._collection_filter
+
+    @collectionFilter.setter
+    def collectionFilter(self, value):
+        if self._collection_filter != value:
+            self._collection_filter = value
+            self._apply_filter()
+            self._save_filters()
+            self.collectionFilterChanged.emit()
+
+    @Property(str, notify=projectFilterChanged)
+    def projectFilter(self):
+        return self._project_filter
+
+    @projectFilter.setter
+    def projectFilter(self, value):
+        if self._project_filter != value:
+            self._project_filter = value
+            self._apply_filter()
+            self._save_filters()
+            self.projectFilterChanged.emit()
+
+    @Property(str, notify=clientFilterChanged)
+    def clientFilter(self):
+        return self._client_filter
+
+    @clientFilter.setter
+    def clientFilter(self, value):
+        if self._client_filter != value:
+            self._client_filter = value
+            self._apply_filter()
+            self._save_filters()
+            self.clientFilterChanged.emit()
+
+    @Property(bool, notify=showCommandsChanged)
+    def showCommands(self):
+        return self._show_commands
+
+    @showCommands.setter
+    def showCommands(self, value):
+        if self._show_commands != value:
+            self._show_commands = value
+            self._apply_filter()
+            self._save_filters()
+            self.showCommandsChanged.emit()
+
+    @Property(bool, notify=showEssentialsChanged)
+    def showEssentials(self):
+        return self._show_essentials
+
+    @showEssentials.setter
+    def showEssentials(self, value):
+        if self._show_essentials != value:
+            self._show_essentials = value
+            self._apply_filter()
+            self._save_filters()
+            self.showEssentialsChanged.emit()
+
+    @Property(Qt.CheckState, notify=isSourceOnlyChanged)
+    def isSourceOnly(self):
+        # Using CheckState to handle None (PartiallyChecked)
+        if self._is_source_only is None:
+            return Qt.PartiallyChecked
+        return Qt.Checked if self._is_source_only else Qt.Unchecked
+
+    @isSourceOnly.setter
+    def isSourceOnly(self, value):
+        # Convert QML/Qt values
+        new_val = None
+        if value == Qt.Checked or value is True:
+            new_val = True
+        elif value == Qt.Unchecked or value is False:
+            new_val = False
+            
+        if self._is_source_only != new_val:
+            self._is_source_only = new_val
+            self._apply_filter()
+            self._save_filters()
+            self.isSourceOnlyChanged.emit()
+
+    @Property(int, notify=selectedCountChanged)
+    def selectedCount(self):
+        return sum(1 for s in self._all_skills if s.get("is_selected", False))
+
+    @Slot(int)
+    def toggleSelection(self, row):
+        if 0 <= row < len(self._filtered_skills):
+            skill = self._filtered_skills[row]
+            skill["is_selected"] = not skill.get("is_selected", False)
+            idx = self.index(row, 0)
+            self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
+            self.selectedCountChanged.emit()
+            self.userSelectionChanged.emit()
+
+    @Slot()
+    def clearSelection(self):
+        for skill in self._all_skills:
+            skill["is_selected"] = False
+        self._apply_filter()
+        self.selectedCountChanged.emit()
+        self.userSelectionChanged.emit()
+
+    @Slot()
+    def selectAll(self):
+        for s in self._filtered_skills:
+            s["is_selected"] = True
+        self.beginResetModel()
+        self.endResetModel()
+        self.selectedCountChanged.emit()
+
+    @Slot(result=list)
+    def getSelectedPaths(self):
+        return [s.get("local_path") for s in self._all_skills if s.get("is_selected", False)]
+
+    @Slot(list)
+    def selectByPaths(self, paths):
+        path_set = set(paths)
+        for s in self._all_skills:
+            if s.get("local_path") in path_set:
+                s["is_selected"] = True
+        self.beginResetModel()
+        self.endResetModel()
+        self.selectedCountChanged.emit()
+        self.userSelectionChanged.emit()
+
+    def removeSkillsByPath(self, paths: list):
+        """
+        Removes skills from the model given their local paths.
+        Used after optimistic deletion.
+        """
+        self._all_skills = [s for s in self._all_skills if s.get('local_path') not in paths]
+        self._apply_filter()
+        self.selectedCountChanged.emit()
+
+    def _apply_filter(self):
+        self.beginResetModel()
+        
+        skills = self._all_skills
+        
+        # 1. Archive filter
+        if not self._show_archived:
+            skills = [s for s in skills if not s.get("is_archived", False)]
+
+        # 2. Collection filter (Show only physical bundles)
+        if self._collection_filter:
+            skills = [s for s in skills if s.get("is_bundle", False)]
+
+        # 3. Category filter
+        if self._category_filter:
+            skills = [s for s in skills if s.get("category") == self._category_filter]
+
+        # 3.5 Project filter - Only apply if NOT in source-only (Library) mode
+        # Note: We allow essentials from any source to pass project filter in Quick Copy mode
+        if self._project_filter and self._is_source_only is not True:
+            skills = [
+                s for s in skills 
+                if s.get("project_label") == self._project_filter 
+                or (self._is_source_only is False and s.get("is_essential", False))
+            ]
+
+        # 3.6 Commands filter
+        if not self._show_commands:
+            skills = [s for s in skills if not s.get("is_command", False)]
+        
+        # 3.6.5 Essentials filter
+        if not self._show_essentials:
+            skills = [s for s in skills if not s.get("is_essential", False)]
+        
+        # 3.6.6 Source filter
+        if self._is_source_only is True:
+            skills = [s for s in skills if s.get("is_source", False)]
+        elif self._is_source_only is False:
+            # In Quick Copy mode, we show project skills AND essentials from master
+            skills = [s for s in skills if not s.get("is_source", False) or s.get("is_essential", False)]
+        
+        # 3.7 Client filter (applies to commands mainly, but could apply to skills)
+        if self._client_filter:
+            query_client = self._client_filter.lower()
+            skills = [
+                s for s in skills 
+                if not s.get("client") or s.get("client").lower() == query_client
+            ]
+
+        # 4. Search text filter
+        if self._filter_text and self._search_engine:
+            # Get the set of skills that pass ALL other filters (Source, Archive, Category, etc.)
+            valid_skill_paths = {s.get("local_path") for s in skills}
+            
+            results = self._search_engine.query(self._filter_text)
+            
+            # Only include results that are in our "valid" set
+            skills = [r[0] for r in results if r[0].get("local_path") in valid_skill_paths]
+            
+            # When searching, we keep the order from the search engine (relevance)
+            self._filtered_skills = skills
+            self.endResetModel()
+            return
+            
+        # 5. Sorting: Essentials first, then by category, then by name
+        def sort_key(s):
+            is_essential = s.get("is_essential", False)
+            is_command = s.get("is_command", False)
+            is_bundle = s.get("is_bundle", False)
+            category = s.get("category", "General")
+            name = s.get("name", "").lower()
+            
+            if is_command:
+                section = category or "Custom Commands"
+            elif is_essential:
+                section = "0_Essentials"
+            elif is_bundle:
+                section = "Collections"
+            else:
+                section = category
+                
+            return (section, name)
+
+        skills.sort(key=sort_key)
+
+        self._filtered_skills = skills
+        self.endResetModel()
+
+    @Slot(int, result=dict)
+    def get_skill_at(self, row):
+        if 0 <= row < len(self._filtered_skills):
+            return self._filtered_skills[row]
+        return {}
+
+    @Slot(list)
+    def setSkills(self, skills):
+        self._all_skills = skills
+        self._search_engine = SearchEngine(skills)
+        self._apply_filter()
+
+    @Slot(int, bool)
+    def setSelected(self, row, selected):
+        if 0 <= row < len(self._filtered_skills):
+            skill = self._filtered_skills[row]
+            if skill.get("is_selected") != selected:
+                skill["is_selected"] = selected
+                idx = self.index(row, 0)
+                self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
+                self.selectedCountChanged.emit()
+
+    @Property(bool, notify=collapsedCategoriesChanged)
+    def isAllExpanded(self):
+        return len(self._collapsed_categories) == 0
+
+    @Slot()
+    def toggleAll(self):
+        if self.isAllExpanded:
+            self.collapseAll()
+        else:
+            self.expandAll()
+        self.collapsedCategoriesChanged.emit()
+
+    @Slot(str)
+    def toggleCategory(self, name):
+        if name in self._collapsed_categories:
+            self._collapsed_categories.remove(name)
+        else:
+            self._collapsed_categories.add(name)
+        
+        self._save_collapsed()
+        self.collapsedCategoriesChanged.emit()
+        self.beginResetModel()
+        self.endResetModel()
+
+    @Slot()
+    def expandAll(self):
+        self._collapsed_categories.clear()
+        self._save_collapsed()
+        self.collapsedCategoriesChanged.emit()
+        self.beginResetModel()
+        self.endResetModel()
+
+    @Slot()
+    def collapseAll(self):
+        # Get all unique section names from filtered skills
+        sections = set()
+        for skill in self._filtered_skills:
+            if skill.get("is_essential", False):
+                sections.add("Essentials")
+            elif skill.get("is_bundle", False):
+                sections.add("Collections")
+            else:
+                sections.add(skill.get("category", "General"))
+        
+        self._collapsed_categories.update(sections)
+        self._save_collapsed()
+        self.collapsedCategoriesChanged.emit()
+        self.beginResetModel()
+        self.endResetModel()
+
+    @Slot(str, result=bool)
+    def isCategoryCollapsed(self, name):
+        return name in self._collapsed_categories
+
+    def _save_collapsed(self):
+        if self._config:
+            self._config.set("collapsed_categories", list(self._collapsed_categories))
+
+    def _save_filters(self):
+        if self._config:
+            self._config.set("show_archived", self._show_archived)
+            self._config.set("category_filter", self._category_filter)
+            self._config.set("collection_filter", self._collection_filter)
+            self._config.set("project_filter", self._project_filter)
+            self._config.set("client_format", self._client_filter)
+            self._config.set("show_commands", self._show_commands)
+            self._config.set("show_essentials", self._show_essentials)
+            self._config.set("is_source_only", self._is_source_only)
+
