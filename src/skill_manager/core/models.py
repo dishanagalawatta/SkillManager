@@ -1,5 +1,4 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Property, Signal, Slot
-import re
 from skill_manager.core.search import SearchEngine
 
 
@@ -369,10 +368,10 @@ class SkillModel(QAbstractListModel):
             # Get the set of skills that pass ALL other filters (Source, Archive, Category, etc.)
             valid_skill_paths = {s.get("local_path") for s in skills}
             
-            results = self._search_engine.query(self._filter_text)
+            results = self._search_engine.query(self._filter_text, valid_paths=valid_skill_paths)
             
-            # Only include results that are in our "valid" set
-            skills = [r[0] for r in results if r[0].get("local_path") in valid_skill_paths]
+            # Results are already pre-filtered by valid_paths inside the query method
+            skills = [r[0] for r in results]
             
             # When searching, we keep the order from the search engine (relevance)
             self._filtered_skills = skills

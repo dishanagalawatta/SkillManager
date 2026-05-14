@@ -50,3 +50,39 @@ def test_search_no_match(skills):
     engine = SearchEngine(skills)
     results = engine.query("nonexistent")
     assert len(results) == 0
+
+def test_search_valid_paths(skills):
+    # Setup paths matching our fixture data
+    skills[0]["local_path"] = "path/1"
+    skills[1]["local_path"] = "path/2"
+    skills[2]["local_path"] = "path/3"
+
+    engine = SearchEngine(skills)
+
+    # Restrict to only the first skill, but search for something that would match others
+    # (or in this case, empty query to match all)
+    valid_paths = {"path/1"}
+    results = engine.query("", valid_paths=valid_paths)
+
+    assert len(results) == 1
+    assert results[0][0]["name"] == "Brainstorming"
+    assert results[0][0]["local_path"] == "path/1"
+
+def test_search_valid_paths_with_query(skills):
+    # Setup paths matching our fixture data
+    skills[0]["local_path"] = "path/1"
+    skills[1]["local_path"] = "path/2"
+    skills[2]["local_path"] = "path/3"
+
+    engine = SearchEngine(skills)
+
+    # Both Brainstorming and React UI have 'e' in description or name, etc.
+    # We query for 'e' to potentially match multiple
+    # But restrict to "path/3" (React UI)
+    valid_paths = {"path/3"}
+    results = engine.query("e", valid_paths=valid_paths)
+
+    # Should only return results from valid_paths that match the query
+    assert all(r[0]["local_path"] in valid_paths for r in results)
+    if len(results) > 0:
+        assert results[0][0]["name"] == "React UI"
