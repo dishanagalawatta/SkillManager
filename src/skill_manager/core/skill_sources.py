@@ -372,7 +372,7 @@ def run_version_command(command):
     try:
         args = shlex.split(command)
         result = subprocess.run(args, shell=False, capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError, ValueError):
         return ""
 
     if result.returncode != 0:
