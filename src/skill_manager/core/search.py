@@ -9,7 +9,7 @@ Usage:
 import re
 from typing import List, Dict, Any, Tuple
 try:
-    from rapidfuzz import fuzz, process
+    from rapidfuzz import fuzz
 except ImportError:
     # Fallback to basic matching if rapidfuzz is not available
     fuzz = None
@@ -63,18 +63,22 @@ class SearchEngine:
             for skill in skills
         ]
 
-    def query(self, query_text: str, threshold: float = 30.0) -> List[Tuple[Dict[str, Any], float]]:
+    def query(self, query_text: str, threshold: float = 30.0, valid_paths: set = None) -> List[Tuple[Dict[str, Any], float]]:
         """
         Search for skills matching the query.
         Returns a list of (skill, score) tuples, sorted by score descending.
         """
         if not query_text:
+            if valid_paths is not None:
+                return [(s[0], 100.0) for s in self._indexed_data if s[0].get("local_path") in valid_paths]
             return [(s[0], 100.0) for s in self._indexed_data]
 
         query_text = query_text.lower()
         results = []
 
         for skill, index_data in self._indexed_data:
+            if valid_paths is not None and skill.get("local_path") not in valid_paths:
+                continue
             score = self._calculate_score(query_text, index_data)
             if score >= threshold:
                 results.append((skill, score))
