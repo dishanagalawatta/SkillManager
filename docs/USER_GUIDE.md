@@ -6,10 +6,10 @@ Welcome to SkillManager, your professional tool for organizing, editing, and syn
 
 The application is divided into four main views, accessible via the left sidebar:
 
-1.  **Library**: Your central repository of all agent skills.
-2.  **Quick Copy**: A fast way to browse skills currently active in your specific projects.
-3.  **Updates**: The hub for syncing changes between your library and your target projects.
-4.  **Settings**: Application configuration, including sources and targets.
+1.  **Library**: Your central repository for all agent skills. Features multi-select deployment and deep inspection.
+2.  **Quick Copy**: A project-focused view for rapid reference copying during active development.
+3.  **Updates**: A centralized hub for synchronizing your library with Git sources and target projects.
+4.  **Settings**: Comprehensive configuration for paths, branding, and deployment formats.
 
 ---
 
@@ -38,8 +38,9 @@ The Quick Copy view is designed for daily workflow efficiency when working withi
 
 When you modify a skill in your central library, you need to push those changes to the projects using it.
 
--   **Scan for Updates**: Click "Scan for Updates" to compare your library against all configured target projects. The system will identify which projects have outdated or missing skills.
--   **Syncing**: You can update individual skills in specific projects, or click "Update All Outdated" to synchronize everything at once.
+- **Git Updates**: Manage your skill sources (Git repos). Check for new versions and update your local library with one click.
+- **Surgical Sync**: The system compares skill versions across your projects and identifies precisely which skills are outdated.
+- **Syncing**: Update individual skills in specific projects, or use "Sync All" to bring all project targets up to date with your library.
 
 ---
 
@@ -47,7 +48,7 @@ When you modify a skill in your central library, you need to push those changes 
 
 Configure how SkillManager integrates with your file system.
 
--   **Skill Sources**: Add the directories where your central library of skills is stored.
--   **Target Projects**: Add the root directories of the projects where you want to deploy skills. SkillManager will automatically manage the `.agents/skills/` directory within these targets.
--   **Client Format**: Choose how SkillManager formats references when copying to the clipboard (e.g., Antigravity, standard Markdown, raw paths) to match your specific AI agent's required syntax.
--   **Appearance**: Toggle Dark/Light mode and other UI preferences.
+- **Skill Sources**: Manage the directories and Git repositories that feed your library.
+- **Target Projects**: Configure project root directories. SkillManager manages the `.agents/skills/` folder in these locations.
+- **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex). This updates the application's logo and the syntax used for copying references.
+- **Appearance**: Toggle Dark/Light mode and Mica/Acrylic effects (Windows only).
