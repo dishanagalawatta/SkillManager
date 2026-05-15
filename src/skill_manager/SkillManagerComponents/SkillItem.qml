@@ -164,10 +164,10 @@ Item {
                 }
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
-            }
                 Accessible.role: Accessible.Button
                 Accessible.name: "Delete skill"
                 Accessible.description: "Delete this skill"
+            }
         }
     }
 }
