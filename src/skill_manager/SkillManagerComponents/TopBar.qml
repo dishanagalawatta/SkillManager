@@ -38,7 +38,7 @@ Rectangle {
                 iconText: "⚡"
                 labelText: "Quick Copy"
                 active: root.currentView === "Quick Copy" || root.currentView === "QuickCopy"
-                onClicked: { 
+                onClicked: (mouse) => { 
                     root.currentView = "Quick Copy"; 
                     root.navigationChanged("Quick Copy") 
                 }
@@ -48,7 +48,7 @@ Rectangle {
                 iconText: "📚"
                 labelText: "Library"
                 active: root.currentView === "Library"
-                onClicked: { 
+                onClicked: (mouse) => { 
                     root.currentView = "Library"
                     root.navigationChanged("Library") 
                 }
@@ -58,14 +58,14 @@ Rectangle {
                 iconText: "🔄"
                 labelText: "Updates"
                 active: root.currentView === "Updates"
-                onClicked: { root.currentView = "Updates"; root.navigationChanged("Updates") }
+                onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }
             }
 
             TopBarButton {
                 iconText: "⚙️"
                 labelText: "Settings"
                 active: root.currentView === "Settings"
-                onClicked: { root.currentView = "Settings"; root.navigationChanged("Settings") }
+                onClicked: (mouse) => { root.currentView = "Settings"; root.navigationChanged("Settings") }
             }
             
             Item { Layout.fillWidth: true }

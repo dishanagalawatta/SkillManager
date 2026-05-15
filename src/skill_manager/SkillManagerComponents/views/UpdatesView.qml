@@ -81,7 +81,7 @@ Item {
                     Button {
                         text: "Scan"
                         enabled: !AppController.isLoading
-                        onClicked: AppController.scanForUpdates()
+                        onClicked: (mouse) => AppController.scanForUpdates()
                         background: Rectangle {
                             radius: height / 2
                             color: "transparent"
@@ -102,7 +102,7 @@ Item {
                     Button {
                         text: "Update All"
                         enabled: !AppController.isLoading && AppController.statsOutdated > 0
-                        onClicked: AppController.updateAllOutdated()
+                        onClicked: (mouse) => AppController.updateAllOutdated()
                         background: Rectangle {
                             radius: height / 2
                             color: parent.enabled ? Theme.accent : Theme.glassBorder
@@ -161,7 +161,7 @@ Item {
                                 spacing: 8
                                 Button {
                                     text: "+ Add Provider"
-                                    onClicked: {
+                                    onClicked: (mouse) => {
                                         uv_sourceEditDialog.editIndex = -1
                                         uv_sourceEditDialog.open()
                                     }
@@ -183,7 +183,7 @@ Item {
                                 }
                                 Button {
                                     text: "+ Folder"
-                                    onClicked: {
+                                    onClicked: (mouse) => {
                                         uv_folderPicker.mode = "source"
                                         uv_folderPicker.open()
                                     }
@@ -283,7 +283,7 @@ Item {
                                             property bool isLatest: Boolean(!modelData.latest_version || modelData.latest_version === modelData.current_version)
                                             text: modelData.is_updating ? "Updating..." : (isLatest ? "✓ Up to Date" : "Update")
                                             enabled: !isLatest && !modelData.is_updating
-                                            onClicked: AppController.runUpdate(index)
+                                            onClicked: (mouse) => AppController.runUpdate(index)
                                             
                                             background: Rectangle {
                                                 implicitWidth: 80
@@ -308,7 +308,7 @@ Item {
                                         Button {
                                             text: "✎"
                                             visible: Boolean(modelData && modelData.source_type !== undefined)
-                                            onClicked: {
+                                            onClicked: (mouse) => {
                                                 uv_sourceEditDialog.editIndex = index
                                                 uv_sourceEditDialog.loadSource(modelData)
                                                 uv_sourceEditDialog.open()
@@ -319,7 +319,7 @@ Item {
                                         }
                                         Button {
                                             text: "✕"
-                                            onClicked: {
+                                            onClicked: (mouse) => {
                                                 if (modelData.source_type !== undefined) {
                                                     Qt.callLater(AppController.removeUpdateSource, index)
                                                 } else {
@@ -383,7 +383,7 @@ Item {
                             }
                             Button {
                                 text: "+ Add Project"
-                                onClicked: {
+                                onClicked: (mouse) => {
                                     uv_folderPicker.mode = "target"
                                     uv_folderPicker.open()
                                 }
@@ -470,7 +470,7 @@ Item {
                                         spacing: 4
                                         Button {
                                             text: "✎"
-                                            onClicked: {
+                                            onClicked: (mouse) => {
                                                 uv_projectRenameDialog.targetPath = modelData.path
                                                 uv_projectRenameDialog.currentName = modelData.name
                                                 uv_projectRenameDialog.open()
@@ -481,7 +481,7 @@ Item {
                                         }
                                         Button {
                                             text: "✕"
-                                            onClicked: Qt.callLater(AppController.removeUpdateTarget, index)
+                                            onClicked: (mouse) => Qt.callLater(AppController.removeUpdateTarget, index)
                                             flat: true
                                             Layout.preferredWidth: 32
                                             Layout.preferredHeight: 32
@@ -578,7 +578,7 @@ Item {
                 }
                 Button {
                     text: "✕"
-                    onClicked: uv_inspector.close()
+                    onClicked: (mouse) => uv_inspector.close()
                     flat: true
                 }
             }
@@ -644,7 +644,7 @@ Item {
                             }
                             Button {
                                 text: "Update"
-                                onClicked: AppController.updateSkillInTarget(uv_inspector.skillData.name, modelData.name)
+                                onClicked: (mouse) => AppController.updateSkillInTarget(uv_inspector.skillData.name, modelData.name)
                             }
                         }
                     }

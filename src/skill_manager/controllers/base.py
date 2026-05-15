@@ -14,4 +14,4 @@ class BaseController:
 
     def __init__(self, app: "AppController"):
         self.app = app
-        self.config: "ConfigManager" = app._config
+        self.config: ConfigManager = app._config

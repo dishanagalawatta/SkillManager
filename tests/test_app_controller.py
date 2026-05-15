@@ -56,7 +56,7 @@ def test_controller_load_initial_data_logic(controller):
     skills = [{"name": "Skill A", "category": "Dev", "is_source": True}]
     controller._finalize_loading(
         all_skills=skills,
-        projects=[],
+        _projects=[],
         cats=["Dev"],
         proj_labels=[],
         status="Success"

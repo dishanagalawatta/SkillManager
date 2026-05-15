@@ -5,7 +5,9 @@ Usage: Accessed via AppController.ui
 import os
 import sys
 from pathlib import Path
-from PySide6.QtCore import QTimer, Slot
+
+from PySide6.QtCore import QTimer
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event
 
@@ -15,7 +17,7 @@ class UIController(BaseController):
 
     def __init__(self, app):
         super().__init__(app)
-        
+
         ui_state = self.config.get("ui_state", {})
         self._window_width = max(1050, ui_state.get("window_width", 1300))
         self._window_height = max(650, ui_state.get("window_height", 650))
@@ -61,9 +63,8 @@ class UIController(BaseController):
             base = Path(__file__).resolve().parent.parent.parent.parent / "assets"
 
         full_path = base / path
-        if not full_path.exists():
-            if "logo/" in path:
-                full_path = base / "logo" / "logo.png"
+        if not full_path.exists() and "logo/" in path:
+            full_path = base / "logo" / "logo.png"
 
         return full_path.as_uri()
 

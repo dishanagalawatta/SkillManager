@@ -5,7 +5,9 @@ Usage: Accessed via AppController.ops
 import json
 import threading
 from pathlib import Path
-from PySide6.QtCore import QTimer, Slot
+
+from PySide6.QtCore import QTimer
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event
 from skill_manager.core.persistence import save_archive, save_essentials
@@ -144,10 +146,10 @@ class OpsController(BaseController):
         """Copies selected skills to a target project."""
         if not target_path:
             return
-        
+
         selected_paths = self.app.skillModel.getSelectedPaths()
         selected_skills = [s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths]
-        
+
         if not selected_skills:
             self.app._set_status("No skills selected to copy")
             return
@@ -158,16 +160,19 @@ class OpsController(BaseController):
             try:
                 from skill_manager.core.copier import copy_skill_folders_to_targets
                 result = copy_skill_folders_to_targets(selected_skills, [target_path])
-                
+
                 parts = []
-                if result['copied']: parts.append(f"{result['copied']} new")
-                if result['merged']: parts.append(f"{result['merged']} updated")
-                
+                if result['copied']:
+                    parts.append(f"{result['copied']} new")
+                if result['merged']:
+                    parts.append(f"{result['merged']} updated")
+
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
                 QTimer.singleShot(0, self.app, self.app.refreshSkills)
                 QTimer.singleShot(0, self.app, self.app.skillModel.clearSelection)
             except Exception as e:
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(f"Copy failed: {e}"))
+                err_msg = f"Copy failed: {e}"
+                QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
         threading.Thread(target=run_copy, daemon=True).start()

@@ -3,7 +3,7 @@ Purpose: Manages skill sources, project targets, and configuration state.
 Usage: Accessed via AppController.config_mgr
 """
 import os
-from PySide6.QtCore import Slot
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event
 

@@ -47,7 +47,6 @@ def parse_skill_md(filepath):
 def parse_command_md(filepath):
     data = {"name": "", "description": "", "raw_content": "", "body_content": "", "metadata": {}}
     try:
-        Path(filepath).name
         stem = Path(filepath).stem
 
         # Skip common non-command files

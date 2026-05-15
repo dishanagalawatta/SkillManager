@@ -67,7 +67,7 @@ class SkillModel(QAbstractListModel):
             self._show_essentials = self._config.get("show_essentials", True)
             self._is_source_only = self._config.get("is_source_only", None)
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, _parent=QModelIndex()):
         return len(self._filtered_skills)
 
     def data(self, index, role=Qt.DisplayRole):

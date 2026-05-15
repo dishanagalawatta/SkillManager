@@ -70,7 +70,7 @@ Rectangle {
             labelText: "Quick Copy"
             collapsed: root.isCollapsed
             active: root.currentView === "Quick Copy"
-            onClicked: { 
+            onClicked: (mouse) => { 
                 console.log("Sidebar: Quick Copy clicked")
                 root.currentView = "Quick Copy"; 
                 root.navigationChanged("Quick Copy") 
@@ -82,7 +82,7 @@ Rectangle {
             labelText: "Library"
             collapsed: root.isCollapsed
             active: root.currentView === "Library"
-            onClicked: { 
+            onClicked: (mouse) => { 
                 root.currentView = "Library"
                 AppController.setViewFilter("all", "")
                 root.navigationChanged("Library") 
@@ -94,7 +94,7 @@ Rectangle {
             labelText: "Updates"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"
-            onClicked: { root.currentView = "Updates"; root.navigationChanged("Updates") }
+            onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }
         }
 
         SidebarButton {
@@ -102,7 +102,7 @@ Rectangle {
             labelText: "Settings"
             collapsed: root.isCollapsed
             active: root.currentView === "Settings"
-            onClicked: { root.currentView = "Settings"; root.navigationChanged("Settings") }
+            onClicked: (mouse) => { root.currentView = "Settings"; root.navigationChanged("Settings") }
         }
     }
 }
