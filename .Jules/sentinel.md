@@ -1,4 +1,0 @@
-## 2024-05-14 - Safer Tokenization in skill_sources
-**Vulnerability:** Execution of untrusted shell commands with `shell=True` in `subprocess.run` and `subprocess.Popen` via configs.
-**Learning:** We need to keep `shell=True` because the commands configured by the user might intentionally use shell features like pipes (`|`) or redirects (`>`). However, we can sanitize variables substituted into the shell commands by using a tokenization strategy that preserves shell functionality while stripping malicious characters like `;` and subshell tokens like `$()` and backticks.
-**Prevention:** Implement `_sanitize_shell_command` that uses `shlex.split` to tokenize the command, preserves allowed shell operators (`&&`, `||`, `|`, `>`, `>>`, `<`), drops potentially malicious operators like `;`, and strips subshell triggers (`$`, `` ` ``) from normal tokens, before reconstructing the command string.
