@@ -51,5 +51,10 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
+        cursorShape: Qt.PointingHandCursor
+
+        ToolTip.text: root.isCollapsed ? "Expand Category" : "Collapse Category"
+        ToolTip.visible: containsMouse
+        ToolTip.delay: 400
     }
 }
