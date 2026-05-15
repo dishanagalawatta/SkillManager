@@ -1,3 +1,3 @@
-## 2025-05-14 - Add tooltips to collapsed sidebar icons
-**Learning:** Icon-only navigation can be ambiguous, particularly when sidebars collapse to save space. Providing tooltips that surface the original text label restores the missing context for screen readers and sighted users exploring the UI.
-**Action:** Always verify that collapsing/responsive behaviors that hide labels in favor of icons include `ToolTip` or `aria-label` equivalents.
+## 2024-05-15 - Missing Interactive States in QML MouseAreas
+**Learning:** Found a pattern where interactive elements built with raw `MouseArea` components in QML (like sidebar collapse toggles or checkbox elements) lack standard UX affordances like `cursorShape: Qt.PointingHandCursor`, `hoverEnabled: true`, and `ToolTip.text`. This makes discoverability poor for icon-only interactions.
+**Action:** When working with custom QML `MouseArea` buttons instead of the standard QtQuick.Controls `Button`, always ensure we manually add hover states, cursor shapes, and tooltips for better accessibility and user confidence.
