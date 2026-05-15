@@ -50,6 +50,6 @@ Item {
         id: mouseAreaSection
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
+        onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
     }
 }

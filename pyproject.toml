@@ -23,6 +23,9 @@ test = [
     "pytest-cov",
     "pytest-asyncio",
 ]
+dev = [
+    "ruff",
+]
 
 [project.scripts]
 skill-manager = "skill_manager.__main__:main"

@@ -7,7 +7,8 @@ Usage:
 """
 
 import re
-from typing import List, Dict, Any, Tuple
+from typing import Any
+
 try:
     from rapidfuzz import fuzz
 except ImportError:
@@ -20,8 +21,8 @@ class SkillIndexer:
     """
     def __init__(self):
         self.vocabulary = set()
-        
-    def tokenize(self, text: str) -> List[str]:
+
+    def tokenize(self, text: str) -> list[str]:
         """Convert text to a list of normalized tokens."""
         if not text:
             return []
@@ -29,18 +30,18 @@ class SkillIndexer:
         tokens = re.findall(r'\b\w+\b', text.lower())
         return [t for t in tokens if len(t) > 1]
 
-    def build_index_data(self, skill: Dict[str, Any]) -> Dict[str, Any]:
+    def build_index_data(self, skill: dict[str, Any]) -> dict[str, Any]:
         """Extract and weight indexable content from a skill."""
         name = skill.get("name", "")
         description = skill.get("description", "")
         category = skill.get("category", "")
-        
+
         # Metadata keywords
         metadata = skill.get("metadata") or {}
         tags = metadata.get("tags", [])
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
-        
+
         # Weighted components
         return {
             "name": name.lower(),
@@ -55,7 +56,7 @@ class SearchEngine:
     """
     Handles fuzzy search and ranking logic.
     """
-    def __init__(self, skills: List[Dict[str, Any]]):
+    def __init__(self, skills: list[dict[str, Any]]):
         self.indexer = SkillIndexer()
         self.skills = skills
         self._indexed_data = [
@@ -63,7 +64,7 @@ class SearchEngine:
             for skill in skills
         ]
 
-    def query(self, query_text: str, threshold: float = 30.0, valid_paths: set = None) -> List[Tuple[Dict[str, Any], float]]:
+    def query(self, query_text: str, threshold: float = 30.0, valid_paths: set = None) -> list[tuple[dict[str, Any], float]]:
         """
         Search for skills matching the query.
         Returns a list of (skill, score) tuples, sorted by score descending.
@@ -87,7 +88,7 @@ class SearchEngine:
         results.sort(key=lambda x: (-x[1], x[0].get("name", "").lower()))
         return results
 
-    def _calculate_score(self, query: str, index_data: Dict[str, Any]) -> float:
+    def _calculate_score(self, query: str, index_data: dict[str, Any]) -> float:
         """
         Calculate a weighted relevance score for a skill.
         """
@@ -100,7 +101,7 @@ class SearchEngine:
         # 1. Exact or near-exact name match (highest priority)
         name_score = fuzz.ratio(query, index_data["name"])
         partial_name_score = fuzz.partial_ratio(query, index_data["name"])
-        
+
         # 2. Tag/Category matches (medium priority)
         tag_score = 0
         if index_data["tags"] or index_data["category"]:

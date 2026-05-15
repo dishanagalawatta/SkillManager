@@ -1,9 +1,9 @@
 """PostHog analytics integration for Skill Manager."""
 import atexit
+import contextlib
 import json
 import os
 import uuid
-from pathlib import Path
 
 
 def _load_env() -> None:
@@ -31,12 +31,10 @@ def _get_or_create_device_id() -> str:
             pass
 
     device_id = f"device_{uuid.uuid4().hex}"
-    try:
+    with contextlib.suppress(Exception):
         device_id_file.write_text(
             json.dumps({"device_id": device_id}), encoding="utf-8"
         )
-    except Exception:
-        pass
     return device_id
 
 
@@ -73,30 +71,24 @@ def capture_event(event: str, properties: dict | None = None) -> None:
     """Capture a PostHog analytics event. Safe to call if PostHog is not configured."""
     if _posthog is None:
         return
-    try:
+    with contextlib.suppress(Exception):
         _posthog.capture(
             distinct_id=get_device_id(),
             event=event,
             properties=properties or {},
         )
-    except Exception:
-        pass
 
 
 def capture_exception(exc: Exception) -> None:
     """Capture an exception for PostHog error tracking."""
     if _posthog is None:
         return
-    try:
+    with contextlib.suppress(Exception):
         _posthog.capture_exception(exc, distinct_id=get_device_id())
-    except Exception:
-        pass
 
 
 def shutdown() -> None:
     """Flush all queued PostHog events and shut down the client."""
     if _posthog is not None:
-        try:
+        with contextlib.suppress(Exception):
             _posthog.shutdown()
-        except Exception:
-            pass

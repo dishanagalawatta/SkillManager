@@ -47,7 +47,7 @@ Rectangle {
                 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: root.isCollapsed = !root.isCollapsed
+                    onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
                     cursorShape: Qt.PointingHandCursor
                 }
             }

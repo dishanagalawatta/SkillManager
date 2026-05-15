@@ -9,14 +9,14 @@ except ImportError:
 def parse_skill_md(filepath):
     data = {"name": "", "description": "", "raw_content": "", "body_content": "", "metadata": {}}
     try:
-        with open(filepath, 'r', encoding='utf-8-sig') as f:
+        with open(filepath, encoding='utf-8-sig') as f:
             content = f.read()
             data["raw_content"] = content
-            
+
         # Extract body content (without frontmatter)
         body = re.sub(r'\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)', '', content, count=1, flags=re.DOTALL)
         data["body_content"] = body.strip()
-            
+
         match = re.match(r'\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)', content, re.DOTALL)
         if match:
             frontmatter = match.group(1)
@@ -25,14 +25,14 @@ def parse_skill_md(filepath):
             data["name"] = str(metadata.get("name", "") or "").strip()
             data["description"] = normalize_description(metadata.get("description", ""))
             data["is_bundle"] = metadata.get("type") == "bundle" or "bundle" in data["name"].lower()
-            
+
         if not data["description"]:
             data["description"] = extract_markdown_description(content)
-            
+
         # Look for manuals (ONLY in manuals/ subdir if SKILL.md exists)
         data["manuals"] = []
         base_dir = Path(filepath).parent
-        
+
         # Files in manuals/ directory (trusted)
         manuals_dir = base_dir / "manuals"
         if manuals_dir.is_dir():
@@ -47,21 +47,21 @@ def parse_skill_md(filepath):
 def parse_command_md(filepath):
     data = {"name": "", "description": "", "raw_content": "", "body_content": "", "metadata": {}}
     try:
-        filename = Path(filepath).name
+        Path(filepath).name
         stem = Path(filepath).stem
-        
+
         # Skip common non-command files
         if stem.lower() in {"readme", "license", "changelog", "contributing", "todo", "package", "security", "skill"}:
             return None
-            
-        with open(filepath, 'r', encoding='utf-8-sig') as f:
+
+        with open(filepath, encoding='utf-8-sig') as f:
             content = f.read()
             data["raw_content"] = content
-            
+
         # Extract body content (without frontmatter)
         body = re.sub(r'\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)', '', content, count=1, flags=re.DOTALL)
         data["body_content"] = body.strip()
-            
+
         match = re.match(r'\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)', content, re.DOTALL)
         if match:
             frontmatter = match.group(1)
@@ -71,7 +71,7 @@ def parse_command_md(filepath):
             data["client"] = metadata.get("client", "")
             data["category"] = metadata.get("category", "")
             data["description"] = normalize_description(metadata.get("description", ""))
-            
+
         # If no name in frontmatter, look for first H1 header
         if not data["name"]:
             h1_match = re.search(r'^#\s+(.*)$', content, re.MULTILINE)
@@ -79,10 +79,10 @@ def parse_command_md(filepath):
                 data["name"] = h1_match.group(1).strip()
             else:
                 data["name"] = stem
-            
+
         if not data["description"]:
             data["description"] = extract_markdown_description(content)
-            
+
         # If name or filename contains client info, extract it
         if not data.get("client"):
             # Check for patterns like "DEPLOY.Codex" or "Codex.md"
@@ -94,13 +94,16 @@ def parse_command_md(filepath):
                 from skill_manager.core.quick_copy import CLIENT_FORMATS
                 if stem in CLIENT_FORMATS:
                     data["client"] = stem
-                    
+
     except Exception as e:
         print(f"Error parsing command {filepath}: {e}")
         return None
     return data
 
 def parse_frontmatter(frontmatter):
+    if not frontmatter:
+        return {}
+
     if yaml is not None:
         try:
             parsed = yaml.safe_load(frontmatter)
@@ -108,28 +111,28 @@ def parse_frontmatter(frontmatter):
                 return parsed
         except Exception:
             pass
-            
+
     parsed = {}
     current_key = None
     current_lines = []
-    
+
     def flush_multiline():
         nonlocal current_key, current_lines
         if current_key:
             parsed[current_key] = " ".join(line.strip() for line in current_lines).strip()
             current_key = None
             current_lines = []
-    
+
     for line in frontmatter.splitlines():
         if re.match(r'^\s', line) and current_key:
             current_lines.append(line)
             continue
-            
+
         flush_multiline()
         key_match = re.match(r'^([A-Za-z0-9_-]+):\s*(.*)$', line)
         if not key_match:
             continue
-            
+
         key, value = key_match.groups()
         value = value.strip()
         if value in {">", "|", ">-", "|-"}:
@@ -137,7 +140,7 @@ def parse_frontmatter(frontmatter):
             current_lines = []
         else:
             parsed[key] = value.strip(' "\'')
-            
+
     flush_multiline()
     return parsed
 
@@ -154,7 +157,7 @@ def extract_markdown_description(content):
     body = re.sub(r'\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)', '', content, count=1, flags=re.DOTALL)
     paragraphs = []
     current = []
-    
+
     for raw_line in body.splitlines():
         line = raw_line.strip()
         if not line:
@@ -165,10 +168,10 @@ def extract_markdown_description(content):
         if line.startswith("#") or line.startswith("```") or line.startswith("---"):
             continue
         current.append(re.sub(r'[*_`]+', '', line))
-        
+
     if current:
         paragraphs.append(" ".join(current))
-        
+
     return normalize_description(paragraphs[0] if paragraphs else "")
 
 _CATEGORY_PATTERNS = None
@@ -177,7 +180,7 @@ def _get_category_patterns():
     global _CATEGORY_PATTERNS
     if _CATEGORY_PATTERNS is not None:
         return _CATEGORY_PATTERNS
-    
+
     _CATEGORY_PATTERNS = {}
     for cat, keywords in CATEGORIES.items():
         # Split keywords into plain and special (those with special chars)
@@ -188,14 +191,14 @@ def _get_category_patterns():
                 special.append(kw)
             else:
                 plain.append(kw)
-        
+
         patterns = []
         if plain:
             patterns.append(re.compile(r'\b(' + '|'.join(re.escape(kw) for kw in plain) + r')\b', re.I))
         if special:
             # Special patterns might need individual matching
             patterns.extend([re.compile(re.escape(kw), re.I) for kw in special])
-        
+
         _CATEGORY_PATTERNS[cat] = patterns
     return _CATEGORY_PATTERNS
 
@@ -274,12 +277,12 @@ def categorize_skill(name, description):
     # Name is high signal, give it more weight (repeat it)
     text = (name + " " + name + " " + description).lower()
     norm_text = re.sub(r'[-_]+', ' ', text)
-    
+
     best_category = "Uncategorized"
     max_matches = 0
-    
+
     patterns = _get_category_patterns()
-    
+
     for category, cat_patterns in patterns.items():
         matches = 0
         for p in cat_patterns:
@@ -295,11 +298,11 @@ def categorize_skill(name, description):
                 matches += len(p.findall(text))
                 if text != norm_text:
                     matches += len(p.findall(norm_text))
-                    
+
         if matches > max_matches:
             max_matches = matches
             best_category = category
-            
+
     return best_category
 
 def keyword_matches(text, keyword):

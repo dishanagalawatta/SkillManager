@@ -1,4 +1,5 @@
-from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Property, Signal, Slot
+from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, Signal, Slot
+
 from skill_manager.core.search import SearchEngine
 
 
@@ -54,7 +55,7 @@ class SkillModel(QAbstractListModel):
         self._search_engine = None
         self._selected_ids = set() # Store selected local_paths for isolation
 
-        
+
         if self._config:
             self._collapsed_categories = set(self._config.get("collapsed_categories", []))
             self._show_archived = self._config.get("show_archived", False)
@@ -72,29 +73,29 @@ class SkillModel(QAbstractListModel):
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or index.row() >= len(self._filtered_skills):
             return None
-        
+
         skill = self._filtered_skills[index.row()]
         path = skill.get("local_path", "")
-        
+
         if role == self.NameRole:
             return skill.get("name", "")
-        elif role == self.CategoryRole:
+        if role == self.CategoryRole:
             return skill.get("category", "")
-        elif role == self.DescriptionRole:
+        if role == self.DescriptionRole:
             return skill.get("description", "")
-        elif role == self.PathRole:
+        if role == self.PathRole:
             return path
-        elif role == self.ProjectRole:
+        if role == self.ProjectRole:
             return skill.get("project_label", "")
-        elif role == self.IsEssentialRole:
+        if role == self.IsEssentialRole:
             return skill.get("is_essential", False)
-        elif role == self.IsSelectedRole:
+        if role == self.IsSelectedRole:
             return path in self._selected_ids
-        elif role == self.IsArchivedRole:
+        if role == self.IsArchivedRole:
             return skill.get("is_archived", False)
-        elif role == self.IsCollectionRole:
+        if role == self.IsCollectionRole:
             return skill.get("is_bundle", False)
-        elif role == self.SectionRole:
+        if role == self.SectionRole:
             if skill.get("is_command", False):
                 return skill.get("category", "Custom Commands") or "Custom Commands"
             if skill.get("is_essential", False):
@@ -102,24 +103,24 @@ class SkillModel(QAbstractListModel):
             if skill.get("is_bundle", False):
                 return "Collections"
             return skill.get("category", "General")
-        elif role == self.RawContentRole:
+        if role == self.RawContentRole:
             return skill.get("raw_content", "")
-        elif role == self.BodyContentRole:
+        if role == self.BodyContentRole:
             return skill.get("body_content", "")
-        elif role == self.RiskRole:
+        if role == self.RiskRole:
             return skill.get("risk", "Unknown")
-        elif role == self.SourceRole:
+        if role == self.SourceRole:
             return skill.get("source", "Unknown")
-        elif role == self.DateRole:
+        if role == self.DateRole:
             return skill.get("date", "Unknown")
-        elif role == self.IsCollapsedRole:
+        if role == self.IsCollapsedRole:
             section = self.data(index, self.SectionRole)
             return section in self._collapsed_categories
-        elif role == self.IsCommandRole:
+        if role == self.IsCommandRole:
             return skill.get("is_command", False)
-        elif role == self.ClientRole:
+        if role == self.ClientRole:
             return skill.get("client", "")
-        
+
         return None
 
     def roleNames(self):
@@ -255,7 +256,7 @@ class SkillModel(QAbstractListModel):
             new_val = True
         elif value == Qt.Unchecked or value is False:
             new_val = False
-            
+
         if self._is_source_only != new_val:
             self._is_source_only = new_val
             self._apply_filter()
@@ -276,11 +277,14 @@ class SkillModel(QAbstractListModel):
         if 0 <= row < len(self._filtered_skills):
             skill = self._filtered_skills[row]
             path = skill.get("local_path")
+            if not path:
+                return
+
             if path in self._selected_ids:
                 self._selected_ids.remove(path)
             else:
                 self._selected_ids.add(path)
-            
+
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self.selectedCountChanged.emit()
@@ -331,9 +335,9 @@ class SkillModel(QAbstractListModel):
 
     def _apply_filter(self):
         self.beginResetModel()
-        
+
         skills = self._all_skills
-        
+
         # 1. Archive filter
         if not self._show_archived:
             skills = [s for s in skills if not s.get("is_archived", False)]
@@ -350,31 +354,31 @@ class SkillModel(QAbstractListModel):
         # Note: We allow essentials from any source to pass project filter in Quick Copy mode
         if self._project_filter and self._is_source_only is not True:
             skills = [
-                s for s in skills 
-                if s.get("project_label") == self._project_filter 
+                s for s in skills
+                if s.get("project_label") == self._project_filter
                 or (self._is_source_only is False and s.get("is_essential", False))
             ]
 
         # 3.6 Commands filter
         if not self._show_commands:
             skills = [s for s in skills if not s.get("is_command", False)]
-        
+
         # 3.6.5 Essentials filter
         if not self._show_essentials:
             skills = [s for s in skills if not s.get("is_essential", False)]
-        
+
         # 3.6.6 Source filter
         if self._is_source_only is True:
             skills = [s for s in skills if s.get("is_source", False)]
         elif self._is_source_only is False:
             # In Quick Copy mode, we show project skills AND essentials from master
             skills = [s for s in skills if not s.get("is_source", False) or s.get("is_essential", False)]
-        
+
         # 3.7 Client filter (applies to commands mainly, but could apply to skills)
         if self._client_filter:
             query_client = self._client_filter.lower()
             skills = [
-                s for s in skills 
+                s for s in skills
                 if not s.get("client") or s.get("client").lower() == query_client
             ]
 
@@ -382,17 +386,17 @@ class SkillModel(QAbstractListModel):
         if self._filter_text and self._search_engine:
             # Get the set of skills that pass ALL other filters (Source, Archive, Category, etc.)
             valid_skill_paths = {s.get("local_path") for s in skills}
-            
+
             results = self._search_engine.query(self._filter_text, valid_paths=valid_skill_paths)
-            
+
             # Results are already pre-filtered by valid_paths inside the query method
             skills = [r[0] for r in results]
-            
+
             # When searching, we keep the order from the search engine (relevance)
             self._filtered_skills = skills
             self.endResetModel()
             return
-            
+
         # 5. Sorting: Essentials first, then by category, then by name
         def sort_key(s):
             is_essential = s.get("is_essential", False)
@@ -400,7 +404,7 @@ class SkillModel(QAbstractListModel):
             is_bundle = s.get("is_bundle", False)
             category = s.get("category", "General")
             name = s.get("name", "").lower()
-            
+
             if is_command:
                 section = category or "Custom Commands"
             elif is_essential:
@@ -409,7 +413,7 @@ class SkillModel(QAbstractListModel):
                 section = "Collections"
             else:
                 section = category
-                
+
             return (section, name)
 
         skills.sort(key=sort_key)
@@ -439,7 +443,7 @@ class SkillModel(QAbstractListModel):
                 self._selected_ids.add(path)
             else:
                 self._selected_ids.discard(path)
-            
+
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self.selectedCountChanged.emit()
@@ -462,7 +466,7 @@ class SkillModel(QAbstractListModel):
             self._collapsed_categories.remove(name)
         else:
             self._collapsed_categories.add(name)
-        
+
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()
         self.beginResetModel()
@@ -487,7 +491,7 @@ class SkillModel(QAbstractListModel):
                 sections.add("Collections")
             else:
                 sections.add(skill.get("category", "General"))
-        
+
         self._collapsed_categories.update(sections)
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()

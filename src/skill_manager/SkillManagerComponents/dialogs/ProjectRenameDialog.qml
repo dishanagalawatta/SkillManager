@@ -122,6 +122,8 @@ Dialog {
                 Layout.fillWidth: true
                 selectByMouse: true
                 font.family: Theme.fontFamily
+                color: Theme.label
+                placeholderTextColor: Theme.secondaryLabel
                 verticalAlignment: TextInput.AlignVCenter
                 leftPadding: 16
                 rightPadding: 16

@@ -133,6 +133,8 @@ Dialog {
                         Layout.fillWidth: true
                         selectByMouse: true
                         font.family: Theme.fontFamily
+                        color: Theme.label
+                        placeholderTextColor: Theme.secondaryLabel
                         leftPadding: 16
                         rightPadding: 16
                         topPadding: 12
@@ -156,6 +158,8 @@ Dialog {
                         Layout.fillWidth: true
                         selectByMouse: true
                         font.family: Theme.fontFamily
+                        color: Theme.label
+                        placeholderTextColor: Theme.secondaryLabel
                         leftPadding: 16
                         rightPadding: 16
                         topPadding: 12

@@ -224,7 +224,7 @@ Rectangle {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: Qt.openUrlExternally("file:///" + modelData.path)
+                                onClicked: (mouse) => Qt.openUrlExternally("file:///" + modelData.path)
                             }
                         }
                     }
@@ -322,6 +322,7 @@ Rectangle {
                     placeholderText: "Optional argument..."
                     font.family: Theme.fontFamily
                     color: Theme.label
+                    placeholderTextColor: Theme.secondaryLabel
                     background: Rectangle {
                         radius: Theme.radiusField
                         color: Theme.glassPill
@@ -382,7 +383,7 @@ Rectangle {
         
         MouseArea {
             anchors.fill: parent
-            onClicked: root.isCollapsed = false
+            onClicked: (mouse) => root.isCollapsed = false
         }
     }
 

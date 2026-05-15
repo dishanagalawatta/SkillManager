@@ -38,44 +38,44 @@ Window {
         MouseArea { 
             height: 6; anchors { top: parent.top; left: parent.left; right: parent.right } 
             cursorShape: Qt.SizeVerCursor
-            onPressed: window.startSystemResize(Qt.TopEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge)
         }
         MouseArea { 
             height: 6; anchors { bottom: parent.bottom; left: parent.left; right: parent.right } 
             cursorShape: Qt.SizeVerCursor
-            onPressed: window.startSystemResize(Qt.BottomEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge)
         }
         MouseArea { 
             width: 6; anchors { left: parent.left; top: parent.top; bottom: parent.bottom } 
             cursorShape: Qt.SizeHorCursor
-            onPressed: window.startSystemResize(Qt.LeftEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.LeftEdge)
         }
         MouseArea { 
             width: 6; anchors { right: parent.right; top: parent.top; bottom: parent.bottom } 
             cursorShape: Qt.SizeHorCursor
-            onPressed: window.startSystemResize(Qt.RightEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.RightEdge)
         }
         
         // Corners
         MouseArea { 
             width: 12; height: 12; anchors.top: parent.top; anchors.left: parent.left 
             cursorShape: Qt.SizeFDiagCursor
-            onPressed: window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
         }
         MouseArea { 
             width: 12; height: 12; anchors.top: parent.top; anchors.right: parent.right 
             cursorShape: Qt.SizeBDiagCursor
-            onPressed: window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.left: parent.left 
             cursorShape: Qt.SizeBDiagCursor
-            onPressed: window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.right: parent.right 
             cursorShape: Qt.SizeFDiagCursor
-            onPressed: window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
         }
     }
 

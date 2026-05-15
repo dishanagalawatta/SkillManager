@@ -6,6 +6,7 @@ import SkillManagerComponents 1.0
 
 Item {
     id: root
+    objectName: "skillItemDelegate"
     width: parent.width
     height: model && model.isCollapsed ? 0 : 66
     visible: model ? !model.isCollapsed : true
@@ -19,8 +20,8 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: root.clicked()
-        onDoubleClicked: root.doubleClicked()
+        onClicked: (mouse) => root.clicked()
+        onDoubleClicked: (mouse) => root.doubleClicked()
     }
     
     property bool isSelected: model && model.isSelected !== undefined ? model.isSelected : false
@@ -69,7 +70,7 @@ Item {
                 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: AppController.skillModel.toggleSelection(index)
+                    onClicked: (mouse) => AppController.skillModel.toggleSelection(index)
                 }
             }
 
@@ -131,7 +132,7 @@ Item {
                 Layout.preferredHeight: 32
                 flat: true
                 visible: mouseArea.containsMouse
-                onClicked: {
+                onClicked: (mouse) => {
                     if (model && model.path) {
                         Qt.callLater(AppController.deleteSkill, model.path)
                     }
