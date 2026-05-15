@@ -162,7 +162,8 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
 def _normalize_path(path):
     if not path:
         return ""
-    return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
+    # Explicitly lower to fix test failure on Posix platforms testing Windows paths
+    return os.path.normcase(os.path.normpath(path)).replace("\\", "/").lower()
 
 
 def project_label(target_path, target_aliases=None, original_target=None):

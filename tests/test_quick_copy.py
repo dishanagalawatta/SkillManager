@@ -80,7 +80,7 @@ def test_project_label_normalization(temp_dir):
     # Test normalization in project_label aliases
     path = "C:\\Work\\Proj"
     aliases = {"c:/work/proj": "Normalized Alias"}
-    assert project_label(path, aliases) == " (C:\\Work\\Proj)"
+    assert project_label(path, aliases) == "Normalized Alias"
 
 def test_format_project_skill_reference_error_handling():
     # Test relative_to failure in command formatting
@@ -127,7 +127,7 @@ def test_project_label_complex(temp_dir):
     
     # Test with normalized alias
     norm_alias = {"c:/path": "Normalized"}
-    assert project_label("C:\\Path", norm_alias) == " (C:\\Path)"
+    assert project_label("C:\\Path", norm_alias) == "Normalized"
 
 def test_format_project_skill_reference_command_fallback():
     # command without project_root but has manuals in path
