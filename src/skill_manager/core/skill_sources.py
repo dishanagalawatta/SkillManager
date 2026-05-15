@@ -392,10 +392,15 @@ def _sanitize_shell_command(command):
         # Basic sanitization of the token itself to remove inline subshells
         sanitized = token.replace('`', '').replace('$(', '')
 
-        # We don't quote here because we are reconstructing a shell string,
-        # but we need to ensure arguments with spaces are quoted again.
-        if ' ' in sanitized and not (sanitized.startswith('"') and sanitized.endswith('"')) and not (sanitized.startswith("'") and sanitized.endswith("'")):
-            sanitized = f'"{sanitized}"'
+        if os.name != 'nt':
+            # shlex.quote safely escapes the token on POSIX, neutralizing all shell characters.
+            # We skip quoting if the token contains '$' to preserve intended environment variables,
+            # as an acceptable heuristic trade-off.
+            if '$' not in sanitized:
+                sanitized = shlex.quote(sanitized)
+        else:
+            if ' ' in sanitized and not (sanitized.startswith('"') and sanitized.endswith('"')) and not (sanitized.startswith("'") and sanitized.endswith("'")):
+                sanitized = f'"{sanitized}"'
 
         if sanitized:
             safe_tokens.append(sanitized)
