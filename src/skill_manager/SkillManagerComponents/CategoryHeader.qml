@@ -50,6 +50,11 @@ Item {
         id: mouseAreaSection
         anchors.fill: parent
         hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
+
+        ToolTip.text: root.isCollapsed ? "Expand Category" : "Collapse Category"
+        ToolTip.visible: containsMouse
+        ToolTip.delay: 400
     }
 }
