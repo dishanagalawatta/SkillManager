@@ -378,10 +378,13 @@ def run_version_command(command):
             command = command.replace("\\", "\\\\")
 
         args = shlex.split(command)
+        if not args:
+            return ""
+
         # Ensure the executable is resolved from PATH if not an absolute path
         args = _resolve_process_command(args, shell=False)
         result = subprocess.run(args, shell=False, capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError, ValueError):
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
         return ""
 
     if result.returncode != 0:
