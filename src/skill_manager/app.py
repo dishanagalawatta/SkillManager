@@ -453,8 +453,6 @@ class AppController(QObject):
                 QTimer.singleShot(0, self, lambda: self._finalize_loading(all_skills, projects, cats, proj_labels, status))
             except Exception as e:
                 error_msg = f"Error scanning skills: {e}"
-                import traceback
-                traceback.print_exc()
                 QTimer.singleShot(0, self, lambda: self._handle_loading_error(error_msg))
 
         threading.Thread(target=run_discovery, daemon=True).start()
@@ -653,8 +651,6 @@ class AppController(QObject):
                 # Clear selection after copy
                 QTimer.singleShot(0, self, self._skill_model.clearSelection)
             except Exception as e:
-                import traceback
-                traceback.print_exc()
                 QTimer.singleShot(0, self, lambda: self._set_status(f"Copy failed: {e}"))
                 
         threading.Thread(target=run_copy, daemon=True).start()
@@ -943,8 +939,6 @@ class AppController(QObject):
                     print(f"[UPDATE] Success: {source.get('name')}")
                 except Exception as e:
                     print(f"[UPDATE] Failed: {source.get('name')} - Error: {e}")
-                    import traceback
-                    traceback.print_exc()
                     error_msg = str(e)
                     QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed for {source.get('name')}: {error_msg}"))
                 finally:
@@ -966,8 +960,6 @@ class AppController(QObject):
                             self._config.set("skills", self._update_sources)
                         except Exception as e:
                             print(f"[ERROR] Error in finalize_ui for {source.get('name')}: {e}")
-                            import traceback
-                            traceback.print_exc()
                             self._set_status(f"Error finishing update: {e}")
 
                     QTimer.singleShot(0, self, finalize_ui)
@@ -1266,8 +1258,6 @@ class AppController(QObject):
                 
             except Exception as e:
                 QTimer.singleShot(0, self, lambda: self._set_status(f"Global update failed: {e}"))
-                import traceback
-                traceback.print_exc()
             finally:
                 self._syncing_targets = []
                 QTimer.singleShot(0, self, self.targetsChanged.emit)
@@ -1343,8 +1333,6 @@ class AppController(QObject):
 
                 QTimer.singleShot(0, self, finalize)
             except Exception as e:
-                import traceback
-                traceback.print_exc()
                 QTimer.singleShot(0, self, lambda: self._set_status(f"Scan failed: {e}"))
                 QTimer.singleShot(0, self, lambda: setattr(self, "_is_loading", False))
                 QTimer.singleShot(0, self, self.isLoadingChanged.emit)
@@ -1417,8 +1405,6 @@ class AppController(QObject):
                 
             except Exception as e:
                 QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed: {e}"))
-                import traceback
-                traceback.print_exc()
 
         threading.Thread(target=run_surgical_sync, daemon=True).start()
 
