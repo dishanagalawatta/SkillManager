@@ -143,7 +143,7 @@ Item {
                                 Layout.preferredHeight: 32
                                 flat: true
                                 property bool isSelected: modelData === AppController.clientFormat
-                                onClicked: AppController.setClientFormat(modelData)
+                                onClicked: (mouse) => AppController.setClientFormat(modelData)
                                 contentItem: Image {
                                     source: AppController.getLogoSource(modelData)
                                     sourceSize.width: 20
@@ -208,7 +208,7 @@ Item {
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     flat: true
-                    onClicked: AppController.skillModel.toggleAll()
+                    onClicked: (mouse) => AppController.skillModel.toggleAll()
                     contentItem: Image {
                         source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("button/collapse.svg") : AppController.getAssetUri("button/expand.svg")
                         sourceSize.width: 18
@@ -279,7 +279,7 @@ Item {
                         Button {
                             id: barAddCommandBtn
                             Layout.preferredHeight: 36
-                            onClicked: qcv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
+                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
                             contentItem: RowLayout {
                                 spacing: 6
                                 Text { text: "+"; font.pixelSize: 16; color: "white"; font.weight: Font.Bold }
@@ -302,7 +302,7 @@ Item {
                             id: barSelectAllBtn
                             Layout.preferredHeight: 36
                             visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
-                            onClicked: AppController.skillModel.selectAll()
+                            onClicked: (mouse) => AppController.skillModel.selectAll()
                             contentItem: Text {
                                 text: "Select All"
                                 font.family: Theme.fontFamily
@@ -329,7 +329,7 @@ Item {
                             Button {
                                 id: barClearBtn
                                 Layout.preferredHeight: 36
-                                onClicked: AppController.skillModel.clearSelection()
+                                onClicked: (mouse) => AppController.skillModel.clearSelection()
                                 contentItem: Text {
                                     text: "Clear Selection"
                                     font.family: Theme.fontFamily
@@ -359,7 +359,7 @@ Item {
                                 id: barAddToColBtn
                                 text: "Add to Collection"
                                 Layout.preferredHeight: 36
-                                onClicked: {
+                                onClicked: (mouse) => {
                                     qcv_root.isEditingCollection = true
                                     qcv_root.editingCollectionName = ""
                                 }
@@ -386,7 +386,7 @@ Item {
                                 objectName: "copySelectedBtn"
                                 text: "Copy Selected"
                                 Layout.preferredHeight: 36
-                                onClicked: AppController.copySelectedSkillsToClipboard()
+                                onClicked: (mouse) => AppController.copySelectedSkillsToClipboard()
                                 contentItem: Text {
                                     text: parent.text
                                     font.family: Theme.fontFamily
@@ -406,7 +406,7 @@ Item {
                             Button {
                                 id: barDeleteBtn
                                 Layout.preferredHeight: 36
-                                onClicked: AppController.deleteSelectedSkills()
+                                onClicked: (mouse) => AppController.deleteSelectedSkills()
                                 contentItem: RowLayout {
                                     spacing: 4
                                     Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
@@ -455,7 +455,7 @@ Item {
                             Layout.preferredWidth: 36
                             Layout.preferredHeight: 36
                             flat: true
-                            onClicked: {
+                            onClicked: (mouse) => {
                                 AppController.saveCustomCollection(qcv_root.editingCollectionName, AppController.skillModel.getSelectedPaths())
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
@@ -478,7 +478,7 @@ Item {
                             Layout.preferredWidth: 36
                             Layout.preferredHeight: 36
                             flat: true
-                            onClicked: {
+                            onClicked: (mouse) => {
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
                             }
@@ -525,10 +525,10 @@ Item {
                 delegate: SkillItem {
                     width: qcv_skillList.width
                     showEssentialIcon: true
-                    onClicked: {
+                    onClicked: (mouse) => {
                         AppController.skillModel.toggleSelection(index)
                     }
-                    onDoubleClicked: {
+                    onDoubleClicked: (mouse) => {
                         AppController.selectSkill(index)
                     }
                 }

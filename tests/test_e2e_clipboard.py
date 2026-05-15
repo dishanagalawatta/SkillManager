@@ -84,6 +84,7 @@ def test_e2e_sync_to_clipboard(e2e_app):
     
     # 1. Navigate to Quick Copy view
     controller.currentView = "QuickCopy"
+    controller.setClientFormat("Gemini CLI")
     qtbot.wait(200)
     
     # 2. Use Search to find our specific skill and select it

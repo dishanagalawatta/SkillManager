@@ -66,9 +66,8 @@ def detect_source_config(data):
         source["source_type"] = "custom"
 
     # For custom sources, if no version command is set, try using the update command as a default
-    if source.get("source_type") == "custom" and update_command:
-        if not source.get("current_version_command"):
-            source["current_version_command"] = update_command
+    if source.get("source_type") == "custom" and update_command and not source.get("current_version_command"):
+        source["current_version_command"] = update_command
 
     # Auto-detect verify command for local paths if not provided
     if local_path and not source.get("verify_command"):
@@ -276,9 +275,8 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
             _emit(output_callback, f"Processing container: {src_path.name}")
             try:
                 for child in src_path.iterdir():
-                    if child.is_dir() and not child.name.startswith('.'):
-                        if _relocate_path_internal(child, dest_base, output_callback):
-                            relocated_count += 1
+                    if child.is_dir() and not child.name.startswith('.') and _relocate_path_internal(child, dest_base, output_callback):
+                        relocated_count += 1
                 # Cleanup the now-empty container
                 _cleanup_empty_parents(src_path / "dummy")
             except Exception as e:

@@ -25,6 +25,10 @@ except ImportError:
 
 import contextlib
 
+from skill_manager.controllers.config_controller import ConfigController
+from skill_manager.controllers.ops_controller import OpsController
+from skill_manager.controllers.ui_controller import UIController
+from skill_manager.controllers.update_controller import UpdateController
 from skill_manager.core.analytics import (
     capture_event,
     capture_exception,
@@ -48,15 +52,9 @@ from skill_manager.core.persistence import (
 )
 from skill_manager.core.quick_copy import (
     CLIENT_FORMATS,
-    delete_project_skill_folders,
     discover_project_skills,
     format_project_skill_reference,
 )
-from skill_manager.core.update_service import UpdateService
-from skill_manager.controllers.ui_controller import UIController
-from skill_manager.controllers.config_controller import ConfigController
-from skill_manager.controllers.ops_controller import OpsController
-from skill_manager.controllers.update_controller import UpdateController
 
 
 class AppController(QObject):
@@ -103,8 +101,10 @@ class AppController(QObject):
         self._update_sources = self._config.get("skills", [])
         for s in self._update_sources:
             s["is_updating"] = False
-            if "current_version" not in s: s["current_version"] = ""
-            if "latest_version" not in s: s["latest_version"] = ""
+            if "current_version" not in s:
+                s["current_version"] = ""
+            if "latest_version" not in s:
+                s["latest_version"] = ""
         self._custom_collections = self._config.get("custom_collections", {})
 
         # Updates and Syncing State
@@ -182,7 +182,8 @@ class AppController(QObject):
             try:
                 if os.path.exists(t):
                     count = len([d for d in os.listdir(t) if os.path.isdir(os.path.join(t, d))])
-            except: pass
+            except Exception:
+                pass
             results.append({
                 "name": self.getTargetLabel(t),
                 "path": t,
@@ -390,7 +391,7 @@ class AppController(QObject):
 
         threading.Thread(target=run_discovery, daemon=True).start()
 
-    def _finalize_loading(self, all_skills, projects, cats, proj_labels, status):
+    def _finalize_loading(self, all_skills, _projects, cats, proj_labels, status):
         """Updates model and UI state on the main thread after discovery completes."""
         if self._categories != cats:
             self._categories = cats
@@ -478,7 +479,8 @@ class AppController(QObject):
 
     @Slot(str)
     def deleteSkill(self, path):
-        if not path: return
+        if not path:
+            return
         skill = next((s for s in self.skillModel._all_skills if s.get("local_path") == path), None)
         if skill:
             self.ops.delete_skills([skill])
@@ -542,7 +544,8 @@ class AppController(QObject):
         self.config_mgr.set_target_alias(path, alias)
 
     @Slot(str, str, result=str)
-    def verifyGitSource(self, url, token):
+    def verifyGitSource(self, url, token=None):
+        """Verify a git source and return the latest version tag/hash."""
         return self.config_mgr.verify_git_source(url, token)
 
     @Slot(str)
@@ -622,16 +625,6 @@ class AppController(QObject):
             self._update_sources[index] = dict(self._update_sources[index])
             self.updateSourcesChanged.emit()
 
-    @Slot(str, str, result=str)
-    def verifyGitSource(self, url, token=None):
-        """Verify a git source and return the latest version tag/hash."""
-        try:
-            from skill_manager.core.skill_sources import get_git_tag
-            tag = get_git_tag(url, is_remote=True, token=token)
-            return tag if tag else ""
-        except Exception as e:
-            print(f"Verify failed: {e}")
-            return ""
 
     @Slot(int)
     def runUpdate(self, index):
@@ -668,7 +661,8 @@ class AppController(QObject):
                     error_msg = str(e)
                     capture_event("skill_source_updated", {"source_type": source.get("source_type", "unknown"), "success": False})
                     capture_exception(e)
-                    QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed for {source.get('name')}: {error_msg}"))
+                    err_msg = f"Update failed for {source.get('name')}: {error_msg}"
+                    QTimer.singleShot(0, self, lambda msg=err_msg: self._set_status(msg))
                 finally:
 
                     def finalize_ui():
@@ -912,8 +906,9 @@ class AppController(QObject):
 
                 msg = f"Update complete for {self.getTargetLabel(path)}: {result['merged']} updated, {result['failed']} failed"
                 QTimer.singleShot(0, self, lambda: self._set_status(msg))
-            except Exception:
-                QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed for {path}: {e}"))
+            except Exception as e:
+                err_msg = f"Update failed for {path}: {e}"
+                QTimer.singleShot(0, self, lambda: self._set_status(err_msg))
             finally:
                 if path in self._syncing_targets:
                     self._syncing_targets.remove(path)

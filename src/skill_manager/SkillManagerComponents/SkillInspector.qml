@@ -88,7 +88,7 @@ Rectangle {
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     visible: root.isQuickCopy && root.skill && root.skill.id !== undefined
-                    onClicked: AppController.toggleCurrentSkillEssential()
+                    onClicked: (mouse) => AppController.toggleCurrentSkillEssential()
                     
                     contentItem: Text {
                         text: starButton.text
@@ -114,7 +114,7 @@ Rectangle {
                 Button {
                     text: "✕"
                     flat: true
-                    onClicked: root.closed()
+                    onClicked: (mouse) => root.closed()
                     visible: !root.isQuickCopy && root.skill && root.skill.id !== undefined
                 }
             }
@@ -341,7 +341,7 @@ Rectangle {
                     text: "Copy Reference"
                     Layout.fillWidth: true
                     visible: root.isQuickCopy
-                    onClicked: {
+                    onClicked: (mouse) => {
                         appController.copySkillReference(root.skill, argField.text)
                     }
                     background: Rectangle {

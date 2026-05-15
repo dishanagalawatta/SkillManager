@@ -65,7 +65,7 @@ Item {
             GlassToggleButton {
                 text: "Show Archived"
                 checked: AppController.skillModel.showArchived
-                onClicked: AppController.skillModel.showArchived = checked
+                onClicked: (mouse) => AppController.skillModel.showArchived = checked
                 
                 iconInactive: "📁"
                 iconActive: "📦"
@@ -99,7 +99,7 @@ Item {
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     flat: true
-                    onClicked: AppController.skillModel.toggleAll()
+                    onClicked: (mouse) => AppController.skillModel.toggleAll()
                     contentItem: Image {
                         source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("button/collapse.svg") : AppController.getAssetUri("button/expand.svg")
                         sourceSize.width: 18
@@ -164,7 +164,7 @@ Item {
                     Button {
                         id: lv_addCommandBtn
                         Layout.preferredHeight: 36
-                        onClicked: lv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
+                        onClicked: (mouse) => lv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
                         contentItem: RowLayout {
                             spacing: 6
                             Text { text: "+"; font.pixelSize: 16; color: "white"; font.weight: Font.Bold }
@@ -187,7 +187,7 @@ Item {
                         id: lv_selectAllBtn
                         Layout.preferredHeight: 36
                         visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
-                        onClicked: AppController.skillModel.selectAll()
+                        onClicked: (mouse) => AppController.skillModel.selectAll()
                         contentItem: Text {
                             text: "Select All"
                             font.family: Theme.fontFamily
@@ -214,7 +214,7 @@ Item {
                         Button {
                             id: lv_clearBtn
                             Layout.preferredHeight: 36
-                            onClicked: AppController.skillModel.clearSelection()
+                            onClicked: (mouse) => AppController.skillModel.clearSelection()
                             contentItem: Text {
                                 text: "Clear Selection"
                                 font.family: Theme.fontFamily
@@ -250,7 +250,7 @@ Item {
                         Button {
                             id: lv_copyBtn
                             Layout.preferredHeight: 36
-                            onClicked: {
+                            onClicked: (mouse) => {
                                 if (lv_targetDrop.currentIndex >= 0 && lv_targetDrop.currentIndex < AppController.targets.length) {
                                     let path = AppController.targets[lv_targetDrop.currentIndex]
                                     AppController.copySelectedSkillsToTarget(path)
@@ -275,7 +275,7 @@ Item {
                         Button {
                             id: lv_deleteBtn
                             Layout.preferredHeight: 36
-                            onClicked: AppController.deleteSelectedSkills()
+                            onClicked: (mouse) => AppController.deleteSelectedSkills()
                             contentItem: RowLayout {
                                 spacing: 4
                                 Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
@@ -326,7 +326,7 @@ Item {
                     width: lv_listView.width
                     isSelected: AppController.selectedSkill.local_path === model.path
                     showEssentialIcon: false
-                    onClicked: {
+                    onClicked: (mouse) => {
                         AppController.selectSkill(index)
                     }
                 }

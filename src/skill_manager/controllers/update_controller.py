@@ -3,7 +3,9 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 import threading
-from PySide6.QtCore import QTimer, Slot
+
+from PySide6.QtCore import QTimer
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.update_service import UpdateService
 
@@ -14,7 +16,7 @@ class UpdateController(BaseController):
     def update_now(self):
         """Starts a global update of all skills and targets."""
         self.app._set_status("Starting global update...")
-        
+
         # Mark targets as syncing
         for t in self.app._targets:
             if t not in self.app._syncing_targets:
@@ -40,7 +42,7 @@ class UpdateController(BaseController):
                 self.app.updateSourcesChanged.emit()
             QTimer.singleShot(0, self.app, update_item)
 
-        def completion_callback(result, updated_sources):
+        def completion_callback(result, _updated_sources):
             def finalize():
                 self.app.load_initial_data()
                 msg = f"Global update complete: {result['merged']} updated, {result['failed']} failed"
@@ -115,7 +117,8 @@ class UpdateController(BaseController):
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
                 QTimer.singleShot(500, self.app, self.scan_for_updates)
             except Exception as e:
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(f"Surgical update failed: {e}"))
+                err_msg = f"Surgical update failed: {e}"
+                QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
         threading.Thread(target=run_surgical_sync, daemon=True).start()
 
