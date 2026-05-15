@@ -390,7 +390,7 @@ def _sanitize_shell_command(command):
             continue
 
         # Basic sanitization of the token itself to remove inline subshells
-        sanitized = token.replace('`', '').replace('$', '')
+        sanitized = token.replace('`', '').replace('$(', '')
 
         # We don't quote here because we are reconstructing a shell string,
         # but we need to ensure arguments with spaces are quoted again.
