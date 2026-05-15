@@ -46,9 +46,15 @@ Rectangle {
                 fillMode: Image.PreserveAspectFit
                 
                 MouseArea {
+                    id: logoMouseArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
                     cursorShape: Qt.PointingHandCursor
+
+                    ToolTip.text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
+                    ToolTip.visible: containsMouse
+                    ToolTip.delay: 400
                 }
             }
             

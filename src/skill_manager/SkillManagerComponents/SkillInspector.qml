@@ -116,6 +116,9 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: !root.isQuickCopy && root.skill && root.skill.id !== undefined
+                    ToolTip.text: "Close Inspector"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
                 }
             }
 
@@ -382,8 +385,15 @@ Rectangle {
         }
         
         MouseArea {
+            id: collapseMouseArea
             anchors.fill: parent
+            hoverEnabled: true
             onClicked: (mouse) => root.isCollapsed = false
+            cursorShape: Qt.PointingHandCursor
+
+            ToolTip.text: "Expand Inspector"
+            ToolTip.visible: containsMouse
+            ToolTip.delay: 400
         }
     }
 
