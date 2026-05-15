@@ -8,6 +8,14 @@ from datetime import datetime
 from pathlib import Path
 
 
+def sanitize_token(text: str) -> str:
+    """Removes sensitive authentication tokens from URLs."""
+    if not isinstance(text, str):
+        return text
+    # Matches http://token@ or https://token@ and masks the token part
+    return re.sub(r'(https?://)[^@/\s]+@', r'\1***@', text)
+
+
 def normalize_skill_source_config(data):
     """Return a backward-compatible skill updater/source config."""
     detected = detect_source_config(data)
@@ -663,7 +671,7 @@ def _run_process(command, output_callback, shell=False):
 
     if process.stdout is not None:
         for line in process.stdout:
-            line_clean = line.strip()
+            line_clean = sanitize_token(line.strip())
             if line_clean:
                 # Always print to terminal for visibility
                 print(f"[PROCESS] {line_clean}")
@@ -679,7 +687,8 @@ def _run_process(command, output_callback, shell=False):
 
     process.wait()
     if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, command)
+        sanitized_command = [sanitize_token(str(arg)) for arg in command] if isinstance(command, list) else sanitize_token(str(command))
+        raise subprocess.CalledProcessError(process.returncode, sanitized_command)
 
 
 def _resolve_process_command(command, shell=False):
@@ -699,6 +708,7 @@ def _resolve_process_command(command, shell=False):
 
 
 def _emit(output_callback, message):
+    message = sanitize_token(str(message))
     # Print to terminal for debugging and visibility
     if message.startswith("[DEBUG]") or message.startswith("[ERROR]") or "Relocating" in message or "Success" in message:
         print(message)
