@@ -370,7 +370,16 @@ def run_version_command(command):
         return ""
 
     try:
+        if os.name == "nt":
+            # On Windows, we need to preserve backslashes in paths.
+            # shlex.split in POSIX mode (which is default and best for removing quotes)
+            # treats backslashes as escape characters. By doubling them, we ensure
+            # they are preserved as single backslashes in the resulting tokens.
+            command = command.replace("\\", "\\\\")
+
         args = shlex.split(command)
+        # Ensure the executable is resolved from PATH if not an absolute path
+        args = _resolve_process_command(args, shell=False)
         result = subprocess.run(args, shell=False, capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError, ValueError):
         return ""
