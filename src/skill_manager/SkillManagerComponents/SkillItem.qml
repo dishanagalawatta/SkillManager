@@ -79,6 +79,11 @@ Item {
                     ToolTip.visible: containsMouse
                     ToolTip.delay: 400
                 }
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "Select skill"
+                Accessible.description: "Check to select this item"
+                Accessible.checkable: true
+                Accessible.checked: model && model.isSelected
             }
 
             // Icon Section
@@ -160,6 +165,9 @@ Item {
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
             }
+                Accessible.role: Accessible.Button
+                Accessible.name: "Delete skill"
+                Accessible.description: "Delete this skill"
         }
     }
 }
