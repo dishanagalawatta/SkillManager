@@ -338,49 +338,49 @@ class SkillModel(QAbstractListModel):
 
         skills = self._all_skills
 
-        # 1. Archive filter
-        if not self._show_archived:
-            skills = [s for s in skills if not s.get("is_archived", False)]
+        # ⚡ Bolt: Single-pass filtering loop optimization
+        # Replaces 8 separate list comprehensions with a single pass
+        # Reduces memory allocations and redundant iterations
+        filtered_skills = []
+        query_client = self._client_filter.lower() if self._client_filter else None
 
-        # 2. Collection filter (Show only physical bundles)
-        if self._collection_filter:
-            skills = [s for s in skills if s.get("is_bundle", False)]
+        for s in skills:
+            # 1. Archive filter
+            if not self._show_archived and s.get("is_archived", False):
+                continue
 
-        # 3. Category filter
-        if self._category_filter:
-            skills = [s for s in skills if s.get("category") == self._category_filter]
+            # 2. Collection filter (Show only physical bundles)
+            if self._collection_filter and not s.get("is_bundle", False):
+                continue
 
-        # 3.5 Project filter - Only apply if NOT in source-only (Library) mode
-        # Note: We allow essentials from any source to pass project filter in Quick Copy mode
-        if self._project_filter and self._is_source_only is not True:
-            skills = [
-                s for s in skills
-                if s.get("project_label") == self._project_filter
-                or (self._is_source_only is False and s.get("is_essential", False))
-            ]
+            # 3. Category filter
+            if self._category_filter and s.get("category") != self._category_filter:
+                continue
 
-        # 3.6 Commands filter
-        if not self._show_commands:
-            skills = [s for s in skills if not s.get("is_command", False)]
+            # 3.5 Project filter - Only apply if NOT in source-only (Library) mode
+            # Note: We allow essentials from any source to pass project filter in Quick Copy mode
+            if self._project_filter and self._is_source_only is not True and s.get("project_label") != self._project_filter and not (self._is_source_only is False and s.get("is_essential", False)):
+                continue
 
-        # 3.6.5 Essentials filter
-        if not self._show_essentials:
-            skills = [s for s in skills if not s.get("is_essential", False)]
+            # 3.6 Commands filter
+            if not self._show_commands and s.get("is_command", False):
+                continue
 
-        # 3.6.6 Source filter
-        if self._is_source_only is True:
-            skills = [s for s in skills if s.get("is_source", False)]
-        elif self._is_source_only is False:
-            # In Quick Copy mode, we show project skills AND essentials from master
-            skills = [s for s in skills if not s.get("is_source", False) or s.get("is_essential", False)]
+            # 3.6.5 Essentials filter
+            if not self._show_essentials and s.get("is_essential", False):
+                continue
 
-        # 3.7 Client filter (applies to commands mainly, but could apply to skills)
-        if self._client_filter:
-            query_client = self._client_filter.lower()
-            skills = [
-                s for s in skills
-                if not s.get("client") or s.get("client").lower() == query_client
-            ]
+            # 3.6.6 Source filter
+            if self._is_source_only is True and not s.get("is_source", False) or self._is_source_only is False and s.get("is_source", False) and not s.get("is_essential", False):
+                continue
+
+            # 3.7 Client filter (applies to commands mainly, but could apply to skills)
+            if query_client and s.get("client") and s.get("client").lower() != query_client:
+                continue
+
+            filtered_skills.append(s)
+
+        skills = filtered_skills
 
         # 4. Search text filter
         if self._filter_text and self._search_engine:
