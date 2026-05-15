@@ -2,7 +2,7 @@
 # Purpose: Maintain high-performance linting and formatting standards.
 # Usage: ruff check .
 
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 
 [lint]

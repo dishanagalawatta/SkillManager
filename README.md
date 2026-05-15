@@ -1,20 +1,29 @@
-# SkillManager
+A professional desktop application for managing, syncing, and deploying reusable AI agent skills across multiple project repositories. Built with a **Solid Matte & Liquid Glass** aesthetic, it provides a high-performance, immersive workspace for developers.
 
-A professional desktop application for managing, syncing, and deploying reusable AI agent skills across multiple project repositories.
+---
 
-## Key Features
+## ✨ Key Features
 
-- **Centralized Library**: Manage all your markdown-based AI skills in one central location.
-- **Cross-Repository Sync**: Effortlessly copy and update skills between your library and target project directories.
-- **Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references to your clipboard for use in AI prompts.
-- **Modern UI**: Sleek, hardware-accelerated interface built with PySide6/QML, featuring a "Solid Matte & Liquid Glass" design system and native window styling (Mica/Acrylic).
-- **Cross-Platform**: Standalone executables for Windows, macOS, and Linux.
+- **🚀 Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard using client-specific templates (Antigravity, Gemini CLI, etc.).
+- **📚 Centralized Library**: Manage all your markdown-based AI skills in one central location with full-text search and category filtering.
+- **🔄 Surgical Sync**: Intelligent synchronization engine that identifies and updates outdated skills across multiple target repositories without full rescans.
+- **🎨 Modern UI**: Hardware-accelerated interface built with PySide6/QML, featuring native Windows 11 styling (Mica/Acrylic) and a premium design system.
+- **📦 Cross-Platform**: Optimized standalone executables for Windows, macOS, and Linux.
 
-## Tech Stack
+## 🎨 Design System
 
-- **Language**: Python 3.10+
-- **GUI Framework**: PySide6 (Qt for Python) with QML
+SkillManager follows the **Solid Matte & Liquid Glass** design guide. It balances the stability of solid, deeply-tinted materials with the depth of frosted glass components.
+
+- **Solid Matte Foundation**: Deeply-tinted material (`#0E1210`) eliminates desktop wallpaper bleed-through.
+- **Liquid Glass Pills**: Functional areas are encapsulated in frosted glass containers with 1px reflection borders.
+- **Mica/Acrylic Integration**: Native shell effects on Windows for an immersive OS-native feel.
+
+For full details, see **[DESIGN.md](DESIGN.md)**.
+
+- **Language**: Python 3.12+
+- **GUI Framework**: PySide6 (Qt 6.8+) with QML
 - **Dependency Management**: `uv`
+- **Linting & Formatting**: `ruff`
 - **Packaging**: PyInstaller & Inno Setup
 - **Testing**: `pytest`
 
@@ -54,24 +63,26 @@ uv run skill-manager
 uv run python -m skill_manager
 ```
 
-## Architecture Overview
+SkillManager is built on a **Hub and Spoke** modular architecture to ensure scalability and maintainability:
 
-SkillManager is designed with a strict separation of concerns:
-- **`src/skill_manager/core/`**: Contains pure Python business logic, handling file parsing, data modeling (`SkillModel`), updating algorithms, and configuration management.
-- **`src/skill_manager/gui/`**: Contains the Python-side UI bridges and styling utilities.
-- **`src/skill_manager/SkillManagerComponents/`**: Contains the QML files that define the declarative user interface.
-- **`src/skill_manager/app.py`**: The main controller that wires the PySide6 engine to the core data models via Qt Signals and Slots.
+- **`AppController` (The Hub)**: The main entry point and QML bridge. It coordinates between specialized sub-controllers.
+- **Sub-Controllers (`src/skill_manager/controllers/`)**:
+    - `UIController`: Manages window geometry, theme state, and asset resolution.
+    - `ConfigController`: Handles source/target configuration and `config.json` persistence.
+    - `OpsController`: Encapsulates skill operations like copying, deletion, and archiving.
+    - `UpdateController`: Orchestrates background synchronization and update state tracking.
+- **Core Domain (`src/skill_manager/core/`)**: Pure Python business logic for parsing, discovery, and search indexing.
+- **QML Components (`src/skill_manager/SkillManagerComponents/`)**: The declarative UI layer.
 
-For an in-depth look at the architecture, design principles, and packaging pipeline, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Available Scripts
+For an in-depth look, see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 | Command | Description |
 |---|---|
 | `uv run skill-manager` | Launch the application locally |
+| `uv run ruff check src` | Run linter across the codebase |
 | `uv run pytest` | Run the unit test suite |
 | `uv run pytest --cov=skill_manager` | Run tests with coverage reporting |
-| `uv run pyinstaller packaging/skill_manager.spec --noconfirm` | Build the standalone executable locally |
+| `uv run pyinstaller packaging/skill_manager.spec` | Build the standalone executable locally |
 
 ## Project Documentation
 

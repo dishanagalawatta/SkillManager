@@ -28,14 +28,23 @@ This guide covers how to set up the SkillManager development environment, run te
 
 You can run the application directly from the source code without compiling it:
 
+## Development Workflow
+
+### 1. Code Quality (Linting)
+SkillManager uses **Ruff** for high-performance linting and formatting. It is configured via `ruff.toml`.
+
 ```bash
-uv run skill-manager
-# OR
-uv run python -m skill_manager
+# Check for linting errors
+uv run ruff check src
+
+# Automatically fix fixable errors
+uv run ruff check src --fix
+
+# Format the code
+uv run ruff format src
 ```
 
-## Running Tests
-
+### 2. Testing
 SkillManager uses `pytest` for unit testing.
 
 ```bash
@@ -48,6 +57,12 @@ uv run pytest --cov=skill_manager
 # Run specific tests
 uv run pytest tests/test_parsing.py
 ```
+
+### 3. CI/CD Standards
+All code changes must pass the following criteria:
+1. **Lint-Clean**: `ruff check` must return no errors.
+2. **Type-Safe**: Use Python type hints in all new code.
+3. **Tested**: New features should include unit tests in the `tests/` directory.
 
 ## Building Executables
 
@@ -66,13 +81,10 @@ If you need to build the executable locally for testing:
     uv pip install pyinstaller pillow
     ```
 
-2.  **Run PyInstaller:**
-    ```bash
-    uv run pyinstaller packaging/skill_manager.spec --noconfirm
-    ```
-
-3.  **Locate Output:**
-    The standalone executable and its bundled dependencies will be located in the `dist/SkillManager/` directory.
-
-### Windows Native Installer (Inno Setup)
-If you have Inno Setup installed on Windows, you can compile the `packaging/windows/installer.iss` file to generate the final `SkillManager_Setup.exe`.
+| Command | Description |
+|---|---|
+| `uv run skill-manager` | Launch the application locally |
+| `uv run ruff check src` | Run ruff linter |
+| `uv run ruff format src` | Format code with ruff |
+| `uv run pytest` | Run the unit test suite |
+| `uv run pyinstaller packaging/skill_manager.spec` | Build the standalone executable |

@@ -4,31 +4,33 @@ SkillManager is a cross-platform desktop application designed to manage, organiz
 
 ## System Overview
 
-The application is structured into three primary layers:
-1.  **Core Domain (`src/skill_manager/core/`)**: Handles data modeling, file parsing, synchronization, and business logic.
-2.  **GUI / Presentation (`src/skill_manager/gui/` & `src/skill_manager/SkillManagerComponents/`)**: The QML-based frontend, managing the visual representation and user interactions.
-3.  **App Controller (`src/skill_manager/app.py`)**: The bridge connecting the QML frontend to the Python backend via Qt's Signal/Slot mechanism.
+The application is structured into four primary layers:
+1.  **Core Domain (`src/skill_manager/core/`)**: Pure Python business logic, handling file parsing, data modeling, synchronization algorithms, and background services.
+2.  **Sub-Controllers (`src/skill_manager/controllers/`)**: Specialized controllers that encapsulate specific logical domains (UI, Config, Ops, Updates).
+3.  **App Hub (`src/skill_manager/app.py`)**: The central `AppController` that coordinates sub-controllers and provides a stable Signal/Slot bridge to the frontend.
+4.  **Declarative UI (`src/skill_manager/SkillManagerComponents/`)**: The QML-based frontend components.
 
 ---
 
-## Core Components
+### 1. The Hub & Spoke Controllers (`controllers/`)
 
-### 1. Data Models (`models.py`)
--   **`SkillModel`**: A `QAbstractListModel` subclass that exposes the list of skills to the QML frontend. It handles filtering (by category, project, client format, search text) and selection states.
+To prevent the `AppController` from becoming a "God Object," responsibilities are distributed into sub-controllers:
 
-### 2. File Parsing & IO (`parsing.py`, `skill_sources.py`)
--   Reads and parses Markdown files (`SKILL.md`, `*.md` commands) containing YAML frontmatter.
--   Extracts metadata such as `name`, `category`, `client`, and custom attributes.
--   Generates full-text search indexes for each skill based on its content and metadata.
+- **`UIController`**: Manages application-wide UI state (Current View, Dark Mode), window geometry (X, Y, Width, Height), and asset URI resolution for QML.
+- **`ConfigController`**: Manages the `ConfigManager` instance, handling the addition/removal of skill sources and project targets.
+- **`OpsController`**: Handles high-frequency skill operations such as copying to projects, deleting skills (with optimistic UI updates), and managing essential/archive states.
+- **`UpdateController`**: Orchestrates background synchronization processes, Git source updates, and provides real-time progress reporting to the UI.
 
-### 3. Synchronization & Copying (`copier.py`, `quick_copy.py`, `updater.py`)
--   **Discovery**: Scans source directories (where skills are authored) and target directories (project repositories where skills are used).
--   **Copying**: Handles copying entire skill folders from the library into target projects.
--   **Updating**: Compares versions of skills in the library against those in target projects and performs surgical updates or global syncs.
+### 2. Data Models (`core/models.py`)
 
-### 4. Configuration Management (`config.py`)
--   Manages application settings, source/target directories, custom collections, and UI state (window size, position, active view).
--   Persists state to `.config` or `AppData` directories depending on the OS.
+- **`SkillModel`**: A `QAbstractListModel` subclass that exposes skills to QML. It implements highly optimized filtering and selection logic, supporting thousands of skills without UI lag.
+
+### 3. Core Services (`core/`)
+
+- **`DiscoveryService`**: Scans the filesystem to populate the models.
+- **`Parsing`**: Extracts YAML frontmatter and Markdown content.
+- **`UpdateService`**: Handles the low-level logic for comparing versions and performing surgical file updates.
+- **`ConfigManager`**: Low-level persistence for `config.json`.
 
 ---
 
@@ -70,3 +72,30 @@ SkillManager is distributed as native standalone executables for Windows, macOS,
 3.  Uses `uv` for fast dependency installation and virtual environment management.
 4.  Builds the OS-specific installers and uploads them as workflow artifacts.
 5.  Creates a new GitHub Release and attaches all generated installers.
+
+---
+
+## Development Patterns
+
+### 1. Signal Handler Best Practices (QML)
+To avoid deprecation warnings in Qt 6.x and ensure scope safety, all QML signal handlers should use formal parameter arrow functions:
+
+**Bad (Deprecated):**
+```qml
+onClicked: {
+    console.log(mouse.x); // 'mouse' is injected
+}
+```
+
+**Good (Standard):**
+```qml
+onClicked: (mouse) => {
+    console.log(mouse.x);
+}
+```
+
+### 2. Hub and Spoke Delegation
+The `AppController` should remain as thin as possible. New logic should be added to specialized controllers in `src/skill_manager/controllers/` and exposed via the `AppController` properties.
+
+### 3. Optimistic UI Updates
+When performing filesystem operations (like deletion), the application should immediately remove the item from the `SkillModel` to provide instant feedback, then handle the actual deletion in a background thread.

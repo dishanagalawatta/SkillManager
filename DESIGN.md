@@ -8,10 +8,10 @@ Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-devel
 
 - **Name:** Skill Manager
 - **Category:** Desktop productivity / developer utility
-- **Current stack:** Python, CustomTkinter, Tkinter `ttk.Treeview`, `tkinterdnd2`
-- **Primary platform today:** Windows desktop
-- **Design target:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while remaining practical in the current toolkit
-- **Primary users:** Developers and power users managing local skill folders across multiple project repositories
+- **Current stack:** Python 3.12+, PySide6 (Qt 6.8+), QML, `uv`, `ruff`
+- **Primary platforms:** Windows (Native Mica/Acrylic), macOS, Linux
+- **Design target:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while utilizing modern hardware acceleration via Qt 6.
+- **Primary users:** Developers and power users managing local skill folders across multiple project repositories.
 
 ## Existing Workflows To Preserve
 
