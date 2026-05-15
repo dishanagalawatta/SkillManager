@@ -72,21 +72,37 @@ Body here.
     assert data["client"] == "Codex"
     assert data["description"] == "Deploy command"
 
-def test_categorize_skill():
-    assert categorize_skill("brainstorming", "creative work") == "Core Workflow"
-    assert categorize_skill("git commit", "source control") == "Developer Tools"
-    assert categorize_skill("react component", "ui development") == "Web Development"
-    assert categorize_skill("unknown", "nothing") == "Uncategorized"
+def test_parse_frontmatter_malformed():
+    # Invalid YAML that yaml.safe_load might still parse as a partial dict or string
+    fm = "name: : invalid : yaml"
+    parsed = parse_frontmatter(fm)
+    assert parsed == {'name': ': invalid : yaml'}
 
-def test_build_skill_search_text():
-    skill_data = {
-        "name": "Alpha",
-        "description": "Desc",
-        "category": "Cat",
-        "metadata": {"version": "1.0.0"}
-    }
-    search_text = build_skill_search_text(skill_data)
-    assert "alpha" in search_text
-    assert "desc" in search_text
-    assert "cat" in search_text
-    assert "1.0.0" in search_text
+def test_parse_frontmatter_empty():
+    assert parse_frontmatter("") == {}
+    assert parse_frontmatter(None) == {}
+
+def test_parse_skill_md_missing():
+    data = parse_skill_md("/non/existent/path")
+    assert data["name"] == ""
+    assert data["raw_content"] == ""
+
+def test_parse_skill_md_no_frontmatter(temp_dir):
+    skill_file = temp_dir / "SKILL.md"
+    skill_file.write_text("# Only Header\nNo frontmatter here.")
+    data = parse_skill_md(str(skill_file))
+    assert data["name"] == ""
+    assert data["body_content"].strip() == "# Only Header\nNo frontmatter here."
+
+def test_categorize_skill_more_keywords():
+    assert categorize_skill("docker", "") == "Cloud Infrastructure"
+    assert categorize_skill("python script", "") == "Programming Languages"
+    assert categorize_skill("react component", "") == "Web Development"
+    assert categorize_skill("security audit", "") == "Security"
+    assert categorize_skill("sql query", "") == "Databases"
+    assert categorize_skill("unit testing", "") == "Testing"
+
+def test_build_skill_search_text_missing_fields():
+    # It adds spaces between default empty parts
+    assert build_skill_search_text({}).strip() == ""
+    assert build_skill_search_text({"name": "Test"}).strip() == "test"

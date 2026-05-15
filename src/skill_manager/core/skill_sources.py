@@ -111,9 +111,9 @@ def run_skill_source_update(source, output_callback=None):
     source.setdefault("latest_version", "")
     source.setdefault("managed_folders", [])
     source.setdefault("removed_folders", [])
-    
+
     local_path = source.get("local_path")
-    
+
     captured_output = []
 
     def intercept_callback(msg):
@@ -132,7 +132,7 @@ def run_skill_source_update(source, output_callback=None):
     if local_path:
         _emit(output_callback, f"[DEBUG] Relocating skills from output to: {local_path}")
         new_managed = _relocate_skills_from_output(captured_output, local_path, output_callback)
-        
+
         if new_managed is not None:
             old_managed = source.get("managed_folders", [])
             # Find folders that were in old_managed but are not in new_managed
@@ -150,7 +150,7 @@ def run_skill_source_update(source, output_callback=None):
                             removed.append(folder_name)
                         except Exception as e:
                             _emit(output_callback, f"[ERROR] Failed to delete {folder_name}: {e}")
-            
+
             source["managed_folders"] = new_managed
             source["removed_folders"] = removed
 
@@ -162,7 +162,7 @@ def run_skill_source_update(source, output_callback=None):
     # We update the original source dict to preserve set defaults if check_skill_source_versions returns a new dict
     updated_source_info = check_skill_source_versions(source, force_refresh=True)
     source.update(updated_source_info)
-    
+
     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return source
 
@@ -179,11 +179,11 @@ def _relocate_path_internal(src_path, dest_base, output_callback):
                 shutil.rmtree(dest_path)
             else:
                 dest_path.unlink()
-        
+
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Relocating {src_path.name} -> {dest_path}...")
         shutil.move(str(src_path), str(dest_path))
-        
+
         # Cleanup empty parent directories (like .agents/skills)
         _cleanup_empty_parents(src_path)
         return True
@@ -199,13 +199,13 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
         return None
 
     dest_base = Path(os.path.expanduser(target_local_path))
-    
+
     # regex to find paths like ~\.agents\skills\caveman or C:\Users\...\.agents\skills\caveman
     # Supports ✓ prefix, handles "Installed to" text, spaces and common path characters.
     # We look for common path starters and capture until end of line or specific delimiters.
     path_regex = re.compile(r'(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.\\[^…\n\r]+|~[^…\n\r]+)')
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    
+
     _emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for installation paths...")
     detected_paths = set()
     for line in captured_output:
@@ -225,7 +225,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
                     match_found = True
             except Exception:
                 continue
-        
+
         if not match_found:
             # Fallback for lines without keywords but containing absolute paths
             fallback_regex = re.compile(r'([a-zA-Z]:[\\/][^\s│]+[a-zA-Z0-9_.-]+)')
@@ -247,7 +247,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
     _emit(output_callback, f"[DEBUG] Relocating to target: {dest_base}")
     relocated_count = 0
     managed_folder_names = set()
-    
+
     for src_path in sorted(detected_paths):
         # Track names regardless of whether we move them (they are part of this source)
         if src_path.name.lower() in ("skills", "agents", ".agents"):
@@ -269,7 +269,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
                 continue
         except Exception:
             continue
-            
+
         # Check if this is a container directory (like 'skills' or 'agents')
         # If it is, we move its contents individually to avoid nested 'skills/skills'
         if src_path.name.lower() in ("skills", "agents", ".agents"):
@@ -296,12 +296,12 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
     # ... (rest remains same)
     unique_source_roots = {p.parent.parent for p in detected_paths}
     target_root = dest_base.parent
-    
+
     # If target_root is project root, use the dedicated data folder to keep root clean
     if target_root.resolve() == Path.cwd().resolve():
         from skill_manager.core.config import DATA_DIR
         target_root = DATA_DIR
-    
+
     for src_root in unique_source_roots:
         for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
             src_lock = src_root / lock_name
@@ -319,7 +319,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
                                 shutil.move(str(src_lock), str(tgt_lock))
                         except OSError:
                             pass
-        
+
         # Clean up the original directories now that lockfiles are removed
         _cleanup_empty_parents(src_root / "skills" / "dummy")
 
@@ -330,45 +330,45 @@ def _merge_and_move_lockfile(source_lock, target_lock, output_callback):
     """Moves and carefully merges a skill lockfile."""
     if not source_lock.is_file():
         return
-    
+
     try:
         if not target_lock.exists():
             target_lock.parent.mkdir(parents=True, exist_ok=True)
             _emit(output_callback, f"Moving lockfile -> {target_lock}...")
             shutil.move(str(source_lock), str(target_lock))
             return
-            
+
         # Target exists, we must merge
         _emit(output_callback, f"Merging lockfile -> {target_lock}...")
         try:
-            with open(target_lock, "r", encoding="utf-8-sig") as f:
+            with open(target_lock, encoding="utf-8-sig") as f:
                 target_data = json.load(f)
         except (json.JSONDecodeError, OSError):
             target_data = {}
-            
+
         try:
-            with open(source_lock, "r", encoding="utf-8-sig") as f:
+            with open(source_lock, encoding="utf-8-sig") as f:
                 source_data = json.load(f)
         except (json.JSONDecodeError, OSError):
             source_data = {}
-            
+
         # Merge 'skills' dictionary
         if "skills" in source_data and isinstance(source_data["skills"], dict):
             if "skills" not in target_data or not isinstance(target_data["skills"], dict):
                 target_data["skills"] = {}
             target_data["skills"].update(source_data["skills"])
-            
+
         # Keep version from source if missing in target
         if "version" in source_data and "version" not in target_data:
             target_data["version"] = source_data["version"]
-            
+
         # Save merged to target
         with open(target_lock, "w", encoding="utf-8") as f:
             json.dump(target_data, f, indent=2)
-            
+
         # Remove source
         source_lock.unlink()
-        
+
     except Exception as e:
         _emit(output_callback, f"Failed to merge lockfile: {e}")
 
@@ -393,7 +393,7 @@ def _cleanup_empty_parents(path, levels=3):
 
 def check_skill_source_versions(source, force_refresh=False):
     source = normalize_skill_source_config(source)
-    
+
     current_version = source.get("current_version", "")
     latest_version = source.get("latest_version", "")
 
@@ -408,7 +408,7 @@ def check_skill_source_versions(source, force_refresh=False):
         detected_current = run_version_command(source.get("current_version_command"))
         if detected_current:
             current_version = clean_v(detected_current)
-            
+
     if source.get("latest_version_command"):
         detected_latest = run_version_command(source.get("latest_version_command"))
         if detected_latest:
@@ -432,7 +432,7 @@ def check_skill_source_versions(source, force_refresh=False):
                 detected_local = get_git_tag(str(path), is_remote=False)
                 if detected_local:
                     current_version = clean_v(detected_local)
-        
+
         if (not latest_version or force_refresh) and repo_url:
             git_latest = get_git_tag(repo_url, is_remote=True, token=token)
             if git_latest:
@@ -446,7 +446,7 @@ def check_skill_source_versions(source, force_refresh=False):
                 detected_latest = run_version_command(f"npm view {package_name} version")
                 if detected_latest:
                     latest_version = clean_v(detected_latest)
-        
+
         # If we just updated an NPM source and don't have a current version,
         # we can optimistically assume it's now the latest version
         if force_refresh and not current_version and latest_version:
@@ -465,7 +465,7 @@ def get_authenticated_url(url: str, token: str) -> str:
     """Injects a GitHub token into a repository URL if provided."""
     if not token or not url or "@" in url.split("://")[-1]:
         return url
-    
+
     # Only support https for token injection
     if url.startswith("https://"):
         return url.replace("https://", f"https://{token}@")
@@ -486,11 +486,13 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 # Format is usually: hash\trefs/tags/v1.2.3
                 lines = result.stdout.strip().split("\n")
                 for line in lines:
-                    if "^{}" in line: continue # Skip peeled tags
+                    if "^{}" in line:
+                        continue  # Skip peeled tags
                     ref = line.split("\t")[-1]
                     tag = ref.replace("refs/tags/", "")
-                    if tag: return tag
-            
+                    if tag:
+                        return tag
+
             # Fallback to latest commit hash on main/master if no tags
             result = subprocess.run(
                 ["git", "ls-remote", auth_url, "HEAD"],
@@ -503,7 +505,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             path = Path(path_or_url)
             if not (path / ".git").is_dir():
                 return ""
-            
+
             # Try to get tag first
             result = subprocess.run(
                 ["git", "-C", str(path), "describe", "--tags", "--abbrev=0"],
@@ -511,7 +513,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.strip()
-            
+
             # Fallback to short hash
             result = subprocess.run(
                 ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
@@ -561,7 +563,7 @@ def _run_repository_update(source, output_callback):
 
     path = Path(os.path.expanduser(clone_path))
     auth_url = get_authenticated_url(repository_url, source.get("github_token"))
-    
+
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
         _run_process(["git", "-C", str(path), "pull", "--ff-only"], output_callback)
@@ -667,11 +669,11 @@ def _run_process(command, output_callback, shell=False):
             if line_clean:
                 # Always print to terminal for visibility
                 print(f"[PROCESS] {line_clean}")
-                
+
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
                 is_progress = bool(re.search(r'\d+%', line_clean))
                 current_time = time.time()
-                
+
                 if not is_progress or (current_time - last_emit_time > 0.5):
                     _emit(output_callback, line_clean)
                     if is_progress:
@@ -731,7 +733,7 @@ def _apply_npm_defaults(source):
             parts.pop(0)
             if parts and parts[0] == "--yes":
                 parts.pop(0)
-        
+
         if parts:
             package_name = parts[0]
             extra_args = " ".join(parts[1:])

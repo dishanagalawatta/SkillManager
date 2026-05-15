@@ -1,9 +1,8 @@
-import os
 import json
+import os
 import shutil
-import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 APP_NAME = "SkillManager"
 DATA_DIR_ENV = "SKILL_MANAGER_DATA_DIR"
@@ -32,7 +31,7 @@ def get_app_data_dir() -> Path:
     override = os.environ.get(DATA_DIR_ENV)
     if override:
         return Path(override).expanduser()
-    
+
     # Use local data folder by default for professional look
     app_dir = Path.cwd() / "data"
     app_dir.mkdir(parents=True, exist_ok=True)
@@ -88,16 +87,16 @@ SKILL_LIBRARY_CACHE_VERSION = 8
 class ConfigManager:
     def __init__(self, filename: str = CONFIG_FILENAME):
         self.config_path = resolve_data_file(filename)
-        self.data: Dict[str, Any] = {}
+        self.data: dict[str, Any] = {}
         self.load()
 
-    def load(self) -> Dict[str, Any]:
+    def load(self) -> dict[str, Any]:
         """Loads configuration. Migrates from root if needed."""
         root_config = Path.cwd() / self.config_path.name
 
         if not self.config_path.exists() and root_config.is_file():
             try:
-                with open(root_config, 'r') as f:
+                with open(root_config) as f:
                     self.data = json.load(f)
                 self.save() # Migrate to new location
                 return self.data
@@ -106,7 +105,7 @@ class ConfigManager:
 
         if self.config_path.exists():
             try:
-                with open(self.config_path, 'r') as f:
+                with open(self.config_path) as f:
                     self.data = json.load(f)
             except Exception as e:
                 print(f"Error loading config: {e}")

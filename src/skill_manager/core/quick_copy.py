@@ -2,7 +2,6 @@ import os
 import shutil
 from pathlib import Path
 
-
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Path"}
 
 
@@ -10,19 +9,19 @@ def _resolve_resilient_path(path_str):
     """Try to resolve a path, being resilient to .agent vs .agents pluralization mismatches."""
     if not path_str:
         return Path()
-        
+
     path = Path(os.path.expanduser(str(path_str).strip()))
     try:
         if path.exists():
             return path.resolve()
     except OSError:
         pass
-    
+
     # Try swapping .agent <-> .agents
     s = str(path)
     # Normalize slashes for detection but keep original for replacement to avoid breaking windows paths more than needed
     s_norm = s.replace("\\", "/")
-    
+
     alt_s = None
     if "/.agent/" in s_norm:
         alt_s = s.replace("/.agent/", "/.agents/").replace("\\.agent\\", "\\.agents\\")
@@ -32,7 +31,7 @@ def _resolve_resilient_path(path_str):
         alt_s = s + "s"
     elif s_norm.endswith("/.agents"):
         alt_s = s[:-1]
-        
+
     if alt_s:
         alt_path = Path(alt_s)
         try:
@@ -169,48 +168,46 @@ def _normalize_path(path):
 def project_label(target_path, target_aliases=None, original_target=None):
     if target_aliases is None:
         target_aliases = {}
-    
+
     norm_target = _normalize_path(target_path)
     norm_original = _normalize_path(original_target) if original_target else ""
-    
+
     # Try using original target (exact or normalized)
     if original_target and original_target in target_aliases:
         return target_aliases[original_target]
     if norm_original and norm_original in target_aliases:
         return target_aliases[norm_original]
-        
+
     # Try resolved path (exact or normalized)
     target_str = str(target_path)
     if target_str in target_aliases:
         return target_aliases[target_str]
     if norm_target in target_aliases:
         return target_aliases[norm_target]
-        
+
     # Full scan for matching normalized keys
     for k, v in target_aliases.items():
         if _normalize_path(k) == norm_target or (norm_original and _normalize_path(k) == norm_original):
             return v
-        
+
     # Use standard format if no alias: "RootName (Base)"
     target_path_obj = Path(target_path)
     root = _project_root_for_target(target_path_obj)
     base = _skill_base_relative(target_path_obj)
-    
+
     # Clean up the .agents/skills suffix if it exists
     if base == ".agents/skills" or base == ".agents\\skills":
         return f"{root.name}"
-    elif base.endswith("/.agents/skills"):
+    if base.endswith("/.agents/skills") or base.endswith("\\.agents\\skills"):
         return f"{root.name} ({base[:-15]})"
-    elif base.endswith("\\.agents\\skills"):
-        return f"{root.name} ({base[:-15]})"
-    
+
     return f"{root.name} ({base})"
 
 
 def format_project_skill_reference(skill, client_format):
     is_command = skill.get("is_command", False)
     local_path = Path(skill.get("local_path", ""))
-    
+
     if is_command:
         # For commands, we want the path relative to the project root
         project_root = skill.get("project_root")
@@ -226,7 +223,7 @@ def format_project_skill_reference(skill, client_format):
                 relative_path = local_path.relative_to(project_root).as_posix()
             except ValueError:
                 relative_path = local_path.name
-        
+
         if client_format == "Codex":
             name = skill.get("name") or local_path.name
             return f"[${name}]({relative_path})"
@@ -241,7 +238,7 @@ def format_project_skill_reference(skill, client_format):
         name = skill.get("name") or local_path.name
         path = skill.get("skill_md_path") or ""
         return f"[${name}]({path})"
-    
+
     relative_path = project_skill_relative_path(skill)
     if client_format == "Antigravity":
         name = skill.get("name") or local_path.name
@@ -296,9 +293,7 @@ def _looks_like_explicit_reference(reference):
         return True
     if lowered.endswith(".md") or "/" in reference or "\\" in reference:
         return True
-    if ":" in reference:
-        return True
-    return False
+    return ":" in reference
 
 
 def project_skill_relative_path(skill):

@@ -41,9 +41,6 @@ def test_model_reset_preserves_selection(model):
         {"name": "A1", "category": "Arch", "local_path": "/a1"},
         {"name": "A2", "category": "Arch", "local_path": "/a2"},
     ]
-    # Note: Currently setSkills resets all_skills, so selection might be lost unless we merge.
-    # The current implementation of setSkills in models.py DOES reset selection.
-    # If the app intends to preserve selection, we'd need to fix the model.
-    # For now, we test the current behavior.
+    # Note: setSkills preserves selection by path.
     model.setSkills(skills)
-    assert model.selectedCount == 0
+    assert model.selectedCount == 1

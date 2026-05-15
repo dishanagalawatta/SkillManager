@@ -69,25 +69,25 @@ Item {
                         GlassCollectionDropdown {
                             id: qcv_collectionDrop
                             Layout.preferredWidth: 160
-                            onCollectionSelected: {
-                                if (name === "All Collections") {
+                            onCollectionSelected: (collectionName) => {
+                                if (collectionName === "All Collections") {
                                     qcv_root._isInternalSelectionChange = true
                                     AppController.setViewFilter("collection", "")
                                     AppController.skillModel.clearSelection()
                                     qcv_root._isInternalSelectionChange = false
                                 } else {
                                     qcv_root._isInternalSelectionChange = true
-                                    AppController.applyCollectionSelection(name)
-                                    AppController.setViewFilter("collection", name)
+                                    AppController.applyCollectionSelection(collectionName)
+                                    AppController.setViewFilter("collection", collectionName)
                                     qcv_root._isInternalSelectionChange = false
                                 }
                             }
-                            onEditCollectionClicked: {
+                            onEditCollectionClicked: (collectionName) => {
                                 qcv_root.isEditingCollection = true
-                                qcv_root.editingCollectionName = name
+                                qcv_root.editingCollectionName = collectionName
                                 qcv_root._isInternalSelectionChange = true
-                                AppController.applyCollectionSelection(name)
-                                AppController.setViewFilter("collection", name)
+                                AppController.applyCollectionSelection(collectionName)
+                                AppController.setViewFilter("collection", collectionName)
                                 qcv_root._isInternalSelectionChange = false
                             }
 
@@ -111,8 +111,8 @@ Item {
                                 let idx = model.indexOf(AppController.skillModel.categoryFilter);
                                 return idx === -1 ? 0 : idx;
                             }
-                            onActivated: {
-                                let cat = currentIndex === 0 ? "" : currentText
+                            onActivated: (index) => {
+                                let cat = index === 0 ? "" : currentText
                                 AppController.setViewFilter("category", cat)
                             }
                         }
@@ -125,8 +125,8 @@ Item {
                                 let idx = model.indexOf(AppController.skillModel.projectFilter);
                                 return idx === -1 ? 0 : idx;
                             }
-                            onActivated: {
-                                let proj = currentIndex === 0 ? "" : currentText
+                            onActivated: (index) => {
+                                let proj = index === 0 ? "" : currentText
                                 AppController.setViewFilter("project", proj)
                             }
                         }
@@ -383,6 +383,7 @@ Item {
 
                             Button {
                                 id: barCopyBtn
+                                objectName: "copySelectedBtn"
                                 text: "Copy Selected"
                                 Layout.preferredHeight: 36
                                 onClicked: AppController.copySelectedSkillsToClipboard()
@@ -440,6 +441,7 @@ Item {
                             placeholderText: "Collection Name"
                             text: qcv_root.editingCollectionName
                             color: Theme.label
+                            placeholderTextColor: Theme.secondaryLabel
                             background: Rectangle {
                                 radius: Theme.radiusField
                                 color: Theme.glassPill
@@ -506,6 +508,7 @@ Item {
             // Skill List
             ListView {
                 id: qcv_skillList
+                objectName: "quickCopyList"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 model: AppController.skillModel

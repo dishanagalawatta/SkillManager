@@ -51,8 +51,8 @@ Item {
                     let idx = model.indexOf(AppController.skillModel.categoryFilter);
                     return idx === -1 ? 0 : idx;
                 }
-                onActivated: {
-                    let cat = currentIndex === 0 ? "" : currentText
+                onActivated: (index) => {
+                    let cat = index === 0 ? "" : currentText
                     AppController.setViewFilter("category", cat)
                 }
             }

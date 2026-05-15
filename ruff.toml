@@ -1,0 +1,45 @@
+# Ruff configuration for SkillManager
+# Purpose: Maintain high-performance linting and formatting standards.
+# Usage: ruff check .
+
+target-version = "py310"
+line-length = 100
+
+[lint]
+# Enable specific rule sets
+# E/F/W: Pycodestyle/Pyflakes/Warnings
+# I: isort (Import sorting)
+# N: pep8-naming
+# UP: pyupgrade (Modern Python syntax)
+# B: flake8-bugbear (Likely bugs)
+# A: flake8-builtins (Shadowing built-ins)
+# C4: flake8-comprehensions
+# ARG: flake8-unused-arguments
+# RET: flake8-return
+# SIM: flake8-simplify
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "ARG", "RET", "SIM"]
+
+ignore = [
+    "E501", # Line too long (handled by formatter)
+]
+
+# Allow unused imports in __init__.py files
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"src/skill_manager/gui/*" = ["N802", "N803", "N806", "N815"]
+"src/skill_manager/core/models.py" = ["N802", "N803", "N806", "N815", "B008"]
+"src/skill_manager/app.py" = ["N802", "N803", "N806", "N815"]
+"src/skill_manager/utils/win32.py" = ["N806", "N802", "F401", "F403", "F405"]
+
+[lint.isort]
+known-first-party = ["skill_manager"]
+combine-as-imports = true
+
+[lint.pep8-naming]
+classmethod-decorators = ["classmethod"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

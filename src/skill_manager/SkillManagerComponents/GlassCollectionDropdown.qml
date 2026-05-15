@@ -130,8 +130,8 @@ ComboBox {
         }
     }
 
-    onActivated: {
-        if (currentIndex >= 0) {
+    onActivated: (index) => {
+        if (index >= 0) {
             collectionSelected(currentText)
         }
     }

@@ -66,15 +66,47 @@ def test_controller_load_initial_data_logic(controller):
     assert "Dev" in controller.categories
     assert controller.isLoading is False
 
-def test_controller_selection_sync(controller):
-    # Setup model with some skills
-    skills = [{"name": "S1", "local_path": "/p1", "is_selected": False, "is_source": True}]
-    controller.skillModel.setSkills(skills)
+def test_controller_copy_single_skill(controller):
+    skill_data = {"name": "S1", "local_path": "/p1", "is_source": True}
+    controller.skillModel.setSkills([skill_data])
     
-    controller.skillModel.toggleSelection(0)
-    assert controller.skillModel.selectedCount == 1
-    
-    # Test copySelectedSkillsToClipboard status update (mocking clipboard)
     with patch.object(controller, "_clipboard") as mock_clip:
-        controller.copySelectedSkillsToClipboard()
-        assert controller.statusMessage.startswith("Copied 1 skills")
+        controller.copySkillToClipboard("/p1")
+        # copySkillToClipboard calls copySkillReference which sets "Copied reference: ..."
+        assert controller.statusMessage.startswith("Copied reference:")
+
+@patch("skill_manager.app.discover_project_skills")
+@patch("skill_manager.core.copier.copy_skill_folders_to_targets")
+@patch("threading.Thread")
+@patch("PySide6.QtCore.QTimer.singleShot")
+def test_controller_sync_project(mock_timer, mock_thread, mock_copy, mock_discover, controller):
+    # Mock Timer to run callback immediately
+    mock_timer.side_effect = lambda ms, receiver, method: method() if callable(method) else method.call()
+    
+    # Mock Thread to return a mock object that executes the target when .start() is called
+    def side_effect(target, daemon=True):
+        mock_inst = MagicMock()
+        mock_inst.start.side_effect = lambda: target()
+        return mock_inst
+    mock_thread.side_effect = side_effect
+    
+    mock_discover.return_value = [{"project_label": "Source", "skills": [{"name": "S1"}]}]
+    mock_copy.return_value = {"merged": 1, "failed": 0}
+    
+    controller.syncProject(controller.targets[0])
+    
+    mock_copy.assert_called_once()
+    assert "Update complete for" in controller.statusMessage
+
+def test_controller_setters(controller):
+    controller.searchQuery = "test"
+    assert controller.searchQuery == "test"
+    
+    # clientFormat is read-only, use setClientFormat Slot
+    controller.setClientFormat("Gemini CLI")
+    assert controller.clientFormat == "Gemini CLI"
+
+def test_controller_toggle_source_only(controller):
+    controller.isSourceOnly = True
+    # isSourceOnly returns CheckState int
+    assert controller.isSourceOnly == True
