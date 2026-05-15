@@ -69,8 +69,15 @@ Item {
                 }
                 
                 MouseArea {
+                    id: checkboxMouseArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     onClicked: (mouse) => AppController.skillModel.toggleSelection(index)
+                    cursorShape: Qt.PointingHandCursor
+
+                    ToolTip.text: (model && model.isSelected) ? "Deselect" : "Select"
+                    ToolTip.visible: containsMouse
+                    ToolTip.delay: 400
                 }
             }
 
