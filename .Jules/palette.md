@@ -1,3 +1,7 @@
 ## 2024-05-15 - Missing Interactive States in QML MouseAreas
 **Learning:** Found a pattern where interactive elements built with raw `MouseArea` components in QML (like sidebar collapse toggles or checkbox elements) lack standard UX affordances like `cursorShape: Qt.PointingHandCursor`, `hoverEnabled: true`, and `ToolTip.text`. This makes discoverability poor for icon-only interactions.
 **Action:** When working with custom QML `MouseArea` buttons instead of the standard QtQuick.Controls `Button`, always ensure we manually add hover states, cursor shapes, and tooltips for better accessibility and user confidence.
+
+## 2024-05-15 - Enhancing Screen Reader Accessibility for QML Custom Components
+**Learning:** In PySide6/QML, custom components like Rectangles and custom button layouts frequently lack built-in ARIA equivalent roles. Screen readers will ignore interactive properties (like custom multi-select checkboxes or click targets using `MouseArea`) if `Accessible.role`, `Accessible.name`, and `Accessible.description` are missing on the parent item. Also, for pseudo-checkboxes, `Accessible.checkable: true` and `Accessible.checked` mapping are required.
+**Action:** When creating interactive UI components without native QML buttons or when adding complex interaction using `MouseArea` to raw primitive items (like Rectangles), explicitly declare the appropriate `Accessible.role` (e.g. `Accessible.CheckBox` or `Accessible.Button`) and describe its intent dynamically if the state changes (e.g., expanded/collapsed categories).
