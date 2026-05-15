@@ -72,4 +72,8 @@ Button {
             }
         }
     }
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
 }
