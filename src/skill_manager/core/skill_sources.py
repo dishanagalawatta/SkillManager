@@ -553,7 +553,7 @@ def _run_repository_update(source, output_callback):
 
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
-        _run_process(["git", "-C", str(path), "pull", "--ff-only"], output_callback)
+        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get("github_token")}; }}; f"] if source.get("github_token") else []) + ["-C", str(path), "pull", "--ff-only"], output_callback)
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
