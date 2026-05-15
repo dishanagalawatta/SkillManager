@@ -12,6 +12,8 @@ dependencies = [
     "PySide6",
     "pyyaml",
     "pywinstyles",
+    "posthog>=7.14.2",
+    "python-dotenv>=1.2.2",
 ]
 
 [project.optional-dependencies]

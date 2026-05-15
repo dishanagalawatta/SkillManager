@@ -231,7 +231,8 @@ def format_project_skill_reference(skill, client_format):
             name = skill.get("name") or local_path.name
             return f"[${name}]({relative_path})"
         if client_format == "Antigravity":
-            return f"/{relative_path}"
+            name = skill.get("name") or local_path.name
+            return f"/skill:{name}"
         if client_format == "Gemini CLI":
             return f"@{relative_path}"
         return relative_path
@@ -243,7 +244,8 @@ def format_project_skill_reference(skill, client_format):
     
     relative_path = project_skill_relative_path(skill)
     if client_format == "Antigravity":
-        return f"/{relative_path}"
+        name = skill.get("name") or local_path.name
+        return f"/skill:{name}"
     if client_format == "Gemini CLI":
         return f"@{relative_path}"
     return relative_path

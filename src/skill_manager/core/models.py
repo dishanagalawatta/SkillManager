@@ -52,6 +52,7 @@ class SkillModel(QAbstractListModel):
         self._config = config
         self._collapsed_categories = set()
         self._search_engine = None
+        self._selected_ids = set() # Store selected local_paths for isolation
 
         
         if self._config:
@@ -73,6 +74,7 @@ class SkillModel(QAbstractListModel):
             return None
         
         skill = self._filtered_skills[index.row()]
+        path = skill.get("local_path", "")
         
         if role == self.NameRole:
             return skill.get("name", "")
@@ -81,13 +83,13 @@ class SkillModel(QAbstractListModel):
         elif role == self.DescriptionRole:
             return skill.get("description", "")
         elif role == self.PathRole:
-            return skill.get("local_path", "")
+            return path
         elif role == self.ProjectRole:
             return skill.get("project_label", "")
         elif role == self.IsEssentialRole:
             return skill.get("is_essential", False)
         elif role == self.IsSelectedRole:
-            return skill.get("is_selected", False)
+            return path in self._selected_ids
         elif role == self.IsArchivedRole:
             return skill.get("is_archived", False)
         elif role == self.IsCollectionRole:
@@ -262,13 +264,23 @@ class SkillModel(QAbstractListModel):
 
     @Property(int, notify=selectedCountChanged)
     def selectedCount(self):
-        return sum(1 for s in self._all_skills if s.get("is_selected", False))
+        # We only count selected items that are currently visible in the filtered list
+        count = 0
+        for s in self._filtered_skills:
+            if s.get("local_path") in self._selected_ids:
+                count += 1
+        return count
 
     @Slot(int)
     def toggleSelection(self, row):
         if 0 <= row < len(self._filtered_skills):
             skill = self._filtered_skills[row]
-            skill["is_selected"] = not skill.get("is_selected", False)
+            path = skill.get("local_path")
+            if path in self._selected_ids:
+                self._selected_ids.remove(path)
+            else:
+                self._selected_ids.add(path)
+            
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self.selectedCountChanged.emit()
@@ -276,30 +288,31 @@ class SkillModel(QAbstractListModel):
 
     @Slot()
     def clearSelection(self):
-        for skill in self._all_skills:
-            skill["is_selected"] = False
-        self._apply_filter()
+        self._selected_ids.clear()
+        self.beginResetModel()
+        self.endResetModel()
         self.selectedCountChanged.emit()
         self.userSelectionChanged.emit()
 
     @Slot()
     def selectAll(self):
         for s in self._filtered_skills:
-            s["is_selected"] = True
+            path = s.get("local_path")
+            if path:
+                self._selected_ids.add(path)
         self.beginResetModel()
         self.endResetModel()
         self.selectedCountChanged.emit()
 
     @Slot(result=list)
     def getSelectedPaths(self):
-        return [s.get("local_path") for s in self._all_skills if s.get("is_selected", False)]
+        return list(self._selected_ids)
 
     @Slot(list)
     def selectByPaths(self, paths):
-        path_set = set(paths)
-        for s in self._all_skills:
-            if s.get("local_path") in path_set:
-                s["is_selected"] = True
+        for path in paths:
+            if path:
+                self._selected_ids.add(path)
         self.beginResetModel()
         self.endResetModel()
         self.selectedCountChanged.emit()
@@ -310,7 +323,9 @@ class SkillModel(QAbstractListModel):
         Removes skills from the model given their local paths.
         Used after optimistic deletion.
         """
-        self._all_skills = [s for s in self._all_skills if s.get('local_path') not in paths]
+        path_set = set(paths)
+        self._all_skills = [s for s in self._all_skills if s.get('local_path') not in path_set]
+        self._selected_ids -= path_set
         self._apply_filter()
         self.selectedCountChanged.emit()
 
@@ -401,6 +416,7 @@ class SkillModel(QAbstractListModel):
 
         self._filtered_skills = skills
         self.endResetModel()
+        self.selectedCountChanged.emit()
 
     @Slot(int, result=dict)
     def get_skill_at(self, row):
@@ -418,11 +434,15 @@ class SkillModel(QAbstractListModel):
     def setSelected(self, row, selected):
         if 0 <= row < len(self._filtered_skills):
             skill = self._filtered_skills[row]
-            if skill.get("is_selected") != selected:
-                skill["is_selected"] = selected
-                idx = self.index(row, 0)
-                self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
-                self.selectedCountChanged.emit()
+            path = skill.get("local_path")
+            if selected:
+                self._selected_ids.add(path)
+            else:
+                self._selected_ids.discard(path)
+            
+            idx = self.index(row, 0)
+            self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
+            self.selectedCountChanged.emit()
 
     @Property(bool, notify=collapsedCategoriesChanged)
     def isAllExpanded(self):
