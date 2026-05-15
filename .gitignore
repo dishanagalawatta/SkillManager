@@ -12,6 +12,9 @@ venv/
 tmp*/
 
 .agents/
+.agent/
+.claude/
 _references/
 scratch
 conductor
+.env

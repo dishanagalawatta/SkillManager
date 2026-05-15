@@ -15,6 +15,7 @@ def normalize_skill_source_config(data):
         "name": str(detected.get("name") or "").strip(),
         "source_type": str(detected.get("source_type") or "auto").strip(),
         "repository_url": str(detected.get("repository_url") or "").strip(),
+        "github_token": str(detected.get("github_token") or "").strip(),
         "local_path": str(detected.get("local_path") or "").strip(),
         "clone_path": str(detected.get("clone_path") or "").strip(),
         "package_name": str(detected.get("package_name") or "").strip(),
@@ -25,7 +26,7 @@ def normalize_skill_source_config(data):
         "latest_version_command": str(detected.get("latest_version_command") or "").strip(),
     }
 
-    for key in ("current_version", "latest_version", "last_updated"):
+    for key in ("current_version", "latest_version", "last_updated", "managed_folders"):
         if data.get(key):
             source[key] = data.get(key)
 
@@ -64,6 +65,11 @@ def detect_source_config(data):
     elif update_command:
         source["source_type"] = "custom"
 
+    # For custom sources, if no version command is set, try using the update command as a default
+    if source.get("source_type") == "custom" and update_command:
+        if not source.get("current_version_command"):
+            source["current_version_command"] = update_command
+
     # Auto-detect verify command for local paths if not provided
     if local_path and not source.get("verify_command"):
         # Expand user path for the generated command to be more portable
@@ -100,6 +106,12 @@ def detect_git_remote(local_path):
 
 def run_skill_source_update(source, output_callback=None):
     source = normalize_skill_source_config(source)
+    # Ensure keys exist to prevent KeyError in tests or UI
+    source.setdefault("current_version", "")
+    source.setdefault("latest_version", "")
+    source.setdefault("managed_folders", [])
+    source.setdefault("removed_folders", [])
+    
     local_path = source.get("local_path")
     
     captured_output = []
@@ -119,23 +131,38 @@ def run_skill_source_update(source, output_callback=None):
     # Post-update: Move skills from installation script output if applicable
     if local_path:
         _emit(output_callback, f"[DEBUG] Relocating skills from output to: {local_path}")
-        _relocate_skills_from_output(captured_output, local_path, output_callback)
+        new_managed = _relocate_skills_from_output(captured_output, local_path, output_callback)
+        
+        if new_managed is not None:
+            old_managed = source.get("managed_folders", [])
+            # Find folders that were in old_managed but are not in new_managed
+            outdated = set(old_managed) - set(new_managed)
+            removed = []
+            if outdated:
+                _emit(output_callback, f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...")
+                dest_base = Path(os.path.expanduser(local_path))
+                for folder_name in sorted(outdated):
+                    folder_path = dest_base / folder_name
+                    if folder_path.is_dir():
+                        _emit(output_callback, f"[DEBUG] Deleting outdated skill folder: {folder_name}")
+                        try:
+                            shutil.rmtree(folder_path)
+                            removed.append(folder_name)
+                        except Exception as e:
+                            _emit(output_callback, f"[ERROR] Failed to delete {folder_name}: {e}")
+            
+            source["managed_folders"] = new_managed
+            source["removed_folders"] = removed
 
     if source.get("verify_command"):
         _emit(output_callback, f"Verifying {source['name']}...")
         _run_shell_command(source["verify_command"], output_callback)
 
-    current_version = run_version_command(source.get("current_version_command"))
-    latest_version = run_version_command(source.get("latest_version_command"))
-
-    if current_version:
-        source["current_version"] = current_version
-    elif latest_version:
-        source["current_version"] = latest_version
-
-    if latest_version:
-        source["latest_version"] = latest_version
-
+    # After update, refresh versions (handles Git tags, etc.)
+    # We update the original source dict to preserve set defaults if check_skill_source_versions returns a new dict
+    updated_source_info = check_skill_source_versions(source, force_refresh=True)
+    source.update(updated_source_info)
+    
     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return source
 
@@ -169,7 +196,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
     """Parses output log for installed paths and moves those folders to target_local_path."""
     if not target_local_path:
         _emit(output_callback, "[DEBUG] Relocation skipped: No target local_path configured.")
-        return
+        return None
 
     dest_base = Path(os.path.expanduser(target_local_path))
     
@@ -214,12 +241,25 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
 
     if not detected_paths:
         _emit(output_callback, "[DEBUG] No installation paths detected in output. Please ensure the tool is installing skills to a visible directory.")
-        return
+        return None
 
     _emit(output_callback, f"[DEBUG] Total unique paths found: {len(detected_paths)}")
     _emit(output_callback, f"[DEBUG] Relocating to target: {dest_base}")
     relocated_count = 0
+    managed_folder_names = set()
+    
     for src_path in sorted(detected_paths):
+        # Track names regardless of whether we move them (they are part of this source)
+        if src_path.name.lower() in ("skills", "agents", ".agents"):
+            try:
+                for child in src_path.iterdir():
+                    if child.is_dir() and not child.name.startswith('.'):
+                        managed_folder_names.add(child.name)
+            except Exception:
+                pass
+        else:
+            managed_folder_names.add(src_path.name)
+
         # We only want to move folders that are NOT already in the destination
         try:
             if src_path.resolve() == dest_base.resolve():
@@ -252,38 +292,38 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
     else:
         _emit(output_callback, "[DEBUG] No folders were moved (maybe already in destination or empty).")
 
+    # Handle .skill-lock.json, skills-lock.json and manifest
+    # ... (rest remains same)
+    unique_source_roots = {p.parent.parent for p in detected_paths}
+    target_root = dest_base.parent
+    
+    # If target_root is project root, use the dedicated data folder to keep root clean
+    if target_root.resolve() == Path.cwd().resolve():
+        from skill_manager.core.config import DATA_DIR
+        target_root = DATA_DIR
+    
+    for src_root in unique_source_roots:
+        for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
+            src_lock = src_root / lock_name
+            if src_lock.is_file():
+                tgt_lock = target_root / lock_name
+                if src_lock.resolve() != tgt_lock.resolve():
+                    if lock_name.endswith(".json"):
+                        _merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
+                    else:
+                        # fallback for non-json or just move if not exists
+                        try:
+                            if not tgt_lock.exists():
+                                tgt_lock.parent.mkdir(parents=True, exist_ok=True)
+                                _emit(output_callback, f"Moving manifest -> {tgt_lock}...")
+                                shutil.move(str(src_lock), str(tgt_lock))
+                        except OSError:
+                            pass
         
-        # Handle .skill-lock.json, skills-lock.json and manifest
-        # The source lockfile is typically in the parent of the skills folder (e.g. ~/.agent/.skill-lock.json)
-        # The target lockfile should be in the parent of the target local_path (e.g. C:/.../.agent/.skill-lock.json)
-        unique_source_roots = {p.parent.parent for p in detected_paths}
-        target_root = dest_base.parent
-        
-        # If target_root is project root, use the dedicated data folder to keep root clean
-        if target_root.resolve() == Path.cwd().resolve():
-            from skill_manager.core.config import DATA_DIR
-            target_root = DATA_DIR
-        
-        for src_root in unique_source_roots:
-            for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
-                src_lock = src_root / lock_name
-                if src_lock.is_file():
-                    tgt_lock = target_root / lock_name
-                    if src_lock.resolve() != tgt_lock.resolve():
-                        if lock_name.endswith(".json"):
-                            _merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
-                        else:
-                            # fallback for non-json or just move if not exists
-                            try:
-                                if not tgt_lock.exists():
-                                    tgt_lock.parent.mkdir(parents=True, exist_ok=True)
-                                    _emit(output_callback, f"Moving manifest -> {tgt_lock}...")
-                                    shutil.move(str(src_lock), str(tgt_lock))
-                            except OSError:
-                                pass
-            
-            # Clean up the original directories now that lockfiles are removed
-            _cleanup_empty_parents(src_root / "skills" / "dummy")
+        # Clean up the original directories now that lockfiles are removed
+        _cleanup_empty_parents(src_root / "skills" / "dummy")
+
+    return list(managed_folder_names)
 
 
 def _merge_and_move_lockfile(source_lock, target_lock, output_callback):
@@ -351,17 +391,137 @@ def _cleanup_empty_parents(path, levels=3):
         pass
 
 
-def check_skill_source_versions(source):
+def check_skill_source_versions(source, force_refresh=False):
     source = normalize_skill_source_config(source)
-    current_version = run_version_command(source.get("current_version_command"))
-    latest_version = run_version_command(source.get("latest_version_command"))
+    
+    current_version = source.get("current_version", "")
+    latest_version = source.get("latest_version", "")
+
+    # Helper to clean version strings
+    def clean_v(v):
+        if v and v.startswith("v"):
+            return v[1:]
+        return v
+
+    # 1. Check for explicit commands first
+    if source.get("current_version_command"):
+        detected_current = run_version_command(source.get("current_version_command"))
+        if detected_current:
+            current_version = clean_v(detected_current)
+            
+    if source.get("latest_version_command"):
+        detected_latest = run_version_command(source.get("latest_version_command"))
+        if detected_latest:
+            latest_version = clean_v(detected_latest)
+
+    # 2. GitHub Repo Override/Priority
+    repo_url = source.get("repository_url")
+    token = source.get("github_token")
+    if repo_url and ("github.com" in repo_url or "gitlab.com" in repo_url):
+        git_latest = get_git_tag(repo_url, is_remote=True, token=token)
+        if git_latest:
+            latest_version = clean_v(git_latest)
+
+    # 3. For Git sources, auto-detect local version
+    if source.get("source_type") == "git":
+        # Always try to refresh local version if directory exists
+        clone_path = source.get("clone_path") or source.get("local_path")
+        if clone_path:
+            path = Path(os.path.expanduser(clone_path))
+            if (path / ".git").is_dir():
+                detected_local = get_git_tag(str(path), is_remote=False)
+                if detected_local:
+                    current_version = clean_v(detected_local)
+        
+        if (not latest_version or force_refresh) and repo_url:
+            git_latest = get_git_tag(repo_url, is_remote=True, token=token)
+            if git_latest:
+                latest_version = clean_v(git_latest)
+
+    # 4. For NPM sources, ensure we have a latest version if missing
+    if source.get("source_type") == "npm":
+        if not latest_version or force_refresh:
+            package_name = source.get("package_name")
+            if package_name:
+                detected_latest = run_version_command(f"npm view {package_name} version")
+                if detected_latest:
+                    latest_version = clean_v(detected_latest)
+        
+        # If we just updated an NPM source and don't have a current version,
+        # we can optimistically assume it's now the latest version
+        if force_refresh and not current_version and latest_version:
+            current_version = latest_version
 
     if current_version:
-        source["current_version"] = current_version
+        source["current_version"] = clean_v(current_version)
     if latest_version:
-        source["latest_version"] = latest_version
+        source["latest_version"] = clean_v(latest_version)
 
     return source
+
+
+
+def get_authenticated_url(url: str, token: str) -> str:
+    """Injects a GitHub token into a repository URL if provided."""
+    if not token or not url or "@" in url.split("://")[-1]:
+        return url
+    
+    # Only support https for token injection
+    if url.startswith("https://"):
+        return url.replace("https://", f"https://{token}@")
+    return url
+
+
+def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
+    """Fetches the latest semantic tag or fallback to commit hash."""
+    try:
+        if is_remote:
+            auth_url = get_authenticated_url(path_or_url, token)
+            # Fetch tags from remote
+            result = subprocess.run(
+                ["git", "ls-remote", "--tags", "--sort=-v:refname", auth_url],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode == 0 and result.stdout:
+                # Format is usually: hash\trefs/tags/v1.2.3
+                lines = result.stdout.strip().split("\n")
+                for line in lines:
+                    if "^{}" in line: continue # Skip peeled tags
+                    ref = line.split("\t")[-1]
+                    tag = ref.replace("refs/tags/", "")
+                    if tag: return tag
+            
+            # Fallback to latest commit hash on main/master if no tags
+            result = subprocess.run(
+                ["git", "ls-remote", auth_url, "HEAD"],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout.split("\t")[0][:7]
+        else:
+            # Local tag discovery
+            path = Path(path_or_url)
+            if not (path / ".git").is_dir():
+                return ""
+            
+            # Try to get tag first
+            result = subprocess.run(
+                ["git", "-C", str(path), "describe", "--tags", "--abbrev=0"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout.strip()
+            
+            # Fallback to short hash
+            result = subprocess.run(
+                ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout.strip()
+    except Exception:
+        pass
+    return ""
 
 
 def run_version_command(command):
@@ -400,6 +560,8 @@ def _run_repository_update(source, output_callback):
         raise ValueError("Configure either local_path or clone_path for git sources.")
 
     path = Path(os.path.expanduser(clone_path))
+    auth_url = get_authenticated_url(repository_url, source.get("github_token"))
+    
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
         _run_process(["git", "-C", str(path), "pull", "--ff-only"], output_callback)
@@ -408,7 +570,7 @@ def _run_repository_update(source, output_callback):
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        _run_process(["git", "clone", repository_url, str(path)], output_callback)
+        _run_process(["git", "clone", auth_url, str(path)], output_callback)
 
     # Emit clone_path into output so _relocate_skills_from_output can detect it
     # when clone_path differs from local_path (staged mode).

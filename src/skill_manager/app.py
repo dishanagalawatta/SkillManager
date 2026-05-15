@@ -27,6 +27,7 @@ from skill_manager.core.config import ConfigManager, SKILL_LIBRARY_ARCHIVE_FILE,
 from skill_manager.core.parsing import parse_skill_md, categorize_skill, build_skill_search_text, parse_command_md, parse_frontmatter
 from skill_manager.core.quick_copy import discover_project_skills, discover_source_skills, format_project_skill_reference, CLIENT_FORMATS, delete_project_skill_folders
 from skill_manager.core.copier import copy_skill_folders_to_targets
+from skill_manager.core.analytics import capture_event, capture_exception, shutdown as posthog_shutdown
 
 class AppController(QObject):
     skillModelChanged = Signal()
@@ -52,9 +53,19 @@ class AppController(QObject):
 
     def __init__(self):
         super().__init__()
-        # Initialize config
+        # Initialize models
         self._config = ConfigManager()
-        self._skill_model = SkillModel(config=self._config)
+        self._library_model = SkillModel(config=self._config)
+        self._quick_copy_model = SkillModel(config=self._config)
+        
+        # Initial model configuration
+        self._library_model.showCommands = False
+        self._library_model.isSourceOnly = True
+        self._library_model.showEssentials = True
+        
+        self._quick_copy_model.showCommands = True
+        self._quick_copy_model.isSourceOnly = False
+        self._quick_copy_model.showEssentials = True
         
         self._selected_skill = {}
         self._is_loading = False
@@ -73,6 +84,8 @@ class AppController(QObject):
         self._update_sources = self._config.get("skills", [])
         for s in self._update_sources:
             s["is_updating"] = False
+            if "current_version" not in s: s["current_version"] = ""
+            if "latest_version" not in s: s["latest_version"] = ""
         self._custom_collections = self._config.get("custom_collections", {})
         
         # Updates state
@@ -97,13 +110,13 @@ class AppController(QObject):
         self._window_y = ui_state.get("window_y", 100)
         self._dark_mode = ui_state.get("dark_mode", False)
 
-        # Apply initial modes based on loaded view
+        # Initial view config based on loaded state
         if self._current_view == "Library":
-            self._skill_model.showCommands = False
-            self._skill_model.isSourceOnly = True
+            # Models are already configured in __init__
+            pass
         elif self._current_view in ["QuickCopy", "Quick Copy"]:
-            self._skill_model.showCommands = True
-            self._skill_model.isSourceOnly = False
+            # Sync any filters if needed, though they are mostly independent now
+            pass
 
         # Load archive and essentials
         self._archive_paths = []
@@ -140,7 +153,17 @@ class AppController(QObject):
 
     @Property(QObject, notify=skillModelChanged)
     def skillModel(self):
-        return self._skill_model
+        if self._current_view == "Library":
+            return self._library_model
+        return self._quick_copy_model
+
+    @Property(QObject, notify=skillModelChanged)
+    def libraryModel(self):
+        return self._library_model
+
+    @Property(QObject, notify=skillModelChanged)
+    def quickCopyModel(self):
+        return self._quick_copy_model
 
     @Property(dict, notify=selectedSkillChanged)
     def selectedSkill(self):
@@ -227,6 +250,56 @@ class AppController(QObject):
     def updateSources(self):
         return self._update_sources
 
+    @Property(str, notify=clientFormatChanged)
+    def logoSource(self):
+        fmt = self._client_format.lower()
+        if "antigravity" in fmt:
+            return self._get_asset_uri("client-logo/antigravity-color.svg")
+        elif "gemini" in fmt:
+            return self._get_asset_uri("client-logo/geminicli-color.svg")
+        elif "codex" in fmt:
+            return self._get_asset_uri("client-logo/codex-color.svg")
+        elif "plain" in fmt:
+            return self._get_asset_uri("client-logo/plaintext-color.svg")
+        
+        return self._get_asset_uri("logo/logo.png")
+
+    @Slot(str, result=str)
+    def getLogoSource(self, fmt):
+        fmt_lower = fmt.lower()
+        if "antigravity" in fmt_lower:
+            return self._get_asset_uri("client-logo/antigravity-color.svg")
+        elif "gemini" in fmt_lower:
+            return self._get_asset_uri("client-logo/geminicli-color.svg")
+        elif "codex" in fmt_lower:
+            return self._get_asset_uri("client-logo/codex-color.svg")
+        elif "plain" in fmt_lower:
+            return self._get_asset_uri("client-logo/plaintext-color.svg")
+        
+        return self._get_asset_uri("logo/logo.png")
+
+    @Slot(str, result=str)
+    def getAssetUri(self, path):
+        """Returns the absolute URI for an asset path."""
+        if getattr(sys, 'frozen', False):
+            # In frozen app, assets are bundled relative to sys._MEIPASS
+            base = Path(sys._MEIPASS) / "assets"
+        else:
+            # In source, assets are in the root assets folder
+            base = Path(__file__).resolve().parent.parent.parent / "assets"
+            
+        full_path = base / path
+        if not full_path.exists():
+            # Fallback to default logo if missing
+            if "logo/" in path:
+                full_path = base / "logo" / "logo.png"
+                
+        return full_path.as_uri()
+
+    def _get_asset_uri(self, path):
+        return self.getAssetUri(path)
+
+
     @Property(dict, notify=targetsChanged)
     def targetAliases(self):
         return self._target_aliases
@@ -236,18 +309,10 @@ class AppController(QObject):
         if self._current_view != value:
             self._current_view = value
             
-            # Apply view-specific modes to the model without clearing filters
-            if value == "Library":
-                self._skill_model.showCommands = False
-                self._skill_model.showEssentials = True
-                self._skill_model.isSourceOnly = True
-            elif value in ["QuickCopy", "Quick Copy"]:
-                self._skill_model.showCommands = True
-                self._skill_model.showEssentials = True
-                self._skill_model.isSourceOnly = False
-                
+            # Persist state
             self._save_ui_state()
             self.currentViewChanged.emit()
+            self.skillModelChanged.emit() # Notify QML that the active model changed
 
     @Property(int, notify=windowWidthChanged)
     def windowWidth(self):
@@ -465,8 +530,13 @@ class AppController(QObject):
             self._categories = cats
             self.categoriesChanged.emit()
 
-        self._skill_model.setSkills(all_skills)
-        self._skill_model.clientFilter = self._client_format
+        # Update both models with the shared skill list
+        self._library_model.setSkills(all_skills)
+        self._quick_copy_model.setSkills(all_skills)
+        
+        # Ensure client filters are set
+        self._library_model.clientFilter = self._client_format
+        self._quick_copy_model.clientFilter = self._client_format
         
         if self._projects != proj_labels:
             self._projects = proj_labels
@@ -487,13 +557,13 @@ class AppController(QObject):
         if index == -1:
             self._selected_skill = {}
         else:
-            self._selected_skill = self._skill_model.get_skill_at(index)
+            self._selected_skill = self.skillModel.get_skill_at(index)
         self.selectedSkillChanged.emit()
 
     @Slot(str)
     def copySkillToClipboard(self, path):
         # Find skill by path in all_skills
-        skill = next((s for s in self._skill_model._all_skills if s.get("local_path") == path), None)
+        skill = next((s for s in self.skillModel._all_skills if s.get("local_path") == path), None)
         if skill:
             self.copySkillReference(skill)
         else:
@@ -501,14 +571,14 @@ class AppController(QObject):
 
     @Slot()
     def copySelectedSkillsToClipboard(self):
-        paths = self._skill_model.getSelectedPaths()
+        paths = self.skillModel.getSelectedPaths()
         if not paths:
             self._set_status("No skills selected")
             return
             
         references = []
         for path in paths:
-            skill = next((s for s in self._skill_model._all_skills if s.get("local_path") == path), None)
+            skill = next((s for s in self.skillModel._all_skills if s.get("local_path") == path), None)
             if skill:
                 references.append(format_project_skill_reference(skill, self._client_format))
             else:
@@ -556,10 +626,12 @@ class AppController(QObject):
         self._save_archive()
             
         self.selectedSkillChanged.emit()
-        self._skill_model._apply_filter() # Refresh list
+        self._library_model._apply_filter()
+        self._quick_copy_model._apply_filter()
         
         status = "archived" if new_state else "restored"
         self._set_status(f"Skill {status}")
+        capture_event("skill_archived", {"action": status})
 
     @Slot()
     def toggleCurrentSkillEssential(self):
@@ -585,7 +657,8 @@ class AppController(QObject):
         self._save_essentials()
             
         self.selectedSkillChanged.emit()
-        self._skill_model._apply_filter() # Refresh list
+        self._library_model._apply_filter()
+        self._quick_copy_model._apply_filter()
         
         status = "added to essentials" if new_state else "removed from essentials"
         self._set_status(f"Skill {status}")
@@ -600,7 +673,7 @@ class AppController(QObject):
         if not path:
             return
 
-        skill = next((s for s in self._skill_model._all_skills if s.get("local_path") == path), None)
+        skill = next((s for s in self.skillModel._all_skills if s.get("local_path") == path), None)
         if not skill:
             self._set_status(f"Cannot delete: skill not found for path {path}")
             return
@@ -614,7 +687,8 @@ class AppController(QObject):
         Uses optimistic UI: removes from the model instantly, then performs
         filesystem deletion and cache patch in a background thread.
         """
-        selected = [s for s in self._skill_model._all_skills if s.get("is_selected", False)]
+        selected_paths = self.skillModel.getSelectedPaths()
+        selected = [s for s in self.skillModel._all_skills if s.get("local_path") in selected_paths]
         if not selected:
             self._set_status("No skills selected for deletion")
             return
@@ -626,13 +700,13 @@ class AppController(QObject):
             self._set_status("No target project selected")
             return
             
-        selected_paths = self._skill_model.getSelectedPaths()
+        selected_paths = self.skillModel.getSelectedPaths()
         if not selected_paths:
             self._set_status("No skills selected to copy")
             return
             
         # Get full skill objects for copier
-        selected_skills = [s for s in self._skill_model._all_skills if s.get("local_path") in selected_paths]
+        selected_skills = [s for s in self.skillModel._all_skills if s.get("local_path") in selected_paths]
         
         self._set_status(f"Copying {len(selected_skills)} skills to {self.getTargetLabel(target_path)}...")
         
@@ -647,11 +721,17 @@ class AppController(QObject):
                 if result['failed']: parts.append(f"{result['failed']} failed")
                 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
+                capture_event("skill_copied_to_project", {
+                    "skills_copied": result["copied"],
+                    "skills_merged": result["merged"],
+                    "skills_failed": result["failed"],
+                    "skills_count": len(selected_skills),
+                })
                 QTimer.singleShot(0, self, lambda: self._set_status(msg))
                 # Refresh to show new skills in the project
                 QTimer.singleShot(0, self, self.refreshSkills)
                 # Clear selection after copy
-                QTimer.singleShot(0, self, self._skill_model.clearSelection)
+                QTimer.singleShot(0, self, self.skillModel.clearSelection)
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -673,8 +753,10 @@ class AppController(QObject):
         count = len(items)
 
         # ── Step 1: Instant visual removal ──────────────────────────────────
-        self._skill_model.removeSkillsByPath(paths_to_remove)
+        self._library_model.removeSkillsByPath(paths_to_remove)
+        self._quick_copy_model.removeSkillsByPath(paths_to_remove)
         self._set_status(f"Deleting {count} item{'s' if count != 1 else ''}…")
+        capture_event("skills_deleted", {"count": count})
 
         # ── Step 2: Background disk + cache work ─────────────────────────────
         def _background_delete():
@@ -744,6 +826,7 @@ class AppController(QObject):
     @Slot(str)
     def launchSkill(self, path):
         self._set_status(f"Launching skill: {path}")
+        capture_event("skill_launched")
         self.openPath(path)
 
     @Slot(str)
@@ -797,6 +880,7 @@ class AppController(QObject):
             self._config.set("targets", self._targets)
             self.targetsChanged.emit()
             self._set_status(f"Added target: {path}")
+            capture_event("project_target_added", {"target_count": len(self._targets)})
 
     @Slot(str)
     def removeTarget(self, path):
@@ -852,6 +936,18 @@ class AppController(QObject):
         self.refreshSkills() # Refresh to update project labels in library
         self._set_status(f"Renamed project to: {alias or 'Default'}")
 
+    @Slot(str, str, result=str)
+    def verifyGitSource(self, url, token):
+        if not url: return ""
+        from skill_manager.core.skill_sources import get_git_tag
+        self._set_status(f"Verifying repository: {url}")
+        tag = get_git_tag(url, is_remote=True, token=token)
+        if tag:
+            self._set_status(f"Repository verified. Latest version: {tag}")
+        else:
+            self._set_status(f"Verification failed for: {url}")
+        return tag
+
     @Slot(str)
     def addUpdateSource(self, package_name):
         if not package_name:
@@ -873,15 +969,19 @@ class AppController(QObject):
     def addSkillSource(self, data):
         if not data:
             return
-        from skill_manager.core.skill_sources import normalize_skill_source_config
+        from skill_manager.core.skill_sources import normalize_skill_source_config, check_skill_source_versions
         new_source = normalize_skill_source_config(data)
         new_source["is_updating"] = False
         new_source["last_updated"] = "Never"
+        
+        # Immediate version check
+        new_source = check_skill_source_versions(new_source)
         
         self._update_sources.append(new_source)
         self._config.set("skills", self._update_sources)
         self.updateSourcesChanged.emit()
         self._set_status(f"Added skill source: {new_source.get('name')}")
+        capture_event("skill_source_added", {"source_type": new_source.get("source_type", "unknown")})
 
     @Slot(int, dict)
     def updateUpdateSource(self, index, data):
@@ -890,9 +990,12 @@ class AppController(QObject):
             is_updating = self._update_sources[index].get("is_updating", False)
             
             # Use core logic to normalize and detect fields
-            from skill_manager.core.skill_sources import normalize_skill_source_config
+            from skill_manager.core.skill_sources import normalize_skill_source_config, check_skill_source_versions
             updated_source = normalize_skill_source_config(data)
             updated_source["is_updating"] = is_updating
+            
+            # Refresh versions
+            updated_source = check_skill_source_versions(updated_source)
             
             self._update_sources[index] = updated_source
             self._config.set("skills", self._update_sources)
@@ -906,6 +1009,7 @@ class AppController(QObject):
             self._config.set("skills", self._update_sources)
             self.updateSourcesChanged.emit()
             self._set_status(f"Removed update source: {source.get('name')}")
+            capture_event("skill_source_removed", {"source_type": source.get("source_type", "unknown")})
 
     @Slot(int)
     def clearJustFinished(self, index):
@@ -914,6 +1018,17 @@ class AppController(QObject):
             # Force refresh
             self._update_sources[index] = dict(self._update_sources[index])
             self.updateSourcesChanged.emit()
+
+    @Slot(str, str, result=str)
+    def verifyGitSource(self, url, token=None):
+        """Verify a git source and return the latest version tag/hash."""
+        try:
+            from skill_manager.core.skill_sources import get_git_tag
+            tag = get_git_tag(url, is_remote=True, token=token)
+            return tag if tag else ""
+        except Exception as e:
+            print(f"Verify failed: {e}")
+            return ""
 
     @Slot(int)
     def runUpdate(self, index):
@@ -936,16 +1051,20 @@ class AppController(QObject):
                         QTimer.singleShot(0, self, lambda: self._set_status(msg))
                     
                     local_path = source.get("local_path")
-                    run_skill_source_update(source, log_callback)
+                    updated_source = run_skill_source_update(source, log_callback)
+                    source.update(updated_source)
                     
                     # Update timestamp
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
                     print(f"[UPDATE] Success: {source.get('name')}")
+                    capture_event("skill_source_updated", {"source_type": source.get("source_type", "unknown"), "success": True})
                 except Exception as e:
                     print(f"[UPDATE] Failed: {source.get('name')} - Error: {e}")
                     import traceback
                     traceback.print_exc()
                     error_msg = str(e)
+                    capture_event("skill_source_updated", {"source_type": source.get("source_type", "unknown"), "success": False})
+                    capture_exception(e)
                     QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed for {source.get('name')}: {error_msg}"))
                 finally:
                     
@@ -1043,7 +1162,9 @@ class AppController(QObject):
         if self._client_format != fmt:
             self._client_format = fmt
             self._config.set("client_format", fmt)
-            self._skill_model.clientFilter = fmt # Update model filter
+            # Update both models
+            self._library_model.clientFilter = fmt
+            self._quick_copy_model.clientFilter = fmt
             self.clientFormatChanged.emit()
             self._set_status(f"Client format set to: {fmt}")
 
@@ -1137,6 +1258,8 @@ class AppController(QObject):
         """
         if filter_type == "category":
             self._skill_model.categoryFilter = value
+            if value:
+                capture_event("skill_searched", {"filter_type": "category"})
         elif filter_type == "collection":
             if not value:
                 self._skill_model.collectionFilter = False
@@ -1214,10 +1337,13 @@ class AppController(QObject):
         def run_full_sync():
             try:
                 from skill_manager.core.skill_sources import run_skill_source_update
+                from skill_manager.core.quick_copy import delete_project_skill_folders
                 
                 # Phase 1: Update skill sources
                 self._set_status("Phase 1/2: Updating skill sources...")
-                for i, source in enumerate(self._update_sources):
+                all_removed_folders = []
+                for i in range(len(self._update_sources)):
+                    source = self._update_sources[i]
                     try:
                         if not source.get("local_path") and self._sources:
                             source["local_path"] = self._sources[0]
@@ -1225,21 +1351,48 @@ class AppController(QObject):
                         def log_callback(msg):
                             QTimer.singleShot(0, self, lambda: self._set_status(msg))
                         
-                        run_skill_source_update(source, log_callback)
-                        source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    except Exception as e:
-                        print(f"[UPDATE] Source failed: {source.get('name')} - {e}")
-                    finally:
-                        source["is_updating"] = False
-                        source["just_finished"] = True
-                        # Force QML update for this item
+                        # run_skill_source_update handles version detection and returns updated source
+                        updated_source = run_skill_source_update(source, log_callback)
+                        updated_source["is_updating"] = False
+                        updated_source["just_finished"] = True
+                        
+                        # Collect removed folders for project-wide cleanup
+                        if updated_source.get("removed_folders"):
+                            all_removed_folders.extend(updated_source["removed_folders"])
+                        
+                        # Update model and config
                         def update_item(idx, data):
                             self._update_sources[idx] = data
                             self.updateSourcesChanged.emit()
-                        QTimer.singleShot(0, self, lambda idx=i, s=dict(source): update_item(idx, s))
+                        QTimer.singleShot(0, self, lambda idx=i, s=dict(updated_source): update_item(idx, s))
+                    except Exception as e:
+                        print(f"[UPDATE] Source failed: {source.get('name')} - {e}")
+                        source["is_updating"] = False
+                        QTimer.singleShot(0, self, self.updateSourcesChanged.emit)
 
                 # Phase 2: Update project folders
                 self._set_status("Phase 2/2: Updating project folders...")
+                
+                # Cleanup removed folders from targets first
+                if all_removed_folders:
+                    self._set_status(f"Cleaning up {len(all_removed_folders)} removed skills from projects...")
+                    # Discover what's currently in targets to find instances to delete
+                    target_projects_state = discover_project_skills(
+                        targets=self._targets,
+                        parse_skill_md=parse_skill_md,
+                        categorize_skill=categorize_skill,
+                        build_search_text=build_skill_search_text
+                    )
+                    removed_set = set(all_removed_folders)
+                    skills_to_delete = []
+                    for p in target_projects_state:
+                        for s in p.get("skills", []):
+                            if s.get("folder_name") in removed_set:
+                                skills_to_delete.append(s)
+                    
+                    if skills_to_delete:
+                        delete_project_skill_folders(skills_to_delete)
+
                 projects = discover_project_skills(
                     targets=self._sources,
                     parse_skill_md=parse_skill_md,
@@ -1274,6 +1427,7 @@ class AppController(QObject):
                 
         threading.Thread(target=run_full_sync, daemon=True).start()
 
+
     @Slot()
     def scanForUpdates(self):
         self._set_status("Scanning for updates...")
@@ -1299,7 +1453,16 @@ class AppController(QObject):
                     target_aliases=self._target_aliases
                 )
                 
-                # 3. Compare
+                # 3. Check versions of all providers (sources)
+                from skill_manager.core.skill_sources import check_skill_source_versions
+                for i in range(len(self._update_sources)):
+                    try:
+                        updated_source = check_skill_source_versions(self._update_sources[i])
+                        self._update_sources[i] = updated_source
+                    except Exception as e:
+                        print(f"[ERROR] Failed to check versions for {self._update_sources[i].get('name')}: {e}")
+
+                # 4. Compare skills across targets
                 results = []
                 
                 # We'll build a map of source skills by name/folder
@@ -1337,8 +1500,6 @@ class AppController(QObject):
                         "folder_name": folder_name,
                         "status": item_status,
                         "status_text": item_status.replace("_", " ").title(),
-                        "version": "1.0", # Placeholder
-                        "latest_version": "1.0",
                         "targets": item_targets
                     })
                 
@@ -1347,6 +1508,7 @@ class AppController(QObject):
                     self._recalculate_stats()
                     self._is_loading = False
                     self.isLoadingChanged.emit()
+                    self.updateSourcesChanged.emit() # Refresh source version labels
                     self._set_status(f"Scan complete: {len(results)} skills processed")
 
                 QTimer.singleShot(0, self, finalize)
@@ -1373,60 +1535,30 @@ class AppController(QObject):
                 # We look in the model first
                 source_skill = next((s for s in self._skill_model._all_skills 
                                     if s.get("is_source") and s.get("name") == skill_name), None)
-                
                 if not source_skill:
-                    # Try by folder_name just in case
-                    source_skill = next((s for s in self._skill_model._all_skills 
-                                        if s.get("is_source") and s.get("folder_name") == skill_name), None)
-                
-                if not source_skill:
-                    # Fallback to manual discovery
-                    source_skills = discover_source_skills(
-                        sources=self._sources,
-                        parse_skill_md=parse_skill_md,
-                        categorize_skill=categorize_skill,
-                        build_search_text=build_skill_search_text,
-                    )
-                    source_skill = next((s for s in source_skills if s.get("name") == skill_name or s.get("folder_name") == skill_name), None)
-                
-                if not source_skill:
-                    QTimer.singleShot(0, self, lambda: self._set_status(f"Error: Skill '{skill_name}' not found."))
+                    self._set_status(f"Error: Could not find source skill {skill_name}")
                     return
 
-                # 2. Find target path
-                target_path = None
-                for path, label in self._target_aliases.items():
-                    if label == target_project_name:
-                        target_path = path
-                        break
-                
+                # 2. Find target project
+                target_path = next((t for t in self._targets if self.getTargetLabel(t) == target_project_name), None)
                 if not target_path:
-                    # Try self._targets
-                    for path in self._targets:
-                        if os.path.basename(path) == target_project_name:
-                            target_path = path
-                            break
-
-                if not target_path:
-                    QTimer.singleShot(0, self, lambda: self._set_status(f"Error: Target '{target_project_name}' not found."))
+                    self._set_status(f"Error: Could not find target project {target_project_name}")
                     return
 
                 # 3. Perform copy
-                result = copy_skill_folders_to_targets([source_skill], [target_path], update_only=False)
+                from skill_manager.core.copier import copy_skill_folders_to_targets
+                result = copy_skill_folders_to_targets([source_skill], [target_path], update_only=True)
                 
+                msg = f"Updated {skill_name} in {target_project_name}"
                 if result["failed"] > 0:
-                    msg = f"Update failed: {result['details'][0]['message']}"
-                else:
-                    msg = f"Successfully updated {skill_name} in {target_project_name}"
-                    # Update status in UI model
-                    QTimer.singleShot(0, self, lambda: self._update_item_status(skill_name, target_project_name, "up_to_date"))
+                    msg = f"Failed to update {skill_name} in {target_project_name}"
                 
                 QTimer.singleShot(0, self, lambda: self._set_status(msg))
+                # Refresh local project data
+                QTimer.singleShot(500, self, self.scanForUpdates)
                 
             except Exception as e:
-                QTimer.singleShot(0, self, lambda: self._set_status(f"Update failed: {e}"))
-                import traceback
-                traceback.print_exc()
+                QTimer.singleShot(0, self, lambda: self._set_status(f"Surgical update failed: {e}"))
 
         threading.Thread(target=run_surgical_sync, daemon=True).start()
 
@@ -1492,6 +1624,7 @@ class AppController(QObject):
         if self._save_timer.isActive():
             self._save_timer.stop()
             self._save_ui_state()
+        posthog_shutdown()
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -1546,7 +1679,9 @@ def main():
     if not engine.rootObjects():
         print("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
-        
+
+    capture_event("app_opened")
+
     # Apply native styles if available
     if HAS_PYWINSTYLES:
         def apply_native_styles():

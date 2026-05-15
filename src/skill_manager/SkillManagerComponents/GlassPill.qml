@@ -8,6 +8,7 @@ Item {
     id: root
     
     property alias color: rect.color
+    property alias radius: rect.radius
     default property alias content: container.data
 
     Rectangle {

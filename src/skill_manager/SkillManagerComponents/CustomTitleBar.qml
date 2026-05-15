@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import App 1.0
 import SkillManagerComponents 1.0
 
 Rectangle {
@@ -37,7 +38,7 @@ Rectangle {
         spacing: 10
 
         Image {
-            source: "../../../assets/logo/logo.png"
+            source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
             Layout.preferredWidth: 18
             Layout.preferredHeight: 18
             fillMode: Image.PreserveAspectFit

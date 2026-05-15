@@ -40,7 +40,7 @@ Rectangle {
             spacing: 12
             
             Image {
-                source: "../../../assets/logo/logo.png"
+                source: appController.logoSource
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 fillMode: Image.PreserveAspectFit

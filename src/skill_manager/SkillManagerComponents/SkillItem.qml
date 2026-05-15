@@ -7,7 +7,7 @@ import SkillManagerComponents 1.0
 Item {
     id: root
     width: parent.width
-    height: model && model.isCollapsed ? 0 : 64
+    height: model && model.isCollapsed ? 0 : 66
     visible: model ? !model.isCollapsed : true
     clip: true
     
@@ -32,7 +32,7 @@ Item {
     Rectangle {
         id: bg
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.margins: 5
         radius: Theme.radiusCard
         color: root.isSelected ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
         border.width: (mouseArea.containsMouse || root.isSelected) ? 1 : 0
