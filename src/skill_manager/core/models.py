@@ -336,66 +336,103 @@ class SkillModel(QAbstractListModel):
     def _apply_filter(self):
         self.beginResetModel()
 
-        skills = self._all_skills
-
-        # 1. Archive filter
-        if not self._show_archived:
-            skills = [s for s in skills if not s.get("is_archived", False)]
-
-        # 2. Collection filter (Show only physical bundles)
-        if self._collection_filter:
-            skills = [s for s in skills if s.get("is_bundle", False)]
-
-        # 3. Category filter
-        if self._category_filter:
-            skills = [s for s in skills if s.get("category") == self._category_filter]
-
-        # 3.5 Project filter - Only apply if NOT in source-only (Library) mode
-        # Note: We allow essentials from any source to pass project filter in Quick Copy mode
-        if self._project_filter and self._is_source_only is not True:
-            skills = [
-                s for s in skills
-                if s.get("project_label") == self._project_filter
-                or (self._is_source_only is False and s.get("is_essential", False))
-            ]
-
-        # 3.6 Commands filter
-        if not self._show_commands:
-            skills = [s for s in skills if not s.get("is_command", False)]
-
-        # 3.6.5 Essentials filter
-        if not self._show_essentials:
-            skills = [s for s in skills if not s.get("is_essential", False)]
-
-        # 3.6.6 Source filter
-        if self._is_source_only is True:
-            skills = [s for s in skills if s.get("is_source", False)]
-        elif self._is_source_only is False:
-            # In Quick Copy mode, we show project skills AND essentials from master
-            skills = [s for s in skills if not s.get("is_source", False) or s.get("is_essential", False)]
-
-        # 3.7 Client filter (applies to commands mainly, but could apply to skills)
-        if self._client_filter:
-            query_client = self._client_filter.lower()
-            skills = [
-                s for s in skills
-                if not s.get("client") or s.get("client").lower() == query_client
-            ]
-
-        # 4. Search text filter
+        # Check if searching is active
         if self._filter_text and self._search_engine:
-            # Get the set of skills that pass ALL other filters (Source, Archive, Category, etc.)
-            valid_skill_paths = {s.get("local_path") for s in skills}
+            # We defer filtering to the search engine.
+            # But we must pass a set of valid paths that match all other filters.
+
+            # Extract filters locally to avoid property lookups in the loop
+            project_filter = self._project_filter
+            is_source_only = self._is_source_only
+            client_filter = self._client_filter.lower() if self._client_filter else None
+            category_filter = self._category_filter
+            show_archived = self._show_archived
+            collection_filter = self._collection_filter
+            show_commands = self._show_commands
+            show_essentials = self._show_essentials
+
+            valid_skill_paths = set()
+            for s in self._all_skills:
+                if not show_archived and s.get("is_archived", False):
+                    continue
+                if collection_filter and not s.get("is_bundle", False):
+                    continue
+                if category_filter and s.get("category") != category_filter:
+                    continue
+
+                is_essential = s.get("is_essential", False)
+
+                if project_filter and is_source_only is not True and s.get("project_label") != project_filter and not (is_source_only is False and is_essential):
+                    continue
+
+                if not show_commands and s.get("is_command", False):
+                    continue
+                if not show_essentials and is_essential:
+                    continue
+
+                is_source = s.get("is_source", False)
+                if is_source_only is True and not is_source:
+                    continue
+                if is_source_only is False and is_source and not is_essential:
+                    continue
+
+                if client_filter:
+                    client = s.get("client")
+                    if client and client.lower() != client_filter:
+                        continue
+
+                valid_skill_paths.add(s.get("local_path"))
 
             results = self._search_engine.query(self._filter_text, valid_paths=valid_skill_paths)
 
             # Results are already pre-filtered by valid_paths inside the query method
-            skills = [r[0] for r in results]
-
-            # When searching, we keep the order from the search engine (relevance)
-            self._filtered_skills = skills
+            self._filtered_skills = [r[0] for r in results]
             self.endResetModel()
             return
+
+        # Optimization: Single-pass filtering instead of 7 multiple list comprehensions.
+        # This speeds up filtering dramatically for large numbers of skills.
+
+        project_filter = self._project_filter
+        is_source_only = self._is_source_only
+        client_filter = self._client_filter.lower() if self._client_filter else None
+        category_filter = self._category_filter
+        show_archived = self._show_archived
+        collection_filter = self._collection_filter
+        show_commands = self._show_commands
+        show_essentials = self._show_essentials
+
+        skills = []
+        for s in self._all_skills:
+            if not show_archived and s.get("is_archived", False):
+                continue
+            if collection_filter and not s.get("is_bundle", False):
+                continue
+            if category_filter and s.get("category") != category_filter:
+                continue
+
+            is_essential = s.get("is_essential", False)
+
+            if project_filter and is_source_only is not True and s.get("project_label") != project_filter and not (is_source_only is False and is_essential):
+                continue
+
+            if not show_commands and s.get("is_command", False):
+                continue
+            if not show_essentials and is_essential:
+                continue
+
+            is_source = s.get("is_source", False)
+            if is_source_only is True and not is_source:
+                continue
+            if is_source_only is False and is_source and not is_essential:
+                continue
+
+            if client_filter:
+                client = s.get("client")
+                if client and client.lower() != client_filter:
+                    continue
+
+            skills.append(s)
 
         # 5. Sorting: Essentials first, then by category, then by name
         def sort_key(s):

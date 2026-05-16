@@ -5,3 +5,6 @@
 ## 2025-05-15 - [Search tokenize performance]
 **Learning:** `re.compile()` inside a function called frequently (like `tokenize` during indexing) adds significant overhead. Python's `in` operator for exact word matches is drastically faster than generator comprehensions like `any(query == t for t in tokens)` especially for single word queries.
 **Action:** When working on loops or tight functions like tokenizers, always hoist `re.compile()` to the class or module level. For checking exact matches in lists, prefer the C-optimized `in` operator when the logic allows.
+## 2025-05-15 - [Optimize Filter List Comprehensions]
+**Learning:** Python list comprehensions are fast individually, but chaining multiple list comprehensions for complex filtering means iterating over the entire dataset multiple times. For an app holding potentially thousands of skills in memory and filtering on every UI interaction, this causes noticeable UI stutter.
+**Action:** Replace chained list comprehensions with a single pass loop whenever filtering large in-memory collections based on multiple independent UI toggles.
