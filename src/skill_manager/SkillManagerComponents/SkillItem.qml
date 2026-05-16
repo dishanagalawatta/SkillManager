@@ -68,6 +68,12 @@ Item {
                     visible: model && model.isSelected
                 }
                 
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "Select skill"
+                Accessible.description: "Check to select this item"
+                Accessible.checkable: true
+                Accessible.checked: model && model.isSelected
+
                 MouseArea {
                     id: checkboxMouseArea
                     anchors.fill: parent
@@ -90,11 +96,17 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: model ? ((model.isEssential && root.showEssentialIcon) ? "★" : (model.isCollection ? "📦" : (model.isCommand ? "⚡" : model.name.charAt(0).toUpperCase()))) : ""
+                    text: {
+                        if (!model) return ""
+                        if (model.isEssential && root.showEssentialIcon) return "★"
+                        if (model.isCollection) return "📦"
+                        if (model.isCommand) return "⚡"
+                        return AppController.getCategoryEmoji(model.category)
+                    }
                     font.family: Theme.fontFamily
-                    font.pixelSize: model && (model.isEssential && root.showEssentialIcon || model.isCollection || model.isCommand) ? 18 : 14
+                    font.pixelSize: (model && model.isEssential) ? 18 : 20
                     font.weight: Font.Bold
-                    color: model && (model.isEssential && root.showEssentialIcon || model.isCommand) ? Theme.accent : Theme.label
+                    color: (model && (model.isEssential || model.isCommand)) ? Theme.accent : Theme.label
                 }
             }
 
@@ -135,6 +147,9 @@ Item {
             // Delete Button
             Button {
                 id: deleteBtn
+                Accessible.role: Accessible.Button
+                Accessible.name: "Delete skill"
+                Accessible.description: "Delete this skill"
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 flat: true

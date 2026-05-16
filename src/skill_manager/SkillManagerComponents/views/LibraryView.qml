@@ -101,7 +101,7 @@ Item {
                     flat: true
                     onClicked: (mouse) => AppController.skillModel.toggleAll()
                     contentItem: Image {
-                        source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("button/collapse.svg") : AppController.getAssetUri("button/expand.svg")
+                        source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
                         sourceSize.width: 18
                         sourceSize.height: 18
                         fillMode: Image.PreserveAspectFit

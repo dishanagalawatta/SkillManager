@@ -25,13 +25,23 @@ Item {
         spacing: 8
 
         Image {
-            source: root.isCollapsed ? AppController.getAssetUri("button/expand.svg") : AppController.getAssetUri("button/collapse.svg")
+            source: root.isCollapsed ? AppController.getAssetUri("ui/expand.svg") : AppController.getAssetUri("ui/collapse.svg")
             sourceSize.width: 12
             sourceSize.height: 12
             fillMode: Image.PreserveAspectFit
             opacity: 0.6
             horizontalAlignment: Image.AlignHCenter
             verticalAlignment: Image.AlignVCenter
+        }
+
+        Text {
+            id: categoryEmoji
+            text: root.sectionName === "Essentials" ? "⭐" : AppController.getCategoryEmoji(root.sectionName)
+            font.pixelSize: 18
+            opacity: root.isCollapsed ? 0.6 : 1.0
+            Layout.alignment: Qt.AlignVCenter
+
+            Behavior on opacity { NumberAnimation { duration: 200 } }
         }
 
 
@@ -46,10 +56,18 @@ Item {
         }
     }
 
+    Accessible.role: Accessible.Button
+    Accessible.name: (root.isCollapsed ? "Expand" : "Collapse") + " category " + root.sectionName
+
     MouseArea {
         id: mouseAreaSection
         anchors.fill: parent
         hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.sectionName)
+
+        ToolTip.text: root.isCollapsed ? "Expand " + root.sectionName : "Collapse " + root.sectionName
+        ToolTip.visible: containsMouse
+        ToolTip.delay: 400
     }
 }

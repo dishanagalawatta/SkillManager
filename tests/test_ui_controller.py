@@ -45,10 +45,10 @@ def test_ui_controller_get_asset_uri(ui_controller):
     assert uri.endswith("logo.png")
 
 def test_ui_controller_open_path(ui_controller, mock_app):
-    with patch("os.startfile", create=True) as mock_startfile, \
-         patch("sys.platform", "win32"):
-        ui_controller.open_path("C:\\test.txt")
-        mock_startfile.assert_called_with("C:\\test.txt")
+    with patch("skill_manager.controllers.ui_controller.sys.platform", "win32"), \
+         patch("skill_manager.controllers.ui_controller.os.startfile", create=True) as mock_startfile:
+        ui_controller.open_path("C:/test.txt")
+        mock_startfile.assert_called_with("C:/test.txt")
         mock_app._set_status.assert_called_with("Opened: test.txt")
 
 def test_ui_controller_launch_skill(ui_controller, mock_app):

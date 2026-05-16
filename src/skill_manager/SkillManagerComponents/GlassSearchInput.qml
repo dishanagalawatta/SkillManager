@@ -65,6 +65,10 @@ TextField {
             Accessible.name: "Clear search"
             ToolTip.text: "Clear search"
             ToolTip.visible: hovered
+
+            HoverHandler {
+                cursorShape: Qt.PointingHandCursor
+            }
         }
     }
     
