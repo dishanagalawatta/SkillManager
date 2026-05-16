@@ -68,6 +68,12 @@ Item {
                     visible: model && model.isSelected
                 }
                 
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "Select skill"
+                Accessible.description: "Check to select this item"
+                Accessible.checkable: true
+                Accessible.checked: model && model.isSelected
+
                 MouseArea {
                     id: checkboxMouseArea
                     anchors.fill: parent
@@ -135,6 +141,9 @@ Item {
             // Delete Button
             Button {
                 id: deleteBtn
+                Accessible.role: Accessible.Button
+                Accessible.name: "Delete skill"
+                Accessible.description: "Delete this skill"
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 flat: true
