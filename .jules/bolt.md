@@ -8,3 +8,7 @@
 ## 2025-05-15 - [Optimize Filter List Comprehensions]
 **Learning:** Python list comprehensions are fast individually, but chaining multiple list comprehensions for complex filtering means iterating over the entire dataset multiple times. For an app holding potentially thousands of skills in memory and filtering on every UI interaction, this causes noticeable UI stutter.
 **Action:** Replace chained list comprehensions with a single pass loop whenever filtering large in-memory collections based on multiple independent UI toggles.
+
+## 2025-05-15 - [Sort Key Optimization]
+**Learning:** Initializing objects like dictionaries inside Python sorting key functions creates significant overhead because the `sort_key` function runs $O(N \log N)$ times during a list sort.
+**Action:** Always hoist static dictionaries, regex compiles, or constant computations outside of the `sort_key` (or any inner loop callback) to the module or enclosing scope. Use early returns inside such callbacks to prevent unnecessary dict `get()` lookups.
