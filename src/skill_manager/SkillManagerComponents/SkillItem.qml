@@ -78,12 +78,13 @@ Item {
                     ToolTip.text: (model && model.isSelected) ? "Deselect" : "Select"
                     ToolTip.visible: containsMouse
                     ToolTip.delay: 400
+
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: "Select skill"
+                    Accessible.description: "Check to select this item"
+                    Accessible.checkable: true
+                    Accessible.checked: model && model.isSelected
                 }
-                Accessible.role: Accessible.CheckBox
-                Accessible.name: "Select skill"
-                Accessible.description: "Check to select this item"
-                Accessible.checkable: true
-                Accessible.checked: model && model.isSelected
             }
 
             // Icon Section
