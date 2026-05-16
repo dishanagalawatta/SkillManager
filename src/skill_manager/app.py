@@ -237,29 +237,184 @@ class AppController(QObject):
     def logoSource(self):
         fmt = self._client_format.lower()
         if "antigravity" in fmt:
-            return self.ui.get_asset_uri("client-logo/antigravity-color.svg")
+            return self.ui.get_asset_uri("clients/antigravity.svg")
         if "gemini" in fmt:
-            return self.ui.get_asset_uri("client-logo/geminicli-color.svg")
+            return self.ui.get_asset_uri("clients/gemini-cli.svg")
         if "codex" in fmt:
-            return self.ui.get_asset_uri("client-logo/codex-color.svg")
+            return self.ui.get_asset_uri("clients/codex.svg")
         if "plain" in fmt:
-            return self.ui.get_asset_uri("client-logo/plaintext-color.svg")
+            return self.ui.get_asset_uri("clients/plaintext.svg")
 
-        return self.ui.get_asset_uri("logo/logo.png")
+        return self.ui.get_asset_uri("brand/logo.png")
 
     @Slot(str, result=str)
     def getLogoSource(self, fmt):
         fmt_lower = fmt.lower()
         if "antigravity" in fmt_lower:
-            return self.ui.get_asset_uri("client-logo/antigravity-color.svg")
+            return self.ui.get_asset_uri("clients/antigravity.svg")
         if "gemini" in fmt_lower:
-            return self.ui.get_asset_uri("client-logo/geminicli-color.svg")
+            return self.ui.get_asset_uri("clients/gemini-cli.svg")
         if "codex" in fmt_lower:
-            return self.ui.get_asset_uri("client-logo/codex-color.svg")
+            return self.ui.get_asset_uri("clients/codex.svg")
         if "plain" in fmt_lower:
-            return self.ui.get_asset_uri("client-logo/plaintext-color.svg")
+            return self.ui.get_asset_uri("clients/plaintext.svg")
 
-        return self.ui.get_asset_uri("logo/logo.png")
+        return self.ui.get_asset_uri("brand/logo.png")
+
+    @Slot(str, result=str)
+    def getCategoryIcon(self, category_name):
+        """Resolves the 3D isometric icon URI for a given category name."""
+        if not category_name:
+            return self.ui.get_asset_uri("categories/default.svg")
+
+        # Normalize and map categories to slugs (matches icon.md)
+        cat_lower = category_name.lower().strip()
+        
+        # Specific mappings for abbreviations to full filenames in icon.md
+        mappings = {
+            "backend dev": "backend-development",
+            "web dev": "web-development",
+            "cloud infra": "cloud-infrastructure",
+            "product mgmt": "product-management",
+            "game dev": "game-development",
+            "embedded": "embedded-systems",
+            "desktop dev": "desktop-development",
+            "knowledge mgmt": "knowledge-management",
+            "mobile dev": "mobile-development",
+            "background jobs": "background-jobs",
+            "build systems": "build-systems",
+            "code quality": "code-quality",
+            "developer tools": "developer-tools",
+            "human resources": "human-resources",
+            "mental health": "mental-health",
+            "social media": "social-media"
+        }
+
+        if cat_lower in mappings:
+            slug = mappings[cat_lower]
+        else:
+            # Standard slugification: "AI" -> "ai", "DevOps" -> "devops"
+            slug = re.sub(r'[^a-z0-9]+', '-', cat_lower).strip('-')
+        
+        asset_rel_path = f"categories/{slug}.svg"
+
+        # Check if the actual file exists in the root assets dir
+        if getattr(sys, 'frozen', False):
+            base_assets = Path(sys._MEIPASS) / "assets"
+        else:
+            base_assets = Path(__file__).resolve().parent.parent.parent / "assets"
+        
+        # Try SVG first, then PNG, then fallback to default
+        if not (base_assets / asset_rel_path).exists():
+            png_path = f"categories/{slug}.png"
+            if (base_assets / png_path).exists():
+                asset_rel_path = png_path
+            else:
+                return self.ui.get_asset_uri("categories/default.svg")
+
+        return self.ui.get_asset_uri(asset_rel_path)
+
+    @Slot(str, result=str)
+    def getCategoryEmoji(self, category_name):
+        """Returns a unique emoji for a given category name. Standardizes visual representation."""
+        if not category_name:
+            return "📁"
+            
+        # Clean the input name (remove markdown bold/italic markers and existing emojis)
+        # e.g., "**🧠 AI**" -> "AI"
+        clean_name = re.sub(r'[*_]', '', category_name) 
+        clean_name = re.sub(r'[^\w\s-]', '', clean_name).strip() 
+        
+        mapping = {
+            "AI": "🧠",
+            "Agents": "🤖",
+            "Architecture": "🏛️",
+            "Backend Development": "⚙️",
+            "Backend Dev": "⚙️",
+            "Cloud Infrastructure": "☁️",
+            "Cloud Infra": "☁️",
+            "DevOps": "♾️",
+            "Security": "🛡️",
+            "Testing": "🧪",
+            "Web Development": "🌐",
+            "Web Dev": "🌐",
+            "Business Strategy": "♟️",
+            "Marketing": "📢",
+            "Product Management": "📈",
+            "Product Mgmt": "📈",
+            "Legal": "⚖️",
+            "Finance": "💰",
+            "Logistics": "📦",
+            "Psychology": "🧩",
+            "Health": "🩺",
+            "Web3": "⛓️",
+            "Game Development": "🎮",
+            "Game Dev": "🎮",
+            "Embedded Systems": "📟",
+            "Embedded": "📟",
+            "Analytics": "📊",
+            "Background Jobs": "⏱️",
+            "Billing": "💳",
+            "Build Systems": "🏗️",
+            "Careers": "💼",
+            "Code Quality": "🧹",
+            "Communications": "📧",
+            "Compliance": "📜",
+            "Content": "📝",
+            "Data": "🧊",
+            "Databases": "🗄️",
+            "Debugging": "🐞",
+            "Design": "🎨",
+            "Desktop Development": "🖥️",
+            "Desktop Dev": "🖥️",
+            "Developer Tools": "🧰",
+            "Diagrams": "🗺️",
+            "Documentation": "📚",
+            "ERP": "🏢",
+            "Fitness": "🏋️",
+            "Human Resources": "👥",
+            "Inventory": "🏬",
+            "Knowledge Management": "💡",
+            "Knowledge Mgmt": "💡",
+            "Localization": "🌍",
+            "Manufacturing": "🏭",
+            "Mental Health": "🧘",
+            "Migration": "🛫",
+            "Mobile Development": "📱",
+            "Mobile Dev": "📱",
+            "Observability": "🔭",
+            "Performance": "🏎️",
+            "Programming Languages": "⌨️",
+            "Programming": "⌨️",
+            "Sleep": "🌙",
+            "Social Media": "💬",
+            "Core Workflow": "🔄",
+            "Shell Scripting": "🐚",
+            "Payments": "💸",
+            "Linting": "✨",
+            "Procurement": "🛒",
+            "Quality Control": "💎",
+            "Rehabilitation": "🩹",
+            "Traditional Medicine": "🌿",
+            "Uncategorized": "📁"
+        }
+        
+        # 1. Exact case-sensitive match on clean name
+        if clean_name in mapping:
+            return mapping[clean_name]
+            
+        # 2. Case-insensitive match on clean name
+        cat_lower = clean_name.lower()
+        for k, v in mapping.items():
+            if k.lower() == cat_lower:
+                return v
+                
+        # 3. Substring match (e.g., "Web" matches "Web Development")
+        for k, v in mapping.items():
+            if k.lower() in cat_lower or cat_lower in k.lower():
+                return v
+
+        return "📁"
 
     @Slot(str, result=str)
     def getAssetUri(self, path):
@@ -960,7 +1115,7 @@ def main():
     QQuickStyle.setStyle("Basic")
 
     app = QGuiApplication(sys.argv)
-    app.setWindowIcon(QIcon(resource_path("assets/logo/logo.png")))
+    app.setWindowIcon(QIcon(resource_path("assets/brand/logo.png")))
 
     controller = AppController()
 

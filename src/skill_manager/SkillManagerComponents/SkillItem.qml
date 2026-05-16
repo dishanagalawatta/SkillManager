@@ -96,11 +96,17 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: model ? ((model.isEssential && root.showEssentialIcon) ? "★" : (model.isCollection ? "📦" : (model.isCommand ? "⚡" : model.name.charAt(0).toUpperCase()))) : ""
+                    text: {
+                        if (!model) return ""
+                        if (model.isEssential && root.showEssentialIcon) return "★"
+                        if (model.isCollection) return "📦"
+                        if (model.isCommand) return "⚡"
+                        return AppController.getCategoryEmoji(model.category)
+                    }
                     font.family: Theme.fontFamily
-                    font.pixelSize: model && (model.isEssential && root.showEssentialIcon || model.isCollection || model.isCommand) ? 18 : 14
+                    font.pixelSize: (model && model.isEssential) ? 18 : 20
                     font.weight: Font.Bold
-                    color: model && (model.isEssential && root.showEssentialIcon || model.isCommand) ? Theme.accent : Theme.label
+                    color: (model && (model.isEssential || model.isCommand)) ? Theme.accent : Theme.label
                 }
             }
 
