@@ -87,4 +87,8 @@ Switch {
         verticalAlignment: Text.AlignVCenter
         leftPadding: control.indicator.width + control.spacing
     }
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
 }

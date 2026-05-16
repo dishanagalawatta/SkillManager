@@ -36,7 +36,11 @@ def test_config_controller_add_target(config_controller, mock_app):
 def test_config_controller_get_target_label(config_controller, mock_app):
     mock_app._target_aliases = {"C:\\project": "MyProj"}
     assert config_controller.get_target_label("C:\\project") == "MyProj"
-    assert config_controller.get_target_label("C:\\other") == "other"
+    import sys
+    if sys.platform == "win32":
+        assert config_controller.get_target_label("C:\\other") == "other"
+    else:
+        assert config_controller.get_target_label("C:\\other") == "C:\\other"
 
 def test_config_controller_set_target_alias(config_controller, mock_app):
     config_controller.set_target_alias("/path/p", "NewName")
