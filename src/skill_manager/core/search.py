@@ -19,6 +19,9 @@ class SkillIndexer:
     """
     Indexes skills for faster and more relevant searching.
     """
+    # Compile regex once for performance
+    _TOKEN_REGEX = re.compile(r'\b\w+\b')
+
     def __init__(self):
         self.vocabulary = set()
 
@@ -27,7 +30,7 @@ class SkillIndexer:
         if not text:
             return []
         # Remove special chars and split by whitespace/punctuation
-        tokens = re.findall(r'\b\w+\b', text.lower())
+        tokens = self._TOKEN_REGEX.findall(text.lower())
         return [t for t in tokens if len(t) > 1]
 
     def build_index_data(self, skill: dict[str, Any]) -> dict[str, Any]:
@@ -121,7 +124,8 @@ class SearchEngine:
         ) / 2.0 # Normalize roughly to 0-100 scale
 
         # Boost exact word matches in name
-        if any(query == t for t in index_data["name_tokens"]):
+        # Optimization: use tokens list if it's a single word query
+        if " " not in query and query in index_data["name_tokens"] or " " in query and any(query == t for t in index_data["name_tokens"]):
             final_score = max(final_score, 90.0)
 
         return min(final_score, 100.0)
