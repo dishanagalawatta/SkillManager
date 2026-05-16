@@ -46,10 +46,9 @@ Item {
         }
     }
 
-    Accessible.role: Accessible.Button
-    Accessible.name: (root.isCollapsed ? "Expand" : "Collapse") + " category " + root.sectionName
-
     MouseArea {
+        Accessible.role: Accessible.Button
+        Accessible.name: (root.isCollapsed ? "Expand" : "Collapse") + " category " + root.sectionName
         id: mouseAreaSection
         anchors.fill: parent
         hoverEnabled: true
