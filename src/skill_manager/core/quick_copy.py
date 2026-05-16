@@ -190,7 +190,7 @@ def project_label(target_path, target_aliases=None, original_target=None):
 
     # Full scan for matching normalized keys
     for k, v in target_aliases.items():
-        if _normalize_path(k) == norm_target or (norm_original and _normalize_path(k) == norm_original):
+        if _normalize_path(k).lower() == norm_target or (norm_original and _normalize_path(k).lower() == norm_original):
             return v
 
     # Use standard format if no alias: "RootName (Base)"
