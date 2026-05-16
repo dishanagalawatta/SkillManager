@@ -442,35 +442,31 @@ class SkillModel(QAbstractListModel):
             skills.append(s)
 
         # 5. Sorting: Essentials first, then by category, then by name
+        # Optimization: Pre-compute order string prefix to avoid dict lookup per item
+        order_map = {
+            "⚙️ System & Workflow": "1_⚙️ System & Workflow",
+            "🛠️ Core Engineering & Technology": "2_🛠️ Core Engineering & Technology",
+            "📈 Business & Operations": "3_📈 Business & Operations",
+            "🛡️ Quality & Data": "4_🛡️ Quality & Data",
+            "📚 Content & Knowledge": "5_📚 Content & Knowledge",
+            "🧘 Specialized & Lifestyle": "6_🧘 Specialized & Lifestyle"
+        }
+
         def sort_key(s):
-            is_essential = s.get("is_essential", False)
-            is_command = s.get("is_command", False)
-            is_bundle = s.get("is_bundle", False)
+            # Early returns avoid unnecessary `.get()` calls for standard skills
+            if s.get("is_command", False):
+                return (f"0_Special|{s.get('category', 'General')}", s.get("name", "").lower())
+            if s.get("is_essential", False):
+                return ("0_Special|Essentials", s.get("name", "").lower())
+            if s.get("is_bundle", False):
+                return ("0_Special|Collections", s.get("name", "").lower())
 
             main_cat = s.get("main_category", "⚙️ System & Workflow")
             sub_cat = s.get("category", "General")
             name = s.get("name", "").lower()
 
-            if is_command:
-                section_sort = f"0_Special|{sub_cat}"
-            elif is_essential:
-                section_sort = "0_Special|Essentials"
-            elif is_bundle:
-                section_sort = "0_Special|Collections"
-            else:
-                # Custom sorting for main categories as requested in docs
-                order = {
-                    "⚙️ System & Workflow": 1,
-                    "🛠️ Core Engineering & Technology": 2,
-                    "📈 Business & Operations": 3,
-                    "🛡️ Quality & Data": 4,
-                    "📚 Content & Knowledge": 5,
-                    "🧘 Specialized & Lifestyle": 6
-                }
-                main_order = order.get(main_cat, 99)
-                section_sort = f"{main_order}_{main_cat}|{sub_cat}"
-
-            return (section_sort, name)
+            main_order_str = order_map.get(main_cat, f"99_{main_cat}")
+            return (f"{main_order_str}|{sub_cat}", name)
 
         skills.sort(key=sort_key)
 
