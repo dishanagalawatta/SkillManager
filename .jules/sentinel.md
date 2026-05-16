@@ -10,3 +10,7 @@
 **Vulnerability:** Subprocess outputs and `subprocess.CalledProcessError` exceptions leaked plaintext authentication tokens injected into git clone URLs.
 **Learning:** Functions that execute subprocesses with authenticated endpoints (like `get_authenticated_url`) must actively sanitize their output streams and exception objects to prevent secrets from reaching terminal logs or UI output windows.
 **Prevention:** Always wrap logging/emission layers and exception instantiation in a sanitization helper that strips sensitive `userinfo` components from URLs (e.g., `re.sub(r'(https?://)[^@/\s]+@', r'\1***@', text)`).
+## $(date +%Y-%m-%d) - [CRITICAL] Command Injection in Git Credential Helper
+**Vulnerability:** Found a command injection vulnerability where a GitHub token was directly embedded into `git -c credential.helper='!f() { ... }'` commands without escaping. Since Git executes credential helpers starting with `!` via the shell, this allowed for arbitrary shell command execution if a malicious token was provided.
+**Learning:** In contexts where values are passed to sub-shells (like Git's `!` command execution), simple string formatting is unsafe, even for seemingly simple strings like tokens.
+**Prevention:** Always use `shlex.quote()` when embedding dynamic, untrusted values (like tokens or API keys) into shell commands or configurations that are interpreted by shells, to guarantee they are handled as literal strings.
