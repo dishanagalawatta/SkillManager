@@ -14,3 +14,6 @@
 ## 2024-05-16 - Standard Components Lose Hover Cursors When Customized
 **Learning:** Standard QtQuick.Controls components like `Switch`, inner `Button` inside `TextField` backgrounds, and custom `Button` styles often do not inherit or display the expected `Qt.PointingHandCursor` by default when hovered, leading to lower discoverability.
 **Action:** When customizing these input components, embed a `HoverHandler { cursorShape: Qt.PointingHandCursor }` at the root of the control to ensure proper interaction feedback.
+## 2024-05-16 - Custom QtQuick Controls Lose Hover Affordances
+**Learning:** In QML, when customizing basic input controls like `Button` (e.g. `SidebarButton` and `TopBarButton`), replacing the standard background/contentItem can strip away native interaction affordances like hover cursor shapes and appropriate accessibility roles if not correctly re-defined.
+**Action:** When building custom `Button` components (not just raw `MouseArea` items), always explicitly re-declare `Accessible.role`, `Accessible.name`, and embed a `HoverHandler { cursorShape: Qt.PointingHandCursor }` at the root of the control to ensure interaction feedback and a11y compatibility.
