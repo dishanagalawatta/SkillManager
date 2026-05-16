@@ -1,4 +1,11 @@
+
 import pytest
+from unittest.mock import patch, MagicMock
+
+@pytest.fixture
+def mock_run():
+    with patch("subprocess.run") as mock:
+        yield mock
 import os
 import subprocess
 from pathlib import Path
@@ -8,7 +15,6 @@ from skill_manager.core.skill_sources import (
     detect_source_config,
     run_skill_source_update,
     _relocate_skills_from_output,
-    get_authenticated_url,
     get_git_tag,
     _run_repository_update,
     _run_npm_update,
@@ -80,13 +86,6 @@ def test_run_skill_source_update_with_relocation(mock_check, mock_relocate, mock
     assert updated["removed_folders"] == ["old-skill"]
     assert updated["current_version"] == "2.0.0"
 
-def test_get_authenticated_url():
-    assert get_authenticated_url("https://github.com/repo.git", "token123") == "https://token123@github.com/repo.git"
-    assert get_authenticated_url("http://github.com/repo.git", "token123") == "http://github.com/repo.git"
-    assert get_authenticated_url("https://github.com/repo.git", None) == "https://github.com/repo.git"
-    assert get_authenticated_url("https://user:pass@github.com/repo.git", "token123") == "https://user:pass@github.com/repo.git"
-
-@patch("subprocess.run")
 def test_get_git_tag_remote(mock_run):
     mock_result = MagicMock()
     mock_result.returncode = 0
