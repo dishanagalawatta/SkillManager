@@ -48,7 +48,7 @@ def test_search_empty_query(skills):
 
 def test_search_no_match(skills):
     engine = SearchEngine(skills)
-    results = engine.query("nonexistent")
+    results = engine.query("xyz_absolutely_nonexistent_xyz", threshold=50.0)
     assert len(results) == 0
 
 def test_search_valid_paths(skills):

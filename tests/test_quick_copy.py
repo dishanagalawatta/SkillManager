@@ -55,7 +55,7 @@ def test_discover_project_skills_success(temp_dir):
     (skill_a / "SKILL.md").write_text("---\nname: Alpha\n---\n")
     
     def mock_parse(p): return {"name": "Alpha"}
-    def mock_cat(n, d): return "Cat"
+    def mock_cat(n, d): return {"main_category": "Main", "sub_category": "Cat"}
     def mock_search(s): return "search"
     
     projects = discover_project_skills([str(skills_dir)], mock_parse, mock_cat, mock_search)
@@ -119,7 +119,7 @@ def test_discover_source_skills_duplicates(temp_dir):
     source_dir.mkdir()
     
     # Discovery twice with same path (should deduplicate)
-    skills = discover_source_skills([str(source_dir), str(source_dir)], lambda p: {}, lambda n, d: "C", lambda s: "s")
+    skills = discover_source_skills([str(source_dir), str(source_dir)], lambda p: {}, lambda n, d: {"main_category": "M", "sub_category": "C"}, lambda s: "s")
     # No skills found but should only scan once (seen_sources set)
     assert len(skills) == 0
 
@@ -266,7 +266,7 @@ def test_discover_source_skills(temp_dir):
     (skill_dir / "SKILL.md").write_text("---\nname: Alpha\n---\n")
     
     def mock_parse(p): return {"name": "Alpha"}
-    def mock_cat(n, d): return "Cat"
+    def mock_cat(n, d): return {"main_category": "Main", "sub_category": "Cat"}
     def mock_search(s): return "search"
     
     skills = discover_source_skills([str(source_dir)], mock_parse, mock_cat, mock_search)

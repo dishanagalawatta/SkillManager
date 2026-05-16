@@ -64,6 +64,18 @@ All code changes must pass the following criteria:
 2. **Type-Safe**: Use Python type hints in all new code.
 3. **Tested**: New features should include unit tests in the `tests/` directory.
 
+### 4. Documentation Synchronization
+SkillManager maintains a strict 1:1 mapping between the Python categorization logic and the `CATEGORIES.md` guide. 
+
+If you add or modify categories in `src/skill_manager/core/parsing.py` or `src/skill_manager/app.py`, you must run the verification script to ensure documentation parity:
+
+```bash
+# Verify that documentation matches the current codebase logic
+uv run python scratch/verify_sync.py
+```
+
+This script extracts keywords and emoji mappings directly from the source code and highlights any discrepancies in the documentation.
+
 ## Building Executables
 
 SkillManager is packaged into standalone executables using PyInstaller.

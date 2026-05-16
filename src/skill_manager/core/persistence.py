@@ -12,6 +12,7 @@ from skill_manager.core.config import (
     SKILL_LIBRARY_ARCHIVE_FILE,
     SKILL_LIBRARY_CACHE_FILE,
     SKILL_LIBRARY_ESSENTIALS_FILE,
+    TEMP_COPIES_FILE,
 )
 
 # Fields that are expensive to store but read on-demand from disk.
@@ -123,3 +124,23 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
     except Exception as exc:
         print(f"[CACHE] Patch failed: {exc}")
         return 0
+
+def save_temp_registry(paths: list[str]) -> None:
+    """Saves the list of temporary copy paths to the registry."""
+    try:
+        with open(TEMP_COPIES_FILE, 'w') as f:
+            json.dump({"temp_paths": paths}, f, indent=4)
+    except Exception as e:
+        print(f"Error saving temp registry: {e}")
+
+def load_temp_registry() -> list[str]:
+    """Loads the list of temporary copy paths from the registry."""
+    if not os.path.exists(TEMP_COPIES_FILE):
+        return []
+    try:
+        with open(TEMP_COPIES_FILE) as f:
+            data = json.load(f)
+            return data.get("temp_paths", [])
+    except Exception as e:
+        print(f"Error loading temp registry: {e}")
+        return []

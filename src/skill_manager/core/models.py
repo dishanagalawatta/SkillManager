@@ -23,6 +23,7 @@ class SkillModel(QAbstractListModel):
     IsCollapsedRole = Qt.UserRole + 17
     IsCommandRole = Qt.UserRole + 18
     ClientRole = Qt.UserRole + 19
+    MainCategoryNameRole = Qt.UserRole + 20
 
     filterChanged = Signal()
     showArchivedChanged = Signal()
@@ -97,12 +98,17 @@ class SkillModel(QAbstractListModel):
             return skill.get("is_bundle", False)
         if role == self.SectionRole:
             if skill.get("is_command", False):
-                return skill.get("category", "Custom Commands") or "Custom Commands"
+                return f"Special|{skill.get('category', 'Custom Commands') or 'Custom Commands'}"
             if skill.get("is_essential", False):
-                return "Essentials"
+                return "Special|Essentials"
             if skill.get("is_bundle", False):
-                return "Collections"
-            return skill.get("category", "General")
+                return "Special|Collections"
+
+            main_cat = skill.get("main_category", "⚙️ System & Workflow")
+            sub_cat = skill.get("category", "General")
+            return f"{main_cat}|{sub_cat}"
+        if role == self.MainCategoryNameRole:
+            return skill.get("main_category", "⚙️ System & Workflow")
         if role == self.RawContentRole:
             return skill.get("raw_content", "")
         if role == self.BodyContentRole:
@@ -140,6 +146,7 @@ class SkillModel(QAbstractListModel):
             self.BodyContentRole: b"bodyContent",
             self.RiskRole: b"risk",
             self.SourceRole: b"source",
+            self.MainCategoryNameRole: b"mainCategoryName",
             self.DateRole: b"date",
             self.IsCollapsedRole: b"isCollapsed",
             self.IsCommandRole: b"isCommand",
@@ -439,19 +446,31 @@ class SkillModel(QAbstractListModel):
             is_essential = s.get("is_essential", False)
             is_command = s.get("is_command", False)
             is_bundle = s.get("is_bundle", False)
-            category = s.get("category", "General")
+
+            main_cat = s.get("main_category", "⚙️ System & Workflow")
+            sub_cat = s.get("category", "General")
             name = s.get("name", "").lower()
 
             if is_command:
-                section = category or "Custom Commands"
+                section_sort = f"0_Special|{sub_cat}"
             elif is_essential:
-                section = "0_Essentials"
+                section_sort = "0_Special|Essentials"
             elif is_bundle:
-                section = "Collections"
+                section_sort = "0_Special|Collections"
             else:
-                section = category
+                # Custom sorting for main categories as requested in docs
+                order = {
+                    "⚙️ System & Workflow": 1,
+                    "🛠️ Core Engineering & Technology": 2,
+                    "📈 Business & Operations": 3,
+                    "🛡️ Quality & Data": 4,
+                    "📚 Content & Knowledge": 5,
+                    "🧘 Specialized & Lifestyle": 6
+                }
+                main_order = order.get(main_cat, 99)
+                section_sort = f"{main_order}_{main_cat}|{sub_cat}"
 
-            return (section, name)
+            return (section_sort, name)
 
         skills.sort(key=sort_key)
 
@@ -519,15 +538,13 @@ class SkillModel(QAbstractListModel):
 
     @Slot()
     def collapseAll(self):
-        # Get all unique section names from filtered skills
+        # Get all unique main categories from filtered skills
         sections = set()
         for skill in self._filtered_skills:
-            if skill.get("is_essential", False):
-                sections.add("Essentials")
-            elif skill.get("is_bundle", False):
-                sections.add("Collections")
+            if skill.get("is_essential", False) or skill.get("is_bundle", False) or skill.get("is_command", False):
+                sections.add("Special")
             else:
-                sections.add(skill.get("category", "General"))
+                sections.add(skill.get("main_category", "⚙️ System & Workflow"))
 
         self._collapsed_categories.update(sections)
         self._save_collapsed()

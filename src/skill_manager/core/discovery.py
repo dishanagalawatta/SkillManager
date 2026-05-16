@@ -91,6 +91,7 @@ class DiscoveryService:
         data = {
             "id": str(local_path),
             "name": skill.get("name", "Unknown"),
+            "main_category": skill.get("main_category", "⚙️ System & Workflow"),
             "category": skill.get("category", "Uncategorized"),
             "description": skill.get("description", ""),
             "local_path": local_path,
@@ -129,6 +130,7 @@ class DiscoveryService:
         data = {
             "id": str(cmd_file),
             "name": cmd_data_raw.get("name") or cmd_file.stem,
+            "main_category": cmd_data_raw.get("main_category") or "⚙️ System & Workflow",
             "category": cmd_data_raw.get("category") or "Custom Commands",
             "description": cmd_data_raw.get("description", ""),
             "local_path": str(cmd_file),

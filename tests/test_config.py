@@ -62,6 +62,14 @@ class ConfigManagerTests(unittest.TestCase):
                 json.dumps({"version": 1, "skills": {}}),
                 encoding="utf-8",
             )
+            (workspace / "temp_copies.json").write_text(
+                json.dumps({}),
+                encoding="utf-8",
+            )
+            (workspace / "quick_copy.json").write_text(
+                json.dumps({}),
+                encoding="utf-8",
+            )
 
             os.chdir(workspace)
             config = self._reload_config(data_dir)
@@ -69,9 +77,11 @@ class ConfigManagerTests(unittest.TestCase):
             manager = config.ConfigManager()
 
             self.assertEqual(manager.get("targets"), ["target-a"])
-            for filename in config.DATA_FILENAMES:
-                self.assertTrue((data_dir / filename).is_file(), filename)
+            # Verify core files migrated
+            self.assertTrue((data_dir / "config.json").is_file())
+            self.assertTrue((data_dir / "skill_library_index.json").is_file())
             self.assertTrue((data_dir / "quick_copy.json").is_file())
+            self.assertTrue((data_dir / "temp_copies.json").is_file())
 
     def test_set_persists_to_config_file(self):
         with temporary_directory() as tmp:

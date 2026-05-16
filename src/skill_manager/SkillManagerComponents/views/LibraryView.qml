@@ -273,9 +273,38 @@ Item {
                         }
 
                         Button {
+                            id: lv_tempCopyBtn
+                            Layout.preferredHeight: 36
+                            onClicked: (mouse) => {
+                                if (lv_targetDrop.currentIndex >= 0 && lv_targetDrop.currentIndex < AppController.targets.length) {
+                                    let path = AppController.targets[lv_targetDrop.currentIndex]
+                                    AppController.copySelectedSkillsToTargetTemporarily(path)
+                                }
+                            }
+                            contentItem: Text {
+                                text: "Copy Temporarily"
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.Bold
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            background: Rectangle {
+                                implicitWidth: 130
+                                radius: Theme.radiusField
+                                color: lv_tempCopyBtn.hovered ? Theme.accent + "15" : "transparent"
+                                border.color: Theme.accent
+                                border.width: 1
+                            }
+                            ToolTip.visible: hovered
+                            ToolTip.text: "Copies selected skills to the target project temporarily. They will be deleted when you close this app."
+                        }
+
+                        Button {
                             id: lv_deleteBtn
                             Layout.preferredHeight: 36
-                            onClicked: (mouse) => AppController.deleteSelectedSkills()
+                        onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
                             contentItem: RowLayout {
                                 spacing: 4
                                 Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
@@ -316,11 +345,11 @@ Item {
                 clip: true
                 spacing: 0
                 
-                section.property: "sectionName"
+                section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
                 section.delegate: CategoryHeader {
-                    sectionName: section
                     width: lv_listView.width
+                    mainCatName: section
                 }
                 delegate: SkillItem {
                     width: lv_listView.width
@@ -328,6 +357,9 @@ Item {
                     showEssentialIcon: false
                     onClicked: (mouse) => {
                         AppController.selectSkill(index)
+                    }
+                    onDeleteRequested: (name, path) => {
+                        lv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))
                     }
                 }
             }
@@ -351,5 +383,9 @@ Item {
 
     CommandCreateDialog {
         id: lv_commandDialog
+    }
+
+    DeleteConfirmDialog {
+        id: lv_deleteConfirmDialog
     }
 }
