@@ -90,6 +90,7 @@ Detailed documentation can be found in the `docs/` directory:
 - [User Guide](docs/USER_GUIDE.md) - How to use the application features.
 - [Development Guide](docs/DEVELOPMENT.md) - Detailed local setup and build instructions.
 - [Architecture Guide](docs/ARCHITECTURE.md) - System design and packaging architecture.
+- [Category Icons](docs/CATEGORY_ICONS.md) - Specification for category-to-emoji mappings and icon sourcing.
 
 ## Deployment & CI/CD
 

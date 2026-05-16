@@ -63,8 +63,8 @@ class UIController(BaseController):
             base = Path(__file__).resolve().parent.parent.parent.parent / "assets"
 
         full_path = base / path
-        if not full_path.exists() and "logo/" in path:
-            full_path = base / "logo" / "logo.png"
+        if not full_path.exists() and ("brand/" in path or "logo" in path):
+            return self.get_asset_uri("brand/logo.png")
 
         return full_path.as_uri()
 
