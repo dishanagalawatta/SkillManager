@@ -33,3 +33,8 @@ skill-manager = "skill_manager.__main__:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["skill_manager*"]
+
+[dependency-groups]
+dev = [
+    "pytest-qt>=4.5.0",
+]

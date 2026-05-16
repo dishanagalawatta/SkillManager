@@ -143,7 +143,7 @@ def test_skill_model_data_various_roles(qapp, skill_list):
     assert model.data(idx, SkillModel.DescriptionRole) == "Desc A"
     assert model.data(idx, SkillModel.IsEssentialRole) is True
     assert model.data(idx, SkillModel.IsCollectionRole) is True
-    assert model.data(idx, SkillModel.SectionRole) == "Essentials"
+    assert model.data(idx, SkillModel.SectionRole) == "Special|Essentials"
     assert model.data(idx, SkillModel.RawContentRole) == "Raw"
     assert model.data(idx, SkillModel.BodyContentRole) == "Body"
     assert model.data(idx, SkillModel.RiskRole) == "High"
@@ -231,22 +231,22 @@ def test_skill_model_expansion_logic(qapp, skill_list):
     
     # Section expansion (default all expanded)
     assert model.isAllExpanded is True
-    assert model.isCategoryCollapsed("Core") is False
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is False
     
     # Collapse section
-    model.toggleCategory("Core")
-    assert model.isCategoryCollapsed("Core") is True
+    model.toggleCategory("⚙️ System & Workflow|Core")
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is True
     assert model.isAllExpanded is False
     assert model.data(model.index(0, 0), SkillModel.IsCollapsedRole) is True
     
     # Expand section
     model.expandAll()
-    assert model.isCategoryCollapsed("Core") is False
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is False
     assert model.isAllExpanded is True
     
     # Collapse all
     model.collapseAll()
-    assert model.isCategoryCollapsed("Core") is True
+    assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
     assert model.isAllExpanded is False
     
     # Toggle all (expands since it's currently collapsed)
@@ -283,9 +283,8 @@ def test_skill_model_collapse_special_sections(qapp):
     model.setSkills(skills)
     
     model.collapseAll()
-    assert model.isCategoryCollapsed("Essentials") is True
-    assert model.isCategoryCollapsed("Collections") is True
-    assert model.isCategoryCollapsed("General") is True
+    assert model.isCategoryCollapsed("Special") is True
+    assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
 
 def test_skill_model_toggle_selection_edge(qapp, skill_list):
     model = SkillModel()

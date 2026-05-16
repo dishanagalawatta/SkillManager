@@ -19,3 +19,4 @@ CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml
 SourceEditDialog 1.0 dialogs/SourceEditDialog.qml
 ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml
+DeleteConfirmDialog 1.0 dialogs/DeleteConfirmDialog.qml

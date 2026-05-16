@@ -32,6 +32,16 @@ To prevent the `AppController` from becoming a "God Object," responsibilities ar
 - **`UpdateService`**: Handles the low-level logic for comparing versions and performing surgical file updates.
 - **`ConfigManager`**: Low-level persistence for `config.json`.
 
+### 4. Categorization Engine (`core/parsing.py`)
+
+The application implements an intelligent auto-classification system for skills without explicit frontmatter categories:
+- **Weighted Frequency**: Matches keywords against skill content, with the `name` field weighted 2x more than the `description`.
+- **Normalization**: Markdown markers are stripped before matching to ensure consistent lookup.
+- **Visual Resolution**:
+    1. **Primary**: `AppController` resolves a pre-defined emoji mapping in `AppController.getCategoryEmoji` as the definitive visual identifier.
+    2. **Definitive Guide**: Full mapping logic and keywords are documented in `docs/CATEGORIES.md`.
+    3. **Generic**: Fallback to a folder icon (`📁`) for unknown categories.
+
 ---
 
 ## UI Design & The "Solid Matte" Aesthetic

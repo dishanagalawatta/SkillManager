@@ -21,6 +21,7 @@ The Library is where you manage your source skills.
 -   **Skill Inspector**: Clicking on any skill opens the Inspector pane on the right. Here you can read the full documentation of the skill, view its raw Markdown, and manage its metadata.
 -   **Creating Commands**: From the Inspector, you can create quick custom `.md` commands based on the skill for specific projects.
 -   **Copying to Projects**: You can select one or multiple skills (using checkboxes) and hit the "Copy to Targets" button to deploy them into specific project folders.
+-   **Automatic Categorization**: SkillManager intelligently categorizes your skills based on their content. By analyzing keywords in the title and description, the app assigns a visual identity (emoji) to each skill. For a full list of supported categories and their trigger keywords, see the **[Categorization Guide](CATEGORIES.md)**.
 
 ---
 

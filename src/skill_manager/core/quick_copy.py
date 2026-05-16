@@ -92,10 +92,12 @@ def discover_source_skills(sources, parse_skill_md, categorize_skill, build_sear
             skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
             skill_data["is_source"] = True
             skill_data.setdefault("metadata", {})
-            skill_data["category"] = categorize_skill(
+            cat_info = categorize_skill(
                 skill_data.get("name", ""),
                 _classification_text(skill_data),
             )
+            skill_data["main_category"] = cat_info.get("main_category", "")
+            skill_data["category"] = cat_info.get("sub_category", "")
             skill_data["search_text"] = build_search_text(skill_data)
             skills.append(skill_data)
 
@@ -138,10 +140,12 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
             skill_data["skill_base_relative"] = _skill_base_relative(resolved_target)
             skill_data["project_label"] = project_label(resolved_target, target_aliases, str(target))
             skill_data.setdefault("metadata", {})
-            skill_data["category"] = categorize_skill(
+            cat_info = categorize_skill(
                 skill_data.get("name", ""),
                 _classification_text(skill_data),
             )
+            skill_data["main_category"] = cat_info.get("main_category", "")
+            skill_data["category"] = cat_info.get("sub_category", "")
             skill_data["search_text"] = build_search_text(skill_data)
             skills.append(skill_data)
 

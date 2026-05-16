@@ -406,7 +406,7 @@ Item {
                             Button {
                                 id: barDeleteBtn
                                 Layout.preferredHeight: 36
-                                onClicked: (mouse) => AppController.deleteSelectedSkills()
+                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
                                 contentItem: RowLayout {
                                     spacing: 4
                                     Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
@@ -515,10 +515,10 @@ Item {
                 clip: true
                 spacing: 0
                 
-                section.property: "sectionName"
+                section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
                 section.delegate: CategoryHeader { 
-                    sectionName: section
+                    mainCatName: section
                     width: qcv_skillList.width
                 }
                 
@@ -530,6 +530,9 @@ Item {
                     }
                     onDoubleClicked: (mouse) => {
                         AppController.selectSkill(index)
+                    }
+                    onDeleteRequested: (name, path) => {
+                        qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))
                     }
                 }
 
@@ -559,5 +562,9 @@ Item {
     // Command Creation Dialog
     CommandCreateDialog {
         id: qcv_commandDialog
+    }
+
+    DeleteConfirmDialog {
+        id: qcv_deleteConfirmDialog
     }
 }

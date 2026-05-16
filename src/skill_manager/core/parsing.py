@@ -71,6 +71,8 @@ def parse_command_md(filepath):
             data["category"] = metadata.get("category", "")
             data["description"] = normalize_description(metadata.get("description", ""))
 
+        data["main_category"] = get_main_category(data.get("category", ""))
+
         # If no name in frontmatter, look for first H1 header
         if not data["name"]:
             h1_match = re.search(r'^#\s+(.*)$', content, re.MULTILINE)
@@ -265,8 +267,31 @@ CATEGORIES = {
     "Travel Health": ["travel health"],
     "Traditional Medicine": ["tcm", "体质"],
     "Testing": ["test", "testing", "qa", "e2e", "playwright", "cypress", "jest", "tdd", "validation", "acceptance", "verify"],
-    "Linting": ["shellcheck", "linting", "lint"]
+    "Linting": ["shellcheck", "linting", "lint"],
+    "Uncategorized": []
 }
+
+MAIN_CATEGORIES_MAPPING = {
+    "🛠️ Core Engineering & Technology": ["AI", "Agents", "Architecture", "Backend Development", "Cloud Infrastructure", "DevOps", "Developer Tools", "Programming Languages", "Web Development", "Mobile Development", "Desktop Development", "Embedded Systems", "Web3", "Game Development", "Shell Scripting", "Build Systems", "Background Jobs"],
+    "📈 Business & Operations": ["Business Strategy", "Marketing", "Product Management", "Finance", "Legal", "Compliance", "Logistics", "Procurement", "Billing", "Payments", "ERP", "Human Resources", "Inventory", "Manufacturing", "Careers"],
+    "🛡️ Quality & Data": ["Security", "Testing", "Debugging", "Performance", "Observability", "Code Quality", "Linting", "Quality Control", "Migration", "Analytics", "Data", "Databases"],
+    "📚 Content & Knowledge": ["Content", "Documentation", "Knowledge Management", "Diagrams", "Design", "Communications", "Social Media", "Localization"],
+    "🧘 Specialized & Lifestyle": ["Psychology", "Health", "Mental Health", "Fitness", "Sleep", "Rehabilitation", "Traditional Medicine", "Occupational Health", "Oral Health", "Sexual Health", "Travel Health"],
+    "⚙️ System & Workflow": ["Core Workflow", "Uncategorized"]
+}
+
+def get_main_category(sub_category):
+    if not sub_category:
+        return "⚙️ System & Workflow"
+    for main_cat, sub_cats in MAIN_CATEGORIES_MAPPING.items():
+        if sub_category in sub_cats:
+            return main_cat
+        # Also check for common aliases
+        if sub_category.lower() in [s.lower() for s in sub_cats]:
+            return main_cat
+
+    # If not found in mapping, default to System & Workflow
+    return "⚙️ System & Workflow"
 
 def categorize_skill(name, description):
     """
@@ -302,7 +327,10 @@ def categorize_skill(name, description):
             max_matches = matches
             best_category = category
 
-    return best_category
+    return {
+        "main_category": get_main_category(best_category),
+        "sub_category": best_category
+    }
 
 def keyword_matches(text, keyword):
     # This is now mostly unused by categorize_skill but kept for compatibility
@@ -320,7 +348,8 @@ def build_skill_search_text(skill_data):
         skill_data.get("name", ""),
         skill_data.get("description", ""),
         skill_data.get("folder_name", ""),
-        skill_data.get("category", "")
+        skill_data.get("category", ""),
+        skill_data.get("main_category", "")
     ]
     metadata = skill_data.get("metadata") or {}
     for key in ("source", "risk", "category", "version", "date_added"):

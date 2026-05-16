@@ -10,7 +10,12 @@ from PySide6.QtCore import QTimer
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event
-from skill_manager.core.persistence import save_archive, save_essentials
+from skill_manager.core.persistence import (
+    load_temp_registry,
+    save_archive,
+    save_essentials,
+    save_temp_registry,
+)
 from skill_manager.core.quick_copy import (
     delete_project_skill_folders,
 )
@@ -142,7 +147,32 @@ class OpsController(BaseController):
         except Exception as exc:
             print(f"[CACHE] Patch failed: {exc}")
 
-    def copy_selected_to_target(self, target_path: str):
+    def cleanup_temp_copies(self):
+        """Deletes all temporary copies recorded in the registry."""
+        temp_paths = load_temp_registry()
+        if not temp_paths:
+            return
+
+        import shutil
+        deleted_count = 0
+        for path_str in temp_paths:
+            p = Path(path_str)
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                    deleted_count += 1
+                elif p.is_file():
+                    p.unlink()
+                    deleted_count += 1
+            except Exception as e:
+                print(f"[TEMP_CLEANUP] Failed to delete {path_str}: {e}")
+
+        # Clear the registry after cleanup
+        save_temp_registry([])
+        if deleted_count > 0:
+            print(f"[TEMP_CLEANUP] Cleaned up {deleted_count} temporary paths.")
+
+    def copy_selected_to_target(self, target_path: str, is_temporary: bool = False):
         """Copies selected skills to a target project."""
         if not target_path:
             return
@@ -168,6 +198,15 @@ class OpsController(BaseController):
                     parts.append(f"{result['merged']} updated")
 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
+
+                if is_temporary and result['details']:
+                    new_temp_paths = [d['message'] for d in result['details'] if d['status'] in ('copied', 'merged')]
+                    if new_temp_paths:
+                        existing = load_temp_registry()
+                        # Use set to avoid duplicates
+                        updated = list(set(existing + new_temp_paths))
+                        save_temp_registry(updated)
+
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
                 QTimer.singleShot(0, self.app, self.app.refreshSkills)
                 QTimer.singleShot(0, self.app, self.app.skillModel.clearSelection)

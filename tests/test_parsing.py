@@ -95,12 +95,12 @@ def test_parse_skill_md_no_frontmatter(temp_dir):
     assert data["body_content"].strip() == "# Only Header\nNo frontmatter here."
 
 def test_categorize_skill_more_keywords():
-    assert categorize_skill("docker", "") == "Cloud Infrastructure"
-    assert categorize_skill("python script", "") == "Programming Languages"
-    assert categorize_skill("react component", "") == "Web Development"
-    assert categorize_skill("security audit", "") == "Security"
-    assert categorize_skill("sql query", "") == "Databases"
-    assert categorize_skill("unit testing", "") == "Testing"
+    assert categorize_skill("docker", "")["sub_category"] == "Cloud Infrastructure"
+    assert categorize_skill("python script", "")["sub_category"] == "Programming Languages"
+    assert categorize_skill("react component", "")["sub_category"] == "Web Development"
+    assert categorize_skill("security audit", "")["sub_category"] == "Security"
+    assert categorize_skill("sql query", "")["sub_category"] == "Databases"
+    assert categorize_skill("unit testing", "")["sub_category"] == "Testing"
 
 def test_build_skill_search_text_missing_fields():
     # It adds spaces between default empty parts

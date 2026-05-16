@@ -608,6 +608,11 @@ test = [
     { name = "pytest-qt" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-qt" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "posthog", specifier = ">=7.14.2" },
@@ -622,6 +627,9 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
 ]
 provides-extras = ["test", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-qt", specifier = ">=4.5.0" }]
 
 [[package]]
 name = "tomli"

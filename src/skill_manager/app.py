@@ -120,6 +120,12 @@ class AppController(QObject):
         self.ops = OpsController(self)
         self.updates = UpdateController(self)
 
+        # 4. Lifecycle Hooks
+        self.ops.cleanup_temp_copies()  # Crash recovery
+        app_inst = QGuiApplication.instance()
+        if app_inst:
+            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_copies)
+
         # 4. Initial Model Configuration
         self._library_model.showCommands = False
         self._library_model.isSourceOnly = True
@@ -261,70 +267,18 @@ class AppController(QObject):
 
         return self.ui.get_asset_uri("brand/logo.png")
 
-    @Slot(str, result=str)
-    def getCategoryIcon(self, category_name):
-        """Resolves the 3D isometric icon URI for a given category name."""
-        if not category_name:
-            return self.ui.get_asset_uri("categories/default.svg")
-
-        # Normalize and map categories to slugs (matches icon.md)
-        cat_lower = category_name.lower().strip()
-        
-        # Specific mappings for abbreviations to full filenames in icon.md
-        mappings = {
-            "backend dev": "backend-development",
-            "web dev": "web-development",
-            "cloud infra": "cloud-infrastructure",
-            "product mgmt": "product-management",
-            "game dev": "game-development",
-            "embedded": "embedded-systems",
-            "desktop dev": "desktop-development",
-            "knowledge mgmt": "knowledge-management",
-            "mobile dev": "mobile-development",
-            "background jobs": "background-jobs",
-            "build systems": "build-systems",
-            "code quality": "code-quality",
-            "developer tools": "developer-tools",
-            "human resources": "human-resources",
-            "mental health": "mental-health",
-            "social media": "social-media"
-        }
-
-        if cat_lower in mappings:
-            slug = mappings[cat_lower]
-        else:
-            # Standard slugification: "AI" -> "ai", "DevOps" -> "devops"
-            slug = re.sub(r'[^a-z0-9]+', '-', cat_lower).strip('-')
-        
-        asset_rel_path = f"categories/{slug}.svg"
-
-        # Check if the actual file exists in the root assets dir
-        if getattr(sys, 'frozen', False):
-            base_assets = Path(sys._MEIPASS) / "assets"
-        else:
-            base_assets = Path(__file__).resolve().parent.parent.parent / "assets"
-        
-        # Try SVG first, then PNG, then fallback to default
-        if not (base_assets / asset_rel_path).exists():
-            png_path = f"categories/{slug}.png"
-            if (base_assets / png_path).exists():
-                asset_rel_path = png_path
-            else:
-                return self.ui.get_asset_uri("categories/default.svg")
-
-        return self.ui.get_asset_uri(asset_rel_path)
 
     @Slot(str, result=str)
-    def getCategoryEmoji(self, category_name):
-        """Returns a unique emoji for a given category name. Standardizes visual representation."""
+    def getCategoryEmoji(self, category_name: str) -> str:
+        """Returns the standard emoji for a given category name.
+        This is the primary visual identifier for the categorization system.
+        """
         if not category_name:
             return "📁"
-            
-        # Clean the input name (remove markdown bold/italic markers and existing emojis)
-        # e.g., "**🧠 AI**" -> "AI"
-        clean_name = re.sub(r'[*_]', '', category_name) 
-        clean_name = re.sub(r'[^\w\s-]', '', clean_name).strip() 
-        
+
+        # Clean the input name (remove markdown bold/italic markers)
+        clean_name = re.sub(r'[*_]', '', category_name).strip()
+
         mapping = {
             "AI": "🧠",
             "Agents": "🤖",
@@ -334,81 +288,89 @@ class AppController(QObject):
             "Cloud Infrastructure": "☁️",
             "Cloud Infra": "☁️",
             "DevOps": "♾️",
-            "Security": "🛡️",
-            "Testing": "🧪",
+            "Developer Tools": "🧰",
+            "Programming Languages": "⌨️",
+            "Programming": "⌨️",
             "Web Development": "🌐",
             "Web Dev": "🌐",
+            "Mobile Development": "📱",
+            "Mobile Dev": "📱",
+            "Desktop Development": "🖥️",
+            "Desktop Dev": "🖥️",
+            "Embedded Systems": "📟",
+            "Embedded": "📟",
+            "Web3": "⛓️",
+            "Game Development": "🎮",
+            "Game Dev": "🎮",
+            "Shell Scripting": "🐚",
+            "Build Systems": "🏗️",
+            "Background Jobs": "⏱️",
             "Business Strategy": "♟️",
             "Marketing": "📢",
             "Product Management": "📈",
             "Product Mgmt": "📈",
-            "Legal": "⚖️",
             "Finance": "💰",
-            "Logistics": "📦",
-            "Psychology": "🧩",
-            "Health": "🩺",
-            "Web3": "⛓️",
-            "Game Development": "🎮",
-            "Game Dev": "🎮",
-            "Embedded Systems": "📟",
-            "Embedded": "📟",
-            "Analytics": "📊",
-            "Background Jobs": "⏱️",
-            "Billing": "💳",
-            "Build Systems": "🏗️",
-            "Careers": "💼",
-            "Code Quality": "🧹",
-            "Communications": "📧",
+            "Legal": "⚖️",
             "Compliance": "📜",
-            "Content": "📝",
-            "Data": "🧊",
-            "Databases": "🗄️",
-            "Debugging": "🐞",
-            "Design": "🎨",
-            "Desktop Development": "🖥️",
-            "Desktop Dev": "🖥️",
-            "Developer Tools": "🧰",
-            "Diagrams": "🗺️",
-            "Documentation": "📚",
+            "Logistics": "📦",
+            "Procurement": "🛒",
+            "Billing": "💳",
+            "Payments": "💸",
             "ERP": "🏢",
-            "Fitness": "🏋️",
             "Human Resources": "👥",
             "Inventory": "🏬",
+            "Manufacturing": "🏭",
+            "Careers": "💼",
+            "Security": "🛡️",
+            "Testing": "🧪",
+            "Debugging": "🐞",
+            "Performance": "🏎️",
+            "Observability": "🔭",
+            "Code Quality": "🧹",
+            "Linting": "✨",
+            "Quality Control": "💎",
+            "Migration": "🛫",
+            "Analytics": "📊",
+            "Data": "🧊",
+            "Databases": "🗄️",
+            "Content": "📝",
+            "Documentation": "📚",
             "Knowledge Management": "💡",
             "Knowledge Mgmt": "💡",
-            "Localization": "🌍",
-            "Manufacturing": "🏭",
-            "Mental Health": "🧘",
-            "Migration": "🛫",
-            "Mobile Development": "📱",
-            "Mobile Dev": "📱",
-            "Observability": "🔭",
-            "Performance": "🏎️",
-            "Programming Languages": "⌨️",
-            "Programming": "⌨️",
-            "Sleep": "🌙",
+            "Diagrams": "🗺️",
+            "Design": "🎨",
+            "Communications": "📧",
             "Social Media": "💬",
-            "Core Workflow": "🔄",
-            "Shell Scripting": "🐚",
-            "Payments": "💸",
-            "Linting": "✨",
-            "Procurement": "🛒",
-            "Quality Control": "💎",
+            "Localization": "🌍",
+            "Psychology": "🧩",
+            "Health": "🩺",
+            "Mental Health": "🧘",
+            "Fitness": "🏋️",
+            "Sleep": "🌙",
             "Rehabilitation": "🩹",
             "Traditional Medicine": "🌿",
-            "Uncategorized": "📁"
+            "Occupational Health": "👷",
+            "Oral Health": "🦷",
+            "Sexual Health": "🏥",
+            "Travel Health": "✈️",
+            "Core Workflow": "🔄",
+            "Uncategorized": "📁",
+            "Essentials": "⭐",
+            "Collections": "📦",
+            "Custom Commands": "⚡"
         }
-        
+
+
         # 1. Exact case-sensitive match on clean name
         if clean_name in mapping:
             return mapping[clean_name]
-            
+
         # 2. Case-insensitive match on clean name
         cat_lower = clean_name.lower()
         for k, v in mapping.items():
             if k.lower() == cat_lower:
                 return v
-                
+
         # 3. Substring match (e.g., "Web" matches "Web Development")
         for k, v in mapping.items():
             if k.lower() in cat_lower or cat_lower in k.lower():
@@ -652,6 +614,10 @@ class AppController(QObject):
     @Slot(str)
     def copySelectedSkillsToTarget(self, target_path):
         self.ops.copy_selected_to_target(target_path)
+
+    @Slot(str)
+    def copySelectedSkillsToTargetTemporarily(self, target_path):
+        self.ops.copy_selected_to_target(target_path, is_temporary=True)
 
 
     @Slot(str)

@@ -9,5 +9,3 @@ Compact mode for skill list view
 Confirmation for deleting
 
 selection method in library
-
-main categories and sub categories
