@@ -8,6 +8,14 @@ from datetime import datetime
 from pathlib import Path
 
 
+def sanitize_token(text: str) -> str:
+    """Removes sensitive authentication tokens from URLs."""
+    if not isinstance(text, str):
+        return text
+    # Matches http://token@ or https://token@ and masks the token part
+    return re.sub(r'(https?://)[^@/\s]+@', r'\1***@', text)
+
+
 def normalize_skill_source_config(data):
     """Return a backward-compatible skill updater/source config."""
     detected = detect_source_config(data)
@@ -414,7 +422,7 @@ def check_skill_source_versions(source, force_refresh=False):
 
     # 2. GitHub Repo Override/Priority
     repo_url = source.get("repository_url")
-    token = source.get("github_token")
+    token = source.get('github_token')
     if repo_url and ("github.com" in repo_url or "gitlab.com" in repo_url):
         git_latest = get_git_tag(repo_url, is_remote=True, token=token)
         if git_latest:
@@ -459,25 +467,14 @@ def check_skill_source_versions(source, force_refresh=False):
 
 
 
-def get_authenticated_url(url: str, token: str) -> str:
-    """Injects a GitHub token into a repository URL if provided."""
-    if not token or not url or "@" in url.split("://")[-1]:
-        return url
-
-    # Only support https for token injection
-    if url.startswith("https://"):
-        return url.replace("https://", f"https://{token}@")
-    return url
-
-
 def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
     """Fetches the latest semantic tag or fallback to commit hash."""
     try:
         if is_remote:
-            auth_url = get_authenticated_url(path_or_url, token)
+            auth_url = path_or_url
             # Fetch tags from remote
             result = subprocess.run(
-                ["git", "ls-remote", "--tags", "--sort=-v:refname", auth_url],
+                ["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={token}; }}; f"] if token else []) + ["ls-remote", "--tags", "--sort=-v:refname", auth_url],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout:
@@ -493,7 +490,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to latest commit hash on main/master if no tags
             result = subprocess.run(
-                ["git", "ls-remote", auth_url, "HEAD"],
+                ["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={token}; }}; f"] if token else []) + ["ls-remote", auth_url, "HEAD"],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout:
@@ -560,17 +557,17 @@ def _run_repository_update(source, output_callback):
         raise ValueError("Configure either local_path or clone_path for git sources.")
 
     path = Path(os.path.expanduser(clone_path))
-    auth_url = get_authenticated_url(repository_url, source.get("github_token"))
+    auth_url = repository_url
 
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
-        _run_process(["git", "-C", str(path), "pull", "--ff-only"], output_callback)
+        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get('github_token')}; }}; f"] if source.get('github_token') else []) + ["-C", str(path), "pull", "--ff-only"], output_callback)
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        _run_process(["git", "clone", auth_url, str(path)], output_callback)
+        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get('github_token')}; }}; f"] if source.get('github_token') else []) + ["clone", auth_url, str(path)], output_callback)
 
     # Emit clone_path into output so _relocate_skills_from_output can detect it
     # when clone_path differs from local_path (staged mode).
@@ -663,7 +660,7 @@ def _run_process(command, output_callback, shell=False):
 
     if process.stdout is not None:
         for line in process.stdout:
-            line_clean = line.strip()
+            line_clean = sanitize_token(line.strip())
             if line_clean:
                 # Always print to terminal for visibility
                 print(f"[PROCESS] {line_clean}")
@@ -679,7 +676,8 @@ def _run_process(command, output_callback, shell=False):
 
     process.wait()
     if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, command)
+        sanitized_command = [sanitize_token(str(arg)) for arg in command] if isinstance(command, list) else sanitize_token(str(command))
+        raise subprocess.CalledProcessError(process.returncode, sanitized_command)
 
 
 def _resolve_process_command(command, shell=False):
@@ -699,6 +697,7 @@ def _resolve_process_command(command, shell=False):
 
 
 def _emit(output_callback, message):
+    message = sanitize_token(str(message))
     # Print to terminal for debugging and visibility
     if message.startswith("[DEBUG]") or message.startswith("[ERROR]") or "Relocating" in message or "Success" in message:
         print(message)
