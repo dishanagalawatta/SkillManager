@@ -5,3 +5,6 @@
 ## 2024-05-15 - Confirmed Missing Interactive States Pattern
 **Learning:** Found another instance of the missing interactive states pattern in `CategoryHeader.qml`. While it had `hoverEnabled: true` for changing the background color, it lacked the crucial `cursorShape` and `ToolTip` to explain the collapse/expand action.
 **Action:** Continues to validate the previous learning. We should systematically check all `MouseArea` components that act as buttons to ensure they have the full suite of UX affordances.
+## 2024-05-16 - Standard Components Lose Hover Cursors When Customized
+**Learning:** Standard QtQuick.Controls components like `Switch`, inner `Button` inside `TextField` backgrounds, and custom `Button` styles often do not inherit or display the expected `Qt.PointingHandCursor` by default when hovered, leading to lower discoverability.
+**Action:** When customizing these input components, embed a `HoverHandler { cursorShape: Qt.PointingHandCursor }` at the root of the control to ensure proper interaction feedback.
