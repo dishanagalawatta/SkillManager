@@ -68,13 +68,12 @@ Item {
                     visible: model && model.isSelected
                 }
                 
-                Accessible.role: Accessible.CheckBox
-                Accessible.name: "Select skill"
-                Accessible.description: "Check to select this item"
-                Accessible.checkable: true
-                Accessible.checked: model && model.isSelected
-
                 MouseArea {
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: "Select skill"
+                    Accessible.description: "Check to select this item"
+                    Accessible.checkable: true
+                    Accessible.checked: model && model.isSelected
                     id: checkboxMouseArea
                     anchors.fill: parent
                     hoverEnabled: true
