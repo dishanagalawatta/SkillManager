@@ -77,10 +77,10 @@ class UIController(BaseController):
                 os.startfile(path)
             elif sys.platform == 'darwin':
                 import subprocess
-                subprocess.run(['open', path])
+                subprocess.run(['open', '--', path])
             else:
                 import subprocess
-                subprocess.run(['xdg-open', path])
+                subprocess.run(['xdg-open', '--', path])
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")

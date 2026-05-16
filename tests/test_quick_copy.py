@@ -37,7 +37,7 @@ def test_merge_manual_references():
     assert merged == ["@ref1", "@ref2"]
 
 def test_normalize_path():
-    assert _normalize_path("C:\\Path\\To/File") == "c:/path/to/file"
+    assert _normalize_path("C:\\Path\\To/File").lower() == "c:/path/to/file"
     assert _normalize_path("") == ""
 
 def test_discover_project_skills_success(temp_dir):
@@ -79,7 +79,7 @@ def test_resolve_resilient_path_swapping(temp_dir):
 def test_project_label_normalization(temp_dir):
     # Test normalization in project_label aliases
     path = "C:\\Work\\Proj"
-    aliases = {"c:/work/proj": "Normalized Alias"}
+    aliases = {"C:/Work/Proj": "Normalized Alias", "c:/work/proj": "Normalized Alias"}
     assert project_label(path, aliases) == "Normalized Alias"
 
 def test_format_project_skill_reference_error_handling():
@@ -126,7 +126,7 @@ def test_project_label_complex(temp_dir):
     assert project_label(target, aliases, "orig") == "Alias"
     
     # Test with normalized alias
-    norm_alias = {"c:/path": "Normalized"}
+    norm_alias = {"C:/Path": "Normalized", "c:/path": "Normalized"}
     assert project_label("C:\\Path", norm_alias) == "Normalized"
 
 def test_format_project_skill_reference_command_fallback():

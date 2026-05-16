@@ -477,7 +477,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             auth_url = get_authenticated_url(path_or_url, token)
             # Fetch tags from remote
             result = subprocess.run(
-                ["git", "ls-remote", "--tags", "--sort=-v:refname", auth_url],
+                ["git", "ls-remote", "--tags", "--sort=-v:refname", "--", auth_url],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout:
@@ -493,7 +493,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to latest commit hash on main/master if no tags
             result = subprocess.run(
-                ["git", "ls-remote", auth_url, "HEAD"],
+                ["git", "ls-remote", "--", auth_url, "HEAD"],
                 capture_output=True, text=True, timeout=15
             )
             if result.returncode == 0 and result.stdout:
@@ -570,7 +570,7 @@ def _run_repository_update(source, output_callback):
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        _run_process(["git", "clone", auth_url, str(path)], output_callback)
+        _run_process(["git", "clone", "--", auth_url, str(path)], output_callback)
 
     # Emit clone_path into output so _relocate_skills_from_output can detect it
     # when clone_path differs from local_path (staged mode).
