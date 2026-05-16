@@ -50,4 +50,10 @@ Button {
         
         // Removed left accent bar for cleaner screenshot-parity look
     }
+    Accessible.role: Accessible.Button
+    Accessible.name: control.labelText
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
 }

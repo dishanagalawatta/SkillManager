@@ -52,4 +52,10 @@ Button {
             color: Theme.accent
         }
     }
+    Accessible.role: Accessible.Button
+    Accessible.name: control.labelText
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
 }
