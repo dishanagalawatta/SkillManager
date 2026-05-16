@@ -81,7 +81,9 @@ class UIController(BaseController):
             else:
                 import subprocess
                 subprocess.run(['xdg-open', path])
-            self.app._set_status(f"Opened: {os.path.basename(path)}")
+            # Normalize path for basename
+            norm_path = path.replace("\\", "/")
+            self.app._set_status(f"Opened: {os.path.basename(norm_path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
 

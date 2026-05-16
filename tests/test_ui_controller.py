@@ -49,7 +49,7 @@ def test_ui_controller_open_path(ui_controller, mock_app):
          patch("sys.platform", "win32"):
         ui_controller.open_path("C:\\test.txt")
         mock_startfile.assert_called_with("C:\\test.txt")
-        mock_app._set_status.assert_called_with("Opened: C:\\test.txt")
+        mock_app._set_status.assert_called_with("Opened: test.txt")
 
 def test_ui_controller_launch_skill(ui_controller, mock_app):
     with patch.object(ui_controller, "open_path") as mock_open:

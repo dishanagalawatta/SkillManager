@@ -59,7 +59,8 @@ class ConfigController(BaseController):
         norm_path = path.replace("\\", "/")
         label = self.app._target_aliases.get(path) or self.app._target_aliases.get(norm_path)
         if not label:
-            label = os.path.basename(path)
+            # os.path.basename doesn't work for Windows paths on Linux, so we do it manually or convert it
+            label = os.path.basename(norm_path)
         return label
 
     def set_target_alias(self, path: str, alias: str):
