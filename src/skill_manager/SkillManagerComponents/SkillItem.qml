@@ -141,6 +141,9 @@ Item {
             // Delete Button
             Button {
                 id: deleteBtn
+                Accessible.role: Accessible.Button
+                Accessible.name: "Delete skill"
+                Accessible.description: "Delete this skill"
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 flat: true
@@ -165,9 +168,6 @@ Item {
                 }
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
-                Accessible.role: Accessible.Button
-                Accessible.name: "Delete skill"
-                Accessible.description: "Delete this skill"
             }
         }
     }
