@@ -414,7 +414,7 @@ def check_skill_source_versions(source, force_refresh=False):
 
     # 2. GitHub Repo Override/Priority
     repo_url = source.get("repository_url")
-    token = source.get("github_token")
+    token = source.get('github_token')
     if repo_url and ("github.com" in repo_url or "gitlab.com" in repo_url):
         git_latest = get_git_tag(repo_url, is_remote=True, token=token)
         if git_latest:
@@ -553,13 +553,13 @@ def _run_repository_update(source, output_callback):
 
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
-        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get("github_token")}; }}; f"] if source.get("github_token") else []) + ["-C", str(path), "pull", "--ff-only"], output_callback)
+        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get('github_token')}; }}; f"] if source.get('github_token') else []) + ["-C", str(path), "pull", "--ff-only"], output_callback)
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get("github_token")}; }}; f"] if source.get("github_token") else []) + ["clone", auth_url, str(path)], output_callback)
+        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={source.get('github_token')}; }}; f"] if source.get('github_token') else []) + ["clone", auth_url, str(path)], output_callback)
 
     # Emit clone_path into output so _relocate_skills_from_output can detect it
     # when clone_path differs from local_path (staged mode).
