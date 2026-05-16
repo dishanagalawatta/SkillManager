@@ -37,7 +37,7 @@ def test_merge_manual_references():
     assert merged == ["@ref1", "@ref2"]
 
 def test_normalize_path():
-    assert _normalize_path("C:\\Path\\To/File").lower() == "c:/path/to/file"
+    assert _normalize_path("C:\\Path\\To/File").lower() == "C:/Path/To/File".lower()
     assert _normalize_path("") == ""
 
 def test_discover_project_skills_success(temp_dir):

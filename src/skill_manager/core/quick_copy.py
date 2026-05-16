@@ -162,29 +162,31 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
 def _normalize_path(path):
     if not path:
         return ""
-    # Explicitly lower to fix test failure on Posix platforms testing Windows paths
-    return os.path.normcase(os.path.normpath(path)).replace("\\", "/").lower()
+    return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
 
 
 def project_label(target_path, target_aliases=None, original_target=None):
     if target_aliases is None:
         target_aliases = {}
 
-    norm_target = _normalize_path(target_path)
-    norm_original = _normalize_path(original_target) if original_target else ""
+    norm_target = _normalize_path(target_path).lower()
+    norm_original = _normalize_path(original_target).lower() if original_target else ""
+
+    # We lower keys for fuzzy matching on Posix/Windows paths
+    lower_aliases = {k.lower(): v for k, v in target_aliases.items()}
 
     # Try using original target (exact or normalized)
-    if original_target and original_target in target_aliases:
-        return target_aliases[original_target]
-    if norm_original and norm_original in target_aliases:
-        return target_aliases[norm_original]
+    if original_target and str(original_target).lower() in lower_aliases:
+        return lower_aliases[str(original_target).lower()]
+    if norm_original and norm_original in lower_aliases:
+        return lower_aliases[norm_original]
 
     # Try resolved path (exact or normalized)
-    target_str = str(target_path)
-    if target_str in target_aliases:
-        return target_aliases[target_str]
-    if norm_target in target_aliases:
-        return target_aliases[norm_target]
+    target_str = str(target_path).lower()
+    if target_str in lower_aliases:
+        return lower_aliases[target_str]
+    if norm_target in lower_aliases:
+        return lower_aliases[norm_target]
 
     # Full scan for matching normalized keys
     for k, v in target_aliases.items():
