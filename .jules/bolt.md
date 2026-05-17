@@ -12,3 +12,7 @@
 ## 2025-05-15 - [Sort Key Optimization]
 **Learning:** Initializing objects like dictionaries inside Python sorting key functions creates significant overhead because the `sort_key` function runs $O(N \log N)$ times during a list sort.
 **Action:** Always hoist static dictionaries, regex compiles, or constant computations outside of the `sort_key` (or any inner loop callback) to the module or enclosing scope. Use early returns inside such callbacks to prevent unnecessary dict `get()` lookups.
+
+## 2026-05-17 - [QML Property Binding Overhead]
+**Learning:** Python functions bound to properties in QML delegates (like `getCategoryEmoji` called for every skill row) execute frequently during UI rendering, scrolling, and filtering. O(N) operations inside these getters cause noticeable UI lag.
+**Action:** Aggressively memoize pure functions called from QML using `@lru_cache` and convert O(N) loop lookups into O(1) dictionary lookups wherever possible.

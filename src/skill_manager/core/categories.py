@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 
 CATEGORY_EMOJI_MAP = {
     "AI": "🧠",
@@ -81,7 +82,12 @@ CATEGORY_EMOJI_MAP = {
     "Custom Commands": "⚡",
 }
 
+# Pre-compute a lowercase version of the map to avoid dynamic lowercasing during iterations
+_MAP_LOWER = {k.lower(): v for k, v in CATEGORY_EMOJI_MAP.items()}
 
+# Cache the resulting emoji lookup for a category name up to maxsize (e.g. 1024 unique category names).
+# This prevents repeated expensive string cleaning and matching.
+@lru_cache(maxsize=1024)
 def get_category_emoji(category_name: str) -> str:
     if not category_name:
         return "📁"
@@ -91,12 +97,10 @@ def get_category_emoji(category_name: str) -> str:
         return CATEGORY_EMOJI_MAP[clean_name]
 
     cat_lower = clean_name.lower()
-    for name, emoji in CATEGORY_EMOJI_MAP.items():
-        if name.lower() == cat_lower:
-            return emoji
+    if cat_lower in _MAP_LOWER:
+        return _MAP_LOWER[cat_lower]
 
-    for name, emoji in CATEGORY_EMOJI_MAP.items():
-        name_lower = name.lower()
+    for name_lower, emoji in _MAP_LOWER.items():
         if name_lower in cat_lower or cat_lower in name_lower:
             return emoji
 
