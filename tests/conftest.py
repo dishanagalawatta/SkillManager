@@ -1,11 +1,12 @@
-import pytest
 import os
-import sys
 import shutil
+import sys
 import tempfile
 import uuid
 from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 from PySide6.QtGui import QGuiApplication
 
 # Automatically add 'src' to PYTHONPATH for all tests
@@ -57,22 +58,22 @@ def mock_app():
     app._syncing_targets = []
     app._target_aliases = {}
     app._update_results = []
-    
+
     # Models
     app._library_model = MagicMock()
     app._quick_copy_model = MagicMock()
     app.skillModel = MagicMock()
-    
+
     # Dependencies
     app._config = MagicMock()
     app._clipboard = MagicMock()
-    
+
     # Common methods
     app._set_status = MagicMock()
     app.refreshSkills = MagicMock()
     app.load_initial_data = MagicMock()
     app.getTargetLabel.side_effect = lambda t: t.split("/")[-1] if t else ""
-    
+
     return app
 
 @pytest.fixture

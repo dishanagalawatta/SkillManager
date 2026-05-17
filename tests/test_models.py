@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from PySide6.QtCore import Qt
+
 from skill_manager.core.models import SkillModel
+
 
 @pytest.fixture
 def skill_list():
@@ -70,15 +73,15 @@ def test_skill_model_collection_filter(qapp, skill_list):
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "Skill A"
 
 def test_skill_model_essential_filter(qapp, skill_list):
-    # showEssentials property controls show_essentials. 
+    # showEssentials property controls show_essentials.
     # If False, it HIDES essentials.
     skill_list[0]["is_essential"] = True
     model = SkillModel()
     model.setSkills(skill_list)
-    
+
     # Default is show_essentials = True, so both A and B are shown
     assert model.rowCount() == 2
-    
+
     model.showEssentials = False
     # Now Skill A is hidden
     assert model.rowCount() == 1
@@ -103,19 +106,19 @@ def test_skill_model_is_source_only(qapp, skill_list):
     # Set up some source and project skills
     skill_list[0]["is_source"] = True
     skill_list[1]["is_source"] = False
-    
+
     model = SkillModel()
     model.setSkills(skill_list)
-    
+
     # Check initial state (default None/PartiallyChecked)
     assert model.isSourceOnly == Qt.PartiallyChecked
-    
+
     # Filter to Sources
     model.isSourceOnly = Qt.Checked
     assert model.isSourceOnly == Qt.Checked
     assert model.rowCount() == 1
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "Skill A"
-    
+
     # Filter to Projects
     model.isSourceOnly = Qt.Unchecked
     assert model.isSourceOnly == Qt.Unchecked
@@ -139,7 +142,7 @@ def test_skill_model_data_various_roles(qapp, skill_list):
     model = SkillModel()
     model.setSkills(skill_list)
     idx = model.index(0, 0)
-    
+
     assert model.data(idx, SkillModel.DescriptionRole) == "Desc A"
     assert model.data(idx, SkillModel.IsEssentialRole) is True
     assert model.data(idx, SkillModel.IsCollectionRole) is True
@@ -180,11 +183,11 @@ def test_skill_model_search_engine_integration(qapp, skill_list):
     mock_search = MagicMock()
     # query returns list of (skill_dict, score)
     mock_search.query.return_value = [(skill_list[1], 1.0)]
-    
+
     model = SkillModel()
     model.setSkills(skill_list)
     model._search_engine = mock_search # Set private member for testing
-    
+
     model.filterText = "skill b"
     assert model.rowCount() == 1
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "Skill B"
@@ -193,7 +196,7 @@ def test_skill_model_search_engine_integration(qapp, skill_list):
 def test_skill_model_set_skills_updates(qapp, skill_list):
     model = SkillModel()
     model.setSkills(skill_list)
-    
+
     new_skills = [{"name": "New", "local_path": "/new"}]
     model.setSkills(new_skills)
     assert model.rowCount() == 1
@@ -228,27 +231,27 @@ def test_skill_model_set_selected(qapp, skill_list):
 def test_skill_model_expansion_logic(qapp, skill_list):
     model = SkillModel()
     model.setSkills(skill_list)
-    
+
     # Section expansion (default all expanded)
     assert model.isAllExpanded is True
     assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is False
-    
+
     # Collapse section
     model.toggleCategory("⚙️ System & Workflow|Core")
     assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is True
     assert model.isAllExpanded is False
     assert model.data(model.index(0, 0), SkillModel.IsCollapsedRole) is True
-    
+
     # Expand section
     model.expandAll()
     assert model.isCategoryCollapsed("⚙️ System & Workflow|Core") is False
     assert model.isAllExpanded is True
-    
+
     # Collapse all
     model.collapseAll()
     assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
     assert model.isAllExpanded is False
-    
+
     # Toggle all (expands since it's currently collapsed)
     model.toggleAll()
     assert model.isAllExpanded is True
@@ -256,19 +259,19 @@ def test_skill_model_expansion_logic(qapp, skill_list):
 def test_skill_model_setters_and_getters(qapp, skill_list):
     model = SkillModel()
     model.setSkills(skill_list)
-    
+
     # Category filter
     model.categoryFilter = "Dev"
     assert model.categoryFilter == "Dev"
-    
+
     # Collection filter
     model.collectionFilter = True
     assert model.collectionFilter is True
-    
+
     # Project filter
     model.projectFilter = "Proj"
     assert model.projectFilter == "Proj"
-    
+
     # Client filter
     model.clientFilter = "Codex"
     assert model.clientFilter == "Codex"
@@ -281,7 +284,7 @@ def test_skill_model_collapse_special_sections(qapp):
     ]
     model = SkillModel()
     model.setSkills(skills)
-    
+
     model.collapseAll()
     assert model.isCategoryCollapsed("Special") is True
     assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
@@ -302,10 +305,10 @@ def test_skill_model_save_methods_with_mock_config(qapp, skill_list):
     mock_conf = MagicMock()
     model = SkillModel(config=mock_conf)
     model.setSkills(skill_list)
-    
+
     model.toggleCategory("Dev")
     mock_conf.set.assert_any_call("collapsed_categories", ["Dev"])
-    
+
     model.showArchived = True
     mock_conf.set.assert_any_call("show_archived", True)
 

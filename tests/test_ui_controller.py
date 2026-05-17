@@ -1,10 +1,9 @@
-import pytest
-import os
-import sys
 from unittest.mock import MagicMock, patch
-from pathlib import Path
-from PySide6.QtCore import QTimer
+
+import pytest
+
 from skill_manager.controllers.ui_controller import UIController
+
 
 @pytest.fixture
 def ui_controller(mock_app):
@@ -20,7 +19,7 @@ def test_ui_controller_init_normalization(mock_app):
     mock_app._config.get.return_value = {"current_view": "library"}
     ctrl = UIController(mock_app)
     assert ctrl._current_view == "Library"
-    
+
     mock_app._config.get.return_value = {"current_view": "quick-copy"}
     ctrl = UIController(mock_app)
     assert ctrl._current_view == "QuickCopy"
@@ -29,7 +28,7 @@ def test_ui_controller_save_state(ui_controller, mock_app):
     ui_controller._current_view = "QuickCopy"
     ui_controller._window_width = 1400
     ui_controller.save_ui_state()
-    
+
     mock_app._config.set.assert_called_once()
     args = mock_app._config.set.call_args[0]
     assert args[0] == "ui_state"

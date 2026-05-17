@@ -1,21 +1,23 @@
-import pytest
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
 from skill_manager.core.quick_copy import (
-    format_project_skill_reference,
-    project_label,
-    discover_source_skills,
-    discover_project_skills,
+    _classification_text,
+    _looks_like_explicit_reference,
+    _normalize_path,
+    _project_root_for_target,
     _resolve_resilient_path,
     delete_project_skill_folders,
-    normalize_manual_references,
-    normalize_manual_reference,
+    discover_project_skills,
+    discover_source_skills,
+    format_project_skill_reference,
     merge_manual_references,
-    _normalize_path,
-    _looks_like_explicit_reference,
-    _project_root_for_target,
-    _classification_text
+    normalize_manual_reference,
+    normalize_manual_references,
+    project_label,
 )
+
 
 def test_normalize_manual_reference():
     assert normalize_manual_reference("test") == "@test"
@@ -36,8 +38,6 @@ def test_merge_manual_references():
     merged = merge_manual_references(existing, additions)
     assert merged == ["@ref1", "@ref2"]
 
-import sys
-
 def test_normalize_path():
     if sys.platform == "win32":
         assert _normalize_path("C:\\Path\\To/File") == "c:/path/to/file"
@@ -49,15 +49,15 @@ def test_discover_project_skills_success(temp_dir):
     project_dir = temp_dir / "my-project"
     skills_dir = project_dir / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
-    
+
     skill_a = skills_dir / "alpha"
     skill_a.mkdir()
     (skill_a / "SKILL.md").write_text("---\nname: Alpha\n---\n")
-    
+
     def mock_parse(p): return {"name": "Alpha"}
     def mock_cat(n, d): return {"main_category": "Main", "sub_category": "Cat"}
     def mock_search(s): return "search"
-    
+
     projects = discover_project_skills([str(skills_dir)], mock_parse, mock_cat, mock_search)
     assert len(projects) == 1
     assert projects[0]["project_label"] == "my-project"
@@ -73,16 +73,15 @@ def test_resolve_resilient_path_swapping(temp_dir):
     # Test swapping .agent <-> .agents
     agent_dir = temp_dir / ".agent"
     agent_dir.mkdir()
-    
+
     # Passing .agents should resolve to .agent
     res = _resolve_resilient_path(temp_dir / ".agents")
     assert res.name == ".agent"
-    
+
     # Passing .agent/sub should resolve to .agent/sub (if exists, but we test the logic)
     # Actually it only resolves IF it exists.
-    
+
 def test_project_label_normalization(temp_dir):
-    import sys
     # Test normalization in project_label aliases
     path = "C:\\Work\\Proj"
     aliases = {"c:/work/proj": "Normalized Alias"}
@@ -107,7 +106,7 @@ def test_skill_base_relative_error():
     # Test ValueError in relative_to
     path = Path("/some/path")
     # _project_root_for_target returns /some (parent)
-    # relative_to(/some) succeeds normally. 
+    # relative_to(/some) succeeds normally.
     # To force error, we need a root that is not a parent.
     with patch("skill_manager.core.quick_copy._project_root_for_target") as mock_root:
         mock_root.return_value = Path("/different/root")
@@ -117,7 +116,7 @@ def test_skill_base_relative_error():
 def test_discover_source_skills_duplicates(temp_dir):
     source_dir = temp_dir / "library"
     source_dir.mkdir()
-    
+
     # Discovery twice with same path (should deduplicate)
     skills = discover_source_skills([str(source_dir), str(source_dir)], lambda p: {}, lambda n, d: {"main_category": "M", "sub_category": "C"}, lambda s: "s")
     # No skills found but should only scan once (seen_sources set)
@@ -128,14 +127,13 @@ def test_resolve_resilient_path_none():
     assert str(_resolve_resilient_path("")) == "."
 
 def test_project_label_complex(temp_dir):
-    import sys
     target = temp_dir / "proj" / ".agents" / "skills"
     target.mkdir(parents=True)
-    
+
     # Test with original target and aliases
     aliases = {"orig": "Alias"}
     assert project_label(target, aliases, "orig") == "Alias"
-    
+
     # Test with normalized alias
     norm_alias = {"c:/path": "Normalized"}
     if sys.platform == "win32":
@@ -151,7 +149,7 @@ def test_format_project_skill_reference_command_fallback():
     }
     ref = format_project_skill_reference(skill, "Gemini CLI")
     assert ref == "@manuals/deploy.md"
-    
+
     # command without project_root AND no manuals in path
     skill2 = {
         "is_command": True,
@@ -187,7 +185,7 @@ def test_classification_text():
 def test_resolve_resilient_path_plural(temp_dir):
     agents_dir = temp_dir / ".agents"
     agents_dir.mkdir()
-    
+
     # Try resolving .agent when only .agents exists
     res = _resolve_resilient_path(temp_dir / ".agent")
     assert res.name == ".agents"
@@ -195,7 +193,7 @@ def test_resolve_resilient_path_plural(temp_dir):
 def test_resolve_resilient_path_nested(temp_dir):
     agent_dir = temp_dir / ".agent" / "skills"
     agent_dir.mkdir(parents=True)
-    
+
     # Try resolving path with .agents in it
     res = _resolve_resilient_path(str(temp_dir / ".agents" / "skills"))
     assert ".agent" in str(res)
@@ -204,7 +202,7 @@ def test_resolve_resilient_path_nested(temp_dir):
 def test_project_label_cleaning():
     path = Path("/work/my-project/.agents/skills")
     assert project_label(path) == "my-project"
-    
+
     # .agents is at index 4, so root is /work/my-project/subdir
     path2 = Path("/work/my-project/subdir/.agents/skills")
     assert project_label(path2) == "subdir"
@@ -226,7 +224,7 @@ def test_format_project_skill_reference_command():
     }
     ref = format_project_skill_reference(skill, "Antigravity")
     assert ref == "/skill:MyCommand"
-    
+
     ref_gemini = format_project_skill_reference(skill, "Gemini CLI")
     assert ref_gemini == "@manuals/cmd.md"
 
@@ -264,11 +262,11 @@ def test_discover_source_skills(temp_dir):
     skill_dir = source_dir / "alpha"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text("---\nname: Alpha\n---\n")
-    
+
     def mock_parse(p): return {"name": "Alpha"}
     def mock_cat(n, d): return {"main_category": "Main", "sub_category": "Cat"}
     def mock_search(s): return "search"
-    
+
     skills = discover_source_skills([str(source_dir)], mock_parse, mock_cat, mock_search)
     assert len(skills) == 1
     assert skills[0]["name"] == "Alpha"

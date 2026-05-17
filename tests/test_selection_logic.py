@@ -1,5 +1,7 @@
 import pytest
+
 from skill_manager.core.models import SkillModel
+
 
 @pytest.fixture
 def model():
@@ -26,7 +28,7 @@ def test_category_selection_logic(model):
     model.categoryFilter = "Arch"
     for i in range(model.rowCount()):
         model.setSelected(i, True)
-    
+
     # Check if only Arch skills are selected in the full list
     selected_paths = model.getSelectedPaths()
     assert len(selected_paths) == 2

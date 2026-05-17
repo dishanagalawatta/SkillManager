@@ -5,7 +5,6 @@ Usage: python run.py
 import ctypes
 import json
 import os
-import re
 import sys
 import threading
 from datetime import datetime
@@ -34,6 +33,8 @@ from skill_manager.core.analytics import (
     capture_exception,
     shutdown as posthog_shutdown,
 )
+from skill_manager.core.categories import get_category_emoji
+from skill_manager.core.commands import create_custom_command_file
 from skill_manager.core.config import (
     ConfigManager,
 )
@@ -54,6 +55,11 @@ from skill_manager.core.quick_copy import (
     CLIENT_FORMATS,
     discover_project_skills,
     format_project_skill_reference,
+)
+from skill_manager.core.resources import (
+    logo_asset_for_client,
+    qml_components_dir,
+    resource_path as resolve_resource_path,
 )
 
 
@@ -241,31 +247,11 @@ class AppController(QObject):
 
     @Property(str, notify=clientFormatChanged)
     def logoSource(self):
-        fmt = self._client_format.lower()
-        if "antigravity" in fmt:
-            return self.ui.get_asset_uri("clients/antigravity.svg")
-        if "gemini" in fmt:
-            return self.ui.get_asset_uri("clients/gemini-cli.svg")
-        if "codex" in fmt:
-            return self.ui.get_asset_uri("clients/codex.svg")
-        if "plain" in fmt:
-            return self.ui.get_asset_uri("clients/plaintext.svg")
-
-        return self.ui.get_asset_uri("brand/logo.png")
+        return self.ui.get_asset_uri(logo_asset_for_client(self._client_format))
 
     @Slot(str, result=str)
     def getLogoSource(self, fmt):
-        fmt_lower = fmt.lower()
-        if "antigravity" in fmt_lower:
-            return self.ui.get_asset_uri("clients/antigravity.svg")
-        if "gemini" in fmt_lower:
-            return self.ui.get_asset_uri("clients/gemini-cli.svg")
-        if "codex" in fmt_lower:
-            return self.ui.get_asset_uri("clients/codex.svg")
-        if "plain" in fmt_lower:
-            return self.ui.get_asset_uri("clients/plaintext.svg")
-
-        return self.ui.get_asset_uri("brand/logo.png")
+        return self.ui.get_asset_uri(logo_asset_for_client(fmt))
 
 
     @Slot(str, result=str)
@@ -273,110 +259,7 @@ class AppController(QObject):
         """Returns the standard emoji for a given category name.
         This is the primary visual identifier for the categorization system.
         """
-        if not category_name:
-            return "📁"
-
-        # Clean the input name (remove markdown bold/italic markers)
-        clean_name = re.sub(r'[*_]', '', category_name).strip()
-
-        mapping = {
-            "AI": "🧠",
-            "Agents": "🤖",
-            "Architecture": "🏛️",
-            "Backend Development": "⚙️",
-            "Backend Dev": "⚙️",
-            "Cloud Infrastructure": "☁️",
-            "Cloud Infra": "☁️",
-            "DevOps": "♾️",
-            "Developer Tools": "🧰",
-            "Programming Languages": "⌨️",
-            "Programming": "⌨️",
-            "Web Development": "🌐",
-            "Web Dev": "🌐",
-            "Mobile Development": "📱",
-            "Mobile Dev": "📱",
-            "Desktop Development": "🖥️",
-            "Desktop Dev": "🖥️",
-            "Embedded Systems": "📟",
-            "Embedded": "📟",
-            "Web3": "⛓️",
-            "Game Development": "🎮",
-            "Game Dev": "🎮",
-            "Shell Scripting": "🐚",
-            "Build Systems": "🏗️",
-            "Background Jobs": "⏱️",
-            "Business Strategy": "♟️",
-            "Marketing": "📢",
-            "Product Management": "📈",
-            "Product Mgmt": "📈",
-            "Finance": "💰",
-            "Legal": "⚖️",
-            "Compliance": "📜",
-            "Logistics": "📦",
-            "Procurement": "🛒",
-            "Billing": "💳",
-            "Payments": "💸",
-            "ERP": "🏢",
-            "Human Resources": "👥",
-            "Inventory": "🏬",
-            "Manufacturing": "🏭",
-            "Careers": "💼",
-            "Security": "🛡️",
-            "Testing": "🧪",
-            "Debugging": "🐞",
-            "Performance": "🏎️",
-            "Observability": "🔭",
-            "Code Quality": "🧹",
-            "Linting": "✨",
-            "Quality Control": "💎",
-            "Migration": "🛫",
-            "Analytics": "📊",
-            "Data": "🧊",
-            "Databases": "🗄️",
-            "Content": "📝",
-            "Documentation": "📚",
-            "Knowledge Management": "💡",
-            "Knowledge Mgmt": "💡",
-            "Diagrams": "🗺️",
-            "Design": "🎨",
-            "Communications": "📧",
-            "Social Media": "💬",
-            "Localization": "🌍",
-            "Psychology": "🧩",
-            "Health": "🩺",
-            "Mental Health": "🧘",
-            "Fitness": "🏋️",
-            "Sleep": "🌙",
-            "Rehabilitation": "🩹",
-            "Traditional Medicine": "🌿",
-            "Occupational Health": "👷",
-            "Oral Health": "🦷",
-            "Sexual Health": "🏥",
-            "Travel Health": "✈️",
-            "Core Workflow": "🔄",
-            "Uncategorized": "📁",
-            "Essentials": "⭐",
-            "Collections": "📦",
-            "Custom Commands": "⚡"
-        }
-
-
-        # 1. Exact case-sensitive match on clean name
-        if clean_name in mapping:
-            return mapping[clean_name]
-
-        # 2. Case-insensitive match on clean name
-        cat_lower = clean_name.lower()
-        for k, v in mapping.items():
-            if k.lower() == cat_lower:
-                return v
-
-        # 3. Substring match (e.g., "Web" matches "Web Development")
-        for k, v in mapping.items():
-            if k.lower() in cat_lower or cat_lower in k.lower():
-                return v
-
-        return "📁"
+        return get_category_emoji(category_name)
 
     @Slot(str, result=str)
     def getAssetUri(self, path):
@@ -915,49 +798,17 @@ class AppController(QObject):
     @Slot(str, str, str, str, str)
     def createCustomCommand(self, name, client, body, project_label, category):
         """Creates a new Custom Command .md file in the project's manuals/ directory."""
-        if not name:
-            self._set_status("Error: Command name is required")
-            return
-
-        if not project_label or project_label == "All Projects":
-            self._set_status("Error: Please select a specific Project")
-            return
-
-        target_path = None
-        # Map project label to path
-        from skill_manager.core.quick_copy import project_label as get_label
-        for t in self._targets:
-            tp = Path(t)
-            if get_label(tp) == project_label:
-                target_path = tp
-                break
-
-        if not target_path:
-            self._set_status(f"Error: Could not find target for {project_label}")
-            return
-
-        # Create manuals/ directory
-        manuals_dir = target_path / "manuals"
-        manuals_dir.mkdir(parents=True, exist_ok=True)
-
-        # Sanitize filename: NAME.CLIENT.md
-        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-        filename = f"{safe_name}.{client}.md"
-        file_path = manuals_dir / filename
-
-        if file_path.exists():
-            self._set_status(f"Error: Command {filename} already exists")
-            return
-
-        # Content with frontmatter
-        content = f"---\nname: {name}\nclient: {client}\ncategory: {category}\ntype: command\ndate: {datetime.now().strftime('%Y-%m-%d')}\n---\n\n{body}"
-
-        try:
-            file_path.write_text(content, encoding='utf-8')
-            self._set_status(f"Created command: {filename}")
+        result = create_custom_command_file(
+            name=name,
+            client=client,
+            body=body,
+            project_label_name=project_label,
+            category=category,
+            targets=self._targets,
+        )
+        self._set_status(result.message)
+        if result.ok:
             self.refreshSkills()
-        except Exception as e:
-            self._set_status(f"Error creating command: {e}")
 
     @Slot(str, str)
     def setViewFilter(self, filter_type, value):
@@ -1068,15 +919,9 @@ class AppController(QObject):
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
+    return resolve_resource_path(relative_path)
 
-    return os.path.join(base_path, relative_path)
-
-def main():
+def main():  # pragma: no cover - QML application bootstrap is validated by startup/E2E smoke tests.
     # Set style to Basic to avoid issues with platform themes during debug
     QQuickStyle.setStyle("Basic")
 
@@ -1098,19 +943,7 @@ def main():
     # Listen to warnings
     engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
 
-    # Setup paths
-    if getattr(sys, 'frozen', False):
-        # Running as a bundle (PyInstaller)
-        # In the spec file we map src/skill_manager/SkillManagerComponents to skill_manager/SkillManagerComponents
-        # PyInstaller 6+ places data in _internal folder when using directory mode
-        base_internal = Path(sys._MEIPASS) / "_internal"
-        if base_internal.exists():
-            qml_dir = base_internal / "skill_manager" / "SkillManagerComponents"
-        else:
-            qml_dir = Path(sys._MEIPASS) / "skill_manager" / "SkillManagerComponents"
-    else:
-        # Running in normal Python environment
-        qml_dir = Path(__file__).resolve().parent / "SkillManagerComponents"
+    qml_dir = qml_components_dir(package_file=__file__)
 
     engine.addImportPath(str(qml_dir.parent))
 

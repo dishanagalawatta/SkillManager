@@ -4,7 +4,7 @@ This guide covers how to set up the SkillManager development environment, run te
 
 ## Prerequisites
 
-- **Python 3.10+** (Python 3.14 recommended for latest performance)
+- **Python 3.12+**
 - **uv**: The ultra-fast Python package installer and resolver.
   - Install via PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
   - Install via Homebrew: `brew install uv`
@@ -35,10 +35,10 @@ SkillManager uses **Ruff** for high-performance linting and formatting. It is co
 
 ```bash
 # Check for linting errors
-uv run ruff check src
+uv run ruff check src tests
 
 # Automatically fix fixable errors
-uv run ruff check src --fix
+uv run ruff check src tests --fix
 
 # Format the code
 uv run ruff format src
@@ -60,9 +60,10 @@ uv run pytest tests/test_parsing.py
 
 ### 3. CI/CD Standards
 All code changes must pass the following criteria:
-1. **Lint-Clean**: `ruff check` must return no errors.
+1. **Lint-Clean**: `uv run ruff check src tests` must return no errors.
 2. **Type-Safe**: Use Python type hints in all new code.
 3. **Tested**: New features should include unit tests in the `tests/` directory.
+4. **Coverage-Aware**: Run `uv run pytest --cov=skill_manager --cov-report=term-missing` before larger changes.
 
 ### 4. Documentation Synchronization
 SkillManager maintains a strict 1:1 mapping between the Python categorization logic and the `CATEGORIES.md` guide. 
@@ -81,7 +82,7 @@ This script extracts keywords and emoji mappings directly from the source code a
 SkillManager is packaged into standalone executables using PyInstaller.
 
 ### Automated Builds (Recommended)
-The CI/CD pipeline in `.github/workflows/release.yml` automatically handles building installers for Windows, macOS, and Linux when a new `v*` tag is pushed to GitHub.
+The quality pipeline in `.github/workflows/quality.yml` runs linting and tests on pushes and pull requests. The release pipeline in `.github/workflows/release.yml` builds installers for Windows, macOS, and Linux when a new `v*` tag is pushed to GitHub.
 
 ### Manual Builds
 
@@ -96,7 +97,7 @@ If you need to build the executable locally for testing:
 | Command | Description |
 |---|---|
 | `uv run skill-manager` | Launch the application locally |
-| `uv run ruff check src` | Run ruff linter |
+| `uv run ruff check src tests` | Run ruff linter |
 | `uv run ruff format src` | Format code with ruff |
 | `uv run pytest` | Run the unit test suite |
 | `uv run pyinstaller packaging/skill_manager.spec` | Build the standalone executable |

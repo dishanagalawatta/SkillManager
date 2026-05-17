@@ -7,7 +7,7 @@ name = "skill-manager"
 version = "1.0.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "PySide6",
     "pyyaml",
@@ -34,7 +34,20 @@ skill-manager = "skill_manager.__main__:main"
 where = ["src"]
 include = ["skill_manager*"]
 
+[tool.coverage.run]
+source = ["skill_manager"]
+omit = ["src/skill_manager/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = false
+
 [dependency-groups]
 dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
     "pytest-qt>=4.5.0",
+    "ruff>=0.8.0",
 ]

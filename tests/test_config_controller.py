@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from skill_manager.controllers.config_controller import ConfigController
+
 
 @pytest.fixture
 def mock_app():
@@ -52,9 +55,9 @@ def test_config_controller_remove_target(config_controller, mock_app):
     mock_app._targets = ["/path/t"]
     mock_app._target_aliases = {"/path/t": "Alias"}
     mock_app._syncing_targets = ["/path/t"]
-    
+
     config_controller.remove_target("/path/t")
-    
+
     assert "/path/t" not in mock_app._targets
     assert "/path/t" not in mock_app._target_aliases
     assert "/path/t" not in mock_app._syncing_targets

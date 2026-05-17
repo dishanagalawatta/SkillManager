@@ -1,14 +1,20 @@
 import os
-import json
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, mock_open
+
 from skill_manager.core.persistence import (
-    save_archive, load_archive,
-    save_essentials, load_essentials,
-    save_cache, load_cache,
+    load_archive,
+    load_cache,
+    load_essentials,
+    load_temp_registry,
     patch_cache_remove,
-    save_temp_registry, load_temp_registry
+    save_archive,
+    save_cache,
+    save_essentials,
+    save_temp_registry,
 )
+
 
 @pytest.fixture
 def temp_files(tmp_path):

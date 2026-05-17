@@ -1,26 +1,36 @@
 
+import subprocess
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
+from skill_manager.core.skill_sources import (
+    _intercept_cross_platform_command,
+    _merge_and_move_lockfile,
+    _parse_npx_command,
+    _relocate_skills_from_output,
+    _resolve_process_command,
+    _run_npm_update,
+    _run_process,
+    _run_repository_update,
+    _run_shell_command,
+    _split_args,
+    check_skill_source_versions,
+    detect_git_remote,
+    detect_source_config,
+    get_git_tag,
+    normalize_skill_source_config,
+    run_skill_source_update,
+    run_version_command,
+    sanitize_token,
+)
+
 
 @pytest.fixture
 def mock_run():
     with patch("subprocess.run") as mock:
         yield mock
-import os
-import subprocess
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-from skill_manager.core.skill_sources import (
-    normalize_skill_source_config,
-    detect_source_config,
-    run_skill_source_update,
-    _relocate_skills_from_output,
-    get_git_tag,
-    _run_repository_update,
-    _run_npm_update,
-    _intercept_cross_platform_command,
-    detect_git_remote
-)
+
 
 def test_normalize_skill_source_config():
     data = {"package_name": "test-package"}
@@ -28,6 +38,10 @@ def test_normalize_skill_source_config():
     assert normalized["name"] == "test-package"
     assert normalized["source_type"] == "npm"
     assert "npx --yes test-package" in normalized["update_command"]
+
+def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
+    assert sanitize_token("https://secret@example.com/repo.git") == "https://***@example.com/repo.git"
+    assert sanitize_token(None) is None
 
 def test_detect_source_config_npm():
     data = {"package_name": "npx --yes my-pkg --foo"}
@@ -44,16 +58,16 @@ def test_detect_source_config_git():
 def test_relocate_skills_from_output(temp_dir):
     target_path = temp_dir / "project_skills"
     target_path.mkdir()
-    
+
     # Create a dummy skill in a temp location
     source_skill_dir = temp_dir / "some_random_path" / "caveman"
     source_skill_dir.mkdir(parents=True)
     (source_skill_dir / "SKILL.md").write_text("content")
-    
+
     output = [f"Installed to {source_skill_dir}"]
-    
+
     _relocate_skills_from_output(output, str(target_path), None)
-    
+
     # Check if it moved
     assert (target_path / "caveman").is_dir()
     assert (target_path / "caveman" / "SKILL.md").exists()
@@ -66,20 +80,20 @@ def test_run_skill_source_update_with_relocation(mock_check, mock_relocate, mock
     local_path = temp_dir / "target"
     local_path.mkdir()
     (local_path / "old-skill").mkdir()
-    
+
     source = {
         "name": "test",
         "local_path": str(local_path),
         "update_command": "ls",
         "managed_folders": ["old-skill"]
     }
-    
+
     # Mock relocation to return a NEW list of managed folders
     mock_relocate.return_value = ["new-skill"]
     mock_check.return_value = {"current_version": "2.0.0"}
-    
+
     updated = run_skill_source_update(source)
-    
+
     # Should have deleted old-skill
     assert not (local_path / "old-skill").exists()
     assert updated["managed_folders"] == ["new-skill"]
@@ -91,7 +105,7 @@ def test_get_git_tag_remote(mock_run):
     mock_result.returncode = 0
     mock_result.stdout = "hash123\trefs/tags/v1.2.3\n"
     mock_run.return_value = mock_result
-    
+
     tag = get_git_tag("https://github.com/repo.git", is_remote=True)
     assert tag == "v1.2.3"
     mock_run.assert_called_once()
@@ -100,12 +114,12 @@ def test_get_git_tag_remote(mock_run):
 def test_get_git_tag_local(mock_run, temp_dir):
     git_dir = temp_dir / ".git"
     git_dir.mkdir()
-    
+
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = "v2.0.0\n"
     mock_run.return_value = mock_result
-    
+
     tag = get_git_tag(str(temp_dir), is_remote=False)
     assert tag == "v2.0.0"
     mock_run.assert_called_once()
@@ -118,9 +132,9 @@ def test_run_repository_update_clone(mock_run, temp_dir):
         "clone_path": str(clone_path),
         "local_path": str(clone_path)
     }
-    
+
     _run_repository_update(source, None)
-    
+
     # Should call clone since path is empty/doesn't exist
     mock_run.assert_called_once()
     assert mock_run.call_args[0][0][1] == "clone"
@@ -129,7 +143,7 @@ def test_run_repository_update_clone(mock_run, temp_dir):
 def test_run_npm_update(mock_run):
     source = {"package_name": "my-pkg", "install_args": "--dev"}
     _run_npm_update(source, None)
-    
+
     mock_run.assert_called_once()
     assert mock_run.call_args[0][0] == ["npx", "--yes", "my-pkg", "--dev"]
 
@@ -141,7 +155,7 @@ def test_run_process_error(mock_popen, mock_which):
     mock_proc.stdout = []
     mock_proc.returncode = 1
     mock_popen.return_value = mock_proc
-    
+
     from skill_manager.core.skill_sources import _run_process
     with pytest.raises(subprocess.CalledProcessError):
         _run_process(["test"], None)
@@ -160,55 +174,115 @@ def test_detect_source_config_auto_npm():
     assert detected["source_type"] == "npm"
     assert detected["package_name"] == "my-pkg"
 
+def test_detect_source_config_custom_and_verify_command(temp_dir):
+    detected = detect_source_config({
+        "update_command": "python install.py",
+        "local_path": str(temp_dir),
+    })
+    assert detected["source_type"] == "custom"
+    assert detected["current_version_command"] == "python install.py"
+    assert "test -d" in detected["verify_command"]
+
+
+def test_parse_npx_and_apply_package_args():
+    assert _parse_npx_command("npx --yes package-name --foo") == ("package-name", "--foo")
+    assert _parse_npx_command("python script.py") == ("", "")
+
+    detected = detect_source_config({"source_type": "npm", "package_name": "npx --yes pkg --dev"})
+    assert detected["package_name"] == "pkg"
+    assert detected["install_args"] == "--dev"
+
 def test_relocate_lock_files(temp_dir):
     target_path = temp_dir / "project_skills"
     target_path.mkdir()
-    
+
     source_root = temp_dir / "source_repo"
     source_root.mkdir()
     (source_root / ".skill-lock.json").write_text("{}")
-    
+
     # regex matches root of detected path
     detected_path = source_root / "skills" / "skill1"
     detected_path.mkdir(parents=True)
-    
+
     output = [f"at {detected_path}"]
     _relocate_skills_from_output(output, str(target_path), None)
-    
+
     # Should move the lock file to project root (target_path.parent)
     assert (target_path.parent / ".skill-lock.json").exists()
+
+
+def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
+    source_lock = tmp_path / "source" / ".skill-lock.json"
+    target_lock = tmp_path / "target" / ".skill-lock.json"
+    source_lock.parent.mkdir()
+    target_lock.parent.mkdir()
+    source_lock.write_text('{"version": "2", "skills": {"a": 1}}')
+    target_lock.write_text('{"skills": {"b": 2}}')
+    messages = []
+
+    _merge_and_move_lockfile(source_lock, target_lock, messages.append)
+
+    merged = target_lock.read_text()
+    assert '"a": 1' in merged
+    assert '"b": 2' in merged
+    assert '"version": "2"' in merged
+    assert not source_lock.exists()
+
+
+def test_relocate_skills_from_output_no_target_or_no_paths(temp_dir):
+    messages = []
+    assert _relocate_skills_from_output([], "", messages.append) is None
+    assert "Relocation skipped" in messages[0]
+
+    messages.clear()
+    assert _relocate_skills_from_output(["nothing here"], str(temp_dir), messages.append) is None
+    assert any("No installation paths" in message for message in messages)
 
 def test_relocate_path_internal_cleanup(temp_dir):
     from skill_manager.core.skill_sources import _relocate_path_internal
     dest_base = temp_dir / "dest"
     dest_base.mkdir()
-    
+
     # Existing directory in destination
     src = temp_dir / "src"
     src.mkdir()
     (dest_base / "src").mkdir()
     (dest_base / "src" / "old.txt").write_text("old")
-    
+
     _relocate_path_internal(src, dest_base, None)
     assert (dest_base / "src").is_dir()
     assert not (dest_base / "src" / "old.txt").exists()
-    
+
     # Existing file in destination
     src2 = temp_dir / "src2"
     src2.mkdir()
     (dest_base / "src2").write_text("blocking file")
-    
+
     _relocate_path_internal(src2, dest_base, None)
     assert (dest_base / "src2").is_dir()
 
 def test_split_args():
-    from skill_manager.core.skill_sources import _split_args
     assert _split_args("  a   b  c  ") == ["a", "b", "c"]
     assert _split_args(None) == []
 
 def test_intercept_cross_platform_success(temp_dir):
     # test -d should succeed for existing dir
-    assert _intercept_cross_platform_command(f"test -d {temp_dir}", None) == True
+    assert _intercept_cross_platform_command(f"test -d {temp_dir}", None)
+
+def test_intercept_cross_platform_echo_and_tilde_typo(temp_dir, monkeypatch):
+    home = temp_dir / "home"
+    target = home / ".agents"
+    target.mkdir(parents=True)
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("HOME", str(home))
+    messages = []
+
+    assert _intercept_cross_platform_command('test -d "~.agents" && echo "ok"', messages.append)
+    assert messages[-1] == "ok"
+
+
+def test_intercept_cross_platform_unsupported_test_command():
+    assert _intercept_cross_platform_command("test -f file.txt", None) is False
 
 def test_intercept_cross_platform_fail():
     with pytest.raises(RuntimeError):
@@ -222,12 +296,12 @@ def test_intercept_cross_platform_invalid():
 def test_detect_git_remote_failures(mock_run, temp_dir):
     # Not a directory
     assert detect_git_remote("/non/existent") == ""
-    
+
     # Not a git repo
     empty_dir = temp_dir / "empty"
     empty_dir.mkdir()
     assert detect_git_remote(str(empty_dir)) == ""
-    
+
     # Subprocess error
     git_dir = temp_dir / "git-fail"
     git_dir.mkdir()
@@ -248,15 +322,15 @@ def test_run_repository_update_pull(mock_run, temp_dir):
     clone_path = temp_dir / "existing-repo"
     clone_path.mkdir()
     (clone_path / ".git").mkdir()
-    
+
     source = {
         "repository_url": "https://github.com/repo.git",
         "clone_path": str(clone_path),
         "local_path": str(clone_path)
     }
-    
+
     _run_repository_update(source, None)
-    
+
     # Should call pull with --ff-only
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
@@ -269,14 +343,66 @@ def test_run_version_command(mock_run):
     mock_result.returncode = 0
     mock_result.stdout = "v1.2.3\n"
     mock_run.return_value = mock_result
-    
-    from skill_manager.core.skill_sources import run_version_command
+
     # Shell command
     assert run_version_command("git --version") == "v1.2.3"
-    
+
     # Command fails
     mock_result.returncode = 1
     assert run_version_command("git --fail") == ""
+
+
+def test_run_version_command_empty_and_bad_split():
+    assert run_version_command("") == ""
+    assert run_version_command('"unterminated') == ""
+
+
+def test_get_git_tag_remote_falls_back_to_head(mock_run):
+    tags_result = MagicMock(returncode=0, stdout="")
+    head_result = MagicMock(returncode=0, stdout="abcdef123456\tHEAD\n")
+    mock_run.side_effect = [tags_result, head_result]
+
+    assert get_git_tag("https://github.com/repo.git", is_remote=True, token="secret") == "abcdef1"
+
+
+def test_get_git_tag_local_falls_back_to_hash(mock_run, temp_dir):
+    (temp_dir / ".git").mkdir()
+    describe = MagicMock(returncode=1, stdout="")
+    rev = MagicMock(returncode=0, stdout="1234567\n")
+    mock_run.side_effect = [describe, rev]
+
+    assert get_git_tag(str(temp_dir), is_remote=False) == "1234567"
+
+
+def test_get_git_tag_handles_exceptions(mock_run):
+    mock_run.side_effect = OSError("git missing")
+    assert get_git_tag("https://github.com/repo.git", is_remote=True) == ""
+
+
+def test_check_skill_source_versions_commands_git_and_npm(temp_dir):
+    git_dir = temp_dir / "repo"
+    (git_dir / ".git").mkdir(parents=True)
+    source = {
+        "source_type": "git",
+        "repository_url": "https://github.com/org/repo.git",
+        "clone_path": str(git_dir),
+        "current_version_command": "current",
+        "latest_version_command": "latest",
+    }
+
+    with (
+        patch("skill_manager.core.skill_sources.run_version_command", side_effect=["v1.0", "v2.0"]),
+        patch("skill_manager.core.skill_sources.get_git_tag", side_effect=["v3.0", "v1.5", "v3.0"]),
+    ):
+        updated = check_skill_source_versions(source, force_refresh=True)
+
+    assert updated["current_version"] == "1.5"
+    assert updated["latest_version"] == "3.0"
+
+    with patch("skill_manager.core.skill_sources.run_version_command", return_value="v9.0"):
+        npm = check_skill_source_versions({"source_type": "npm", "package_name": "pkg"}, True)
+    assert npm["current_version"] == "9.0"
+    assert npm["latest_version"] == "9.0"
 
 def test_relocate_skills_from_output_detected(temp_dir):
     target_path = temp_dir / "project_skills"
@@ -301,3 +427,82 @@ def test_run_skill_source_update_npm(mock_run):
     run_skill_source_update(source)
     # _run_npm_update should be called via _run_process
     mock_run.assert_called()
+
+
+def test_run_skill_source_update_cleanup_failure_and_verify(temp_dir):
+    local_path = temp_dir / "skills"
+    old = local_path / "old"
+    old.mkdir(parents=True)
+    source = {
+        "name": "custom",
+        "source_type": "custom",
+        "local_path": str(local_path),
+        "update_command": "echo update",
+        "verify_command": f"test -d {local_path}",
+        "managed_folders": ["old"],
+    }
+    messages = []
+
+    with (
+        patch("skill_manager.core.skill_sources._run_shell_command") as shell,
+        patch("skill_manager.core.skill_sources._relocate_skills_from_output", return_value=[]),
+        patch("skill_manager.core.skill_sources.shutil.rmtree", side_effect=OSError("locked")),
+        patch("skill_manager.core.skill_sources.check_skill_source_versions", side_effect=lambda s, force_refresh=False: s),
+    ):
+        updated = run_skill_source_update(source, messages.append)
+
+    assert shell.call_count == 2
+    assert updated["managed_folders"] == []
+    assert updated["removed_folders"] == []
+    assert any("Failed to delete old" in message for message in messages)
+
+
+def test_run_repository_update_errors(temp_dir):
+    with pytest.raises(ValueError, match="repository_url"):
+        _run_repository_update({"local_path": str(temp_dir)}, None)
+    with pytest.raises(ValueError, match="local_path"):
+        _run_repository_update({"repository_url": "url"}, None)
+
+    non_empty = temp_dir / "non-empty"
+    non_empty.mkdir()
+    (non_empty / "file.txt").write_text("x")
+    with pytest.raises(ValueError, match="not an empty git checkout"):
+        _run_repository_update(
+            {"repository_url": "url", "clone_path": str(non_empty), "local_path": str(non_empty)},
+            None,
+        )
+
+
+def test_run_shell_command_intercept_and_process():
+    messages = []
+    with patch("skill_manager.core.skill_sources._run_process") as run_process:
+        _run_shell_command("echo hi", messages.append)
+    run_process.assert_called_once_with("echo hi", messages.append, shell=True)
+
+
+def test_resolve_process_command_passthrough_and_absolute():
+    assert _resolve_process_command("echo hi", shell=True) == "echo hi"
+    assert _resolve_process_command([], shell=False) == []
+    assert _resolve_process_command(["C:/bin/tool.exe", "arg"]) == ["C:/bin/tool.exe", "arg"]
+
+
+def test_run_process_emits_sanitized_output_and_throttles_progress():
+    proc = MagicMock()
+    proc.stdout = iter([
+        "https://secret@example.com/repo.git\n",
+        "Updating files: 45%\n",
+        "Updating files: 46%\n",
+    ])
+    proc.returncode = 0
+    messages = []
+
+    with (
+        patch("skill_manager.core.skill_sources._resolve_process_command", return_value=["tool"]),
+        patch("skill_manager.core.skill_sources.subprocess.Popen", return_value=proc),
+        patch("time.time", side_effect=[1, 1.1, 1.2]),
+    ):
+        _run_process(["tool"], messages.append)
+
+    assert "https://***@example.com/repo.git" in messages
+    assert "Updating files: 45%" in messages
+    assert "Updating files: 46%" not in messages
