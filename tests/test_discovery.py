@@ -1,7 +1,9 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
+
 from skill_manager.core.discovery import DiscoveryService
+
 
 @pytest.fixture
 def service():
@@ -51,9 +53,9 @@ def test_discover_all(mock_load, mock_save, mock_proj, mock_src, service):
         "target_path": "/t1",
         "skills": [{"name": "P1S1", "local_path": "/t1/s1", "category": "Cat2"}]
     }]
-    
+
     result = service.discover_all(use_cache=False)
-    
+
     assert len(result["skills"]) == 2
     assert "Cat1" in result["categories"]
     assert "Cat2" in result["categories"]

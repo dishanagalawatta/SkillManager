@@ -1,5 +1,7 @@
 import pytest
+
 from skill_manager.core.search import SearchEngine, SkillIndexer
+
 
 @pytest.fixture
 def skills():

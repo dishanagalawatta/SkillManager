@@ -1,9 +1,11 @@
-import os
 import json
-import pytest
+import os
 from unittest.mock import MagicMock, patch
-from pathlib import Path
+
+import pytest
+
 from skill_manager.core import analytics
+
 
 @pytest.fixture
 def mock_posthog():
@@ -19,10 +21,10 @@ def test_get_or_create_device_id(temp_data_dir):
     # Test creation
     device_id = analytics._get_or_create_device_id()
     assert device_id.startswith("device_")
-    
+
     device_file = temp_data_dir / "device_id.json"
     assert device_file.exists()
-    
+
     # Test persistence
     second_id = analytics._get_or_create_device_id()
     assert second_id == device_id
@@ -34,30 +36,34 @@ def test_capture_event_no_config():
 
 def test_capture_event_with_config(mock_posthog):
     mock_client = MagicMock()
-    with patch("skill_manager.core.analytics._posthog", mock_client):
-        with patch("skill_manager.core.analytics.get_device_id", return_value="test_dev"):
-            analytics.capture_event("test_event", {"prop": 1})
-            mock_client.capture.assert_called_once_with(
-                distinct_id="test_dev",
-                event="test_event",
-                properties={"prop": 1}
-            )
+    with (
+        patch("skill_manager.core.analytics._posthog", mock_client),
+        patch("skill_manager.core.analytics.get_device_id", return_value="test_dev"),
+    ):
+        analytics.capture_event("test_event", {"prop": 1})
+        mock_client.capture.assert_called_once_with(
+            distinct_id="test_dev",
+            event="test_event",
+            properties={"prop": 1},
+        )
 
 def test_capture_exception(mock_posthog):
     mock_client = MagicMock()
-    with patch("skill_manager.core.analytics._posthog", mock_client):
-        with patch("skill_manager.core.analytics.get_device_id", return_value="test_dev"):
-            exc = ValueError("test")
-            analytics.capture_exception(exc)
-            mock_client.capture_exception.assert_called_once_with(
-                exc,
-                distinct_id="test_dev"
-            )
+    with (
+        patch("skill_manager.core.analytics._posthog", mock_client),
+        patch("skill_manager.core.analytics.get_device_id", return_value="test_dev"),
+    ):
+        exc = ValueError("test")
+        analytics.capture_exception(exc)
+        mock_client.capture_exception.assert_called_once_with(
+            exc,
+            distinct_id="test_dev",
+        )
 
 def test_get_or_create_device_id_corrupted(temp_data_dir):
     device_file = temp_data_dir / "device_id.json"
     device_file.write_text("invalid json")
-    
+
     device_id = analytics._get_or_create_device_id()
     assert device_id.startswith("device_")
     assert "device_id" in json.loads(device_file.read_text())

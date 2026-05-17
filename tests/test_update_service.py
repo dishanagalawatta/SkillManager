@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from skill_manager.core.update_service import UpdateService
+
 
 @pytest.fixture
 def service():
@@ -15,38 +18,26 @@ def service():
 @patch("skill_manager.core.update_service.copy_skill_folders_to_targets")
 def test_run_global_update(mock_copy, mock_proj, mock_src_upd, service):
     mock_src_upd.return_value = {"name": "S1", "removed_folders": ["old_f"]}
-    mock_proj.return_value = [{"project_label": "P1", "skills": []}]
+    mock_proj.side_effect = [
+        [{"project_label": "P1", "skills": [{"folder_name": "old_f"}]}],
+        [{"project_label": "Source", "skills": [{"folder_name": "new", "name": "New"}]}],
+    ]
     mock_copy.return_value = {"merged": 1, "failed": 0}
-    
+
     status_cb = MagicMock()
     progress_cb = MagicMock()
     comp_cb = MagicMock()
-    
-    # We test the logic inside the thread (calling directly for simplicity in mock test)
-    with patch("threading.Thread") as mock_thread:
-        mock_instance = MagicMock()
-        mock_thread.return_value = mock_instance
-        # Make the thread run immediately for testing logic
-        mock_instance.start.side_effect = lambda: run_global_update_logic()
-        
-        # We need to capture the inner function. 
-        # A better way: refactor Service to have a non-threaded method, but for now:
-        def run_global_update_logic():
-            # This is a bit tricky because the function is local.
-            # Let's just mock Thread to run the target.
-            pass
 
-    # Actually, a simpler way to test threaded logic is to mock Thread to just execute the target
-    with patch("threading.Thread") as mock_thread:
-        def side_effect(target, daemon=True):
-            target()
-            return MagicMock()
-        mock_thread.side_effect = side_effect
-        service.run_global_update(status_cb, progress_cb, comp_cb)
-    
+    service.run_global_update_sync(status_cb, progress_cb, comp_cb)
+
     assert mock_src_upd.called
-    assert mock_copy.called
+    mock_copy.assert_called_once_with(
+        [{"folder_name": "new", "name": "New"}],
+        ["/target"],
+        update_only=True,
+    )
     assert comp_cb.called
+    progress_cb.assert_called_once()
 
 @patch("skill_manager.core.update_service.discover_source_skills")
 @patch("skill_manager.core.update_service.discover_project_skills")
@@ -55,19 +46,75 @@ def test_scan_for_updates(mock_check, mock_proj, mock_src, service):
     mock_src.return_value = [{"name": "Skill1", "folder_name": "f1"}]
     mock_proj.return_value = [{"project_label": "P1", "skills": []}]
     mock_check.return_value = {"name": "S1", "latest_version": "2.0"}
-    
+
     status_cb = MagicMock()
     comp_cb = MagicMock()
-    
-    with patch("threading.Thread") as mock_thread:
-        def side_effect(target, daemon=True):
-            target()
-            return MagicMock()
-        mock_thread.side_effect = side_effect
-        service.scan_for_updates(status_cb, comp_cb)
-    
+
+    service.scan_for_updates_sync(status_cb, comp_cb)
+
     assert comp_cb.called
     results, sources = comp_cb.call_args[0]
     assert results[0]["status"] == "missing"
     assert sources[0]["latest_version"] == "2.0"
     assert status_cb.called
+
+
+def test_compare_source_and_target_skills_mixed_statuses():
+    results = UpdateService.compare_source_and_target_skills(
+        [
+            {"name": "A", "folder_name": "a"},
+            {"name": "B", "folder_name": "b"},
+        ],
+        [
+            {"project_label": "P1", "skills": [{"folder_name": "a"}]},
+            {"project_label": "P2", "skills": [{"folder_name": "a"}, {"folder_name": "b"}]},
+        ],
+    )
+
+    by_name = {result["folder_name"]: result for result in results}
+    assert by_name["a"]["status"] == "up_to_date"
+    assert by_name["b"]["status"] == "missing"
+    assert by_name["b"]["targets"][0] == {"name": "P1", "status": "missing"}
+
+
+@patch("skill_manager.core.update_service.run_skill_source_update")
+@patch("skill_manager.core.update_service.discover_project_skills")
+@patch("skill_manager.core.update_service.copy_skill_folders_to_targets")
+def test_run_global_update_recovers_source_failure(mock_copy, mock_proj, mock_src_upd, service):
+    mock_src_upd.side_effect = RuntimeError("boom")
+    mock_proj.return_value = []
+    mock_copy.return_value = {"merged": 0, "failed": 0}
+    status_cb = MagicMock()
+    progress_cb = MagicMock()
+    comp_cb = MagicMock()
+
+    service.run_global_update_sync(status_cb, progress_cb, comp_cb)
+
+    progress_cb.assert_called_once()
+    assert progress_cb.call_args.args[1]["is_updating"] is False
+    comp_cb.assert_called_once()
+
+
+@patch("skill_manager.core.update_service.discover_project_skills")
+def test_cleanup_removed_project_skills_deletes_matches(mock_proj, service):
+    mock_proj.return_value = [
+        {"project_label": "P", "skills": [{"folder_name": "old"}, {"folder_name": "keep"}]}
+    ]
+    status_cb = MagicMock()
+    with patch("skill_manager.core.update_service.delete_project_skill_folders") as delete:
+        service._cleanup_removed_project_skills(["old"], status_cb)
+
+    delete.assert_called_once_with([{"folder_name": "old"}])
+    status_cb.assert_called_once()
+
+
+@patch("skill_manager.core.update_service.discover_source_skills")
+def test_scan_for_updates_top_level_error_reports_status(mock_src, service):
+    mock_src.side_effect = RuntimeError("scan failed")
+    status_cb = MagicMock()
+    comp_cb = MagicMock()
+
+    service.scan_for_updates_sync(status_cb, comp_cb)
+
+    assert status_cb.call_args_list[-1].args[0] == "Scan failed: scan failed"
+    comp_cb.assert_not_called()

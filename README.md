@@ -40,7 +40,7 @@ If you just want to use the application, head over to the [Releases](https://git
 ## Getting Started (Developers)
 
 ### 1. Prerequisites
-- Python 3.10 or higher
+- Python 3.12 or higher
 - [uv](https://astral.sh/uv) (Ultra-fast Python package installer)
 
 ### 2. Clone the Repository
@@ -79,7 +79,7 @@ For an in-depth look, see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 | Command | Description |
 |---|---|
 | `uv run skill-manager` | Launch the application locally |
-| `uv run ruff check src` | Run linter across the codebase |
+| `uv run ruff check src tests` | Run linter across the codebase |
 | `uv run pytest` | Run the unit test suite |
 | `uv run pytest --cov=skill_manager` | Run tests with coverage reporting |
 | `uv run pyinstaller packaging/skill_manager.spec` | Build the standalone executable locally |
@@ -94,7 +94,7 @@ Detailed documentation can be found in the `docs/` directory:
 
 ## Deployment & CI/CD
 
-SkillManager uses a fully automated GitHub Actions pipeline. Pushing a tag starting with `v` (e.g., `v1.0.0`) triggers the `.github/workflows/release.yml` workflow. This matrix build spins up Windows, macOS, and Linux runners to:
+SkillManager uses GitHub Actions for both quality gates and release packaging. The `.github/workflows/quality.yml` workflow runs linting and tests on pushes and pull requests. Pushing a tag starting with `v` (e.g., `v1.0.0`) triggers the `.github/workflows/release.yml` workflow. This matrix build spins up Windows, macOS, and Linux runners to:
 1. Freeze the Python code using `PyInstaller`.
 2. Wrap the executables in OS-specific native formats (Inno Setup for Windows, `create-dmg` for macOS).
 3. Automatically publish the artifacts to a GitHub Release.

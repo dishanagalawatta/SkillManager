@@ -1,14 +1,13 @@
-import pytest
-from pathlib import Path
 from skill_manager.core.parsing import (
-    parse_skill_md,
+    build_skill_search_text,
+    categorize_skill,
+    extract_markdown_description,
+    normalize_description,
     parse_command_md,
     parse_frontmatter,
-    normalize_description,
-    extract_markdown_description,
-    categorize_skill,
-    build_skill_search_text
+    parse_skill_md,
 )
+
 
 def test_parse_frontmatter_standard():
     fm = "name: Test Skill\ndescription: A test description\ncategory: Development"
@@ -50,7 +49,7 @@ type: bundle
 # Alpha Skill
 This is the body.
 """, encoding="utf-8")
-    
+
     data = parse_skill_md(str(skill_file))
     assert data["name"] == "Alpha"
     assert data["description"] == "Test skill alpha"
@@ -66,7 +65,7 @@ description: Deploy command
 # Deploy
 Body here.
 """, encoding="utf-8")
-    
+
     data = parse_command_md(str(cmd_file))
     assert data["name"] == "Deploy"
     assert data["client"] == "Codex"
