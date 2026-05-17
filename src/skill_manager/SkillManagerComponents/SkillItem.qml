@@ -144,6 +144,11 @@ Item {
                         border.width: model && model.isSelected ? 0 : 1
                         border.color: Theme.glassBorder
                         
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.name: "Select " + (model ? model.name : "skill")
+                        Accessible.checkable: true
+                        Accessible.checked: model && model.isSelected
+
                         Text {
                             anchors.centerIn: parent
                             text: "✓"
@@ -229,6 +234,14 @@ Item {
                         Layout.preferredHeight: 32
                         flat: true
                         visible: mouseArea.containsMouse
+
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Delete " + (model ? model.name : "skill")
+
+                        HoverHandler {
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
                         onClicked: (mouse) => {
                             if (model && model.path) {
                                 root.deleteRequested(model.name, model.path)

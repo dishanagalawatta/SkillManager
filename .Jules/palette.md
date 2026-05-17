@@ -17,3 +17,7 @@
 ## 2024-05-16 - Custom QtQuick Controls Lose Hover Affordances
 **Learning:** In QML, when customizing basic input controls like `Button` (e.g. `SidebarButton` and `TopBarButton`), replacing the standard background/contentItem can strip away native interaction affordances like hover cursor shapes and appropriate accessibility roles if not correctly re-defined.
 **Action:** When building custom `Button` components (not just raw `MouseArea` items), always explicitly re-declare `Accessible.role`, `Accessible.name`, and embed a `HoverHandler { cursorShape: Qt.PointingHandCursor }` at the root of the control to ensure interaction feedback and a11y compatibility.
+
+## 2024-05-16 - Custom Pseudo-Controls Require Explicit Accessible States
+**Learning:** In QML, when building custom interactive elements that act as standard controls (e.g. a `Rectangle` acting as a multi-select checkbox), screen readers cannot infer the element's state. Providing `Accessible.role` and `Accessible.name` is not enough; pseudo-checkboxes also require `Accessible.checkable: true` and a property binding for `Accessible.checked: (boolean expression)` to be fully accessible.
+**Action:** Always fully specify the accessibility interface for custom control types. For custom checkboxes, ensure `Accessible.checkable` and `Accessible.checked` are mapped correctly to the data model.
