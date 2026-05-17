@@ -14,3 +14,8 @@
 **Vulnerability:** Found a command injection vulnerability where a GitHub token was directly embedded into `git -c credential.helper='!f() { ... }'` commands without escaping. Since Git executes credential helpers starting with `!` via the shell, this allowed for arbitrary shell command execution if a malicious token was provided.
 **Learning:** In contexts where values are passed to sub-shells (like Git's `!` command execution), simple string formatting is unsafe, even for seemingly simple strings like tokens.
 **Prevention:** Always use `shlex.quote()` when embedding dynamic, untrusted values (like tokens or API keys) into shell commands or configurations that are interpreted by shells, to guarantee they are handled as literal strings.
+
+## 2024-05-20 - [Enhanced `sanitize_token` to Mask Git Credential Helper Passwords]
+**Vulnerability:** Git personal access tokens injected into subprocess commands via inline git credential helpers (e.g., `-c "credential.helper=!f() { echo username=token; echo password=ghp_...; }; f"`) could be exposed in standard output or error logs when commands fail.
+**Learning:** The existing URL-based `sanitize_token` function was insufficient to mask credential helper tokens because they don't follow the `https://user:pass@` URI format.
+**Prevention:** Ensured the central `sanitize_token` utility explicitly matches and masks `password=...` assignments in the credential helper syntax. Always sanitize process command arguments when forming `CalledProcessError` exceptions.

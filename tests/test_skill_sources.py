@@ -43,6 +43,9 @@ def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
     assert sanitize_token("https://secret@example.com/repo.git") == "https://***@example.com/repo.git"
     assert sanitize_token(None) is None
 
+def test_sanitize_token_masks_git_credential_helper():
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password=ghp_ThisIsASecretToken12345; }; f") == "credential.helper=!f() { echo username=token; echo password=***; }; f"
+
 def test_detect_source_config_npm():
     data = {"package_name": "npx --yes my-pkg --foo"}
     detected = detect_source_config(data)
