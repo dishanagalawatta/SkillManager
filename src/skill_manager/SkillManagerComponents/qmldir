@@ -12,6 +12,8 @@ SkillInspector 1.0 SkillInspector.qml
 FilterPill 1.0 FilterPill.qml
 GlassDropdown 1.0 GlassDropdown.qml
 GlassToggleButton 1.0 GlassToggleButton.qml
+ActionButton 1.0 ActionButton.qml
+IconButton 1.0 IconButton.qml
 CustomTitleBar 1.0 CustomTitleBar.qml
 FrostOverlay 1.0 FrostOverlay.qml
 

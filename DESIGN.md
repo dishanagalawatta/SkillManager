@@ -10,18 +10,18 @@ Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-devel
 - **Category:** Desktop productivity / developer utility
 - **Current stack:** Python 3.12+, PySide6 (Qt 6.8+), QML, `uv`, `ruff`
 - **Primary platforms:** Windows (Native Mica/Acrylic), macOS, Linux
-- **Design target:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while utilizing modern hardware acceleration via Qt 6.
+- **Design project:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while utilizing modern hardware acceleration via Qt 6.
 - **Primary users:** Developers and power users managing local skill folders across multiple project repositories.
 
 ## Existing Workflows To Preserve
 
 The Liquid Glass redesign must not move or weaken these workflows:
 
-- **Quick Copy:** Browse skills discovered in project paths, select/copy references, manage saved sets, handle manual references, and keep project-scoped state clear.
-- **Library:** Browse local skills, search, filter by category, expand/collapse categories, select multiple skills, archive/unarchive, open skill details, and copy selected skill folders to configured project targets.
+- **Quick Copy:** Browse skills discovered in project paths, select/copy references, manage saved sets, handle command references, and keep project-scoped state clear.
+- **Library:** Browse local skills, search, filter by category, expand/collapse categories, select multiple skills, archive/unarchive, open skill details, and copy selected skill folders to configured project projects.
 - **Copy to Projects:** Keep this action in the Library workflow. It supports multi-select and copies whole skill folders, not only `SKILL.md`.
-- **Updates:** Manage source and target project directories, drag/drop paths, reorder sources, run folder updates, manage configured skill update commands, run update checks, and sync linked project targets after successful source updates.
-- **Essentials and manuals:** Treat Essentials and manual references as first-class selectable items wherever the Quick Copy workflow shows project skills.
+- **Updates:** Manage source and project project directories, drag/drop paths, reorder sources, run folder updates, manage configured skill update commands, run update checks, and sync linked project projects after successful source updates.
+- **Starred and commands:** Treat Starred and command references as first-class selectable items wherever the Quick Copy workflow shows project skills.
 
 ## Solid Matte & Glass Principles
 
@@ -78,7 +78,7 @@ Window
     Progress, result summary, transient messages
 ```
 
-The current top-level `CTkTabview` can remain in the first implementation phase, but the long-term Liquid Glass target is a sidebar-driven layout:
+The current top-level `CTkTabview` can remain in the first implementation phase, but the long-term Liquid Glass project is a sidebar-driven layout:
 
 | Current Tab | Liquid Glass Destination |
 |---|---|
@@ -169,6 +169,10 @@ Avoid large bold text inside dense panels. Keep text left-aligned. Dense list an
 - Shadows: use lightly and only for functional floating layers, toasts, popovers, and dialogs.
 - Motion: use short, purposeful fades or small translations only when they clarify state. Honor reduced motion by removing movement.
 
+### Motion And List Performance
+
+Skill lists must optimize for immediate response before visual flourish. Category expand/collapse should reduce the active QML delegate set instead of keeping every hidden row mounted at `height: 0`, and row delegates should consume cached model roles for grouping/collapse state instead of doing previous-row lookups in QML. Avoid height animations across bulk list operations; use short hover, focus, color, and inspector transitions where they do not trigger large relayouts.
+
 ## Layout Model
 
 ### Primary Navigation
@@ -221,7 +225,7 @@ Quick Copy is a vertical stack of specialized glass pills, each controlling a sp
 Quick Copy
   Glass Pill 1 (Context): Refresh, Project selector, Search, Category filter
   Glass Pill 2 (Configuration): Output format menu, Copy Selected, Remove Selected
-  Glass Pill 3 (Essentials): Combined project skills and manual references count
+  Glass Pill 3 (Starred): Combined project skills and command references count
   Glass Pill 4 (Manual Input): Input field, Add, Paste, Browse actions
   Split Content (Layer 2 Pills):
     Left Pill: Skill tree with single-line summaries
@@ -246,7 +250,7 @@ Updates
   Glass header: purpose and current update context
   Left project folder pane:
     Source directories list, add/remove/reorder, drag/drop
-    Target directories list, add/remove, drag/drop
+    Project directories list, add/remove, drag/drop
     Run Folder Update
   Right skill source pane:
     Skill source update rows
@@ -255,7 +259,7 @@ Updates
   Bottom glass status: progress, sync results, warnings
 ```
 
-Sources and targets should feel like two related source lists:
+Sources and projects should feel like two related source lists:
 
 - Use a single Project Folders pane beside the skill-source update list on wide windows.
 - Each pane has a compact glass header, list, and toolbar buttons.
@@ -299,7 +303,7 @@ Preferred labels:
 - `Unarchive`
 - `Delete`
 - `Add Source`
-- `Add Target`
+- `Add Project`
 - `Check for Updates`
 
 Avoid vague labels like `OK`. Dialog buttons should use specific verbs such as `Copy Folders`, `Save`, `Delete`, or `Cancel`.
@@ -311,7 +315,7 @@ Avoid vague labels like `OK`. Dialog buttons should use specific verbs such as `
 - Preserve selected items when filtering if possible.
 - Show clear empty states:
   - `No skills match this search.`
-  - `No project skills found in configured targets.`
+  - `No project skills found in configured projects.`
 - Support `Ctrl+F` now; use `Cmd+F` if a macOS build is introduced.
 
 ### Menus And Context Menus
@@ -332,7 +336,7 @@ Future redesign should introduce predictable menus:
 Use modal dialogs only for focused tasks:
 
 - Add/edit skill update configuration
-- Choose project copy targets
+- Choose project copy projects
 - Confirm destructive delete when undo is not available
 
 Dialog rules:
@@ -385,7 +389,7 @@ Use a consistent status model:
 
 - Inline count: `24/120 shown`
 - Running state: `Scanning configured projects...`
-- Success: `Copied 3 skills to 2 targets.`
+- Success: `Copied 3 skills to 2 projects.`
 - Partial failure: `Copied 2 skills. 1 skipped.`
 - Failure: `Failed to scan project skills.`
 
@@ -424,7 +428,7 @@ Pointer behavior:
 
 - Right-click opens context menu.
 - Double-click opens skill detail.
-- Drag/drop for source and target directories remains supported.
+- Drag/drop for source and project directories remains supported.
 - Hover states should be subtle but visible on buttons and tree rows.
 - Glass hover states should change elevation or tint slightly, not jump or glow.
 
@@ -488,7 +492,7 @@ Use this checklist when implementing the Liquid Glass redesign:
 - [ ] Gaps between stacked pills allow the primary background to remain visible.
 - [ ] Light and dark appearances use the validated hex-based Solid Matte tokens.
 - [ ] Reduced-transparency and increased-contrast fallbacks preserve the "pill-stacked" hierarchy.
-- [ ] The Quick Copy view follows the modular stack of context, configuration, essentials, and manual input pills.
+- [ ] The Quick Copy view follows the modular stack of context, configuration, starred, and manual input pills.
 - [ ] The Skill Inspector is persistent and updates immediately on selection.
 - [ ] Tree rows and list items sit directly on the frosted glass material.
 - [ ] Buttons use vibrant fills (Primary) or tinted glass backgrounds (Secondary/Destructive).

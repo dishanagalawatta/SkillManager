@@ -10,6 +10,7 @@ data/
 venv/
 
 tmp*/
+TODO.md
 
 .agents/
 .agent/

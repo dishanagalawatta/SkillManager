@@ -1,6 +1,7 @@
 """
-Discovery service for finding and processing skills from sources and targets.
+Discovery service for finding and processing skills from sources and projects.
 """
+
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -12,19 +13,28 @@ from skill_manager.core.parsing import (
     parse_skill_md,
 )
 from skill_manager.core.persistence import load_cache, save_cache
-from skill_manager.core.quick_copy import discover_project_skills, discover_source_skills
+from skill_manager.core.quick_copy import discover_package_skills, discover_project_skills
 
 
 class DiscoveryService:
-    def __init__(self, sources: list[str], targets: list[str], archive_paths: list[str], essential_paths: list[str], target_aliases: dict[str, str] = None):
+    def __init__(
+        self,
+        sources: list[str],
+        projects: list[str],
+        archive_paths: list[str],
+        starred_paths: list[str],
+        project_aliases: dict[str, str] = None,
+    ):
         self.sources = sources
-        self.targets = targets
+        self.projects = projects
         self.archive_paths = archive_paths
-        self.essential_paths = essential_paths
-        self.target_aliases = target_aliases or {}
+        self.starred_paths = starred_paths
+        self.project_aliases = project_aliases or {}
 
-    def discover_all(self, use_cache: bool = True, cache_callback: Callable[[dict[str, Any]], None] = None) -> dict[str, Any]:
-        """Performs full discovery of skills from all sources and targets."""
+    def discover_all(
+        self, use_cache: bool = True, cache_callback: Callable[[dict[str, Any]], None] = None
+    ) -> dict[str, Any]:
+        """Performs full discovery of skills from all sources and projects."""
 
         # 1. Try cache first
         if use_cache:
@@ -32,8 +42,8 @@ class DiscoveryService:
             if cached_data and cache_callback:
                 cache_callback(cached_data)
 
-        # 2a. Discover from master sources
-        source_skills_raw = discover_source_skills(
+        # 2a. Discover from master packages
+        package_skills_raw = discover_package_skills(
             sources=self.sources,
             parse_skill_md=parse_skill_md,
             categorize_skill=categorize_skill,
@@ -41,41 +51,45 @@ class DiscoveryService:
         )
 
         all_skills = []
-        for skill in source_skills_raw:
-            all_skills.append(self._transform_skill(skill, is_source=True))
+        for skill in package_skills_raw:
+            all_skills.append(self._transform_skill(skill, is_package=True))
 
-        # 2b. Discover from project targets
-        projects = discover_project_skills(
-            targets=self.targets,
+        # 2b. Discover from project skill folders
+        projects_state = discover_project_skills(
+            projects=self.projects,
             parse_skill_md=parse_skill_md,
             categorize_skill=categorize_skill,
             build_search_text=build_skill_search_text,
-            target_aliases=self.target_aliases
+            project_aliases=self.project_aliases,
         )
 
-        for p in projects:
+        for p in projects_state:
             for skill in p.get("skills", []):
-                all_skills.append(self._transform_skill(skill, is_source=False, project_label=p.get("project_label")))
+                all_skills.append(
+                    self._transform_skill(
+                        skill, is_package=False, project_label=p.get("project_label")
+                    )
+                )
 
-            # Also discover commands in manuals/ subdir
-            target_path = Path(p["target_path"])
-            manuals_dir = target_path / "manuals"
-            if manuals_dir.is_dir():
-                for cmd_file in manuals_dir.glob("*.md"):
+            # Also discover commands in commands/ subdir
+            project_path = Path(p["project_path"])
+            commands_dir = project_path / "commands"
+            if commands_dir.is_dir():
+                for cmd_file in commands_dir.glob("*.md"):
                     cmd_data = self._process_command_file(cmd_file, p)
                     if cmd_data:
                         all_skills.append(cmd_data)
 
         # 3. Pre-compute metadata
         cats = sorted({s["category"] for s in all_skills if s["category"]})
-        proj_labels = sorted({p["project_label"] for p in projects})
+        proj_labels = sorted({p["project_label"] for p in projects_state})
 
         result = {
             "skills": all_skills,
-            "projects": projects,
+            "projects": projects_state,
             "categories": cats,
             "project_labels": proj_labels,
-            "status": f"Found {len(all_skills)} skills in master library ({len(projects)} project targets)"
+            "status": f"Found {len(all_skills)} skills in master library ({len(projects_state)} projects)",
         }
 
         # 4. Update cache
@@ -83,7 +97,9 @@ class DiscoveryService:
 
         return result
 
-    def _transform_skill(self, skill: dict[str, Any], is_source: bool, project_label: str = None) -> dict[str, Any]:
+    def _transform_skill(
+        self, skill: dict[str, Any], is_package: bool, project_label: str = None
+    ) -> dict[str, Any]:
         """Normalizes raw skill data into the format expected by the UI models."""
         metadata = skill.get("metadata", {})
         local_path = skill.get("local_path", "")
@@ -95,12 +111,14 @@ class DiscoveryService:
             "category": skill.get("category", "Uncategorized"),
             "description": skill.get("description", ""),
             "local_path": local_path,
-            "project_label": skill.get("project_label") or project_label or ("Master Library" if is_source else "Unknown Project"),
+            "project_label": skill.get("project_label")
+            or project_label
+            or ("Master Library" if is_package else "Unknown Project"),
             "project_root": skill.get("project_root", ""),
-            "target_path": skill.get("target_path", ""),
-            "is_essential": metadata.get("essential", False) or local_path in self.essential_paths,
+            "project_path": skill.get("project_path", ""),
+            "is_starred": metadata.get("starred", False) or metadata.get("essential", False) or local_path in self.starred_paths,
             "is_bundle": skill.get("is_bundle", False),
-            "manuals": skill.get("manuals", []),
+            "commands": skill.get("commands", []),
             "is_selected": False,
             "is_archived": local_path in self.archive_paths,
             "search_text": skill.get("search_text", ""),
@@ -109,19 +127,24 @@ class DiscoveryService:
             "risk": metadata.get("risk", "Unknown"),
             "source": metadata.get("source", "Unknown"),
             "date": str(metadata.get("date_added") or metadata.get("date", "Unknown")),
-            "is_source": is_source,
+            "is_package": is_package,
+            "is_source": is_package,  # Compatibility
         }
 
-        if not is_source:
-            data.update({
-                "skill_base_relative": skill.get("skill_base_relative", ""),
-                "folder_name": skill.get("folder_name", ""),
-                "skill_md_path": skill.get("skill_md_path", "")
-            })
+        if not is_package:
+            data.update(
+                {
+                    "skill_base_relative": skill.get("skill_base_relative", ""),
+                    "folder_name": skill.get("folder_name", ""),
+                    "skill_md_path": skill.get("skill_md_path", ""),
+                }
+            )
 
         return data
 
-    def _process_command_file(self, cmd_file: Path, project: dict[str, Any]) -> dict[str, Any] | None:
+    def _process_command_file(
+        self, cmd_file: Path, project: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Parses a command markdown file and returns its normalized representation."""
         cmd_data_raw = parse_command_md(str(cmd_file))
         if not cmd_data_raw:
@@ -136,10 +159,10 @@ class DiscoveryService:
             "local_path": str(cmd_file),
             "project_label": project.get("project_label", "Unknown Project"),
             "project_root": project.get("project_root", ""),
-            "target_path": project.get("target_path", ""),
-            "is_essential": False,
+            "project_path": project.get("project_path", ""),
+            "is_starred": False,
             "is_bundle": False,
-            "manuals": [],
+            "commands": [],
             "is_selected": False,
             "is_archived": False,
             "raw_content": cmd_data_raw.get("raw_content", ""),
@@ -147,9 +170,10 @@ class DiscoveryService:
             "risk": "Low",
             "source": "Custom",
             "date": str(cmd_data_raw.get("metadata", {}).get("date", "Unknown")),
-            "is_source": False,
+            "is_package": False,
+            "is_source": False,  # Compatibility
             "is_command": True,
-            "client": cmd_data_raw.get("client", "")
+            "client": cmd_data_raw.get("client", ""),
         }
         data["search_text"] = build_skill_search_text(data)
         return data

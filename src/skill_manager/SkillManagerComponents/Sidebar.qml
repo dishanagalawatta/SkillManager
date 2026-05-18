@@ -90,7 +90,6 @@ Rectangle {
             active: root.currentView === "Library"
             onClicked: (mouse) => { 
                 root.currentView = "Library"
-                AppController.setViewFilter("all", "")
                 root.navigationChanged("Library") 
             }
         }

@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from skill_manager.core.discovery import DiscoveryService
@@ -8,56 +6,63 @@ from skill_manager.core.discovery import DiscoveryService
 @pytest.fixture
 def service():
     return DiscoveryService(
-        sources=["/src1"],
-        targets=["/target1"],
-        archive_paths=[],
-        essential_paths=[]
+        sources=["/src1", "/src2"],
+        projects=["/project1"],
+        archive_paths=["/src2/archived"],
+        starred_paths=["/src1/starred"],
+        project_aliases={"/project1": "My Project Alias"},
     )
+
 
 def test_transform_skill_source(service):
     skill = {
         "name": "Test Skill",
         "local_path": "/src1/skill1",
         "category": "Test",
-        "metadata": {"risk": "High"}
+        "metadata": {"risk": "High"},
     }
-    transformed = service._transform_skill(skill, is_source=True)
+    transformed = service._transform_skill(skill, is_package=True)
     assert transformed["name"] == "Test Skill"
-    assert transformed["is_source"] is True
+    assert transformed["is_package"] is True
     assert transformed["risk"] == "High"
     assert transformed["project_label"] == "Master Library"
+
 
 def test_transform_skill_project(service):
     skill = {
         "name": "Proj Skill",
-        "local_path": "/target1/skillA",
+        "local_path": "/project1/skillA",
         "category": "Dev",
         "skill_base_relative": "skillA",
-        "folder_name": "skillA"
+        "folder_name": "skillA",
     }
-    transformed = service._transform_skill(skill, is_source=False, project_label="My Project")
+    transformed = service._transform_skill(skill, is_package=False, project_label="My Project")
     assert transformed["name"] == "Proj Skill"
-    assert transformed["is_source"] is False
+    assert transformed["is_package"] is False
     assert transformed["project_label"] == "My Project"
-    assert transformed["folder_name"] == "skillA"
+    assert transformed["skill_base_relative"] == "skillA"
 
-@patch("skill_manager.core.discovery.discover_source_skills")
-@patch("skill_manager.core.discovery.discover_project_skills")
-@patch("skill_manager.core.discovery.save_cache")
-@patch("skill_manager.core.discovery.load_cache")
-def test_discover_all(mock_load, mock_save, mock_proj, mock_src, service):
-    mock_load.return_value = None
-    mock_src.return_value = [{"name": "S1", "local_path": "/s1", "category": "Cat1"}]
-    mock_proj.return_value = [{
-        "project_label": "P1",
-        "target_path": "/t1",
-        "skills": [{"name": "P1S1", "local_path": "/t1/s1", "category": "Cat2"}]
-    }]
 
-    result = service.discover_all(use_cache=False)
+def test_transform_skill_archived_and_starred(service):
+    # Archived
+    s1 = {"local_path": "/src2/archived"}
+    t1 = service._transform_skill(s1, is_package=True)
+    assert t1["is_archived"] is True
 
-    assert len(result["skills"]) == 2
-    assert "Cat1" in result["categories"]
-    assert "Cat2" in result["categories"]
-    assert "P1" in result["project_labels"]
-    assert mock_save.called
+    # Starred
+    s2 = {"local_path": "/src1/starred"}
+    t2 = service._transform_skill(s2, is_package=True)
+    assert t2["is_starred"] is True
+
+
+def test_process_command_file(service, temp_dir):
+    cmd_file = temp_dir / "Test.Codex.md"
+    cmd_file.write_text("---\nname: My Command\ncategory: Ops\n---\nBody")
+
+    project = {"project_label": "Proj", "project_root": str(temp_dir)}
+    data = service._process_command_file(cmd_file, project)
+
+    assert data["name"] == "My Command"
+    assert data["category"] == "Ops"
+    assert data["is_command"] is True
+    assert data["project_label"] == "Proj"

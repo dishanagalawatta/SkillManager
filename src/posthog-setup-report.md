@@ -20,9 +20,9 @@ The wizard has completed a deep integration of PostHog analytics into Skill Mana
 | `app_opened` | Fired when the app starts successfully | `src/skill_manager/app.py` |
 | `skill_copied_to_project` | Fired when skills are copied to a target project, with `skills_copied`, `skills_merged`, `skills_failed`, and `skills_count` properties | `src/skill_manager/app.py` |
 | `skills_deleted` | Fired when the user deletes one or more skills, with a `count` property | `src/skill_manager/app.py` |
-| `skill_source_added` | Fired when a new skill source is added, with `source_type` property | `src/skill_manager/app.py` |
-| `skill_source_removed` | Fired when a skill source is removed, with `source_type` property | `src/skill_manager/app.py` |
-| `skill_source_updated` | Fired when a source update run completes, with `source_type` and `success` (bool) properties | `src/skill_manager/app.py` |
+| `skill_package_added` | Fired when a new skill source is added, with `source_type` property | `src/skill_manager/app.py` |
+| `skill_package_removed` | Fired when a skill source is removed, with `source_type` property | `src/skill_manager/app.py` |
+| `skill_package_updated` | Fired when a source update run completes, with `source_type` and `success` (bool) properties | `src/skill_manager/app.py` |
 | `project_target_added` | Fired when a new project target directory is added, with `target_count` property | `src/skill_manager/app.py` |
 | `skill_archived` | Fired when a skill is archived or restored, with an `action` property (`archived` / `restored`) | `src/skill_manager/app.py` |
 | `skill_launched` | Fired when the user opens a skill folder in the OS file explorer | `src/skill_manager/app.py` |

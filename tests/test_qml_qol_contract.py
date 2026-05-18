@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 QML_DIR = (
     Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
@@ -59,6 +60,44 @@ def test_action_bars_use_shared_action_buttons_and_keep_primary_names():
     assert 'labelText: "Update All"' in updates
 
 
+def test_qml_buttons_route_through_shared_primitives():
+    allowed_raw_button_files = {
+        "ActionButton.qml",
+        "FilterPill.qml",
+        "GlassToggleButton.qml",
+        "IconButton.qml",
+        "SidebarButton.qml",
+        "TopBarButton.qml",
+    }
+
+    offenders = []
+    for path in QML_DIR.rglob("*.qml"):
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"(^|\s)Button\s*\{", text) and path.name not in allowed_raw_button_files:
+            offenders.append(str(path.relative_to(QML_DIR)))
+
+    assert offenders == []
+    assert "IconButton 1.0 IconButton.qml" in (QML_DIR / "qmldir").read_text(encoding="utf-8")
+
+
+def test_shared_buttons_center_content_and_use_role_tokens():
+    action_button = (QML_DIR / "ActionButton.qml").read_text(encoding="utf-8")
+    icon_button = (QML_DIR / "IconButton.qml").read_text(encoding="utf-8")
+    toggle = (QML_DIR / "GlassToggleButton.qml").read_text(encoding="utf-8")
+    sidebar = (QML_DIR / "SidebarButton.qml").read_text(encoding="utf-8")
+    topbar = (QML_DIR / "TopBarButton.qml").read_text(encoding="utf-8")
+
+    for source in (action_button, icon_button, toggle, topbar):
+        assert "anchors.centerIn: parent" in source
+
+    assert "anchors.leftMargin: 12" in sidebar
+    assert 'property string role: "secondary"' in icon_button
+    assert 'control.role === "destructive"' in icon_button
+    assert 'control.role === "primary"' in action_button
+    assert "Theme.disabledControl" in icon_button
+    assert "Theme.dangerHover" in icon_button
+
+
 def test_compact_rows_are_persisted_and_wired_to_skill_items():
     settings = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
@@ -81,6 +120,19 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
     assert "root.compactRows ? 42 : 54" in skill_item
     assert "delegate: SkillItem" in quick_copy
     assert "delegate: SkillItem" in library
+
+
+def test_skill_rows_use_cached_model_grouping_for_smooth_collapse():
+    skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
+    models_py = (QML_DIR.parent / "core" / "models.py").read_text(encoding="utf-8")
+
+    assert "model.isFirstInSubcategory" in skill_item
+    assert "model.isMainCollapsed" in skill_item
+    assert "model.isSubCollapsed" in skill_item
+    assert "get_skill_at(index - 1)" not in skill_item
+    assert "Behavior on height" not in skill_item
+    assert "IsFirstInSubcategoryRole" in models_py
+    assert "_build_visible_rows" in models_py
 
 
 def test_dark_polish_tokens_drive_shared_components():
@@ -116,3 +168,16 @@ def test_quick_copy_project_dropdown_uses_labels():
     # Must use AppController.projectLabels, not AppController.projects
     assert "AppController.projectLabels" in quick_copy
     assert "AppController.projects" not in quick_copy
+
+
+def test_library_and_quick_copy_filters_are_view_scoped():
+    quick_copy = (QML_DIR / "views" / "QuickCopyView.qml").read_text(encoding="utf-8")
+    library = (QML_DIR / "views" / "LibraryView.qml").read_text(encoding="utf-8")
+
+    assert "AppController.libraryModel" in library
+    assert "AppController.quickCopyModel" not in library
+    assert "projectFilter" not in library
+    assert 'setViewFilterForView("Library"' in library
+
+    assert "AppController.quickCopyModel" in quick_copy
+    assert 'setViewFilterForView("QuickCopy"' in quick_copy

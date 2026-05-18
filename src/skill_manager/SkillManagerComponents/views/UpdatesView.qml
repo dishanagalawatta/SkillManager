@@ -14,16 +14,16 @@ Item {
     FolderPickerNative {
         id: uv_folderPicker
         onFolderSelected: (path) => {
-            if (mode === "source") {
+            if (mode === "package") {
                 AppController.addSource(path)
-            } else if (mode === "target") {
-                AppController.addTarget(path)
+            } else if (mode === "project") {
+                AppController.addProject(path)
             }
         }
     }
 
-    SourceEditDialog {
-        id: uv_sourceEditDialog
+    PackageEditDialog {
+        id: uv_packageEditDialog
     }
 
     ProjectRenameDialog {
@@ -78,44 +78,20 @@ Item {
                 RowLayout {
                     spacing: 8
                     
-                    Button {
-                        text: "Scan"
+                    ActionButton {
+                        labelText: "Scan"
+                        role: "secondary"
+                        tooltipText: enabled ? "Check configured projects for available skill updates." : "Update scan is already running."
                         enabled: !AppController.isLoading
                         onClicked: (mouse) => AppController.scanForUpdates()
-                        background: Rectangle {
-                            radius: height / 2
-                            color: "transparent"
-                            border.color: parent.enabled ? Theme.accent : Theme.glassBorder
-                            border.width: 1
-                        }
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? Theme.accent : Theme.secondaryLabel
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            font.weight: Font.Bold
-                            leftPadding: 12
-                            rightPadding: 12
-                        }
                     }
 
-                    Button {
-                        text: "Update All"
+                    ActionButton {
+                        labelText: "Update All"
+                        role: "primary"
+                        tooltipText: enabled ? "Update every skill currently marked outdated." : "No outdated skills are ready to update."
                         enabled: !AppController.isLoading && AppController.statsOutdated > 0
                         onClicked: (mouse) => AppController.updateAllOutdated()
-                        background: Rectangle {
-                            radius: height / 2
-                            color: parent.enabled ? Theme.accent : Theme.glassBorder
-                        }
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? "white" : Theme.secondaryLabel
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            font.weight: Font.Bold
-                            leftPadding: 16
-                            rightPadding: 16
-                        }
                     }
                 }
             }
@@ -131,14 +107,14 @@ Item {
                 color: "transparent"
             }
 
-            // Left Pane: Sources Manager
+            // Left Pane: Packages Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.45
                 SplitView.minimumWidth: 280
                 Layout.fillHeight: true
                 spacing: 16
 
-                // Sources Manager
+                // Packages Manager
                 GlassPill {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -148,9 +124,9 @@ Item {
                         anchors.margins: 16
                         
                         RowLayout {
-                            id: uv_sourcesHeader
+                            id: uv_packagesHeader
                             Text {
-                                text: "Sources (Skill Providers)"
+                                text: "Skill Packages"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.sizeSectionTitle
                                 font.weight: Font.Bold
@@ -159,62 +135,36 @@ Item {
                             }
                             RowLayout {
                                 spacing: 8
-                                Button {
-                                    text: "+ Add Provider"
+                                ActionButton {
+                                    labelText: "Add Package"
+                                    iconText: "+"
+                                    role: "secondary"
                                     onClicked: (mouse) => {
-                                        uv_sourceEditDialog.editIndex = -1
-                                        uv_sourceEditDialog.open()
-                                    }
-                                    background: Rectangle {
-                                        radius: Theme.radiusButton
-                                        color: parent.down ? Theme.accent : (parent.hovered ? Theme.accent + "22" : "transparent")
-                                        border.color: Theme.accent
-                                        border.width: 1
-                                    }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: Theme.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeCaption
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
+                                        uv_packageEditDialog.editIndex = -1
+                                        uv_packageEditDialog.open()
                                     }
                                 }
-                                Button {
-                                    text: "+ Folder"
+                                ActionButton {
+                                    labelText: "Folder"
+                                    iconText: "+"
+                                    role: "secondary"
                                     onClicked: (mouse) => {
-                                        uv_folderPicker.mode = "source"
+                                        uv_folderPicker.mode = "package"
                                         uv_folderPicker.open()
-                                    }
-                                    background: Rectangle {
-                                        radius: Theme.radiusButton
-                                        color: parent.down ? Theme.accent : (parent.hovered ? Theme.accent + "22" : "transparent")
-                                        border.color: Theme.accent
-                                        border.width: 1
-                                    }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: Theme.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeCaption
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
                                     }
                                 }
                             }
                         }
 
                         ListView {
-                            id: uv_sourcesList
+                            id: uv_packagesList
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            model: AppController.updateSources
+                            model: AppController.updatePackages
                             spacing: 8
                             delegate: Rectangle {
-                                width: uv_sourcesList.width
+                                width: uv_packagesList.width
                                 height: 52
                                 color: Theme.glassPill
                                 radius: 12
@@ -278,57 +228,43 @@ Item {
                                         spacing: 4
                                         
                                         // Update Button / Status
-                                        Button {
+                                        ActionButton {
                                             id: uv_itemUpdateBtn
                                             property bool isLatest: Boolean(!modelData.latest_version || modelData.latest_version === modelData.current_version)
-                                            text: modelData.is_updating ? "Updating..." : (isLatest ? "✓ Up to Date" : "Update")
+                                            labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
+                                            role: isLatest ? "secondary" : "primary"
+                                            buttonHeight: 26
                                             enabled: !isLatest && !modelData.is_updating
-                                            onClicked: (mouse) => AppController.runUpdate(index)
-                                            
-                                            background: Rectangle {
-                                                implicitWidth: 80
-                                                implicitHeight: 24
-                                                radius: 12
-                                                color: uv_itemUpdateBtn.isLatest ? "transparent" : (uv_itemUpdateBtn.enabled ? Theme.accent : Theme.glassBorder)
-                                                border.color: uv_itemUpdateBtn.isLatest ? Theme.success : "transparent"
-                                                border.width: uv_itemUpdateBtn.isLatest ? 1 : 0
-                                            }
-                                            contentItem: Text {
-                                                text: parent.text
-                                                color: uv_itemUpdateBtn.isLatest ? Theme.success : (uv_itemUpdateBtn.enabled ? "white" : Theme.secondaryLabel)
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 10
-                                                font.weight: Font.Bold
-                                                horizontalAlignment: Text.AlignHCenter
-                                                verticalAlignment: Text.AlignVCenter
-                                            }
+                                            onClicked: (mouse) => AppController.runPackageUpdate(index)
                                         }
 
 
-                                        Button {
-                                            text: "✎"
+                                        IconButton {
+                                            iconText: "Edit"
+                                            iconSize: 10
+                                            buttonSize: 28
+                                            role: "ghost"
+                                            tooltipText: "Edit package"
                                             visible: Boolean(modelData && modelData.source_type !== undefined)
                                             onClicked: (mouse) => {
-                                                uv_sourceEditDialog.editIndex = index
-                                                uv_sourceEditDialog.loadSource(modelData)
-                                                uv_sourceEditDialog.open()
+                                                uv_packageEditDialog.editIndex = index
+                                                uv_packageEditDialog.loadPackage(modelData)
+                                                uv_packageEditDialog.open()
                                             }
-                                            flat: true
-                                            Layout.preferredWidth: 28
-                                            Layout.preferredHeight: 28
                                         }
-                                        Button {
-                                            text: "✕"
+                                        IconButton {
+                                            iconText: "Del"
+                                            iconSize: 10
+                                            buttonSize: 28
+                                            role: "destructive"
+                                            tooltipText: "Remove package"
                                             onClicked: (mouse) => {
                                                 if (modelData.source_type !== undefined) {
-                                                    Qt.callLater(AppController.removeUpdateSource, index)
+                                                    Qt.callLater(AppController.removeUpdatePackage, index)
                                                 } else {
                                                     Qt.callLater(AppController.removeSourceByIndex, index)
                                                 }
                                             }
-                                            flat: true
-                                            Layout.preferredWidth: 28
-                                            Layout.preferredHeight: 28
                                         }
                                     }
                                 }
@@ -356,14 +292,14 @@ Item {
                 }
             }
 
-            // Right Pane: Targets Manager
+            // Right Pane: Projects Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.55
                 SplitView.minimumWidth: 320
                 Layout.fillHeight: true
                 spacing: 16
 
-                // Targets Manager
+                // Projects Manager
                 GlassPill {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -374,46 +310,33 @@ Item {
                         
                         RowLayout {
                             Text {
-                                text: "Targets (Project Skill Folders)"
+                                text: "Projects (Skill Folders)"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.sizeSectionTitle
                                 font.weight: Font.Bold
                                 color: Theme.label
                                 Layout.fillWidth: true
                             }
-                            Button {
-                                text: "+ Add Project"
+                            ActionButton {
+                                labelText: "Add Project"
+                                iconText: "+"
+                                role: "secondary"
                                 onClicked: (mouse) => {
-                                    uv_folderPicker.mode = "target"
+                                    uv_folderPicker.mode = "project"
                                     uv_folderPicker.open()
-                                }
-                                background: Rectangle {
-                                    radius: Theme.radiusButton
-                                    color: parent.down ? Theme.accent : (parent.hovered ? Theme.accent + "22" : "transparent")
-                                    border.color: Theme.accent
-                                    border.width: 1
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.sizeCaption
-                                    font.weight: Font.Bold
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
                                 }
                             }
                         }
 
                         ListView {
-                            id: uv_targetsList
+                            id: uv_projectsList
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            model: AppController.updateTargets
+                            model: AppController.updateProjects
                             spacing: 8
                             delegate: Rectangle {
-                                width: uv_targetsList.width
+                                width: uv_projectsList.width
                                 height: 52
                                 color: Theme.glassPill
                                 radius: 12
@@ -468,23 +391,25 @@ Item {
 
                                     RowLayout {
                                         spacing: 4
-                                        Button {
-                                            text: "✎"
+                                        IconButton {
+                                            iconText: "Edit"
+                                            iconSize: 10
+                                            buttonSize: 32
+                                            role: "ghost"
+                                            tooltipText: "Rename project"
                                             onClicked: (mouse) => {
-                                                uv_projectRenameDialog.targetPath = modelData.path
+                                                uv_projectRenameDialog.projectPath = modelData.path
                                                 uv_projectRenameDialog.currentName = modelData.name
                                                 uv_projectRenameDialog.open()
                                             }
-                                            flat: true
-                                            Layout.preferredWidth: 32
-                                            Layout.preferredHeight: 32
                                         }
-                                        Button {
-                                            text: "✕"
-                                            onClicked: (mouse) => Qt.callLater(AppController.removeUpdateTarget, index)
-                                            flat: true
-                                            Layout.preferredWidth: 32
-                                            Layout.preferredHeight: 32
+                                        IconButton {
+                                            iconText: "Del"
+                                            iconSize: 10
+                                            buttonSize: 32
+                                            role: "destructive"
+                                            tooltipText: "Remove project"
+                                            onClicked: (mouse) => Qt.callLater(AppController.removeUpdateProject, index)
                                         }
                                     }
                                 }
@@ -513,35 +438,6 @@ Item {
             }
         }
 
-        // Bottom Status Bar
-        GlassPill {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            visible: AppController.statusMessage !== ""
-            
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 12
-                
-                Text {
-                    text: "Status:"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeCaption
-                    font.weight: Font.Bold
-                    color: Theme.accent
-                }
-                
-                Text {
-                    text: AppController.statusMessage
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeCaption
-                    color: Theme.label
-                    Layout.fillWidth: true
-                    elide: Text.ElideRight
-                }
-            }
-        }
     }
 
     // Detail Inspector (Drawer-like)
@@ -576,7 +472,7 @@ Item {
                     color: Theme.label
                     Layout.fillWidth: true
                 }
-                Button {
+                IconButton {
                     text: "✕"
                     onClicked: (mouse) => uv_inspector.close()
                     flat: true
@@ -619,7 +515,7 @@ Item {
                 }
 
                 Text {
-                    text: "Affected Targets"
+                    text: "Affected Projects"
                     font.weight: Font.Bold
                     color: Theme.label
                 }
@@ -627,7 +523,7 @@ Item {
                 ListView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    model: uv_inspector.skillData ? uv_inspector.skillData.targets : []
+                    model: uv_inspector.skillData ? uv_inspector.skillData.projects : []
                     spacing: 8
                     delegate: Rectangle {
                         width: parent.width
@@ -642,9 +538,9 @@ Item {
                                 Layout.fillWidth: true
                                 color: Theme.label
                             }
-                            Button {
+                            ActionButton {
                                 text: "Update"
-                                onClicked: (mouse) => AppController.updateSkillInTarget(uv_inspector.skillData.name, modelData.name)
+                                onClicked: (mouse) => AppController.updateSkillInProject(uv_inspector.skillData.name, modelData.name)
                             }
                         }
                     }

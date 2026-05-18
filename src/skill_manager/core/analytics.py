@@ -1,4 +1,5 @@
 """PostHog analytics integration for Skill Manager."""
+
 import atexit
 import contextlib
 import json
@@ -9,6 +10,7 @@ import uuid
 def _load_env() -> None:
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
@@ -20,6 +22,7 @@ _load_env()
 def _get_or_create_device_id() -> str:
     """Return a persistent device ID stored in the app data directory."""
     from skill_manager.core.config import DATA_DIR
+
     device_id_file = DATA_DIR / "device_id.json"
 
     if device_id_file.exists():
@@ -32,9 +35,7 @@ def _get_or_create_device_id() -> str:
 
     device_id = f"device_{uuid.uuid4().hex}"
     with contextlib.suppress(Exception):
-        device_id_file.write_text(
-            json.dumps({"device_id": device_id}), encoding="utf-8"
-        )
+        device_id_file.write_text(json.dumps({"device_id": device_id}), encoding="utf-8")
     return device_id
 
 
@@ -45,6 +46,7 @@ def _init_posthog():
         return None
     try:
         from posthog import Posthog
+
         client = Posthog(
             token,
             host=host,

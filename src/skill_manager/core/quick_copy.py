@@ -6,45 +6,27 @@ CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Path"}
 
 
 def _resolve_resilient_path(path_str):
-    """Try to resolve a path, being resilient to .agent vs .agents pluralization mismatches."""
+    """Resolve a skill path and auto-detect .agents/skills for project roots."""
     if not path_str:
         return Path()
 
     path = Path(os.path.expanduser(str(path_str).strip()))
     try:
         if path.exists():
+            # Auto-detect .agents/skills if project root was provided
+            if path.is_dir() and path.name.lower() not in ("skills", ".agents"):
+                potential = path / ".agents" / "skills"
+                if potential.exists() and potential.is_dir():
+                    return potential.resolve()
             return path.resolve()
     except OSError:
         pass
 
-    # Try swapping .agent <-> .agents
-    s = str(path)
-    # Normalize slashes for detection but keep original for replacement to avoid breaking windows paths more than needed
-    s_norm = s.replace("\\", "/")
-
-    alt_s = None
-    if "/.agent/" in s_norm:
-        alt_s = s.replace("/.agent/", "/.agents/").replace("\\.agent\\", "\\.agents\\")
-    elif "/.agents/" in s_norm:
-        alt_s = s.replace("/.agents/", "/.agent/").replace("\\.agents\\", "\\.agent\\")
-    elif s_norm.endswith("/.agent"):
-        alt_s = s + "s"
-    elif s_norm.endswith("/.agents"):
-        alt_s = s[:-1]
-
-    if alt_s:
-        alt_path = Path(alt_s)
-        try:
-            if alt_path.exists():
-                return alt_path.resolve()
-        except OSError:
-            pass
-
     return path
 
 
-def discover_source_skills(sources, parse_skill_md, categorize_skill, build_search_text):
-    """Discover skills from master source folders (config['sources']).
+def discover_package_skills(sources, parse_skill_md, categorize_skill, build_search_text):
+    """Discover skills from master package folders (config['sources']).
 
     Returns a flat list of skill dicts, each tagged with ``is_source=True``.
     Deduplicates by resolved path so the same folder listed twice is only
@@ -86,11 +68,14 @@ def discover_source_skills(sources, parse_skill_md, categorize_skill, build_sear
             skill_data["local_path"] = str(child)
             skill_data["skill_md_path"] = str(skill_md_path)
             skill_data["source_path"] = str(resolved_source)
-            skill_data["target_path"] = str(resolved_source)  # source IS the target for library items
+            skill_data["project_path"] = str(
+                resolved_source
+            )  # source IS the project for library items
             skill_data["project_label"] = "Master Library"
             skill_data["project_root"] = str(resolved_source)
             skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
-            skill_data["is_source"] = True
+            skill_data["is_package"] = True
+            skill_data["is_source"] = True  # Compatibility
             skill_data.setdefault("metadata", {})
             cat_info = categorize_skill(
                 skill_data.get("name", ""),
@@ -104,24 +89,26 @@ def discover_source_skills(sources, parse_skill_md, categorize_skill, build_sear
     return skills
 
 
-def discover_project_skills(targets, parse_skill_md, categorize_skill, build_search_text, target_aliases=None):
-    if target_aliases is None:
-        target_aliases = {}
-    projects = []
-    seen_targets = set()
+def discover_project_skills(
+    projects, parse_skill_md, categorize_skill, build_search_text, project_aliases=None
+):
+    if project_aliases is None:
+        project_aliases = {}
+    projects_list = []
+    seen_projects = set()
 
-    for target in targets:
-        resolved_target = _resolve_resilient_path(target)
-        if not resolved_target or not resolved_target.is_dir():
+    for project in projects:
+        resolved_project = _resolve_resilient_path(project)
+        if not resolved_project or not resolved_project.is_dir():
             continue
 
-        target_key = os.path.normcase(str(resolved_target))
-        if target_key in seen_targets:
+        project_key = os.path.normcase(str(resolved_project))
+        if project_key in seen_projects:
             continue
-        seen_targets.add(target_key)
+        seen_projects.add(project_key)
 
         skills = []
-        for child in sorted(resolved_target.iterdir(), key=lambda item: item.name.lower()):
+        for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
             if not child.is_dir():
                 continue
             skill_md_path = child / "SKILL.md"
@@ -134,11 +121,13 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
             skill_data["folder_name"] = child.name
             skill_data["local_path"] = str(child)
             skill_data["skill_md_path"] = str(skill_md_path)
-            skill_data["project_key"] = target_key
-            skill_data["target_path"] = str(resolved_target)
-            skill_data["project_root"] = str(_project_root_for_target(resolved_target))
-            skill_data["skill_base_relative"] = _skill_base_relative(resolved_target)
-            skill_data["project_label"] = project_label(resolved_target, target_aliases, str(target))
+            skill_data["project_key"] = project_key
+            skill_data["project_path"] = str(resolved_project)
+            skill_data["project_root"] = str(_project_root_for_project(resolved_project))
+            skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
+            skill_data["project_label"] = project_label(
+                resolved_project, project_aliases, str(project)
+            )
             skill_data.setdefault("metadata", {})
             cat_info = categorize_skill(
                 skill_data.get("name", ""),
@@ -150,17 +139,19 @@ def discover_project_skills(targets, parse_skill_md, categorize_skill, build_sea
             skills.append(skill_data)
 
         if skills:
-            project_root = _project_root_for_target(resolved_target)
-            projects.append({
-                "target_path": str(resolved_target),
-                "project_root": str(project_root),
-                "project_label": project_label(resolved_target, target_aliases, str(target)),
-                "skill_base_relative": _skill_base_relative(resolved_target),
-                "project_key": target_key,
-                "skills": skills,
-            })
+            project_root = _project_root_for_project(resolved_project)
+            projects_list.append(
+                {
+                    "project_path": str(resolved_project),
+                    "project_root": str(project_root),
+                    "project_label": project_label(resolved_project, project_aliases, str(project)),
+                    "skill_base_relative": _skill_base_relative(resolved_project),
+                    "project_key": project_key,
+                    "skills": skills,
+                }
+            )
 
-    return projects
+    return projects_list
 
 
 def _normalize_path(path):
@@ -169,35 +160,37 @@ def _normalize_path(path):
     return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
 
 
-def project_label(target_path, target_aliases=None, original_target=None):
-    if target_aliases is None:
-        target_aliases = {}
+def project_label(project_path, project_aliases=None, original_project=None):
+    if project_aliases is None:
+        project_aliases = {}
 
-    norm_target = _normalize_path(target_path)
-    norm_original = _normalize_path(original_target) if original_target else ""
+    norm_project = _normalize_path(project_path)
+    norm_original = _normalize_path(original_project) if original_project else ""
 
-    # Try using original target (exact or normalized)
-    if original_target and original_target in target_aliases:
-        return target_aliases[original_target]
-    if norm_original and norm_original in target_aliases:
-        return target_aliases[norm_original]
+    # Try using original project (exact or normalized)
+    if original_project and original_project in project_aliases:
+        return project_aliases[original_project]
+    if norm_original and norm_original in project_aliases:
+        return project_aliases[norm_original]
 
     # Try resolved path (exact or normalized)
-    target_str = str(target_path)
-    if target_str in target_aliases:
-        return target_aliases[target_str]
-    if norm_target in target_aliases:
-        return target_aliases[norm_target]
+    project_str = str(project_path)
+    if project_str in project_aliases:
+        return project_aliases[project_str]
+    if norm_project in project_aliases:
+        return project_aliases[norm_project]
 
     # Full scan for matching normalized keys
-    for k, v in target_aliases.items():
-        if _normalize_path(k) == norm_target or (norm_original and _normalize_path(k) == norm_original):
+    for k, v in project_aliases.items():
+        if _normalize_path(k) == norm_project or (
+            norm_original and _normalize_path(k) == norm_original
+        ):
             return v
 
     # Use standard format if no alias: "RootName (Base)"
-    target_path_obj = Path(target_path)
-    root = _project_root_for_target(target_path_obj)
-    base = _skill_base_relative(target_path_obj)
+    project_path_obj = Path(project_path)
+    root = _project_root_for_project(project_path_obj)
+    base = _skill_base_relative(project_path_obj)
 
     # Clean up the .agents/skills suffix if it exists
     if base == ".agents/skills" or base == ".agents\\skills":
@@ -216,10 +209,10 @@ def format_project_skill_reference(skill, client_format):
         # For commands, we want the path relative to the project root
         project_root = skill.get("project_root")
         if not project_root:
-            # Fallback: try to find manuals/ in the path
+            # Fallback: try to find commands/ in the path
             try:
-                manual_idx = local_path.parts.index("manuals")
-                relative_path = "/".join(local_path.parts[manual_idx:])
+                command_idx = local_path.parts.index("commands")
+                relative_path = "/".join(local_path.parts[command_idx:])
             except ValueError:
                 relative_path = local_path.name
         else:
@@ -252,11 +245,11 @@ def format_project_skill_reference(skill, client_format):
     return relative_path
 
 
-def normalize_manual_references(text):
+def normalize_command_references(text):
     references = []
     seen = set()
     for line in str(text or "").splitlines():
-        reference = normalize_manual_reference(line)
+        reference = normalize_command_reference(line)
         if not reference:
             continue
         key = reference.casefold()
@@ -267,7 +260,7 @@ def normalize_manual_references(text):
     return references
 
 
-def normalize_manual_reference(value):
+def normalize_command_reference(value):
     reference = str(value or "").strip()
     if not reference:
         return ""
@@ -276,11 +269,11 @@ def normalize_manual_reference(value):
     return f"@{reference.lstrip('@')}"
 
 
-def merge_manual_references(existing, additions):
+def merge_command_references(existing, additions):
     merged = []
     seen = set()
     for reference in list(existing or []) + list(additions or []):
-        normalized = normalize_manual_reference(reference)
+        normalized = normalize_command_reference(reference)
         if not normalized:
             continue
         key = normalized.casefold()
@@ -302,7 +295,11 @@ def _looks_like_explicit_reference(reference):
 
 def project_skill_relative_path(skill):
     base = str(skill.get("skill_base_relative") or "").replace("\\", "/").strip("/")
-    folder = str(skill.get("folder_name") or Path(skill.get("local_path", "")).name).replace("\\", "/").strip("/")
+    folder = (
+        str(skill.get("folder_name") or Path(skill.get("local_path", "")).name)
+        .replace("\\", "/")
+        .strip("/")
+    )
     return f"{base}/{folder}/SKILL.md" if base else f"{folder}/SKILL.md"
 
 
@@ -311,54 +308,65 @@ def delete_project_skill_folders(skills):
     for skill in skills:
         label = skill.get("name") or skill.get("folder_name") or "Unknown"
         source_path = Path(os.path.expanduser(str(skill.get("local_path") or ""))).resolve()
-        target_path = Path(os.path.expanduser(str(skill.get("target_path") or ""))).resolve()
-        error = _delete_validation_error(source_path, target_path)
+        project_path = Path(os.path.expanduser(str(skill.get("project_path") or ""))).resolve()
+        error = _delete_validation_error(source_path, project_path)
         if error:
             result["skipped"] += 1
-            result["details"].append({"skill": label, "path": str(source_path), "status": "skipped", "message": error})
+            result["details"].append(
+                {"skill": label, "path": str(source_path), "status": "skipped", "message": error}
+            )
             continue
 
         try:
             shutil.rmtree(source_path)
         except Exception as exc:
             result["failed"] += 1
-            result["details"].append({"skill": label, "path": str(source_path), "status": "failed", "message": str(exc)})
+            result["details"].append(
+                {"skill": label, "path": str(source_path), "status": "failed", "message": str(exc)}
+            )
             continue
 
         result["deleted"] += 1
-        result["details"].append({"skill": label, "path": str(source_path), "status": "deleted", "message": str(source_path)})
+        result["details"].append(
+            {
+                "skill": label,
+                "path": str(source_path),
+                "status": "deleted",
+                "message": str(source_path),
+            }
+        )
 
     return result
 
 
-def _delete_validation_error(source_path, target_path):
-    if not target_path.is_dir():
-        return f"Target folder does not exist: {target_path}"
+def _delete_validation_error(source_path, project_path):
+    if not project_path.is_dir():
+        return f"Project folder does not exist: {project_path}"
     if not source_path.is_dir():
         return f"Skill folder does not exist: {source_path}"
-    if source_path.parent != target_path:
-        return f"Skill folder is not a direct child of target: {target_path}"
+    if source_path.parent != project_path:
+        return f"Skill folder is not a direct child of project: {project_path}"
     if not (source_path / "SKILL.md").is_file():
         return f"Skill folder is missing SKILL.md: {source_path}"
     return ""
 
 
-def _project_root_for_target(target_path):
-    parts = target_path.parts
-    for marker in (".agent", ".agents", ".codex", ".gemini"):
+def _project_root_for_project(project_path):
+    parts = project_path.parts
+    for marker in (".agents", ".codex", ".gemini"):
         if marker in parts:
             marker_index = parts.index(marker)
             if marker_index > 0:
                 return Path(*parts[:marker_index])
-    return target_path.parent
+    return project_path.parent
 
 
-def _skill_base_relative(target_path):
-    root = _project_root_for_target(target_path)
+def _skill_base_relative(project_path):
+    root = _project_root_for_project(project_path)
     try:
-        return target_path.relative_to(root).as_posix()
+        return project_path.relative_to(root).as_posix()
     except ValueError:
-        return target_path.name
+        return project_path.name
 
 
 def _classification_text(skill_data):

@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QMetaObject, QObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 
@@ -29,14 +29,17 @@ def e2e_app(qtbot, mock_config, temp_dir):
 
     # Update config
     from skill_manager.core.config import ConfigManager
+
     cfg = ConfigManager()
     cfg.set("sources", [str(lib_path)])
     cfg.set("client_format", "Gemini CLI")
     cfg.save()
 
     # 2. Initialize Controller with patched discovery to prevent real data leaks
-    with patch("skill_manager.app.DiscoveryService"), \
-         patch("skill_manager.app.AppController.load_initial_data"):
+    with (
+        patch("skill_manager.app.DiscoveryService"),
+        patch("skill_manager.app.AppController.load_initial_data"),
+    ):
         controller = AppController()
 
     # Ensure selected IDs are clear
@@ -51,7 +54,9 @@ def e2e_app(qtbot, mock_config, temp_dir):
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("appController", controller)
 
-    qml_dir = Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    qml_dir = (
+        Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    )
     engine.addImportPath(str(qml_dir.parent))
 
     qml_file = qml_dir / "Main.qml"
@@ -69,15 +74,16 @@ def e2e_app(qtbot, mock_config, temp_dir):
         "name": unique_name,
         "category": "Testing",
         "local_path": str(skill_file.parent),
-        "is_source": False, # Make it look like a project skill
-        "is_essential": True, # And also essential for good measure
+        "is_source": False,  # Make it look like a project skill
+        "is_starred": True,  # And also starred for good measure
         "project": "Test Project",
-        "project_label": "Test Project"
+        "project_label": "Test Project",
     }
     controller.libraryModel.setSkills([mock_skill])
     controller.quickCopyModel.setSkills([mock_skill])
 
     return controller, engine, qtbot, unique_name
+
 
 def test_e2e_sync_to_clipboard(e2e_app):
     controller, engine, qtbot, unique_name = e2e_app
@@ -107,7 +113,6 @@ def test_e2e_sync_to_clipboard(e2e_app):
     # 5. Click the button
     # In headless environments, mouseClick on QML items is often unreliable.
     # invokeMethod is more robust for CI while still testing the UI->Controller integration.
-    from PySide6.QtCore import QMetaObject
     QMetaObject.invokeMethod(copy_btn, "clicked")
 
     # 6. Verify clipboard content
@@ -117,3 +122,11 @@ def test_e2e_sync_to_clipboard(e2e_app):
     assert unique_name in final_text or "test-skill" in final_text
     assert "@" in final_text
     assert controller.statusMessage.startswith("Copied")
+
+    status_text = root.findChild(QObject, "topStatusText")
+    assert status_text is not None
+    assert "Copied" in status_text.property("text")
+
+    delete_btn = root.findChild(QObject, "quickCopyDeleteSelectedBtn")
+    assert delete_btn is not None
+    assert delete_btn.property("visible") is True

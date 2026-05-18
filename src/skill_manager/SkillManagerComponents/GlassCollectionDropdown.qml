@@ -24,35 +24,20 @@ ComboBox {
                 Layout.fillWidth: true
             }
             
-            // Edit Button (Pen Icon)
-            Button {
+            // Edit Button
+            IconButton {
                 id: editBtn
-                Layout.preferredWidth: 24
-                Layout.preferredHeight: 24
-                flat: true
+                buttonSize: 24
+                iconSize: 10
+                iconText: "Edit"
+                role: "ghost"
+                tooltipText: "Edit Collection"
                 visible: index > 0 // Only for custom collections
-                hoverEnabled: true
-                
-                contentItem: Text {
-                    text: "✎"
-                    font.pixelSize: 14
-                    color: editBtn.hovered ? Theme.accent : Theme.secondaryLabel
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                
-                background: Rectangle {
-                    color: editBtn.hovered ? Theme.glassPill : "transparent"
-                    radius: Theme.radiusSmall
-                }
                 
                 onClicked: {
                     control.popup.close()
                     control.editCollectionClicked(modelData)
                 }
-                
-                ToolTip.visible: hovered
-                ToolTip.text: "Edit Collection"
             }
         }
         background: Rectangle {

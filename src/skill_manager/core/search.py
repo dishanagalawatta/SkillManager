@@ -15,12 +15,14 @@ except ImportError:
     # Fallback to basic matching if rapidfuzz is not available
     fuzz = None
 
+
 class SkillIndexer:
     """
     Indexes skills for faster and more relevant searching.
     """
+
     # Compile regex once for performance
-    _TOKEN_REGEX = re.compile(r'\b\w+\b')
+    _TOKEN_REGEX = re.compile(r"\b\w+\b")
 
     def __init__(self):
         self.vocabulary = set()
@@ -52,29 +54,34 @@ class SkillIndexer:
             "category": category.lower(),
             "tags": [t.lower() for t in tags],
             "description_tokens": self.tokenize(description),
-            "full_text": f"{name} {category} {description} {' '.join(tags)}".lower()
+            "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
         }
+
 
 class SearchEngine:
     """
     Handles fuzzy search and ranking logic.
     """
+
     def __init__(self, skills: list[dict[str, Any]]):
         self.indexer = SkillIndexer()
         self.skills = skills
-        self._indexed_data = [
-            (skill, self.indexer.build_index_data(skill))
-            for skill in skills
-        ]
+        self._indexed_data = [(skill, self.indexer.build_index_data(skill)) for skill in skills]
 
-    def query(self, query_text: str, threshold: float = 30.0, valid_paths: set = None) -> list[tuple[dict[str, Any], float]]:
+    def query(
+        self, query_text: str, threshold: float = 30.0, valid_paths: set = None
+    ) -> list[tuple[dict[str, Any], float]]:
         """
         Search for skills matching the query.
         Returns a list of (skill, score) tuples, sorted by score descending.
         """
         if not query_text:
             if valid_paths is not None:
-                return [(s[0], 100.0) for s in self._indexed_data if s[0].get("local_path") in valid_paths]
+                return [
+                    (s[0], 100.0)
+                    for s in self._indexed_data
+                    if s[0].get("local_path") in valid_paths
+                ]
             return [(s[0], 100.0) for s in self._indexed_data]
 
         query_text = query_text.lower()
@@ -118,14 +125,17 @@ class SearchEngine:
         # Weighted calculation
         # Max score is 100. Priority: Name > Tags > Content
         final_score = (
-            (max(name_score, partial_name_score) * 1.0) +
-            (tag_score * 0.6) +
-            (content_score * 0.4)
-        ) / 2.0 # Normalize roughly to 0-100 scale
+            (max(name_score, partial_name_score) * 1.0) + (tag_score * 0.6) + (content_score * 0.4)
+        ) / 2.0  # Normalize roughly to 0-100 scale
 
         # Boost exact word matches in name
         # Optimization: use tokens list if it's a single word query
-        if " " not in query and query in index_data["name_tokens"] or " " in query and any(query == t for t in index_data["name_tokens"]):
+        if (
+            " " not in query
+            and query in index_data["name_tokens"]
+            or " " in query
+            and any(query == t for t in index_data["name_tokens"])
+        ):
             final_score = max(final_score, 90.0)
 
         return min(final_score, 100.0)

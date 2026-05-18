@@ -82,7 +82,7 @@ Dialog {
                     Layout.fillWidth: true
                 }
                 
-                Button {
+                IconButton {
                     text: "✕"
                     flat: true
                     Layout.preferredWidth: 32
@@ -182,11 +182,11 @@ Dialog {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
-                    Text { text: "Target Project"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
+                    Text { text: "Project"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
                     GlassDropdown {
                         id: projectDrop
                         Layout.fillWidth: true
-                        model: AppController.projects
+                        model: AppController.projectLabels
                     }
                 }
                 
@@ -250,7 +250,7 @@ Dialog {
                 
                 Item { Layout.fillWidth: true }
                 
-                Button {
+                ActionButton {
                     text: "Cancel"
                     Layout.preferredWidth: 100
                     Layout.preferredHeight: 40
@@ -273,7 +273,7 @@ Dialog {
                     }
                 }
                 
-                Button {
+                ActionButton {
                     id: createBtn
                     text: "Create Command"
                     Layout.preferredWidth: 160

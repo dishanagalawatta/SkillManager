@@ -144,7 +144,7 @@ The `SkillModel` and QML layer recognize several "system" sections that bypass s
 
 | Section | Header Emoji | Item Icon | Description |
 | :--- | :---: | :---: | :--- |
-| **Essentials** | ⭐ | ★ | High-priority skills (pinned to top). Golden tinted header. |
+| **Starred** | ⭐ | ★ | High-priority skills (pinned to top). Golden tinted header. |
 | **Collections** | 📦 | 📦 | Bundled skill sets (bundles). |
 | **Custom Commands** | ⚡ | ⚡ | Specialized executable skills. |
 
@@ -166,7 +166,7 @@ The `getCategoryEmoji` logic supports common shorthand aliases for developer pro
 - **Section Sorting**: 
   - Main Categories are sorted according to a predefined priority (System > Engineering > Business > Data > Knowledge > Lifestyle).
   - Sub Categories are sorted alphabetically within their Main Category.
-  - **Essentials**, **Collections**, and **Custom Commands** are forced to the top as pseudo-Main Categories.
+  - **Starred**, **Collections**, and **Custom Commands** are forced to the top as pseudo-Main Categories.
 
 ---
 

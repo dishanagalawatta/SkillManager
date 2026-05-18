@@ -71,30 +71,53 @@ Rectangle {
             Item { Layout.fillWidth: true }
         }
         
-        // Right side
-        Item {
-            Layout.preferredWidth: 250
-            Layout.fillHeight: true
-            
-            Text {
-                id: statusText
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: AppController.statusMessage
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeMetadata
-                color: Theme.secondaryLabel
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideLeft
-                width: parent.width
-                
-                Behavior on opacity { NumberAnimation { duration: 300 } }
+        Rectangle {
+            id: statusPill
+            objectName: "topStatusPill"
+            Layout.preferredWidth: 270
+            Layout.preferredHeight: 34
+            Layout.alignment: Qt.AlignVCenter
+            radius: Theme.radiusPill
+            color: AppController.statusMessage !== "" ? Theme.glassActive : "transparent"
+            border.color: AppController.statusMessage !== "" ? Theme.glassBorder : "transparent"
+            border.width: AppController.statusMessage !== "" ? 1 : 0
+            opacity: AppController.statusMessage !== "" ? 1 : 0
+
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+            Behavior on color { ColorAnimation { duration: 150 } }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    width: 7
+                    height: 7
+                    radius: 4
+                    color: AppController.isLoading ? Theme.selectedRowBorder : Theme.secondaryLabel
+                    opacity: AppController.isLoading ? 1 : 0.75
+                }
+
+                Text {
+                    id: statusText
+                    objectName: "topStatusText"
+                    Layout.fillWidth: true
+                    text: AppController.statusMessage
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideLeft
+                }
             }
 
             Connections {
                 target: AppController
                 function onStatusMessageChanged() {
-                    statusText.opacity = 1
+                    statusPill.opacity = 1
                     statusTimer.restart()
                 }
             }
@@ -102,7 +125,7 @@ Rectangle {
             Timer {
                 id: statusTimer
                 interval: 5000
-                onTriggered: statusText.opacity = 0
+                onTriggered: statusPill.opacity = 0
             }
         }
     }

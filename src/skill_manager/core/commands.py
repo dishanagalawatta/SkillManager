@@ -13,11 +13,11 @@ class CommandCreateResult:
     path: Path | None = None
 
 
-def find_target_for_project(project_label_name: str, targets: list[str]) -> Path | None:
-    for target in targets:
-        target_path = Path(target)
-        if project_label(target_path) == project_label_name:
-            return target_path
+def find_project_path_by_label(project_label_name: str, project_paths: list[str]) -> Path | None:
+    for path in project_paths:
+        project_path = Path(path)
+        if project_label(project_path) == project_label_name:
+            return project_path
     return None
 
 
@@ -53,7 +53,7 @@ def create_custom_command_file(
     body: str,
     project_label_name: str,
     category: str,
-    targets: list[str],
+    project_paths: list[str],
     created_on: date | None = None,
 ) -> CommandCreateResult:
     if not name:
@@ -62,18 +62,20 @@ def create_custom_command_file(
     if not project_label_name or project_label_name == "All Projects":
         return CommandCreateResult(False, "Error: Please select a specific Project")
 
-    target_path = find_target_for_project(project_label_name, targets)
-    if not target_path:
-        return CommandCreateResult(False, f"Error: Could not find target for {project_label_name}")
+    project_path = find_project_path_by_label(project_label_name, project_paths)
+    if not project_path:
+        return CommandCreateResult(
+            False, f"Error: Could not find project directory for {project_label_name}"
+        )
 
     filename = build_command_filename(name, client)
-    manuals_dir = target_path / "manuals"
-    file_path = manuals_dir / filename
+    commands_dir = project_path / "commands"
+    file_path = commands_dir / filename
     if file_path.exists():
         return CommandCreateResult(False, f"Error: Command {filename} already exists", file_path)
 
     try:
-        manuals_dir.mkdir(parents=True, exist_ok=True)
+        commands_dir.mkdir(parents=True, exist_ok=True)
         file_path.write_text(
             build_command_content(name, client, body, category, created_on),
             encoding="utf-8",

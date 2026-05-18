@@ -3,22 +3,22 @@ import shutil
 from pathlib import Path
 
 
-def update_projects(target_paths, source_paths, progress_callback=None):
+def update_projects(project_paths, source_paths, progress_callback=None):
     """
-    Iterates through subfolders in each target path.
+    Iterates through subfolders in each project path.
     For each subfolder, it checks the source paths in the order they were provided.
     The first source path containing a matching subfolder is considered the highest priority.
-    It copies the contents of that prioritized source subfolder to the target subfolder,
+    It copies the contents of that prioritized source subfolder to the project subfolder,
     overwriting existing files.
     """
 
-    targets = []
-    for tp in target_paths:
+    projects = []
+    for tp in project_paths:
         p = Path(tp).resolve()
         if p.is_dir():
-            targets.append(p)
+            projects.append(p)
         else:
-            print(f"Warning: Target path '{tp}' is not a directory or does not exist. Skipping.")
+            print(f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping.")
 
     sources = []
     for sp in source_paths:
@@ -28,8 +28,8 @@ def update_projects(target_paths, source_paths, progress_callback=None):
         else:
             print(f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping.")
 
-    if not targets:
-        print("Error: No valid target directories provided.")
+    if not projects:
+        print("Error: No valid project directories provided.")
         return None
 
     if not sources:
@@ -38,15 +38,15 @@ def update_projects(target_paths, source_paths, progress_callback=None):
 
     # Count total folders to process
     total_folders = 0
-    target_items = []
-    for target_dir in targets:
-        items = [item for item in target_dir.iterdir() if item.is_dir()]
-        target_items.append((target_dir, items))
+    project_items = []
+    for project_dir in projects:
+        items = [item for item in project_dir.iterdir() if item.is_dir()]
+        project_items.append((project_dir, items))
         total_folders += len(items)
 
     print("Starting update process...")
-    print("Targets:")
-    for t in targets:
+    print("Projects:")
+    for t in projects:
         print(f"  - {t}")
     print("\nSources (in order of priority):")
     for s in sources:
@@ -57,9 +57,9 @@ def update_projects(target_paths, source_paths, progress_callback=None):
     skipped_count = 0
     processed_count = 0
 
-    # Iterate through each target directory
-    for target_dir, items in target_items:
-        print(f"\nProcessing target directory: '{target_dir.name}'")
+    # Iterate through each project directory
+    for project_dir, items in project_items:
+        print(f"\nProcessing project directory: '{project_dir.name}'")
 
         for item in items:
             folder_name = item.name
@@ -73,7 +73,7 @@ def update_projects(target_paths, source_paths, progress_callback=None):
                 if potential_source.is_dir():
                     selected_source_subfolder = potential_source
                     selected_source_dir = source_dir
-                    break # Stop at the first (highest priority) match
+                    break  # Stop at the first (highest priority) match
 
             if selected_source_subfolder:
                 msg = f"Updating '{folder_name}'..."
@@ -105,23 +105,24 @@ def update_projects(target_paths, source_paths, progress_callback=None):
     print(f"Total projects skipped: {skipped_count}")
     return updated_count, skipped_count
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Update subfolders in multiple target directories from multiple prioritized source directories."
+        description="Update subfolders in multiple project directories from multiple prioritized source directories."
     )
     parser.add_argument(
-        "--targets",
-        nargs='+',
+        "--projects",
+        nargs="+",
         required=True,
-        help="One or more target directories containing subfolders to be updated."
+        help="One or more project directories containing subfolders to be updated.",
     )
     parser.add_argument(
         "--sources",
-        nargs='+',
+        nargs="+",
         required=True,
-        help="One or more source directories containing updates. The order specifies priority (first = highest)."
+        help="One or more source directories containing updates. The order specifies priority (first = highest).",
     )
 
     args = parser.parse_args()
 
-    update_projects(args.targets, args.sources)
+    update_projects(args.projects, args.sources)

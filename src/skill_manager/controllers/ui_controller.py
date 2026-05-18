@@ -2,6 +2,7 @@
 Purpose: Manages UI state, window geometry, themes, and system shell actions.
 Usage: Accessed via AppController.ui
 """
+
 import os
 import sys
 from pathlib import Path
@@ -25,12 +26,19 @@ class UIController(BaseController):
         self._window_y = ui_state.get("window_y", 100)
         self._dark_mode = ui_state.get("dark_mode", False)
         self._current_view = ui_state.get("current_view", "Library")
+        self._startup_view = ui_state.get("startup_view", self._current_view)
+        self._remember_filters = ui_state.get("remember_filters", True)
+        self._default_project_filter = ui_state.get("default_project_filter", "last")
+        self._reduced_motion = ui_state.get("reduced_motion", False)
+        self._compact_list_rows = ui_state.get("compact_list_rows", False)
 
         # Normalize old values
         if self._current_view == "library":
             self._current_view = "Library"
         elif self._current_view == "quick-copy":
             self._current_view = "QuickCopy"
+        self._startup_view = self._normalize_view_name(self._startup_view)
+        self._current_view = self._startup_view
 
         # Debounce timer for UI state saves
         self._save_timer = QTimer()
@@ -45,19 +53,51 @@ class UIController(BaseController):
     def save_ui_state(self):
         """Saves current window geometry and UI preferences to config."""
         ui_state = self.config.get("ui_state", {})
-        ui_state.update({
-            "window_width": self._window_width,
-            "window_height": self._window_height,
-            "window_x": self._window_x,
-            "window_y": self._window_y,
-            "dark_mode": self._dark_mode,
-            "current_view": self._current_view
-        })
+        ui_state.update(
+            {
+                "window_width": self._window_width,
+                "window_height": self._window_height,
+                "window_x": self._window_x,
+                "window_y": self._window_y,
+                "dark_mode": self._dark_mode,
+                "current_view": self._current_view,
+                "startup_view": self._startup_view,
+                "remember_filters": self._remember_filters,
+                "default_project_filter": self._default_project_filter,
+                "reduced_motion": self._reduced_motion,
+                "compact_list_rows": self._compact_list_rows,
+            }
+        )
         self.config.set("ui_state", ui_state)
+
+    def reset_ui_state(self):
+        """Restores speed-focused UI preferences to stable defaults."""
+        self._window_width = 1300
+        self._window_height = 650
+        self._window_x = 100
+        self._window_y = 100
+        self._current_view = "Library"
+        self._startup_view = "Library"
+        self._remember_filters = True
+        self._default_project_filter = "last"
+        self._reduced_motion = False
+        self._compact_list_rows = False
+        self.save_ui_state()
+
+    @staticmethod
+    def _normalize_view_name(value: str) -> str:
+        view = str(value or "").replace(" ", "").replace("-", "")
+        view_map = {
+            "quickcopy": "QuickCopy",
+            "library": "Library",
+            "updates": "Updates",
+            "settings": "Settings",
+        }
+        return view_map.get(view.lower(), "Library")
 
     def get_asset_uri(self, path: str) -> str:
         """Returns the absolute URI for an asset path."""
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             base = Path(sys._MEIPASS) / "assets"
         else:
             base = Path(__file__).resolve().parent.parent.parent.parent / "assets"
@@ -73,14 +113,16 @@ class UIController(BaseController):
         if not path:
             return
         try:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 os.startfile(path)
-            elif sys.platform == 'darwin':
+            elif sys.platform == "darwin":
                 import subprocess
-                subprocess.run(['open', path])
+
+                subprocess.run(["open", path])
             else:
                 import subprocess
-                subprocess.run(['xdg-open', path])
+
+                subprocess.run(["xdg-open", path])
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
