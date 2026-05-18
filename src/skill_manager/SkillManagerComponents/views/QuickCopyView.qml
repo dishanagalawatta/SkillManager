@@ -125,7 +125,7 @@ Item {
                         GlassDropdown {
                             id: qcv_projectDrop
                             Layout.preferredWidth: 150
-                            model: ["All Projects"].concat(AppController.projects)
+                            model: ["All Projects"].concat(AppController.projectLabels)
                             currentIndex: {
                                 let idx = model.indexOf(AppController.skillModel.projectFilter);
                                 return idx === -1 ? 0 : idx;
