@@ -2,6 +2,7 @@
 Purpose: Abstract base class for sub-controllers to share state and access the AppController Hub.
 Usage: Inherit from BaseController and access self.app or self.config.
 """
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -53,25 +53,25 @@ Item {
                 id: lv_categoryDrop
                 model: ["All Categories"].concat(AppController.categories)
                 currentIndex: {
-                    let idx = model.indexOf(AppController.skillModel.categoryFilter);
+                    let idx = model.indexOf(AppController.libraryModel.categoryFilter);
                     return idx === -1 ? 0 : idx;
                 }
                 onActivated: (index) => {
                     let cat = index === 0 ? "" : currentText
-                    AppController.setViewFilter("category", cat)
+                    AppController.setViewFilterForView("Library", "category", cat)
                 }
             }
 
             GlassSearchInput {
                 id: lv_searchInput
                 Layout.preferredWidth: 250
-                onTextChanged: AppController.skillModel.filterText = text
+                onTextChanged: AppController.libraryModel.filterText = text
             }
 
             GlassToggleButton {
                 text: "Show Archived"
-                checked: AppController.skillModel.showArchived
-                onClicked: (mouse) => AppController.skillModel.showArchived = checked
+                checked: AppController.libraryModel.showArchived
+                onClicked: (mouse) => AppController.libraryModel.showArchived = checked
                 
                 iconInactive: "📁"
                 iconActive: "📦"
@@ -83,13 +83,12 @@ Item {
         Flow {
             Layout.fillWidth: true
             spacing: 8
-            visible: lv_searchInput.text !== "" || AppController.skillModel.categoryFilter !== "" || AppController.skillModel.projectFilter !== ""
+            visible: lv_searchInput.text !== "" || AppController.libraryModel.categoryFilter !== ""
 
             Repeater {
                 model: [
-                    { label: lv_searchInput.text ? "Search: " + lv_searchInput.text : "", clear: function() { lv_searchInput.text = ""; AppController.skillModel.filterText = "" } },
-                    { label: AppController.skillModel.projectFilter ? "Project: " + AppController.skillModel.projectFilter : "", clear: function() { AppController.setViewFilter("project", "") } },
-                    { label: AppController.skillModel.categoryFilter ? "Category: " + AppController.skillModel.categoryFilter : "", clear: function() { AppController.setViewFilter("category", "") } }
+                    { label: lv_searchInput.text ? "Search: " + lv_searchInput.text : "", clear: function() { lv_searchInput.text = ""; AppController.libraryModel.filterText = "" } },
+                    { label: AppController.libraryModel.categoryFilter ? "Category: " + AppController.libraryModel.categoryFilter : "", clear: function() { AppController.setViewFilterForView("Library", "category", "") } }
                 ].filter((item) => item.label !== "")
 
                 delegate: Rectangle {
@@ -149,14 +148,14 @@ Item {
                 anchors.margins: 12
                 spacing: 12
                 // LEFT: Toggle All
-                Button {
+                IconButton {
                     id: lv_toggleAllBtn
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
-                    flat: true
-                    onClicked: (mouse) => AppController.skillModel.toggleAll()
+                    buttonSize: 32
+                    role: "ghost"
+                    tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
+                    onClicked: (mouse) => AppController.libraryModel.toggleAll()
                     contentItem: Image {
-                        source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
+                        source: AppController.libraryModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
                         sourceSize.width: 18
                         sourceSize.height: 18
                         fillMode: Image.PreserveAspectFit
@@ -164,12 +163,6 @@ Item {
                         horizontalAlignment: Image.AlignHCenter
                         verticalAlignment: Image.AlignVCenter
                     }
-                    background: Rectangle {
-                        radius: Theme.radiusSmall
-                        color: lv_toggleAllBtn.hovered ? Theme.glassPill : "transparent"
-                    }
-                    ToolTip.visible: hovered
-                    ToolTip.text: AppController.skillModel.isAllExpanded ? "Collapse All" : "Expand All"
                 }
 
                 Rectangle {
@@ -183,7 +176,7 @@ Item {
                 // LEFT: Selection Count
                 RowLayout {
                     spacing: 12
-                    visible: AppController.skillModel.selectedCount > 0
+                    visible: AppController.libraryModel.selectedCount > 0
                     
                     Rectangle {
                         width: 28
@@ -192,7 +185,7 @@ Item {
                         color: Theme.accent
                         Text {
                             anchors.centerIn: parent
-                            text: AppController.skillModel.selectedCount
+                            text: AppController.libraryModel.selectedCount
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
@@ -221,27 +214,27 @@ Item {
                         labelText: "Add Command"
                         iconText: "+"
                         role: "secondary"
-                        onClicked: (mouse) => lv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
+                        onClicked: (mouse) => lv_commandDialog.openWithContext("", AppController.clientFormat)
                     }
 
                     ActionButton {
                         id: lv_selectAllBtn
                         labelText: "Select All"
                         role: "secondary"
-                        visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
-                        onClicked: (mouse) => AppController.skillModel.selectAll()
+                        visible: AppController.libraryModel.selectedCount < AppController.libraryModel.rowCount()
+                        onClicked: (mouse) => AppController.libraryModel.selectAll()
                     }
 
                     // Selection-specific actions
                     RowLayout {
                         spacing: 8
-                        visible: AppController.skillModel.selectedCount > 0
+                        visible: AppController.libraryModel.selectedCount > 0
                         
                         ActionButton {
                             id: lv_clearBtn
                             labelText: "Clear Selection"
                             role: "secondary"
-                            onClicked: (mouse) => AppController.skillModel.clearSelection()
+                            onClicked: (mouse) => AppController.libraryModel.clearSelection()
                         }
 
                         Rectangle {
@@ -277,9 +270,9 @@ Item {
                         ActionButton {
                             id: lv_deleteBtn
                             labelText: "Delete Selected"
-                            iconText: "🗑️"
+                            iconText: "Del"
                             role: "destructive"
-                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
+                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.deleteSelectedSkills())
                         }
 
                         Rectangle {
@@ -321,7 +314,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.preferredWidth: 400
-                model: AppController.skillModel
+                model: AppController.libraryModel
                 clip: true
                 spacing: 0
                 
@@ -337,7 +330,7 @@ Item {
                     showStarredIcon: false
                     showInlineDelete: false
                     onClicked: (mouse) => {
-                        AppController.skillModel.toggleSelection(index)
+                        AppController.libraryModel.toggleSelection(index)
                     }
                     onDoubleClicked: (mouse) => {
                         AppController.selectSkill(index)

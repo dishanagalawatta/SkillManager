@@ -31,7 +31,7 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        'pyyaml',
+        'yaml',
         'pywinstyles',
     ],
     hookspath=[],
@@ -62,7 +62,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(base_path, 'assets', 'logo', 'logo.png'), # Using PNG for now, convert to .ico/.icns for best results
+    icon=os.path.join(base_path, 'assets', 'brand', 'logo.png'), # Using PNG for now, convert to .ico/.icns for best results
 )
 
 coll = COLLECT(

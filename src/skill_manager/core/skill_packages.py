@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -13,38 +14,62 @@ def sanitize_token(text: str) -> str:
     if not isinstance(text, str):
         return text
     # Matches http://token@ or https://token@ and masks the token part
-    return re.sub(r'(https?://)[^@/\s]+@', r'\1***@', text)
+    return re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
 
 
-def normalize_skill_source_config(data):
-    """Return a backward-compatible skill updater/source config."""
-    detected = detect_source_config(data)
+def normalize_skill_package_config(data):
+    """Return a backward-compatible skill package config."""
+    detected = detect_package_config(data)
+
+    # Support both old and new keys for backward compatibility
+    pkg_path = str(detected.get("package_path") or detected.get("local_path") or "").strip()
+    pkg_args = str(detected.get("package_args") or detected.get("install_args") or "").strip()
+
     source = {
+        "package_id": str(detected.get("package_id") or "").strip(),
         "name": str(detected.get("name") or "").strip(),
         "source_type": str(detected.get("source_type") or "auto").strip(),
         "repository_url": str(detected.get("repository_url") or "").strip(),
         "github_token": str(detected.get("github_token") or "").strip(),
-        "local_path": str(detected.get("local_path") or "").strip(),
+        "package_path": pkg_path,
         "clone_path": str(detected.get("clone_path") or "").strip(),
         "package_name": str(detected.get("package_name") or "").strip(),
-        "install_args": str(detected.get("install_args") or "").strip(),
+        "package_args": pkg_args,
         "update_command": str(detected.get("update_command") or "").strip(),
         "verify_command": str(detected.get("verify_command") or "").strip(),
         "current_version_command": str(detected.get("current_version_command") or "").strip(),
         "latest_version_command": str(detected.get("latest_version_command") or "").strip(),
     }
 
+    # Backward compatibility: ensure local_path and install_args are still available if needed by other modules
+    source["local_path"] = source["package_path"]
+    source["install_args"] = source["package_args"]
+
     for key in ("current_version", "latest_version", "last_updated", "managed_folders"):
         if data.get(key):
             source[key] = data.get(key)
 
     if not source["name"]:
-        source["name"] = _fallback_source_name(source)
+        source["name"] = _fallback_package_name(source)
+    if not source["package_id"]:
+        source["package_id"] = _stable_package_id(source)
 
     return source
 
 
-def detect_source_config(data):
+def _stable_package_id(source):
+    identity = (
+        source.get("repository_url")
+        or source.get("package_name")
+        or source.get("package_path")
+        or source.get("name")
+        or "unnamed-package"
+    )
+    digest = hashlib.sha1(str(identity).strip().lower().encode("utf-8")).hexdigest()[:12]
+    return f"pkg_{digest}"
+
+
+def detect_package_config(data):
     source = dict(data or {})
     source_type = str(source.get("source_type") or "auto").strip().lower()
     source["source_type"] = source_type
@@ -52,7 +77,9 @@ def detect_source_config(data):
     update_command = str(source.get("update_command") or "").strip()
     package_name = str(source.get("package_name") or "").strip()
     repository_url = str(source.get("repository_url") or "").strip()
-    local_path = str(source.get("local_path") or "").strip()
+
+    # Support both old and new keys
+    package_path = str(source.get("package_path") or source.get("local_path") or "").strip()
 
     if source_type == "auto":
         if package_name:
@@ -69,28 +96,34 @@ def detect_source_config(data):
         source.setdefault("current_version_command", "")
     elif source_type == "custom":
         source.setdefault("repository_url", repository_url)
-        source.setdefault("local_path", local_path)
+        source.setdefault("package_path", package_path)
     elif update_command:
         source["source_type"] = "custom"
 
     # For custom sources, if no version command is set, try using the update command as a default
-    if source.get("source_type") == "custom" and update_command and not source.get("current_version_command"):
+    if (
+        source.get("source_type") == "custom"
+        and update_command
+        and not source.get("current_version_command")
+    ):
         source["current_version_command"] = update_command
 
     # Auto-detect verify command for local paths if not provided
-    if local_path and not source.get("verify_command"):
+    if package_path and not source.get("verify_command"):
         # Expand user path for the generated command to be more portable
         # although our interceptor will handle ~ as well.
-        source["verify_command"] = f'test -d {local_path} && echo "Skills installed in {local_path}"'
+        source["verify_command"] = (
+            f'test -d {package_path} && echo "Skills installed in {package_path}"'
+        )
 
     return source
 
 
-def detect_git_remote(local_path):
-    if not local_path:
+def detect_git_remote(package_path):
+    if not package_path:
         return ""
 
-    path = Path(os.path.expanduser(local_path))
+    path = Path(os.path.expanduser(package_path))
     if not path.exists():
         return ""
 
@@ -111,15 +144,15 @@ def detect_git_remote(local_path):
     return result.stdout.strip()
 
 
-def run_skill_source_update(source, output_callback=None):
-    source = normalize_skill_source_config(source)
+def run_skill_package_update(source, output_callback=None):
+    source = normalize_skill_package_config(source)
     # Ensure keys exist to prevent KeyError in tests or UI
     source.setdefault("current_version", "")
     source.setdefault("latest_version", "")
     source.setdefault("managed_folders", [])
     source.setdefault("removed_folders", [])
 
-    local_path = source.get("local_path")
+    package_path = source.get("package_path")
 
     captured_output = []
 
@@ -133,12 +166,12 @@ def run_skill_source_update(source, output_callback=None):
     elif source.get("update_command"):
         _run_shell_command(source["update_command"], intercept_callback)
     else:
-        _run_repository_update(source, intercept_callback)
+        _run_git_package_update(source, intercept_callback)
 
     # Post-update: Move skills from installation script output if applicable
-    if local_path:
-        _emit(output_callback, f"[DEBUG] Relocating skills from output to: {local_path}")
-        new_managed = _relocate_skills_from_output(captured_output, local_path, output_callback)
+    if package_path:
+        _emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
+        new_managed = _relocate_packages_from_output(captured_output, package_path, output_callback)
 
         if new_managed is not None:
             old_managed = source.get("managed_folders", [])
@@ -146,12 +179,18 @@ def run_skill_source_update(source, output_callback=None):
             outdated = set(old_managed) - set(new_managed)
             removed = []
             if outdated:
-                _emit(output_callback, f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...")
-                dest_base = Path(os.path.expanduser(local_path))
+                _emit(
+                    output_callback,
+                    f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...",
+                )
+                dest_base = Path(os.path.expanduser(package_path))
                 for folder_name in sorted(outdated):
                     folder_path = dest_base / folder_name
                     if folder_path.is_dir():
-                        _emit(output_callback, f"[DEBUG] Deleting outdated skill folder: {folder_name}")
+                        _emit(
+                            output_callback,
+                            f"[DEBUG] Deleting outdated skill folder: {folder_name}",
+                        )
                         try:
                             shutil.rmtree(folder_path)
                             removed.append(folder_name)
@@ -166,8 +205,8 @@ def run_skill_source_update(source, output_callback=None):
         _run_shell_command(source["verify_command"], output_callback)
 
     # After update, refresh versions (handles Git tags, etc.)
-    # We update the original source dict to preserve set defaults if check_skill_source_versions returns a new dict
-    updated_source_info = check_skill_source_versions(source, force_refresh=True)
+    # We update the original source dict to preserve set defaults if check_skill_package_versions returns a new dict
+    updated_source_info = check_skill_package_versions(source, force_refresh=True)
     source.update(updated_source_info)
 
     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -199,24 +238,26 @@ def _relocate_path_internal(src_path, dest_base, output_callback):
         return False
 
 
-def _relocate_skills_from_output(captured_output, target_local_path, output_callback):
-    """Parses output log for installed paths and moves those folders to target_local_path."""
-    if not target_local_path:
-        _emit(output_callback, "[DEBUG] Relocation skipped: No target local_path configured.")
+def _relocate_packages_from_output(captured_output, target_package_path, output_callback):
+    """Parses output log for installed paths and moves those folders to target_package_path."""
+    if not target_package_path:
+        _emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
         return None
 
-    dest_base = Path(os.path.expanduser(target_local_path))
+    dest_base = Path(os.path.expanduser(target_package_path))
 
     # regex to find paths like ~\.agents\skills\caveman or C:\Users\...\.agents\skills\caveman
     # Supports ✓ prefix, handles "Installed to" text, spaces and common path characters.
     # We look for common path starters and capture until end of line or specific delimiters.
-    path_regex = re.compile(r'(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.\\[^…\n\r]+|~[^…\n\r]+)')
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    path_regex = re.compile(
+        r"(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.\\[^…\n\r]+|~[^…\n\r]+)"
+    )
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-    _emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for installation paths...")
+    _emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for package paths...")
     detected_paths = set()
     for line in captured_output:
-        clean_line = ansi_escape.sub('', line)
+        clean_line = ansi_escape.sub("", line)
         # Search for paths after specific keywords to handle spaces correctly
         match_found = False
         for match in path_regex.finditer(clean_line):
@@ -224,7 +265,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
             # Expand ~ and normalize
             try:
                 # Remove trailing ellipsis or common terminal artifacts
-                raw_path = re.sub(r'[…\s│]+$', '', raw_path).strip()
+                raw_path = re.sub(r"[…\s│]+$", "", raw_path).strip()
                 expanded = Path(os.path.expanduser(raw_path)).resolve()
                 if expanded.is_dir():
                     detected_paths.add(expanded)
@@ -235,7 +276,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
 
         if not match_found:
             # Fallback for lines without keywords but containing absolute paths
-            fallback_regex = re.compile(r'([a-zA-Z]:[\\/][^\s│]+[a-zA-Z0-9_.-]+)')
+            fallback_regex = re.compile(r"([a-zA-Z]:[\\/][^\s│]+[a-zA-Z0-9_.-]+)")
             for match in fallback_regex.finditer(clean_line):
                 raw_path = match.group(1).strip()
                 try:
@@ -247,7 +288,10 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
                     continue
 
     if not detected_paths:
-        _emit(output_callback, "[DEBUG] No installation paths detected in output. Please ensure the tool is installing skills to a visible directory.")
+        _emit(
+            output_callback,
+            "[DEBUG] No package paths detected in output. Please ensure the tool is installing skills to a visible directory.",
+        )
         return None
 
     _emit(output_callback, f"[DEBUG] Total unique paths found: {len(detected_paths)}")
@@ -260,7 +304,7 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
         if src_path.name.lower() in ("skills", "agents", ".agents"):
             try:
                 for child in src_path.iterdir():
-                    if child.is_dir() and not child.name.startswith('.'):
+                    if child.is_dir() and not child.name.startswith("."):
                         managed_folder_names.add(child.name)
             except Exception:
                 pass
@@ -283,7 +327,11 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
             _emit(output_callback, f"Processing container: {src_path.name}")
             try:
                 for child in src_path.iterdir():
-                    if child.is_dir() and not child.name.startswith('.') and _relocate_path_internal(child, dest_base, output_callback):
+                    if (
+                        child.is_dir()
+                        and not child.name.startswith(".")
+                        and _relocate_path_internal(child, dest_base, output_callback)
+                    ):
                         relocated_count += 1
                 # Cleanup the now-empty container
                 _cleanup_empty_parents(src_path / "dummy")
@@ -296,20 +344,27 @@ def _relocate_skills_from_output(captured_output, target_local_path, output_call
     if relocated_count > 0:
         _emit(output_callback, f"Successfully relocated {relocated_count} folders.")
     else:
-        _emit(output_callback, "[DEBUG] No folders were moved (maybe already in destination or empty).")
+        _emit(
+            output_callback,
+            "[DEBUG] No folders were moved (maybe already in destination or empty).",
+        )
 
     # Handle .skill-lock.json, skills-lock.json and manifest
-    # ... (rest remains same)
     unique_source_roots = {p.parent.parent for p in detected_paths}
     target_root = dest_base.parent
 
     # If target_root is project root, use the dedicated data folder to keep root clean
     if target_root.resolve() == Path.cwd().resolve():
         from skill_manager.core.config import DATA_DIR
+
         target_root = DATA_DIR
 
     for src_root in unique_source_roots:
-        for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
+        for lock_name in (
+            ".skill-lock.json",
+            "skills-lock.json",
+            ".antigravity-install-manifest.json",
+        ):
             src_lock = src_root / lock_name
             if src_lock.is_file():
                 tgt_lock = target_root / lock_name
@@ -397,8 +452,8 @@ def _cleanup_empty_parents(path, levels=3):
         pass
 
 
-def check_skill_source_versions(source, force_refresh=False):
-    source = normalize_skill_source_config(source)
+def check_skill_package_versions(source, force_refresh=False):
+    source = normalize_skill_package_config(source)
 
     current_version = source.get("current_version", "")
     latest_version = source.get("latest_version", "")
@@ -422,7 +477,7 @@ def check_skill_source_versions(source, force_refresh=False):
 
     # 2. GitHub Repo Override/Priority
     repo_url = source.get("repository_url")
-    token = source.get('github_token')
+    token = source.get("github_token")
     if repo_url and ("github.com" in repo_url or "gitlab.com" in repo_url):
         git_latest = get_git_tag(repo_url, is_remote=True, token=token)
         if git_latest:
@@ -431,7 +486,7 @@ def check_skill_source_versions(source, force_refresh=False):
     # 3. For Git sources, auto-detect local version
     if source.get("source_type") == "git":
         # Always try to refresh local version if directory exists
-        clone_path = source.get("clone_path") or source.get("local_path")
+        clone_path = source.get("clone_path") or source.get("package_path")
         if clone_path:
             path = Path(os.path.expanduser(clone_path))
             if (path / ".git").is_dir():
@@ -466,7 +521,6 @@ def check_skill_source_versions(source, force_refresh=False):
     return source
 
 
-
 def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
     """Fetches the latest semantic tag or fallback to commit hash."""
     try:
@@ -474,8 +528,19 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             auth_url = path_or_url
             # Fetch tags from remote
             result = subprocess.run(
-                ["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f"] if token else []) + ["ls-remote", "--tags", "--sort=-v:refname", auth_url],
-                capture_output=True, text=True, timeout=15
+                ["git"]
+                + (
+                    [
+                        "-c",
+                        f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f",
+                    ]
+                    if token
+                    else []
+                )
+                + ["ls-remote", "--tags", "--sort=-v:refname", auth_url],
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.returncode == 0 and result.stdout:
                 # Format is usually: hash\trefs/tags/v1.2.3
@@ -490,8 +555,19 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to latest commit hash on main/master if no tags
             result = subprocess.run(
-                ["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f"] if token else []) + ["ls-remote", auth_url, "HEAD"],
-                capture_output=True, text=True, timeout=15
+                ["git"]
+                + (
+                    [
+                        "-c",
+                        f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f",
+                    ]
+                    if token
+                    else []
+                )
+                + ["ls-remote", auth_url, "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.split("\t")[0][:7]
@@ -504,7 +580,9 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             # Try to get tag first
             result = subprocess.run(
                 ["git", "-C", str(path), "describe", "--tags", "--abbrev=0"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.strip()
@@ -512,7 +590,9 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             # Fallback to short hash
             result = subprocess.run(
                 ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.strip()
@@ -528,7 +608,9 @@ def run_version_command(command):
 
     try:
         command_list = shlex.split(command)
-        result = subprocess.run(command_list, shell=False, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            command_list, shell=False, capture_output=True, text=True, timeout=30
+        )
     except (OSError, subprocess.SubprocessError, ValueError):
         return ""
 
@@ -537,41 +619,65 @@ def run_version_command(command):
     return result.stdout.strip()
 
 
-def _run_repository_update(source, output_callback):
+def _run_git_package_update(source, output_callback):
     """
     Clones or pulls a git repository.
 
     Supports two modes:
-    - Standard: `local_path` is used for both the git checkout and as the relocation base.
-    - Staged: `clone_path` is used for the git checkout; `local_path` is the relocation target.
+    - Standard: `package_path` is used for both the git checkout and as the relocation base.
+    - Staged: `clone_path` is used for the git checkout; `package_path` is the relocation target.
       After a successful clone/pull, `clone_path` is emitted into output so that
-      `_relocate_skills_from_output` can detect it and move skills into `local_path`.
+      `_relocate_packages_from_output` can detect it and move skills into `package_path`.
     """
     repository_url = source.get("repository_url")
-    local_path = source.get("local_path")
-    clone_path = source.get("clone_path") or local_path
+    package_path = source.get("package_path")
+    clone_path = source.get("clone_path") or package_path
 
     if not repository_url:
         raise ValueError("Configure a repository_url for git sources.")
     if not clone_path:
-        raise ValueError("Configure either local_path or clone_path for git sources.")
+        raise ValueError("Configure either package_path or clone_path for git sources.")
 
     path = Path(os.path.expanduser(clone_path))
     auth_url = repository_url
 
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
-        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f"] if source.get('github_token') else []) + ["-C", str(path), "pull", "--ff-only"], output_callback)
+        _run_process(
+            ["git"]
+            + (
+                [
+                    "-c",
+                    f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f",
+                ]
+                if source.get("github_token")
+                else []
+            )
+            + ["-C", str(path), "pull", "--ff-only"],
+            output_callback,
+        )
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        _run_process(["git"] + (["-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f"] if source.get('github_token') else []) + ["clone", auth_url, str(path)], output_callback)
+        _run_process(
+            ["git"]
+            + (
+                [
+                    "-c",
+                    f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f",
+                ]
+                if source.get("github_token")
+                else []
+            )
+            + ["clone", auth_url, str(path)],
+            output_callback,
+        )
 
-    # Emit clone_path into output so _relocate_skills_from_output can detect it
-    # when clone_path differs from local_path (staged mode).
-    if clone_path != local_path:
+    # Emit clone_path into output so _relocate_packages_from_output can detect it
+    # when clone_path differs from package_path (staged mode).
+    if clone_path != package_path:
         _emit(output_callback, f"Installed to {path}")
 
 
@@ -581,8 +687,8 @@ def _run_npm_update(source, output_callback):
         raise ValueError("Configure an npm package name.")
 
     command = ["npx", "--yes", package_name]
-    if source.get("install_args"):
-        command.extend(_split_args(source["install_args"]))
+    if source.get("package_args"):
+        command.extend(_split_args(source["package_args"]))
     _run_process(command, output_callback)
 
 
@@ -666,7 +772,7 @@ def _run_process(command, output_callback, shell=False):
                 print(f"[PROCESS] {line_clean}")
 
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
-                is_progress = bool(re.search(r'\d+%', line_clean))
+                is_progress = bool(re.search(r"\d+%", line_clean))
                 current_time = time.time()
 
                 if not is_progress or (current_time - last_emit_time > 0.5):
@@ -676,7 +782,11 @@ def _run_process(command, output_callback, shell=False):
 
     process.wait()
     if process.returncode != 0:
-        sanitized_command = [sanitize_token(str(arg)) for arg in command] if isinstance(command, list) else sanitize_token(str(command))
+        sanitized_command = (
+            [sanitize_token(str(arg)) for arg in command]
+            if isinstance(command, list)
+            else sanitize_token(str(command))
+        )
         raise subprocess.CalledProcessError(process.returncode, sanitized_command)
 
 
@@ -699,26 +809,31 @@ def _resolve_process_command(command, shell=False):
 def _emit(output_callback, message):
     message = sanitize_token(str(message))
     # Print to terminal for debugging and visibility
-    if message.startswith("[DEBUG]") or message.startswith("[ERROR]") or "Relocating" in message or "Success" in message:
+    if (
+        message.startswith("[DEBUG]")
+        or message.startswith("[ERROR]")
+        or "Relocating" in message
+        or "Success" in message
+    ):
         print(message)
     if output_callback:
         output_callback(message)
 
 
-def _fallback_source_name(source):
+def _fallback_package_name(source):
     package_name = source.get("package_name")
     if package_name:
         return package_name
 
     repository_url = source.get("repository_url", "").rstrip("/")
     if repository_url:
-        return repository_url.rsplit("/", 1)[-1].removesuffix(".git") or "Unnamed Source"
+        return repository_url.rsplit("/", 1)[-1].removesuffix(".git") or "Unnamed Package"
 
-    local_path = source.get("local_path")
-    if local_path:
-        return Path(local_path).name or "Unnamed Source"
+    package_path = source.get("package_path")
+    if package_path:
+        return Path(package_path).name or "Unnamed Package"
 
-    return "Unnamed Source"
+    return "Unnamed Package"
 
 
 def _apply_npm_defaults(source):
@@ -736,20 +851,20 @@ def _apply_npm_defaults(source):
             extra_args = " ".join(parts[1:])
             source["package_name"] = package_name
             if extra_args:
-                existing_args = str(source.get("install_args") or "").strip()
-                source["install_args"] = f"{extra_args} {existing_args}".strip()
+                existing_args = str(source.get("package_args") or "").strip()
+                source["package_args"] = f"{extra_args} {existing_args}".strip()
 
     update_command = str(source.get("update_command") or "").strip()
     if not package_name and update_command:
         parsed_package, parsed_args = _parse_npx_command(update_command)
         package_name = parsed_package
         source["package_name"] = package_name
-        source.setdefault("install_args", parsed_args)
+        source.setdefault("package_args", parsed_args)
 
     if not package_name:
         return
 
-    args = str(source.get("install_args") or "").strip()
+    args = str(source.get("package_args") or "").strip()
     source["update_command"] = f"npx --yes {package_name}" + (f" {args}" if args else "")
 
     source["latest_version_command"] = f"npm show {package_name} version"

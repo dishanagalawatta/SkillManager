@@ -81,19 +81,19 @@ Rectangle {
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                 }
-                Button {
+                IconButton {
                     id: starButton
-                    text: (root.skill && root.skill.is_essential) ? "★" : "☆"
+                    text: (root.skill && root.skill.is_starred) ? "★" : "☆"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
-                    visible: root.isQuickCopy && root.skill && root.skill.id !== undefined
-                    onClicked: (mouse) => AppController.toggleCurrentSkillEssential()
+                    visible: root.skill && root.skill.id !== undefined
+                    onClicked: (mouse) => AppController.toggleCurrentSkillStarred()
                     
                     contentItem: Text {
                         text: starButton.text
                         font.pixelSize: 22
-                        color: (root.skill && root.skill.is_essential) ? "#FFD700" : Theme.secondaryLabel
+                        color: (root.skill && root.skill.is_starred) ? "#FFD700" : Theme.secondaryLabel
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         opacity: starButton.hovered ? 1.0 : 0.8
@@ -108,10 +108,10 @@ Rectangle {
                     }
                     
                     ToolTip.visible: hovered
-                    ToolTip.text: (root.skill && root.skill.is_essential) ? "Remove from Essentials" : "Add to Essentials"
+                    ToolTip.text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
                 }
 
-                Button {
+                IconButton {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
@@ -184,10 +184,10 @@ Rectangle {
                 }
             }
 
-            // Documentation / Manuals (Moved up for better visibility)
+            // Documentation / Commands (Moved up for better visibility)
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: (root.skill && root.skill.manuals) ? root.skill.manuals.length > 0 : false
+                visible: (root.skill && root.skill.commands) ? root.skill.commands.length > 0 : false
                 spacing: 4
                 
                 Text {
@@ -203,7 +203,7 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 6
                     Repeater {
-                        model: root.skill.manuals || []
+                        model: root.skill.commands || []
                         delegate: Rectangle {
                             height: 16
                             width: tagText.implicitWidth + 10
@@ -340,7 +340,7 @@ Rectangle {
                 spacing: 8
                 visible: root.skill.id !== undefined
 
-                Button {
+                ActionButton {
                     text: "Copy Reference"
                     Layout.fillWidth: true
                     visible: root.isQuickCopy

@@ -1,9 +1,9 @@
 /**
- * Purpose: A modern "Solid Matte" dialog for renaming project targets.
+ * Purpose: A modern "Solid Matte" dialog for renaming projects.
  * Usage:
  * ProjectRenameDialog {
  *     id: renameDialog
- *     targetPath: "c:/path/to/project"
+ *     projectPath: "c:/path/to/project"
  *     currentName: "My Project"
  * }
  */
@@ -17,7 +17,7 @@ import SkillManagerComponents 1.0
 Dialog {
     id: root
     
-    property string targetPath: ""
+    property string projectPath: ""
     property string currentName: ""
     
     x: (parent.width - width) / 2
@@ -64,7 +64,7 @@ Dialog {
                 }
                 
                 Text {
-                    text: "Rename Target Project"
+                    text: "Rename Project"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -72,7 +72,7 @@ Dialog {
                     Layout.fillWidth: true
                 }
                 
-                Button {
+                IconButton {
                     text: "✕"
                     flat: true
                     Layout.preferredWidth: 32
@@ -108,7 +108,7 @@ Dialog {
             Layout.margins: 24
             
             Text { 
-                text: "Display Name for:\n" + root.targetPath
+                text: "Display Name for:\n" + root.projectPath
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.sizeCaption
                 color: Theme.secondaryLabel
@@ -151,7 +151,7 @@ Dialog {
                 
                 Item { Layout.fillWidth: true }
                 
-                Button {
+                ActionButton {
                     text: "Cancel"
                     Layout.preferredWidth: 100
                     Layout.preferredHeight: 40
@@ -174,12 +174,12 @@ Dialog {
                     }
                 }
                 
-                Button {
+                ActionButton {
                     text: "Save"
                     Layout.preferredWidth: 100
                     Layout.preferredHeight: 40
                     onClicked: {
-                        AppController.setTargetAlias(root.targetPath, renameInput.text)
+                        AppController.setProjectAlias(root.projectPath, renameInput.text)
                         root.accept()
                     }
                     

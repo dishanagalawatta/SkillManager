@@ -1,7 +1,8 @@
 """
-Purpose: Manages skill sources, project targets, and configuration state.
+Purpose: Manages skill sources, projects, and configuration state.
 Usage: Accessed via AppController.config_mgr
 """
+
 import os
 
 from skill_manager.controllers.base import BaseController
@@ -14,11 +15,20 @@ class ConfigController(BaseController):
     def add_source(self, url: str):
         """Adds a local skill source directory."""
         path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
-        if path not in self.app._sources:
-            self.app._sources.append(path)
-            self.config.set("sources", self.app._sources)
-            self.app.sourcesChanged.emit()
-            self.app._set_status(f"Added source: {path}")
+        raw_path = str(path or "").strip()
+        if not raw_path:
+            return
+
+        try:
+            # Resolve to absolute path to prevent CWD dependency issues
+            resolved_path = os.path.abspath(os.path.expanduser(raw_path))
+            if resolved_path not in self.app._sources:
+                self.app._sources.append(resolved_path)
+                self.config.set("sources", self.app._sources)
+                self.app.sourcesChanged.emit()
+                self.app._set_status(f"Added source: {resolved_path}")
+        except Exception as e:
+            self.app._set_status(f"Failed to add source: {e}")
 
     def remove_source(self, path: str):
         """Removes a local skill source directory."""
@@ -28,60 +38,68 @@ class ConfigController(BaseController):
             self.app.sourcesChanged.emit()
             self.app._set_status(f"Removed source: {path}")
 
-    def add_target(self, url: str):
-        """Adds a project target directory."""
+    def add_project(self, url: str):
+        """Adds a project directory."""
         path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
-        if path not in self.app._targets:
-            self.app._targets.append(path)
-            self.config.set("targets", self.app._targets)
-            self.app.targetsChanged.emit()
-            self.app._set_status(f"Added target: {path}")
-            capture_event("project_target_added", {"target_count": len(self.app._targets)})
+        if path not in self.app._projects:
+            self.app._projects.append(path)
+            self.config.set("projects", self.app._projects)
+            self.app.projectsChanged.emit()
+            self.app._set_status(f"Added project: {path}")
+            capture_event("project_added", {"project_count": len(self.app._projects)})
 
-    def remove_target(self, path: str):
-        """Removes a project target directory."""
-        if path in self.app._targets:
-            self.app._targets.remove(path)
-            if path in self.app._syncing_targets:
-                self.app._syncing_targets.remove(path)
+    def remove_project(self, path: str):
+        """Removes a project directory."""
+        if path in self.app._projects:
+            self.app._projects.remove(path)
+            if path in self.app._syncing_projects:
+                self.app._syncing_projects.remove(path)
             # Also remove alias if it exists
-            if path in self.app._target_aliases:
-                del self.app._target_aliases[path]
-                self.config.set("target_aliases", self.app._target_aliases)
-            self.config.set("targets", self.app._targets)
-            self.app.targetsChanged.emit()
-            self.app._set_status(f"Removed target: {path}")
+            if path in self.app._project_aliases:
+                del self.app._project_aliases[path]
+                self.config.set("project_aliases", self.app._project_aliases)
+            self.config.set("projects", self.app._projects)
+            self.app.projectsChanged.emit()
+            self.app._set_status(f"Removed project: {path}")
 
-    def get_target_label(self, path: str) -> str:
-        """Returns the human-readable label for a target path."""
+    def get_project_label(self, path: str) -> str:
+        """Returns the human-readable label for a project path."""
         if not path:
             return ""
         norm_path = path.replace("\\", "/")
-        label = self.app._target_aliases.get(path) or self.app._target_aliases.get(norm_path)
+        label = self.app._project_aliases.get(path) or self.app._project_aliases.get(norm_path)
         if not label:
-            label = os.path.basename(path)
+            # Smart label detection for project folders
+            if norm_path.endswith("/.agents/skills"):
+                label = os.path.basename(os.path.dirname(os.path.dirname(path)))
+            elif os.path.basename(path).lower() == "skills" and len(norm_path.split("/")) > 2:
+                parent = norm_path.split("/")[-2]
+                label = norm_path.split("/")[-3] if parent == ".agents" else parent
+            else:
+                label = os.path.basename(path)
         return label
 
-    def set_target_alias(self, path: str, alias: str):
-        """Sets a custom alias for a project target."""
+    def set_project_alias(self, path: str, alias: str):
+        """Sets a custom alias for a project."""
         if not path:
             return
         if not alias:
-            if path in self.app._target_aliases:
-                del self.app._target_aliases[path]
+            if path in self.app._project_aliases:
+                del self.app._project_aliases[path]
         else:
-            self.app._target_aliases[path] = alias
+            self.app._project_aliases[path] = alias
 
-        self.config.set("target_aliases", self.app._target_aliases)
-        self.app.targetsChanged.emit()
+        self.config.set("project_aliases", self.app._project_aliases)
+        self.app.projectsChanged.emit()
         self.app.refreshSkills()
         self.app._set_status(f"Renamed project to: {alias or 'Default'}")
 
-    def verify_git_source(self, url: str, token: str = None) -> str:
+    def verify_git_package(self, url: str, token: str = None) -> str:
         """Verifies a git repository and returns its latest tag."""
         if not url:
             return ""
-        from skill_manager.core.skill_sources import get_git_tag
+        from skill_manager.core.skill_packages import get_git_tag
+
         self.app._set_status(f"Verifying repository: {url}")
         tag = get_git_tag(url, is_remote=True, token=token)
         if tag:

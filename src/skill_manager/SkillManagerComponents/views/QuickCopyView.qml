@@ -77,13 +77,13 @@ Item {
                             onCollectionSelected: (collectionName) => {
                                 if (collectionName === "All Collections") {
                                     qcv_root._isInternalSelectionChange = true
-                                    AppController.setViewFilter("collection", "")
-                                    AppController.skillModel.clearSelection()
+                                    AppController.setViewFilterForView("QuickCopy", "collection", "")
+                                    AppController.quickCopyModel.clearSelection()
                                     qcv_root._isInternalSelectionChange = false
                                 } else {
                                     qcv_root._isInternalSelectionChange = true
                                     AppController.applyCollectionSelection(collectionName)
-                                    AppController.setViewFilter("collection", collectionName)
+                                    AppController.setViewFilterForView("QuickCopy", "collection", collectionName)
                                     qcv_root._isInternalSelectionChange = false
                                 }
                             }
@@ -92,12 +92,12 @@ Item {
                                 qcv_root.editingCollectionName = collectionName
                                 qcv_root._isInternalSelectionChange = true
                                 AppController.applyCollectionSelection(collectionName)
-                                AppController.setViewFilter("collection", collectionName)
+                                AppController.setViewFilterForView("QuickCopy", "collection", collectionName)
                                 qcv_root._isInternalSelectionChange = false
                             }
 
                             Connections {
-                                target: AppController.skillModel
+                                target: AppController.quickCopyModel
                                 function onUserSelectionChanged() {
                                     if (!qcv_root.isEditingCollection && !qcv_root._isInternalSelectionChange) {
                                         if (qcv_collectionDrop.currentIndex !== 0) {
@@ -113,12 +113,12 @@ Item {
                             Layout.preferredWidth: 130
                             model: ["All Categories"].concat(AppController.categories)
                             currentIndex: {
-                                let idx = model.indexOf(AppController.skillModel.categoryFilter);
+                                let idx = model.indexOf(AppController.quickCopyModel.categoryFilter);
                                 return idx === -1 ? 0 : idx;
                             }
                             onActivated: (index) => {
                                 let cat = index === 0 ? "" : currentText
-                                AppController.setViewFilter("category", cat)
+                                AppController.setViewFilterForView("QuickCopy", "category", cat)
                             }
                         }
 
@@ -127,12 +127,12 @@ Item {
                             Layout.preferredWidth: 150
                             model: ["All Projects"].concat(AppController.projectLabels)
                             currentIndex: {
-                                let idx = model.indexOf(AppController.skillModel.projectFilter);
+                                let idx = model.indexOf(AppController.quickCopyModel.projectFilter);
                                 return idx === -1 ? 0 : idx;
                             }
                             onActivated: (index) => {
                                 let proj = index === 0 ? "" : currentText
-                                AppController.setViewFilter("project", proj)
+                                AppController.setViewFilterForView("QuickCopy", "project", proj)
                             }
                         }
                     }
@@ -142,11 +142,9 @@ Item {
                         spacing: 8
                         Repeater {
                             model: AppController.clientFormats
-                            delegate: Button {
+                            delegate: IconButton {
                                 id: clientBtn
-                                Layout.preferredWidth: 32
-                                Layout.preferredHeight: 32
-                                flat: true
+                                buttonSize: 32
                                 property bool isSelected: modelData === AppController.clientFormat
                                 onClicked: (mouse) => AppController.setClientFormat(modelData)
                                 contentItem: Image {
@@ -184,7 +182,7 @@ Item {
                     }
 
                     onTextChanged: {
-                        AppController.skillModel.filterText = text
+                        AppController.quickCopyModel.filterText = text
                     }
                 }
             }
@@ -193,13 +191,13 @@ Item {
         Flow {
             Layout.fillWidth: true
             spacing: 8
-            visible: searchInput.text !== "" || AppController.skillModel.categoryFilter !== "" || AppController.skillModel.projectFilter !== ""
+            visible: searchInput.text !== "" || AppController.quickCopyModel.categoryFilter !== "" || AppController.quickCopyModel.projectFilter !== ""
 
             Repeater {
                 model: [
-                    { label: searchInput.text ? "Search: " + searchInput.text : "", clear: function() { searchInput.text = ""; AppController.skillModel.filterText = "" } },
-                    { label: AppController.skillModel.projectFilter ? "Project: " + AppController.skillModel.projectFilter : "", clear: function() { AppController.setViewFilter("project", "") } },
-                    { label: AppController.skillModel.categoryFilter ? "Category: " + AppController.skillModel.categoryFilter : "", clear: function() { AppController.setViewFilter("category", "") } }
+                    { label: searchInput.text ? "Search: " + searchInput.text : "", clear: function() { searchInput.text = ""; AppController.quickCopyModel.filterText = "" } },
+                    { label: AppController.quickCopyModel.projectFilter ? "Project: " + AppController.quickCopyModel.projectFilter : "", clear: function() { AppController.setViewFilterForView("QuickCopy", "project", "") } },
+                    { label: AppController.quickCopyModel.categoryFilter ? "Category: " + AppController.quickCopyModel.categoryFilter : "", clear: function() { AppController.setViewFilterForView("QuickCopy", "category", "") } }
                 ].filter((item) => item.label !== "")
 
                 delegate: Rectangle {
@@ -257,14 +255,14 @@ Item {
                 anchors.margins: 12
                 spacing: 12
                 // LEFT: Toggle All
-                Button {
+                IconButton {
                     id: qcv_toggleAllBtn
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
-                    flat: true
-                    onClicked: (mouse) => AppController.skillModel.toggleAll()
+                    buttonSize: 32
+                    role: "ghost"
+                    tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
+                    onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
                     contentItem: Image {
-                        source: AppController.skillModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
+                        source: AppController.quickCopyModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
                         sourceSize.width: 18
                         sourceSize.height: 18
                         fillMode: Image.PreserveAspectFit
@@ -272,12 +270,6 @@ Item {
                         horizontalAlignment: Image.AlignHCenter
                         verticalAlignment: Image.AlignVCenter
                     }
-                    background: Rectangle {
-                        radius: Theme.radiusSmall
-                        color: qcv_toggleAllBtn.hovered ? Theme.glassPill : "transparent"
-                    }
-                    ToolTip.visible: hovered
-                    ToolTip.text: AppController.skillModel.isAllExpanded ? "Collapse All" : "Expand All"
                 }
 
                 Rectangle {
@@ -292,7 +284,7 @@ Item {
                 RowLayout {
                     id: qcv_infoGroup
                     spacing: 12
-                    visible: AppController.skillModel.selectedCount > 0
+                    visible: AppController.quickCopyModel.selectedCount > 0
                     
                     Rectangle {
                         width: 28
@@ -301,7 +293,7 @@ Item {
                         color: Theme.accent
                         Text {
                             anchors.centerIn: parent
-                            text: AppController.skillModel.selectedCount
+                            text: AppController.quickCopyModel.selectedCount
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
@@ -335,27 +327,27 @@ Item {
                             labelText: "Add Command"
                             iconText: "+"
                             role: "secondary"
-                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
+                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.quickCopyModel.projectFilter, AppController.clientFormat)
                         }
 
                         ActionButton {
                             id: barSelectAllBtn
                             labelText: "Select All"
                             role: "secondary"
-                            visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
-                            onClicked: (mouse) => AppController.skillModel.selectAll()
+                            visible: AppController.quickCopyModel.selectedCount < AppController.quickCopyModel.rowCount()
+                            onClicked: (mouse) => AppController.quickCopyModel.selectAll()
                         }
 
                         // Selection-specific actions
                         RowLayout {
                             spacing: 8
-                            visible: AppController.skillModel.selectedCount > 0
+                            visible: AppController.quickCopyModel.selectedCount > 0
                             
                             ActionButton {
                                 id: barClearBtn
                                 labelText: "Clear Selection"
                                 role: "secondary"
-                                onClicked: (mouse) => AppController.skillModel.clearSelection()
+                                onClicked: (mouse) => AppController.quickCopyModel.clearSelection()
                             }
 
                             Rectangle {
@@ -380,9 +372,9 @@ Item {
                                 id: barDeleteBtn
                                 objectName: "quickCopyDeleteSelectedBtn"
                                 labelText: "Delete Selected"
-                                iconText: "🗑️"
+                                iconText: "Del"
                                 role: "destructive"
-                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
+                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.deleteSelectedSkills())
                             }
 
                             Rectangle {
@@ -425,13 +417,16 @@ Item {
                             onTextChanged: qcv_root.editingCollectionName = text
                         }
 
-                        Button {
+                        IconButton {
                             id: qcv_saveColBtn
-                            Layout.preferredWidth: 36
-                            Layout.preferredHeight: 36
+                            buttonSize: 36
+                            iconSize: 12
+                            iconText: "Save"
+                            role: "primary"
+                            tooltipText: "Save collection"
                             flat: true
                             onClicked: (mouse) => {
-                                AppController.saveCustomCollection(qcv_root.editingCollectionName, AppController.skillModel.getSelectedPaths())
+                                AppController.saveCustomCollection(qcv_root.editingCollectionName, AppController.quickCopyModel.getSelectedPaths())
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
                             }
@@ -448,10 +443,13 @@ Item {
                             }
                         }
 
-                        Button {
+                        IconButton {
                             id: qcv_cancelColBtn
-                            Layout.preferredWidth: 36
-                            Layout.preferredHeight: 36
+                            buttonSize: 36
+                            iconSize: 10
+                            iconText: "Cancel"
+                            role: "destructive"
+                            tooltipText: "Cancel collection editing"
                             flat: true
                             onClicked: (mouse) => {
                                 qcv_root.isEditingCollection = false
@@ -486,7 +484,7 @@ Item {
                 objectName: "quickCopyList"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                model: AppController.skillModel
+                model: AppController.quickCopyModel
                 clip: true
                 spacing: 0
                 
@@ -502,7 +500,7 @@ Item {
                     showStarredIcon: true
                     showInlineDelete: false
                     onClicked: (mouse) => {
-                        AppController.skillModel.toggleSelection(index)
+                        AppController.quickCopyModel.toggleSelection(index)
                     }
                     onDoubleClicked: (mouse) => {
                         AppController.selectSkill(index)

@@ -6,7 +6,7 @@ A professional desktop application for managing, syncing, and deploying reusable
 
 - **🚀 Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard using client-specific templates (Antigravity, Gemini CLI, etc.).
 - **📚 Centralized Library**: Manage all your markdown-based AI skills in one central location with full-text search and category filtering.
-- **🔄 Surgical Sync**: Intelligent synchronization engine that identifies and updates outdated skills across multiple target repositories without full rescans.
+- **🔄 Surgical Sync**: Intelligent synchronization engine that identifies and updates outdated skills across multiple project repositories without full rescans.
 - **🎨 Modern UI**: Hardware-accelerated interface built with PySide6/QML, featuring native Windows 11 styling (Mica/Acrylic) and a premium design system.
 - **📦 Cross-Platform**: Optimized standalone executables for Windows, macOS, and Linux.
 
@@ -68,7 +68,7 @@ SkillManager is built on a **Hub and Spoke** modular architecture to ensure scal
 - **`AppController` (The Hub)**: The main entry point and QML bridge. It coordinates between specialized sub-controllers.
 - **Sub-Controllers (`src/skill_manager/controllers/`)**:
     - `UIController`: Manages window geometry, theme state, and asset resolution.
-    - `ConfigController`: Handles source/target configuration and `config.json` persistence.
+    - `ConfigController`: Handles source/project configuration and `config.json` persistence.
     - `OpsController`: Encapsulates skill operations like copying, deletion, and archiving.
     - `UpdateController`: Orchestrates background synchronization and update state tracking.
 - **Core Domain (`src/skill_manager/core/`)**: Pure Python business logic for parsing, discovery, and search indexing.

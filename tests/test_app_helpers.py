@@ -6,7 +6,7 @@ from skill_manager.core.commands import (
     build_command_content,
     build_command_filename,
     create_custom_command_file,
-    find_target_for_project,
+    find_project_path_by_label,
 )
 from skill_manager.core.resources import logo_asset_for_client, qml_components_dir, resource_path
 
@@ -57,10 +57,10 @@ def test_qml_components_dir_dev_and_frozen(tmp_path):
 
 
 def test_command_helpers_create_success_and_validate(tmp_path):
-    target = tmp_path / "project" / ".agents" / "skills"
-    target.mkdir(parents=True)
+    project_path = tmp_path / "project" / ".agents" / "skills"
+    project_path.mkdir(parents=True)
 
-    assert find_target_for_project("project", [str(target)]) == target
+    assert find_project_path_by_label("project", [str(project_path)]) == project_path
     assert build_command_filename("Deploy Now!", "Codex") == "Deploy_Now_.Codex.md"
     assert "date: 2026-01-02" in build_command_content(
         "Deploy",
@@ -76,7 +76,7 @@ def test_command_helpers_create_success_and_validate(tmp_path):
         body="",
         project_label_name="project",
         category="Ops",
-        targets=[str(target)],
+        project_paths=[str(project_path)],
     )
     assert not missing_name.ok
     assert missing_name.message == "Error: Command name is required"
@@ -87,7 +87,7 @@ def test_command_helpers_create_success_and_validate(tmp_path):
         body="",
         project_label_name="All Projects",
         category="Ops",
-        targets=[str(target)],
+        project_paths=[str(project_path)],
     )
     assert not missing_project.ok
     assert missing_project.message == "Error: Please select a specific Project"
@@ -98,7 +98,7 @@ def test_command_helpers_create_success_and_validate(tmp_path):
         body="run it",
         project_label_name="project",
         category="Ops",
-        targets=[str(target)],
+        project_paths=[str(project_path)],
         created_on=date(2026, 1, 2),
     )
     assert created.ok
@@ -110,20 +110,20 @@ def test_command_helpers_create_success_and_validate(tmp_path):
         body="run it",
         project_label_name="project",
         category="Ops",
-        targets=[str(target)],
+        project_paths=[str(project_path)],
     )
     assert not duplicate.ok
     assert "already exists" in duplicate.message
 
 
-def test_command_create_missing_target(tmp_path):
+def test_command_create_missing_project(tmp_path):
     result = create_custom_command_file(
         name="Deploy",
         client="Codex",
         body="",
         project_label_name="missing",
         category="Ops",
-        targets=[str(tmp_path)],
+        project_paths=[str(tmp_path)],
     )
     assert not result.ok
-    assert result.message == "Error: Could not find target for missing"
+    assert result.message == "Error: Could not find project directory for missing"

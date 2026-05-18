@@ -21,9 +21,13 @@ class ConfigManagerTests(unittest.TestCase):
             os.environ["SKILL_MANAGER_DATA_DIR"] = self._old_data_dir
         os.chdir(self._old_cwd)
 
-    def _reload_config(self, data_dir):
-        os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
+    def _reload_config(self, data_dir=None):
+        if data_dir is None:
+            os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+        else:
+            os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
         import skill_manager.core.config as config
+
         return importlib.reload(config)
 
     def test_migrates_legacy_root_json_files_to_data_dir(self):
@@ -54,8 +58,8 @@ class ConfigManagerTests(unittest.TestCase):
                 json.dumps({"client_format": "Codex", "skill_sets": {}}),
                 encoding="utf-8",
             )
-            (workspace / "skill_library_essentials.json").write_text(
-                json.dumps({"essentials": []}),
+            (workspace / "skill_library_starred.json").write_text(
+                json.dumps({"starred": []}),
                 encoding="utf-8",
             )
             (workspace / "skills-lock.json").write_text(
@@ -76,7 +80,8 @@ class ConfigManagerTests(unittest.TestCase):
 
             manager = config.ConfigManager()
 
-            self.assertEqual(manager.get("targets"), ["target-a"])
+            # Targets should be migrated to projects
+            self.assertEqual(manager.get("projects"), ["target-a"])
             # Verify core files migrated
             self.assertTrue((data_dir / "config.json").is_file())
             self.assertTrue((data_dir / "skill_library_index.json").is_file())
@@ -90,10 +95,71 @@ class ConfigManagerTests(unittest.TestCase):
             config = self._reload_config(data_dir)
 
             manager = config.ConfigManager()
-            manager.set("targets", ["target-a"])
+            manager.set("projects", ["project-a"])
 
             saved = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
-            self.assertEqual(saved["targets"], ["target-a"])
+            self.assertEqual(saved["projects"], ["project-a"])
+
+    def test_default_data_dir_is_stable_across_working_directories(self):
+        with temporary_directory() as tmp:
+            root = Path(tmp)
+            local_app_data = root / "local-app-data"
+            workspace_a = root / "workspace-a"
+            workspace_b = root / "workspace-b"
+            workspace_a.mkdir()
+            workspace_b.mkdir()
+
+            with mock.patch.dict(os.environ, {"LOCALAPPDATA": str(local_app_data)}, clear=False):
+                config = self._reload_config()
+
+                os.chdir(workspace_a)
+                path_a = config.resolve_data_file("config.json")
+                os.chdir(workspace_b)
+                path_b = config.resolve_data_file("config.json")
+
+            self.assertEqual(path_a, path_b)
+            self.assertEqual(path_a.parent, local_app_data / "SkillManager")
+
+    def test_resolve_data_file_respects_late_data_dir_override(self):
+        with temporary_directory() as tmp:
+            root = Path(tmp)
+            initial_data_dir = root / "initial-data"
+            late_data_dir = root / "late-data"
+            initial_data_dir.mkdir()
+            late_data_dir.mkdir()
+            os.chdir(root)
+
+            config = self._reload_config(initial_data_dir)
+            os.environ["SKILL_MANAGER_DATA_DIR"] = str(late_data_dir)
+
+            manager = config.ConfigManager()
+            manager.set("projects", ["late-project"])
+
+            saved = json.loads((late_data_dir / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["projects"], ["late-project"])
+            self.assertFalse((initial_data_dir / "config.json").exists())
+
+    def test_migrates_repo_local_data_json_files_to_stable_data_dir(self):
+        with temporary_directory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            data_dir = root / "stable-data"
+            repo_data = workspace / "data"
+            workspace.mkdir()
+            repo_data.mkdir()
+            data_dir.mkdir()
+
+            (repo_data / "config.json").write_text(
+                json.dumps({"targets": ["repo-data-target"], "sources": []}),
+                encoding="utf-8",
+            )
+
+            os.chdir(workspace)
+            config = self._reload_config(data_dir)
+            manager = config.ConfigManager()
+
+            self.assertEqual(manager.get("projects"), ["repo-data-target"])
+            self.assertTrue((data_dir / "config.json").is_file())
 
     def test_resolve_data_file_falls_back_to_legacy_when_copy_is_blocked(self):
         with temporary_directory() as tmp:

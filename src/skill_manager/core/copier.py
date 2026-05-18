@@ -3,59 +3,59 @@ import shutil
 from pathlib import Path
 
 
-def copy_skill_folders_to_targets(skills, targets, update_only=False):
-    result = {
-        "copied": 0,
-        "merged": 0,
-        "skipped": 0,
-        "failed": 0,
-        "details": []
-    }
+def copy_skill_folders_to_projects(skills, projects, update_only=False):
+    result = {"copied": 0, "merged": 0, "skipped": 0, "failed": 0, "details": []}
 
-    normalized_targets = [_normalize_target_path(target) for target in targets]
+    normalized_projects = [_normalize_project_path(project) for project in projects]
 
     for skill in skills:
-        source_path, folder_name, error = _normalize_skill_source(skill)
+        source_path, folder_name, error = _normalize_skill_package(skill)
         if error:
-            result["skipped"] += max(1, len(normalized_targets))
-            result["details"].append({
-                "skill": skill.get("name") or skill.get("folder_name") or "Unknown",
-                "target": "",
-                "status": "skipped",
-                "message": error
-            })
+            result["skipped"] += max(1, len(normalized_projects))
+            result["details"].append(
+                {
+                    "skill": skill.get("name") or skill.get("folder_name") or "Unknown",
+                    "project": "",
+                    "status": "skipped",
+                    "message": error,
+                }
+            )
             continue
 
-        for target_path, target_error in normalized_targets:
+        for project_path, project_error in normalized_projects:
             skill_label = skill.get("name") or folder_name
-            if target_error:
+            if project_error:
                 result["skipped"] += 1
-                result["details"].append({
-                    "skill": skill_label,
-                    "target": str(target_path),
-                    "status": "skipped",
-                    "message": target_error
-                })
+                result["details"].append(
+                    {
+                        "skill": skill_label,
+                        "project": str(project_path),
+                        "status": "skipped",
+                        "message": project_error,
+                    }
+                )
                 continue
 
-            destination_path = target_path / folder_name
+            destination_path = project_path / folder_name
             existed = destination_path.exists()
 
             if update_only and not existed:
-                # Skip skills that don't already exist in the target when update_only is True
+                # Skip skills that don't already exist in the project when update_only is True
                 continue
 
             try:
-                target_path.mkdir(parents=False, exist_ok=True)
+                project_path.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
             except Exception as exc:
                 result["failed"] += 1
-                result["details"].append({
-                    "skill": skill_label,
-                    "target": str(target_path),
-                    "status": "failed",
-                    "message": str(exc)
-                })
+                result["details"].append(
+                    {
+                        "skill": skill_label,
+                        "project": str(project_path),
+                        "status": "failed",
+                        "message": str(exc),
+                    }
+                )
                 continue
 
             if existed:
@@ -64,17 +64,19 @@ def copy_skill_folders_to_targets(skills, targets, update_only=False):
             else:
                 result["copied"] += 1
                 status = "copied"
-            result["details"].append({
-                "skill": skill_label,
-                "target": str(target_path),
-                "status": status,
-                "message": str(destination_path)
-            })
+            result["details"].append(
+                {
+                    "skill": skill_label,
+                    "project": str(project_path),
+                    "status": status,
+                    "message": str(destination_path),
+                }
+            )
 
     return result
 
 
-def _normalize_skill_source(skill):
+def _normalize_skill_package(skill):
     raw_path = skill.get("local_path") or ""
     if not raw_path:
         return None, "", "Skill has no local folder path."
@@ -93,15 +95,34 @@ def _normalize_skill_source(skill):
     return source_path, folder_name, ""
 
 
-def _normalize_target_path(target):
-    raw_path = str(target or "").strip()
+def _normalize_project_path(project):
+    raw_path = str(project or "").strip()
     if not raw_path:
-        return Path("."), "Target path is empty."
+        return Path("."), "Project path is empty."
 
-    target_path = Path(os.path.expanduser(raw_path)).resolve()
-    if target_path.exists() and not target_path.is_dir():
-        return target_path, f"Target is not a folder: {target_path}"
-    if not target_path.exists() and not target_path.parent.is_dir():
-        return target_path, f"Target parent folder does not exist: {target_path.parent}"
+    project_path = Path(os.path.expanduser(raw_path)).resolve()
 
-    return target_path, ""
+    if project_path.exists() and not project_path.is_dir():
+        return project_path, f"Project directory is not a folder: {project_path}"
+
+    # Auto-detect .agents/skills if project root was provided
+    if project_path.name.lower() not in ("skills", ".agents"):
+        found = False
+        potential = project_path / ".agents" / "skills"
+        if potential.exists() and potential.is_dir():
+            project_path = potential.resolve()
+            found = True
+        if not found:
+            # Assume it's a project root, use the standard .agents/skills
+            project_path = (project_path / ".agents" / "skills").resolve()
+
+    if not project_path.exists():
+        # Validate that the intended project root exists
+        if project_path.name == "skills" and project_path.parent.name == ".agents":
+            project_root = project_path.parent.parent
+            if not project_root.is_dir():
+                return project_path, f"Project root folder does not exist: {project_root}"
+        elif not project_path.parent.is_dir():
+            return project_path, f"Project parent folder does not exist: {project_path.parent}"
+
+    return project_path, ""

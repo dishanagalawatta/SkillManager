@@ -18,7 +18,7 @@ To prevent the `AppController` from becoming a "God Object," responsibilities ar
 
 - **`UIController`**: Manages application-wide UI state (Current View, Dark Mode), window geometry (X, Y, Width, Height), and asset URI resolution for QML.
 - **`ConfigController`**: Manages the `ConfigManager` instance, handling the addition/removal of skill sources and project targets.
-- **`OpsController`**: Handles high-frequency skill operations such as copying to projects, deleting skills (with optimistic UI updates), and managing essential/archive states.
+- **`OpsController`**: Handles high-frequency skill operations such as copying to projects, deleting skills (with optimistic UI updates), and managing starred/archive states.
 - **`UpdateController`**: Orchestrates background synchronization processes, Git source updates, and provides real-time progress reporting to the UI.
 
 ### 2. Data Models (`core/models.py`)

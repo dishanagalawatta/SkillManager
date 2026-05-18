@@ -2,7 +2,8 @@ import ctypes
 import sys
 from ctypes import wintypes
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
+
     class POINT(ctypes.Structure):
         _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
 
@@ -24,6 +25,7 @@ if sys.platform == 'win32':
             ("rcNormalPosition", RECT),
         ]
 
+
 import pywinstyles
 
 
@@ -36,7 +38,7 @@ def apply_native_style(window, style_name: str) -> None:
         window: The tkinter window object (Tk or Toplevel).
         style_name: The name of the style to apply.
     """
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return
 
     try:
@@ -49,9 +51,10 @@ def apply_native_style(window, style_name: str) -> None:
     except Exception as e:
         print(f"Failed to apply native style {style_name}: {e}")
 
+
 def get_window_placement(hwnd: int) -> tuple | None:
     """Returns the placement of the window identified by hwnd."""
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return None
 
     placement = WINDOWPLACEMENT()
@@ -62,14 +65,19 @@ def get_window_placement(hwnd: int) -> tuple | None:
             placement.showCmd,
             (placement.ptMinPosition.x, placement.ptMinPosition.y),
             (placement.ptMaxPosition.x, placement.ptMaxPosition.y),
-            (placement.rcNormalPosition.left, placement.rcNormalPosition.top,
-             placement.rcNormalPosition.right, placement.rcNormalPosition.bottom)
+            (
+                placement.rcNormalPosition.left,
+                placement.rcNormalPosition.top,
+                placement.rcNormalPosition.right,
+                placement.rcNormalPosition.bottom,
+            ),
         )
     return None
 
+
 def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     """Sets the placement of the window identified by hwnd."""
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return False
 
     placement = WINDOWPLACEMENT()
@@ -78,7 +86,11 @@ def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     placement.showCmd = placement_data[1]
     placement.ptMinPosition.x, placement.ptMinPosition.y = placement_data[2]
     placement.ptMaxPosition.x, placement.ptMaxPosition.y = placement_data[3]
-    placement.rcNormalPosition.left, placement.rcNormalPosition.top, \
-    placement.rcNormalPosition.right, placement.rcNormalPosition.bottom = placement_data[4]
+    (
+        placement.rcNormalPosition.left,
+        placement.rcNormalPosition.top,
+        placement.rcNormalPosition.right,
+        placement.rcNormalPosition.bottom,
+    ) = placement_data[4]
 
     return bool(ctypes.windll.user32.SetWindowPlacement(hwnd, ctypes.byref(placement)))

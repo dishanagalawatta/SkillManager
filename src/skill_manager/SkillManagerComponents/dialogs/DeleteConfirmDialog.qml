@@ -97,7 +97,7 @@ Dialog {
                     Layout.fillWidth: true
                 }
                 
-                Button {
+                IconButton {
                     text: "✕"
                     flat: true
                     Layout.preferredWidth: 32
@@ -185,7 +185,7 @@ Dialog {
                 
                 Item { Layout.fillWidth: true }
                 
-                Button {
+                ActionButton {
                     id: cancelBtn
                     text: "Cancel"
                     Layout.preferredWidth: 100
@@ -210,7 +210,7 @@ Dialog {
                     }
                 }
                 
-                Button {
+                ActionButton {
                     id: deleteBtn
                     text: "Delete"
                     Layout.preferredWidth: 100

@@ -12,26 +12,17 @@ Item {
     // Model properties
     property string mainCat: model && model.mainCategoryName ? model.mainCategoryName : ""
     property string subCat: model && model.category ? model.category : ""
-    property bool isMainCollapsed: AppController.skillModel.isCategoryCollapsed(mainCat)
-    property bool isSubCollapsed: AppController.skillModel.isCategoryCollapsed(subCat)
+    property bool isMainCollapsed: model && model.isMainCollapsed !== undefined ? model.isMainCollapsed : false
+    property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
     property bool compactRows: AppController.compactListRows
 
-    // Detect if this is the first item in a new sub-category within the same main category
-    property bool isFirstInSub: {
-        if (index === 0) return true;
-        let prev = AppController.skillModel.get_skill_at(index - 1);
-        if (!prev) return true;
-        return prev.main_category !== mainCat || prev.category !== subCat;
-    }
+    // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
+    property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
 
     // Dynamic height based on visibility of sub-header and item content
     height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 42 : 54))
     visible: height > 0
     clip: true
-
-    Behavior on height {
-        NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
-    }
 
     Column {
         width: parent.width
@@ -223,7 +214,7 @@ Item {
                     }
 
                     // Delete Button
-                    Button {
+                    IconButton {
                         id: deleteBtn
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32

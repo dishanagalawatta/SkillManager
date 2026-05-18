@@ -1,27 +1,45 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import App 1.0
 
 Button {
     id: control
-    
+
     property bool isActive: false
     property string iconText: ""
-    
-    contentItem: Row {
-        spacing: 6
-        Text {
-            text: control.iconText
-            font.pixelSize: 14
-            verticalAlignment: Text.AlignVCenter
-        }
-        Text {
-            text: control.text
-            font.family: Theme.fontFamily
-            font.pixelSize: 12
-            font.weight: control.isActive ? Font.Bold : Font.Normal
-            color: Theme.label
-            verticalAlignment: Text.AlignVCenter
+
+    padding: 0
+
+    contentItem: Item {
+        implicitHeight: 32
+        implicitWidth: contentRow.implicitWidth
+
+        RowLayout {
+            id: contentRow
+            anchors.centerIn: parent
+            spacing: 6
+
+            Text {
+                text: control.iconText
+                font.pixelSize: 14
+                color: Theme.secondaryLabel
+                visible: control.iconText !== ""
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            Text {
+                text: control.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                font.weight: control.isActive ? Font.Bold : Font.Normal
+                color: Theme.label
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignVCenter
+            }
         }
     }
 
@@ -29,12 +47,12 @@ Button {
         implicitWidth: 100
         implicitHeight: 32
         radius: Theme.radiusPill
-        color: control.isActive ? Theme.glassActive : Theme.glassPill
+        color: control.isActive ? Theme.glassActive : (control.hovered ? Theme.glassHover : Theme.glassPill)
         border.color: control.isActive ? Theme.accent : Theme.glassBorder
         border.width: 1
-        
+
         Behavior on color { ColorAnimation { duration: 200 } }
     }
-    
+
     onClicked: isActive = !isActive
 }

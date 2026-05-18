@@ -1,8 +1,8 @@
 /**
- * Purpose: A comprehensive "Solid Matte" dialog for adding and editing skill sources.
+ * Purpose: A comprehensive "Solid Matte" dialog for adding and editing skill packages.
  * Usage:
- * SourceEditDialog {
- *     id: sourceDialog
+ * PackageEditDialog {
+ *     id: packageDialog
  *     onAccepted: (data) => console.log(data)
  * }
  */
@@ -55,7 +55,7 @@ Dialog {
         }
     }
 
-    function loadSource(data) {
+    function loadPackage(data) {
         nameInput.text = data.name || ""
         let types = ["npm", "git", "custom"]
         let idx = types.indexOf(data.source_type)
@@ -64,8 +64,8 @@ Dialog {
         packageInput.text = data.package_name || ""
         repoInput.text = data.repository_url || ""
         tokenInput.text = data.github_token || ""
-        pathInput.text = data.local_path || ""
-        argsInput.text = data.install_args || ""
+        pathInput.text = data.package_path || data.local_path || ""
+        argsInput.text = data.package_args || data.install_args || ""
         cmdInput.text = data.update_command || ""
         currentVerCmdInput.text = data.current_version_command || ""
         latestVerCmdInput.text = data.latest_version_command || ""
@@ -104,7 +104,7 @@ Dialog {
                     spacing: 2
                     Layout.fillWidth: true
                     Text {
-                        text: root.isEdit ? "Edit Skill Source" : "Add Skill Source"
+                        text: root.isEdit ? "Edit Skill Package" : "Add Skill Package"
                         font.family: Theme.fontFamily
                         font.pixelSize: 18
                         font.weight: Font.Bold
@@ -118,7 +118,7 @@ Dialog {
                     }
                 }
                 
-                Button {
+                IconButton {
                     text: "✕"
                     flat: true
                     Layout.preferredWidth: 32
@@ -182,7 +182,7 @@ Dialog {
                             spacing: 8
                             Rectangle { width: 4; height: 16; radius: 2; color: Theme.accent }
                             Text {
-                                text: "Source Identity"
+                                text: "Package Identity"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 15
                                 font.weight: Font.Bold
@@ -401,14 +401,14 @@ Dialog {
                                         border.width: 1
                                     }
                                 }
-                                Button {
+                                ActionButton {
                                     text: "🔍 Verify"
                                     enabled: repoInput.text.length > 0
                                     Layout.preferredHeight: 40
                                     Layout.preferredWidth: 100
                                     onClicked: {
                                         verificationStatus.text = "Validating..."
-                                        let tag = AppController.verifyGitSource(repoInput.text, tokenInput.text)
+                                        let tag = AppController.verifyGitPackage(repoInput.text, tokenInput.text)
                                         if (tag) {
                                             verificationStatus.text = "✓ Connection Successful (Latest: " + tag + ")"
                                         } else {
@@ -524,7 +524,7 @@ Dialog {
                         }
                     }
                     
-                    // Section 3: Target Configuration
+                    // Section 3: Local Configuration
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
@@ -544,7 +544,7 @@ Dialog {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            Text { text: "Target Directory"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.secondaryLabel }
+                            Text { text: "Package Path"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.secondaryLabel }
                             RowLayout {
                                 spacing: 12
                                 TextField { 
@@ -562,7 +562,7 @@ Dialog {
                                         border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
                                     }
                                 }
-                                Button {
+                                IconButton {
                                     text: "📁"
                                     Layout.preferredWidth: 44
                                     Layout.preferredHeight: 44
@@ -616,7 +616,7 @@ Dialog {
                 
                 Item { Layout.fillWidth: true }
                 
-                Button {
+                ActionButton {
                     text: "Cancel"
                     Layout.preferredWidth: 90
                     Layout.preferredHeight: 36
@@ -638,8 +638,8 @@ Dialog {
                     }
                 }
                 
-                Button {
-                    text: root.isEdit ? "Save Changes" : "Create Source"
+                ActionButton {
+                    text: root.isEdit ? "Save Changes" : "Create Package"
                     Layout.preferredWidth: 140
                     Layout.preferredHeight: 36
                     enabled: nameInput.text !== "" && (packageInput.text !== "" || repoInput.text !== "" || cmdInput.text !== "")
@@ -651,16 +651,16 @@ Dialog {
                             "package_name": packageInput.text,
                             "repository_url": repoInput.text,
                             "github_token": tokenInput.text,
-                            "local_path": pathInput.text,
-                            "install_args": argsInput.text,
+                            "package_path": pathInput.text,
+                            "package_args": argsInput.text,
                             "update_command": cmdInput.text,
                             "current_version_command": currentVerCmdInput.text,
                             "latest_version_command": latestVerCmdInput.text
                         }
                         if (root.isEdit) {
-                            AppController.updateUpdateSource(root.editIndex, data)
+                            AppController.updateUpdatePackage(root.editIndex, data)
                         } else {
-                            AppController.addSkillSource(data)
+                            AppController.addSkillPackage(data)
                         }
                         root.accept()
                     }

@@ -82,6 +82,31 @@ Window {
     property string currentView: AppController.currentView
     onCurrentViewChanged: AppController.currentView = currentView
 
+    function navigateTo(view) {
+        window.currentView = view
+        let source = "views/" + view.replace(" ", "") + "View.qml"
+        if (viewLoader.source.toString().indexOf(source) === -1) {
+            viewLoader.source = source
+        }
+    }
+
+    function focusCurrentSearch() {
+        if (viewLoader.item && viewLoader.item.focusSearch) {
+            viewLoader.item.focusSearch()
+        }
+    }
+
+    Shortcut { sequences: ["Ctrl+F", "Meta+F"]; onActivated: window.focusCurrentSearch() }
+    Shortcut { sequence: "Escape"; onActivated: AppController.clearViewFilters() }
+    Shortcut { sequences: ["Ctrl+C", "Meta+C"]; onActivated: AppController.copyCurrentSelectionOrFocusedSkill() }
+    Shortcut { sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.selectAllVisibleSkills() }
+    Shortcut { sequences: ["Ctrl+Shift+A", "Meta+Shift+A"]; onActivated: AppController.clearVisibleSelection() }
+    Shortcut { sequences: ["Ctrl+E", "Meta+E"]; onActivated: AppController.toggleAllVisibleCategories() }
+    Shortcut { sequence: "Alt+1"; onActivated: window.navigateTo("QuickCopy") }
+    Shortcut { sequence: "Alt+2"; onActivated: window.navigateTo("Library") }
+    Shortcut { sequence: "Alt+3"; onActivated: window.navigateTo("Updates") }
+    Shortcut { sequence: "Alt+4"; onActivated: window.navigateTo("Settings") }
+
     Rectangle {
         anchors.fill: parent
         color: "transparent"
@@ -111,12 +136,8 @@ Window {
                 id: topBar
                 currentView: window.currentView
                 onNavigationChanged: (view) => {
-                    window.currentView = view
                     if (!view.startsWith("Category:")) {
-                        let source = "views/" + view.replace(" ", "") + "View.qml"
-                        if (viewLoader.source.toString().indexOf(source) === -1) {
-                            viewLoader.source = source
-                        }
+                        window.navigateTo(view)
                     } else if (viewLoader.source.toString().indexOf("QuickCopyView.qml") === -1 && 
                                viewLoader.source.toString().indexOf("LibraryView.qml") === -1) {
                         viewLoader.source = "views/QuickCopyView.qml"

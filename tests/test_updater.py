@@ -23,6 +23,7 @@ def test_update_projects_success(temp_dir):
     assert skipped == 0
     assert (project_skill_a / "SKILL.md").read_text() == "v2 content"
 
+
 def test_update_projects_priority(temp_dir):
     source_1 = temp_dir / "source1"
     source_1.mkdir()
@@ -45,6 +46,7 @@ def test_update_projects_priority(temp_dir):
     # Priority: source2 > source1
     update_projects([str(target_dir)], [str(source_2), str(source_1)])
     assert (target_dir / "skill-a" / "SKILL.md").read_text() == "source 2 content"
+
 
 def test_update_projects_skip(temp_dir):
     source_dir = temp_dir / "source"

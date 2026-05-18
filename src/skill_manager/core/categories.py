@@ -76,7 +76,7 @@ CATEGORY_EMOJI_MAP = {
     "Travel Health": "✈️",
     "Core Workflow": "🔄",
     "Uncategorized": "📁",
-    "Essentials": "⭐",
+    "Starred": "⭐",
     "Collections": "📦",
     "Custom Commands": "⚡",
 }

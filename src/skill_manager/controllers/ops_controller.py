@@ -2,6 +2,7 @@
 Purpose: Manages skill operations like copying, deleting, and status toggles.
 Usage: Accessed via AppController.ops
 """
+
 import json
 import threading
 from pathlib import Path
@@ -13,7 +14,7 @@ from skill_manager.core.analytics import capture_event
 from skill_manager.core.persistence import (
     load_temp_registry,
     save_archive,
-    save_essentials,
+    save_starred,
     save_temp_registry,
 )
 from skill_manager.core.quick_copy import (
@@ -56,8 +57,8 @@ class OpsController(BaseController):
         self.app._set_status(f"Skill {status}")
         capture_event("skill_archived", {"action": status})
 
-    def toggle_essential(self):
-        """Toggles essential status for the currently selected skill."""
+    def toggle_starred(self):
+        """Toggles starred status for the currently selected skill."""
         skill = self.app._selected_skill
         if not skill:
             return
@@ -66,25 +67,25 @@ class OpsController(BaseController):
         if not path:
             return
 
-        is_essential = skill.get("is_essential", False)
-        new_state = not is_essential
+        is_starred = skill.get("is_starred", False)
+        new_state = not is_starred
 
-        skill["is_essential"] = new_state
+        skill["is_starred"] = new_state
 
         if new_state:
-            if path not in self.app._essential_paths:
-                self.app._essential_paths.append(path)
+            if path not in self.app._starred_paths:
+                self.app._starred_paths.append(path)
         else:
-            if path in self.app._essential_paths:
-                self.app._essential_paths.remove(path)
+            if path in self.app._starred_paths:
+                self.app._starred_paths.remove(path)
 
-        save_essentials(self.app._essential_paths)
+        save_starred(self.app._starred_paths)
 
         self.app.selectedSkillChanged.emit()
         self.app._library_model._apply_filter()
         self.app._quick_copy_model._apply_filter()
 
-        status = "added to essentials" if new_state else "removed from essentials"
+        status = "starred" if new_state else "unstarred"
         self.app._set_status(f"Skill {status}")
 
     def delete_skills(self, items: list):
@@ -133,6 +134,7 @@ class OpsController(BaseController):
         """Surgically remove entries from cache JSON."""
         try:
             from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
+
             cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
             if not cache_path.exists():
                 return
@@ -141,7 +143,9 @@ class OpsController(BaseController):
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
-            data["skills"] = [s for s in data.get("skills", []) if s.get("local_path") not in path_set]
+            data["skills"] = [
+                s for s in data.get("skills", []) if s.get("local_path") not in path_set
+            ]
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
         except Exception as exc:
@@ -154,6 +158,7 @@ class OpsController(BaseController):
             return
 
         import shutil
+
         deleted_count = 0
         for path_str in temp_paths:
             p = Path(path_str)
@@ -172,13 +177,15 @@ class OpsController(BaseController):
         if deleted_count > 0:
             print(f"[TEMP_CLEANUP] Cleaned up {deleted_count} temporary paths.")
 
-    def copy_selected_to_target(self, target_path: str, is_temporary: bool = False):
-        """Copies selected skills to a target project."""
-        if not target_path:
+    def copy_selected_to_project(self, project_path: str, is_temporary: bool = False):
+        """Copies selected skills to a project."""
+        if not project_path:
             return
 
         selected_paths = self.app.skillModel.getSelectedPaths()
-        selected_skills = [s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths]
+        selected_skills = [
+            s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths
+        ]
 
         if not selected_skills:
             self.app._set_status("No skills selected to copy")
@@ -188,19 +195,24 @@ class OpsController(BaseController):
 
         def run_copy():
             try:
-                from skill_manager.core.copier import copy_skill_folders_to_targets
-                result = copy_skill_folders_to_targets(selected_skills, [target_path])
+                from skill_manager.core.copier import copy_skill_folders_to_projects
+
+                result = copy_skill_folders_to_projects(selected_skills, [project_path])
 
                 parts = []
-                if result['copied']:
+                if result["copied"]:
                     parts.append(f"{result['copied']} new")
-                if result['merged']:
+                if result["merged"]:
                     parts.append(f"{result['merged']} updated")
 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
 
-                if is_temporary and result['details']:
-                    new_temp_paths = [d['message'] for d in result['details'] if d['status'] in ('copied', 'merged')]
+                if is_temporary and result["details"]:
+                    new_temp_paths = [
+                        d["message"]
+                        for d in result["details"]
+                        if d["status"] in ("copied", "merged")
+                    ]
                     if new_temp_paths:
                         existing = load_temp_registry()
                         # Use set to avoid duplicates
