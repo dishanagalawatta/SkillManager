@@ -181,3 +181,10 @@ def test_library_and_quick_copy_filters_are_view_scoped():
 
     assert "AppController.quickCopyModel" in quick_copy
     assert 'setViewFilterForView("QuickCopy"' in quick_copy
+
+
+def test_folder_picker_native_uses_qt6_properties():
+    folder_picker = (QML_DIR / "dialogs" / "FolderPickerNative.qml").read_text(encoding="utf-8")
+    assert "folder.toString()" not in folder_picker
+    assert "selectedFolder.toString()" in folder_picker
+

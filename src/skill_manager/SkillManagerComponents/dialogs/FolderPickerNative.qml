@@ -23,7 +23,7 @@ FolderDialog {
     }
     
     onAccepted: {
-        let path = folder.toString()
+        let path = selectedFolder.toString()
         if (path.startsWith("file:///")) {
             path = path.substring(8)
         } else if (path.startsWith("file:")) {
