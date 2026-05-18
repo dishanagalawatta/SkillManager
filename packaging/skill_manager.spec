@@ -6,8 +6,8 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
 
-# Base path relative to this spec file
-base_path = os.path.abspath(os.path.join(os.getcwd()))
+# Base path relative to this spec file (using PyInstaller's injected SPECPATH)
+base_path = os.path.abspath(os.path.join(SPECPATH, '..'))
 
 # Assets to include
 # Format: (source_path, target_subdir)
@@ -33,6 +33,8 @@ a = Analysis(
         'PySide6.QtWidgets',
         'yaml',
         'pywinstyles',
+        'posthog',
+        'dotenv',
     ],
     hookspath=[],
     hooksconfig={},
@@ -62,7 +64,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(base_path, 'assets', 'brand', 'logo.png'), # Using PNG for now, convert to .ico/.icns for best results
+    icon=os.path.join(base_path, 'assets', 'brand', 'logo.ico'), # Using generated multi-size .ico icon
 )
 
 coll = COLLECT(

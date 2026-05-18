@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 QML_DIR = (
     Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"

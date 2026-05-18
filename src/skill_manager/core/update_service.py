@@ -32,7 +32,9 @@ class UpdateService:
     ):
         self.sources = sources
         self.projects = projects
-        self.update_packages = update_packages if update_packages is not None else (update_sources or [])
+        self.update_packages = (
+            update_packages if update_packages is not None else (update_sources or [])
+        )
         self.project_aliases = project_aliases or {}
 
     def run_global_update(
@@ -127,7 +129,9 @@ class UpdateService:
                 if not updated_skill_folders or skill.get("folder_name") in updated_skill_folders:
                     package_id = package_id_by_folder.get(
                         skill.get("folder_name")
-                    ) or package_id_by_source.get(self._ownership_project_key(skill.get("source_path", "")))
+                    ) or package_id_by_source.get(
+                        self._ownership_project_key(skill.get("source_path", ""))
+                    )
                     if package_id:
                         skill = {**skill, "package_id": package_id}
                     all_raw_skills.append(skill)

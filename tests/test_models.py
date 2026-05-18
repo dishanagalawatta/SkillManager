@@ -189,7 +189,9 @@ def test_skill_model_project_mode_never_leaks_starred_packages(qapp):
 
     model.isPackageOnly = Qt.Unchecked
     model.projectFilter = "Project A"
-    assert [model.data(model.index(i, 0), SkillModel.NameRole) for i in range(model.rowCount())] == [
+    assert [
+        model.data(model.index(i, 0), SkillModel.NameRole) for i in range(model.rowCount())
+    ] == [
         "Project Star",
         "Project Other",
     ]

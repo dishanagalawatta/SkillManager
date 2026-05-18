@@ -114,7 +114,9 @@ def test_cleanup_removed_project_skills_deletes_matches(mock_proj, service):
     status_cb = MagicMock()
     ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
     with (
-        patch("skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership),
+        patch(
+            "skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership
+        ),
         patch("skill_manager.core.update_service.save_project_skill_ownership") as save_ownership,
         patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
     ):
