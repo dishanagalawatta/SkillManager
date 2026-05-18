@@ -16,8 +16,7 @@ def sanitize_token(text: str) -> str:
     # Matches http://token@ or https://token@ and masks the token part
     text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
-    text = re.sub(r"(echo password=)[^;]+", r"\1***", text)
-    return text
+    return re.sub(r"(echo password=)[^;]+", r"\1***", text)
 
 
 def normalize_skill_package_config(data):
