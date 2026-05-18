@@ -14,6 +14,11 @@ Item {
     property string editingCollectionName: ""
     property bool _isInternalSelectionChange: false
 
+    function focusSearch() {
+        searchInput.forceActiveFocus()
+        searchInput.selectAll()
+    }
+
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
     }
@@ -185,6 +190,55 @@ Item {
             }
         }
 
+        Flow {
+            Layout.fillWidth: true
+            spacing: 8
+            visible: searchInput.text !== "" || AppController.skillModel.categoryFilter !== "" || AppController.skillModel.projectFilter !== ""
+
+            Repeater {
+                model: [
+                    { label: searchInput.text ? "Search: " + searchInput.text : "", clear: function() { searchInput.text = ""; AppController.skillModel.filterText = "" } },
+                    { label: AppController.skillModel.projectFilter ? "Project: " + AppController.skillModel.projectFilter : "", clear: function() { AppController.setViewFilter("project", "") } },
+                    { label: AppController.skillModel.categoryFilter ? "Category: " + AppController.skillModel.categoryFilter : "", clear: function() { AppController.setViewFilter("category", "") } }
+                ].filter((item) => item.label !== "")
+
+                delegate: Rectangle {
+                    height: 28
+                    width: chipLabel.implicitWidth + 34
+                    radius: Theme.radiusPill
+                    color: Theme.glassPill
+                    border.color: Theme.glassBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 8
+                        spacing: 6
+                        Text {
+                            id: chipLabel
+                            text: modelData.label
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                            color: Theme.secondaryLabel
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            text: "x"
+                            font.pixelSize: 13
+                            color: Theme.accent
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: modelData.clear()
+                    }
+                }
+            }
+        }
+
         // Selection Action Bar
         Rectangle {
             id: selectionBar
@@ -276,49 +330,20 @@ Item {
                         spacing: 8
                         visible: !qcv_root.isEditingCollection
 
-                        Button {
+                        ActionButton {
                             id: barAddCommandBtn
-                            Layout.preferredHeight: 36
+                            labelText: "Add Command"
+                            iconText: "+"
+                            role: "secondary"
                             onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
-                            contentItem: RowLayout {
-                                spacing: 6
-                                Text { text: "+"; font.pixelSize: 16; color: "white"; font.weight: Font.Bold }
-                                Text {
-                                    text: "Add Command"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.weight: Font.Bold
-                                    color: "white"
-                                }
-                            }
-                            background: Rectangle {
-                                implicitWidth: 120
-                                radius: Theme.radiusField
-                                color: barAddCommandBtn.pressed ? Theme.accent : (barAddCommandBtn.hovered ? Theme.accent + "DD" : Theme.accent)
-                            }
                         }
 
-                        Button {
+                        ActionButton {
                             id: barSelectAllBtn
-                            Layout.preferredHeight: 36
+                            labelText: "Select All"
+                            role: "secondary"
                             visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
                             onClicked: (mouse) => AppController.skillModel.selectAll()
-                            contentItem: Text {
-                                text: "Select All"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                color: Theme.accent
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                implicitWidth: 90
-                                radius: Theme.radiusField
-                                color: barSelectAllBtn.hovered ? Theme.accent + "15" : "transparent"
-                                border.color: barSelectAllBtn.hovered ? Theme.accent + "40" : "transparent"
-                                border.width: 1
-                            }
                         }
 
                         // Selection-specific actions
@@ -326,25 +351,11 @@ Item {
                             spacing: 8
                             visible: AppController.skillModel.selectedCount > 0
                             
-                            Button {
+                            ActionButton {
                                 id: barClearBtn
-                                Layout.preferredHeight: 36
+                                labelText: "Clear Selection"
+                                role: "secondary"
                                 onClicked: (mouse) => AppController.skillModel.clearSelection()
-                                contentItem: Text {
-                                    text: "Clear Selection"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    color: Theme.secondaryLabel
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                                background: Rectangle {
-                                    implicitWidth: 110
-                                    radius: Theme.radiusField
-                                    color: barClearBtn.hovered ? Theme.glassHover : "transparent"
-                                    border.color: barClearBtn.hovered ? Theme.glassBorder : "transparent"
-                                    border.width: 1
-                                }
                             }
 
                             Rectangle {
@@ -355,76 +366,40 @@ Item {
                                 Layout.rightMargin: 4
                             }
 
-                            Button {
+                            ActionButton {
                                 id: barAddToColBtn
-                                text: "Add to Collection"
-                                Layout.preferredHeight: 36
+                                labelText: "Add to Collection"
+                                role: "secondary"
                                 onClicked: (mouse) => {
                                     qcv_root.isEditingCollection = true
                                     qcv_root.editingCollectionName = ""
                                 }
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.weight: Font.Bold
-                                    color: Theme.accent
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                                background: Rectangle {
-                                    implicitWidth: 130
-                                    radius: Theme.radiusField
-                                    color: barAddToColBtn.hovered ? Theme.accent + "10" : "transparent"
-                                    border.color: Theme.accent
-                                    border.width: 1
-                                }
                             }
 
-                            Button {
+                            ActionButton {
+                                id: barDeleteBtn
+                                objectName: "quickCopyDeleteSelectedBtn"
+                                labelText: "Delete Selected"
+                                iconText: "🗑️"
+                                role: "destructive"
+                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
+                            }
+
+                            Rectangle {
+                                objectName: "quickCopyDestructiveDivider"
+                                width: 1
+                                height: 20
+                                color: Theme.separator
+                                Layout.leftMargin: 4
+                                Layout.rightMargin: 4
+                            }
+
+                            ActionButton {
                                 id: barCopyBtn
                                 objectName: "copySelectedBtn"
-                                text: "Copy Selected"
-                                Layout.preferredHeight: 36
+                                labelText: "Copy Selected"
+                                role: "primary"
                                 onClicked: (mouse) => AppController.copySelectedSkillsToClipboard()
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.weight: Font.Bold
-                                    color: "white"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                                background: Rectangle {
-                                    implicitWidth: 120
-                                    radius: Theme.radiusField
-                                    color: barCopyBtn.pressed ? Theme.accent : (barCopyBtn.hovered ? Theme.accent + "EE" : Theme.accent)
-                                }
-                            }
-
-                            Button {
-                                id: barDeleteBtn
-                                Layout.preferredHeight: 36
-                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
-                                contentItem: RowLayout {
-                                    spacing: 4
-                                    Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
-                                    Text {
-                                        text: "Delete Selected"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 12
-                                        color: Theme.danger
-                                        font.weight: Font.DemiBold
-                                    }
-                                }
-                                background: Rectangle {
-                                    implicitWidth: 130
-                                    radius: Theme.radiusField
-                                    color: barDeleteBtn.hovered ? Theme.danger + "15" : "transparent"
-                                    border.color: barDeleteBtn.hovered ? Theme.danger + "30" : "transparent"
-                                    border.width: barDeleteBtn.hovered ? 1 : 0
-                                }
                             }
                         }
                     }
@@ -524,11 +499,15 @@ Item {
                 
                 delegate: SkillItem {
                     width: qcv_skillList.width
-                    showEssentialIcon: true
+                    showStarredIcon: true
+                    showInlineDelete: false
                     onClicked: (mouse) => {
                         AppController.skillModel.toggleSelection(index)
                     }
                     onDoubleClicked: (mouse) => {
+                        AppController.selectSkill(index)
+                    }
+                    onRightClicked: {
                         AppController.selectSkill(index)
                     }
                     onDeleteRequested: (name, path) => {

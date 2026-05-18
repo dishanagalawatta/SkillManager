@@ -7,6 +7,11 @@ import ".."
 
 Item {
     id: lv_root
+
+    function focusSearch() {
+        lv_searchInput.forceActiveFocus()
+        lv_searchInput.selectAll()
+    }
     
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
@@ -58,6 +63,7 @@ Item {
             }
 
             GlassSearchInput {
+                id: lv_searchInput
                 Layout.preferredWidth: 250
                 onTextChanged: AppController.skillModel.filterText = text
             }
@@ -72,6 +78,55 @@ Item {
                 textActive: "Showing Archived"
             }
 
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 8
+            visible: lv_searchInput.text !== "" || AppController.skillModel.categoryFilter !== "" || AppController.skillModel.projectFilter !== ""
+
+            Repeater {
+                model: [
+                    { label: lv_searchInput.text ? "Search: " + lv_searchInput.text : "", clear: function() { lv_searchInput.text = ""; AppController.skillModel.filterText = "" } },
+                    { label: AppController.skillModel.projectFilter ? "Project: " + AppController.skillModel.projectFilter : "", clear: function() { AppController.setViewFilter("project", "") } },
+                    { label: AppController.skillModel.categoryFilter ? "Category: " + AppController.skillModel.categoryFilter : "", clear: function() { AppController.setViewFilter("category", "") } }
+                ].filter((item) => item.label !== "")
+
+                delegate: Rectangle {
+                    height: 28
+                    width: chipLabel.implicitWidth + 34
+                    radius: Theme.radiusPill
+                    color: Theme.glassPill
+                    border.color: Theme.glassBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 8
+                        spacing: 6
+                        Text {
+                            id: chipLabel
+                            text: modelData.label
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                            color: Theme.secondaryLabel
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            text: "x"
+                            font.pixelSize: 13
+                            color: Theme.accent
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: modelData.clear()
+                    }
+                }
+            }
         }
         
         // Multi-select Action Bar
@@ -161,49 +216,20 @@ Item {
                     spacing: 8
                     
                     // Always Visible Actions
-                    Button {
+                    ActionButton {
                         id: lv_addCommandBtn
-                        Layout.preferredHeight: 36
+                        labelText: "Add Command"
+                        iconText: "+"
+                        role: "secondary"
                         onClicked: (mouse) => lv_commandDialog.openWithContext(AppController.skillModel.projectFilter, AppController.clientFormat)
-                        contentItem: RowLayout {
-                            spacing: 6
-                            Text { text: "+"; font.pixelSize: 16; color: "white"; font.weight: Font.Bold }
-                            Text {
-                                text: "Add Command"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: Font.Bold
-                                color: "white"
-                            }
-                        }
-                        background: Rectangle {
-                            implicitWidth: 120
-                            radius: Theme.radiusField
-                            color: lv_addCommandBtn.pressed ? Theme.accent : (lv_addCommandBtn.hovered ? Theme.accent + "DD" : Theme.accent)
-                        }
                     }
 
-                    Button {
+                    ActionButton {
                         id: lv_selectAllBtn
-                        Layout.preferredHeight: 36
+                        labelText: "Select All"
+                        role: "secondary"
                         visible: AppController.skillModel.selectedCount < AppController.skillModel.rowCount()
                         onClicked: (mouse) => AppController.skillModel.selectAll()
-                        contentItem: Text {
-                            text: "Select All"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            color: Theme.accent
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        background: Rectangle {
-                            implicitWidth: 90
-                            radius: Theme.radiusField
-                            color: lv_selectAllBtn.hovered ? Theme.accent + "15" : "transparent"
-                            border.color: lv_selectAllBtn.hovered ? Theme.accent + "40" : "transparent"
-                            border.width: 1
-                        }
                     }
 
                     // Selection-specific actions
@@ -211,25 +237,11 @@ Item {
                         spacing: 8
                         visible: AppController.skillModel.selectedCount > 0
                         
-                        Button {
+                        ActionButton {
                             id: lv_clearBtn
-                            Layout.preferredHeight: 36
+                            labelText: "Clear Selection"
+                            role: "secondary"
                             onClicked: (mouse) => AppController.skillModel.clearSelection()
-                            contentItem: Text {
-                                text: "Clear Selection"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                color: Theme.secondaryLabel
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                implicitWidth: 110
-                                radius: Theme.radiusField
-                                color: lv_clearBtn.hovered ? Theme.glassHover : "transparent"
-                                border.color: lv_clearBtn.hovered ? Theme.glassBorder : "transparent"
-                                border.width: 1
-                            }
                         }
 
                         Rectangle {
@@ -241,87 +253,55 @@ Item {
                         }
 
                         GlassDropdown {
-                            id: lv_targetDrop
+                            id: lv_projectDrop
                             Layout.preferredHeight: 36
                             Layout.preferredWidth: 160
-                            model: AppController.targetLabels
+                            model: AppController.projectLabels
+                            enabled: AppController.projects.length > 0
                         }
                         
-                        Button {
-                            id: lv_copyBtn
-                            Layout.preferredHeight: 36
-                            onClicked: (mouse) => {
-                                if (lv_targetDrop.currentIndex >= 0 && lv_targetDrop.currentIndex < AppController.targets.length) {
-                                    let path = AppController.targets[lv_targetDrop.currentIndex]
-                                    AppController.copySelectedSkillsToTarget(path)
-                                }
-                            }
-                            contentItem: Text {
-                                text: "Copy to Project"
-                                color: "white"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: Font.Bold
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                implicitWidth: 120
-                                radius: Theme.radiusField
-                                color: lv_copyBtn.pressed ? Theme.accent : (lv_copyBtn.hovered ? Theme.accent + "EE" : Theme.accent)
-                            }
-                        }
-
-                        Button {
+                        ActionButton {
                             id: lv_tempCopyBtn
-                            Layout.preferredHeight: 36
+                            labelText: "Copy Temporarily"
+                            role: "secondary"
+                            enabled: AppController.projects.length > 0
+                            tooltipText: enabled ? "Copies selected skills to the project temporarily. They will be deleted when you close this app." : "Add a project in Updates before copying skills."
                             onClicked: (mouse) => {
-                                if (lv_targetDrop.currentIndex >= 0 && lv_targetDrop.currentIndex < AppController.targets.length) {
-                                    let path = AppController.targets[lv_targetDrop.currentIndex]
-                                    AppController.copySelectedSkillsToTargetTemporarily(path)
+                                if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
+                                    let path = AppController.projects[lv_projectDrop.currentIndex]
+                                    AppController.copySelectedSkillsToProjectTemporarily(path)
                                 }
                             }
-                            contentItem: Text {
-                                text: "Copy Temporarily"
-                                color: Theme.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: Font.Bold
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                implicitWidth: 130
-                                radius: Theme.radiusField
-                                color: lv_tempCopyBtn.hovered ? Theme.accent + "15" : "transparent"
-                                border.color: Theme.accent
-                                border.width: 1
-                            }
-                            ToolTip.visible: hovered
-                            ToolTip.text: "Copies selected skills to the target project temporarily. They will be deleted when you close this app."
                         }
 
-                        Button {
+                        ActionButton {
                             id: lv_deleteBtn
-                            Layout.preferredHeight: 36
-                        onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
-                            contentItem: RowLayout {
-                                spacing: 4
-                                Text { text: "🗑️"; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
-                                Text {
-                                    text: "Delete Selected"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    color: Theme.danger
-                                    font.weight: Font.DemiBold
+                            labelText: "Delete Selected"
+                            iconText: "🗑️"
+                            role: "destructive"
+                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.skillModel.selectedCount, () => AppController.deleteSelectedSkills())
+                        }
+
+                        Rectangle {
+                            objectName: "libraryDestructiveDivider"
+                            width: 1
+                            height: 20
+                            color: Theme.separator
+                            Layout.leftMargin: 4
+                            Layout.rightMargin: 4
+                        }
+
+                        ActionButton {
+                            id: lv_copyBtn
+                            labelText: "Copy to Project"
+                            role: "primary"
+                            enabled: AppController.projects.length > 0
+                            tooltipText: enabled ? "" : "Add a project in Updates before copying skills."
+                            onClicked: (mouse) => {
+                                if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
+                                    let path = AppController.projects[lv_projectDrop.currentIndex]
+                                    AppController.copySelectedSkillsToProject(path)
                                 }
-                            }
-                            background: Rectangle {
-                                implicitWidth: 130
-                                radius: Theme.radiusField
-                                color: lv_deleteBtn.hovered ? Theme.danger + "15" : "transparent"
-                                border.color: lv_deleteBtn.hovered ? Theme.danger + "30" : "transparent"
-                                border.width: lv_deleteBtn.hovered ? 1 : 0
                             }
                         }
                     }
@@ -354,8 +334,15 @@ Item {
                 delegate: SkillItem {
                     width: lv_listView.width
                     isSelected: AppController.selectedSkill.local_path === model.path
-                    showEssentialIcon: false
+                    showStarredIcon: false
+                    showInlineDelete: false
                     onClicked: (mouse) => {
+                        AppController.skillModel.toggleSelection(index)
+                    }
+                    onDoubleClicked: (mouse) => {
+                        AppController.selectSkill(index)
+                    }
+                    onRightClicked: {
                         AppController.selectSkill(index)
                     }
                     onDeleteRequested: (name, path) => {
