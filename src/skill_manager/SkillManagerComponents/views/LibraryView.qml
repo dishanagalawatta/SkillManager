@@ -155,9 +155,13 @@ Item {
                     tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.libraryModel.toggleAll()
                     contentItem: Image {
-                        source: AppController.libraryModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
-                        sourceSize.width: 18
-                        sourceSize.height: 18
+                        source: AppController.libraryModel.isAllExpanded ?
+                                AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
+                                AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
+                        width: 18
+                        height: 18
+                        sourceSize.width: 72
+                        sourceSize.height: 72
                         fillMode: Image.PreserveAspectFit
                         opacity: lv_toggleAllBtn.hovered ? 1.0 : 0.7
                         horizontalAlignment: Image.AlignHCenter
@@ -270,7 +274,7 @@ Item {
                         ActionButton {
                             id: lv_deleteBtn
                             labelText: "Delete Selected"
-                            iconText: "Del"
+                            iconText: "🗑️"
                             role: "destructive"
                             onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.deleteSelectedSkills())
                         }
@@ -336,11 +340,19 @@ Item {
                         AppController.selectSkill(index)
                     }
                     onRightClicked: {
-                        AppController.selectSkill(index)
+                        if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {
+                            AppController.selectSkill(-1)
+                        } else {
+                            AppController.selectSkill(index)
+                        }
                     }
                     onDeleteRequested: (name, path) => {
                         lv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))
                     }
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    active: true
                 }
             }
 

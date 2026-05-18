@@ -52,7 +52,7 @@ def test_discovery_service_starred():
         "metadata": {"risk": "Low", "source": "Internal"},
     }
 
-    transformed = service._transform_skill(raw_skill, is_package=True)
+    transformed = service.transform_skill(raw_skill, is_package=True)
     assert transformed["is_starred"] is True
     assert "is_essential" not in transformed
 
@@ -86,4 +86,4 @@ def test_skill_model_starred():
     # Check data for starred role and section role
     idx = model.index(0, 0)
     assert model.data(idx, SkillModel.IsStarredRole) is True
-    assert model.data(idx, SkillModel.SectionRole) == "Special|Starred"
+    assert model.data(idx, SkillModel.SectionRole) == "Special|General"

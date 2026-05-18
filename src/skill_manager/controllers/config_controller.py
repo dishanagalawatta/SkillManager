@@ -40,6 +40,8 @@ class ConfigController(BaseController):
 
     def add_project(self, url: str):
         """Adds a project directory."""
+        if not url or not str(url).strip():
+            return
         path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
         if path not in self.app._projects:
             self.app._projects.append(path)

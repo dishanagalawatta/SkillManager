@@ -76,6 +76,16 @@ def test_config_controller_remove_project(config_controller, mock_app):
     mock_app.projectsChanged.emit.assert_called_once()
 
 
+def test_config_controller_add_source_invalid(config_controller, mock_app):
+    config_controller.add_source("")
+    mock_app.sourcesChanged.emit.assert_not_called()
+
+
+def test_config_controller_add_project_invalid(config_controller, mock_app):
+    config_controller.add_project("")
+    mock_app.projectsChanged.emit.assert_not_called()
+
+
 @patch("skill_manager.core.skill_packages.get_git_tag")
 def test_config_controller_verify_git_fail(mock_tag, config_controller, mock_app):
     mock_tag.return_value = ""

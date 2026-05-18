@@ -9,7 +9,7 @@ Item {
     width: parent.width
 
     property string mainCatName: "" // Passed from ListView section
-    property bool isMainCollapsed: AppController.skillModel.isCategoryCollapsed(mainCatName)
+    property bool isMainCollapsed: AppController.skillModel.collapsedCategories.includes(mainCatName)
 
     height: 44 // Fixed height for main header
     visible: mainCatName !== ""
@@ -28,9 +28,16 @@ Item {
         spacing: 8
 
         Image {
-            source: root.isMainCollapsed ? AppController.getAssetUri("ui/expand.svg") : AppController.getAssetUri("ui/collapse.svg")
-            sourceSize.width: 14
-            sourceSize.height: 14
+            source: root.isMainCollapsed ?
+                    AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
+                    AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
+            width: 14
+            height: 14
+            Layout.preferredWidth: 14
+            Layout.preferredHeight: 14
+            Layout.alignment: Qt.AlignVCenter
+            sourceSize.width: 56
+            sourceSize.height: 56
             fillMode: Image.PreserveAspectFit
             opacity: 0.7
             horizontalAlignment: Image.AlignHCenter

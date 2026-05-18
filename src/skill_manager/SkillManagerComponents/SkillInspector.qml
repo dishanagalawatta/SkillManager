@@ -115,7 +115,7 @@ Rectangle {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
-                    visible: !root.isQuickCopy && root.skill && root.skill.id !== undefined
+                    visible: root.skill && root.skill.id !== undefined
                     ToolTip.text: "Close Inspector"
                     ToolTip.visible: hovered
                     ToolTip.delay: 400

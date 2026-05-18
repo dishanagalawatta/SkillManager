@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
 
 from skill_manager.core.models import SkillModel
 
@@ -46,6 +46,17 @@ def test_skill_model_data_roles(qapp, skill_list):
     index = model.index(0, 0)
     assert model.data(index, SkillModel.NameRole) == "Skill B"  # Sorted by category Core then Dev
     assert model.data(index, SkillModel.CategoryRole) == "Core"
+    assert model.data(index, SkillModel.PathRole) == "/b"
+    assert model.data(index, SkillModel.IsStarredRole) is False
+    assert model.data(index, SkillModel.IsSelectedRole) is False
+    assert model.data(index, SkillModel.IsArchivedRole) is False
+
+
+def test_skill_model_data_invalid_index(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+    assert model.data(model.index(10, 0), SkillModel.NameRole) is None
+    assert model.data(QModelIndex(), SkillModel.NameRole) is None
 
 
 def test_skill_model_show_archived(qapp, skill_list):
@@ -222,7 +233,7 @@ def test_skill_model_data_various_roles(qapp, skill_list):
     assert model.data(idx, SkillModel.DescriptionRole) == "Desc A"
     assert model.data(idx, SkillModel.IsStarredRole) is True
     assert model.data(idx, SkillModel.IsCollectionRole) is True
-    assert model.data(idx, SkillModel.SectionRole) == "Special|Starred"
+    assert model.data(idx, SkillModel.SectionRole) == "Special|Dev"
     assert model.data(idx, SkillModel.RawContentRole) == "Raw"
     assert model.data(idx, SkillModel.BodyContentRole) == "Body"
     assert model.data(idx, SkillModel.RiskRole) == "High"
@@ -366,7 +377,7 @@ def test_skill_model_collapsed_subcategory_keeps_one_subheader_row(qapp):
         ]
     )
 
-    model.toggleCategory("Dev")
+    model.toggleCategory("⚙️ System & Workflow|Dev")
 
     assert model.rowCount() == 2
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "A1"
@@ -446,8 +457,8 @@ def test_skill_model_save_methods_with_mock_config(qapp, skill_list):
     model = SkillModel(config=mock_conf)
     model.setSkills(skill_list)
 
-    model.toggleCategory("Dev")
-    mock_conf.set.assert_any_call("collapsed_categories", ["Dev"])
+    model.toggleCategory("⚙️ System & Workflow|Dev")
+    mock_conf.set.assert_any_call("collapsed_categories", ["⚙️ System & Workflow|Dev"])
 
     model.showArchived = True
     mock_conf.set.assert_any_call("show_archived", True)
@@ -460,3 +471,211 @@ def test_skill_model_role_names(qapp):
     assert b"category" in roles.values()
     assert b"sectionName" in roles.values()
     assert b"isCollapsed" in roles.values()
+    assert b"subCategoryName" in roles.values()
+
+
+def test_collapsible_starred_categories(qapp):
+    # Setup some test skills:
+    # 1. Starred skill in "Community" category
+    # 2. Starred skill in "Planning" category
+    # 3. Regular skill in "Community" category
+    skills = [
+        {"name": "Star Comm", "category": "Community", "is_starred": True, "local_path": "/star_comm"},
+        {"name": "Star Plan", "category": "Planning", "is_starred": True, "local_path": "/star_plan"},
+        {"name": "Reg Comm", "category": "Community", "is_starred": False, "local_path": "/reg_comm"},
+    ]
+    model = SkillModel()
+    model.setSkills(skills)
+
+    # 1. Test grouping and roles
+    # We expect sort order:
+    # Starred skills at the top grouped under "Special"
+    # Row 0: Star Comm (Special|Community)
+    # Row 1: Star Plan (Special|Planning)
+    # Row 2: Reg Comm (⚙️ System & Workflow|Community)
+
+    assert model.rowCount() == 3
+
+    idx_star_comm = model.index(0, 0)
+    idx_star_plan = model.index(1, 0)
+    idx_reg_comm = model.index(2, 0)
+
+    assert model.data(idx_star_comm, SkillModel.NameRole) == "Star Comm"
+    assert model.data(idx_star_plan, SkillModel.NameRole) == "Star Plan"
+    assert model.data(idx_reg_comm, SkillModel.NameRole) == "Reg Comm"
+
+    # Test SubCategoryNameRole returns the original category name
+    assert model.data(idx_star_comm, SkillModel.SubCategoryNameRole) == "Community"
+    assert model.data(idx_star_plan, SkillModel.SubCategoryNameRole) == "Planning"
+    assert model.data(idx_reg_comm, SkillModel.SubCategoryNameRole) == "Community"
+
+    # Test SectionRole returns Special|<category> for starred skills
+    assert model.data(idx_star_comm, SkillModel.SectionRole) == "Special|Community"
+    assert model.data(idx_star_plan, SkillModel.SectionRole) == "Special|Planning"
+    assert model.data(idx_reg_comm, SkillModel.SectionRole) == "⚙️ System & Workflow|Community" # Default main category is "⚙️ System & Workflow"
+
+    # 2. Test targeted collapsing behavior using section names
+    # Collapse only "Special|Community"
+    model.toggleCategory("Special|Community")
+    assert model.isCategoryCollapsed("Special|Community") is True
+    assert model.isCategoryCollapsed("Special|Planning") is False
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Community") is False
+
+    # Check isCollapsed roles
+    assert model.data(idx_star_comm, SkillModel.IsCollapsedRole) is True
+    assert model.data(idx_star_plan, SkillModel.IsCollapsedRole) is False
+    assert model.data(idx_reg_comm, SkillModel.IsCollapsedRole) is False
+
+
+def test_category_expansion_refactor(qapp):
+    model = SkillModel()
+
+    # 1. Test collapsedCategories property
+    assert hasattr(model, "collapsedCategories")
+    assert isinstance(model.collapsedCategories, list)
+
+    # 2. Test name collisions in sub-category collapse state
+    skills = [
+        {"name": "Skill A", "main_category": "General", "category": "SubA", "local_path": "/a"},
+        {"name": "Skill B", "main_category": "MainB", "category": "General", "local_path": "/b"},
+    ]
+    model.setSkills(skills)
+
+    # Collapse main category "General"
+    model.toggleCategory("General")
+
+    assert model.isCategoryCollapsed("General") is True
+    assert model.isCategoryCollapsed("MainB|General") is False
+
+    # Prepare rows so internal names exist
+    rows = model._prepare_rows(skills)
+
+    # Skill A (in main category "General") is collapsed because its main category is collapsed.
+    assert model._is_main_collapsed(rows[0]) is True
+    # Skill B (in main category "MainB", subcategory "General") should NOT have its subcategory collapsed.
+    assert model._is_sub_collapsed(rows[1]) is False
+
+
+def test_skill_model_filtering_uses_layout_signals(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+
+    # Listeners for model reset
+    reset_about_to_be_called = False
+    reset_called = False
+
+    def on_about_to_reset():
+        nonlocal reset_about_to_be_called
+        reset_about_to_be_called = True
+
+    def on_reset():
+        nonlocal reset_called
+        reset_called = True
+
+    model.modelAboutToBeReset.connect(on_about_to_reset)
+    model.modelReset.connect(on_reset)
+
+    # Listeners for layout change
+    layout_about_to_change_called = False
+    layout_change_called = False
+
+    def on_layout_about_to_change():
+        nonlocal layout_about_to_change_called
+        layout_about_to_change_called = True
+
+    def on_layout_changed():
+        nonlocal layout_change_called
+        layout_change_called = True
+
+    model.layoutAboutToBeChanged.connect(on_layout_about_to_change)
+    model.layoutChanged.connect(on_layout_changed)
+
+    # Trigger a filter change
+    model.showArchived = True
+
+    # Asserting that layout signals are emitted instead of model reset
+    assert layout_about_to_change_called is True
+    assert layout_change_called is True
+    assert reset_about_to_be_called is False
+    assert reset_called is False
+
+
+def test_skill_model_rebuild_uses_layout_signals(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+
+    # Listeners for model reset
+    reset_about_to_be_called = False
+    reset_called = False
+
+    def on_about_to_reset():
+        nonlocal reset_about_to_be_called
+        reset_about_to_be_called = True
+
+    def on_reset():
+        nonlocal reset_called
+        reset_called = True
+
+    model.modelAboutToBeReset.connect(on_about_to_reset)
+    model.modelReset.connect(on_reset)
+
+    # Listeners for layout change
+    layout_about_to_change_called = False
+    layout_change_called = False
+
+    def on_layout_about_to_change():
+        nonlocal layout_about_to_change_called
+        layout_about_to_change_called = True
+
+    def on_layout_changed():
+        nonlocal layout_change_called
+        layout_change_called = True
+
+    model.layoutAboutToBeChanged.connect(on_layout_about_to_change)
+    model.layoutChanged.connect(on_layout_changed)
+
+    # Trigger a rebuild by toggling category
+    model.toggleCategory("⚙️ System & Workflow|Core")
+
+    # Asserting that layout signals are emitted instead of model reset
+    assert layout_about_to_change_called is True
+    assert layout_change_called is True
+    assert reset_about_to_be_called is False
+    assert reset_called is False
+
+
+def test_skill_model_invalid_data_role(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+    idx = model.index(0)
+    # Testing a non-existent role
+    assert model.data(idx, Qt.UserRole + 999) is None
+    # Testing an invalid index
+    assert model.data(model.index(-1), Qt.DisplayRole) is None
+
+
+def test_skill_model_flags(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+    idx = model.index(0)
+    flags = model.flags(idx)
+    assert flags & Qt.ItemIsSelectable
+    assert flags & Qt.ItemIsEnabled
+
+
+def test_skill_model_set_data(qapp, skill_list):
+    model = SkillModel()
+    model.setSkills(skill_list)
+    # toggleSelection is the intended way to change selection
+    model.toggleSelection(0)
+    assert model.data(model.index(0), SkillModel.IsSelectedRole) is True
+
+    # Verify that setData still returns False for now (unimplemented)
+    res = model.setData(model.index(0), False, SkillModel.IsSelectedRole)
+    assert res is False
+
+
+
+
+
+

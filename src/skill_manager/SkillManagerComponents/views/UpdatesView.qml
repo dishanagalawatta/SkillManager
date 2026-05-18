@@ -253,7 +253,7 @@ Item {
                                             }
                                         }
                                         IconButton {
-                                            iconText: "Del"
+                                            iconText: "🗑️"
                                             iconSize: 10
                                             buttonSize: 28
                                             role: "destructive"
@@ -404,7 +404,7 @@ Item {
                                             }
                                         }
                                         IconButton {
-                                            iconText: "Del"
+                                            iconText: "🗑️"
                                             iconSize: 10
                                             buttonSize: 32
                                             role: "destructive"
