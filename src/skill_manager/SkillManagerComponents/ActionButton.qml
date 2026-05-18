@@ -73,11 +73,12 @@ Button {
             return control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
         }
         border.color: {
+            if (control.visualFocus) return Theme.accent
             if (!control.enabled) return Theme.glassBorder
             if (control.role === "destructive") return control.hovered || control.down ? Theme.danger : "transparent"
             return control.hovered || control.down ? Theme.glassBorder : "transparent"
         }
-        border.width: control.role === "primary" ? 0 : (control.hovered || !control.enabled ? 1 : 0)
+        border.width: control.visualFocus ? 2 : (control.role === "primary" ? 0 : (control.hovered || !control.enabled ? 1 : 0))
         opacity: control.enabled ? 1.0 : 0.65
     }
 

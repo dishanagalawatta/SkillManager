@@ -72,8 +72,8 @@ Button {
             anchors.fill: parent
             radius: Theme.radiusPill
             color: control.checked ? Theme.selectedRow : (control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : Theme.glassPill))
-            border.color: control.checked ? Theme.selectedRowBorder : Theme.glassBorder
-            border.width: 1
+            border.color: control.visualFocus ? Theme.accent : (control.checked ? Theme.selectedRowBorder : Theme.glassBorder)
+            border.width: control.visualFocus ? 2 : 1
 
             Behavior on color { ColorAnimation { duration: 200 } }
             Behavior on border.color { ColorAnimation { duration: 200 } }
