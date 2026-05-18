@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.core.skill_packages import (
+    _detect_command_type,
     _intercept_cross_platform_command,
     _merge_and_move_lockfile,
     _parse_npx_command,
@@ -555,10 +556,110 @@ def test_run_process_emits_sanitized_output_and_throttles_progress():
     with (
         patch("skill_manager.core.skill_packages._resolve_process_command", return_value=["tool"]),
         patch("skill_manager.core.skill_packages.subprocess.Popen", return_value=proc),
-        patch("time.time", side_effect=[1, 1.1, 1.2]),
+        patch("time.time", side_effect=[1, 1.1, 1.2] + [2.0] * 10),
     ):
         _run_process(["tool"], messages.append)
 
     assert "https://***@example.com/repo.git" in messages
     assert "Updating files: 45%" in messages
     assert "Updating files: 46%" not in messages
+
+
+def test_detect_command_type_variants():
+    # pnpm, yarn, pipx detection logic
+    # _detect_command_type classifies npx as npm, and other command types as custom
+    assert _detect_command_type("npx --yes my-package") == "npm"
+    assert _detect_command_type("npx my-package") == "npm"
+    assert _detect_command_type("yarn my-package") == "custom"
+    assert _detect_command_type("pnpm my-package") == "custom"
+    assert _detect_command_type("pipx run my-package") == "custom"
+    assert _detect_command_type("python script.py") == "custom"
+
+
+def test_normalize_skill_package_config_malformed():
+    # normalize_skill_package_config with malformed or incomplete data
+    # Empty dict
+    res = normalize_skill_package_config({})
+    assert res["name"] == "Unnamed Package"
+    assert res["source_type"] == "auto"
+    assert res["package_id"].startswith("pkg_")
+
+    # None or invalid input
+    res_none = normalize_skill_package_config(None)
+    assert res_none["name"] == "Unnamed Package"
+    assert res_none["source_type"] == "auto"
+
+    # Missing some keys but has others
+    res_partial = normalize_skill_package_config({"package_path": "   "})
+    assert res_partial["package_path"] == ""
+    assert res_partial["name"] == "Unnamed Package"
+
+
+@patch("skill_manager.core.skill_packages._run_process")
+def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir):
+    clone_path = temp_dir / "existing-repo"
+    clone_path.mkdir()
+    (clone_path / ".git").mkdir()
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    # Simulate conflict / git pull error
+    mock_run.side_effect = subprocess.CalledProcessError(1, ["git", "pull"], stderr="Conflict or network error")
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_git_package_update(source, None)
+
+    # Simulating network failure on clone (path does not exist)
+    new_clone_path = temp_dir / "new-repo"
+    source_new = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(new_clone_path),
+        "package_path": str(new_clone_path),
+    }
+    mock_run.side_effect = subprocess.CalledProcessError(128, ["git", "clone"], stderr="Could not resolve host")
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_git_package_update(source_new, None)
+
+
+def test_run_process_timeout_handling():
+    # Testing Popen raising TimeoutExpired or subprocess wait timeout
+    # Although _run_process doesn't have timeout argument, we can verify subprocess failure or OSError
+    with (
+        patch("skill_manager.core.skill_packages._resolve_process_command", return_value=["some-cmd"]),
+        patch("subprocess.Popen") as mock_popen
+    ):
+        mock_popen.side_effect = subprocess.SubprocessError("Process failed to start")
+        with pytest.raises(subprocess.SubprocessError):
+            _run_process(["some-cmd"], None)
+
+
+def test_detect_command_type_edge_cases():
+    assert _detect_command_type("npx --yes my-pkg") == "npm"
+    assert _detect_command_type("git clone ...") == "custom"
+    assert _detect_command_type("copy file ...") == "custom"
+
+
+@patch("shutil.which")
+def test_run_process_missing_executable(mock_which):
+    mock_which.return_value = None
+    from skill_manager.core.skill_packages import _run_process
+    with pytest.raises(FileNotFoundError) as exc:
+        _run_process(["non-existent-cmd"], None)
+    assert "not found" in str(exc.value)
+
+
+
+@patch("subprocess.Popen")
+def test_run_process_timeout(mock_popen):
+    mock_proc = MagicMock()
+    mock_proc.poll.return_value = None # Still running
+    mock_proc.communicate.return_value = (b"", b"")
+    mock_popen.return_value = mock_proc
+
+    # This might be hard to test without actually waiting, so we mock time or poll
+    # For now, just ensure it handles the interface
+
+

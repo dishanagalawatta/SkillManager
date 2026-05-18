@@ -21,6 +21,7 @@ Item {
 
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
+        searchInput.text = AppController.quickCopyModel.filterText
     }
 
     // No forced reset on completion - use persistent state
@@ -95,17 +96,6 @@ Item {
                                 AppController.setViewFilterForView("QuickCopy", "collection", collectionName)
                                 qcv_root._isInternalSelectionChange = false
                             }
-
-                            Connections {
-                                target: AppController.quickCopyModel
-                                function onUserSelectionChanged() {
-                                    if (!qcv_root.isEditingCollection && !qcv_root._isInternalSelectionChange) {
-                                        if (qcv_collectionDrop.currentIndex !== 0) {
-                                            qcv_collectionDrop.currentIndex = 0
-                                        }
-                                    }
-                                }
-                            }
                         }
 
                         GlassDropdown {
@@ -147,19 +137,24 @@ Item {
                                 buttonSize: 32
                                 property bool isSelected: modelData === AppController.clientFormat
                                 onClicked: (mouse) => AppController.setClientFormat(modelData)
-                                contentItem: Image {
-                                    source: AppController.getLogoSource(modelData)
-                                    sourceSize.width: 20
-                                    sourceSize.height: 20
-                                    fillMode: Image.PreserveAspectFit
-                                    opacity: clientBtn.isSelected ? 1.0 : 0.5
-                                    horizontalAlignment: Image.AlignHCenter
-                                    verticalAlignment: Image.AlignVCenter
+                                contentItem: Item {
+                                    implicitWidth: clientBtn.buttonSize
+                                    implicitHeight: clientBtn.buttonSize
+                                    Image {
+                                        anchors.centerIn: parent
+                                        source: AppController.getLogoSource(modelData)
+                                        width: 16
+                                        height: 16
+                                        sourceSize.width: 16
+                                        sourceSize.height: 16
+                                        fillMode: Image.PreserveAspectFit
+                                        opacity: clientBtn.isSelected ? 1.0 : 0.5
+                                    }
                                 }
                                 background: Rectangle {
-                                    radius: Theme.radiusField
-                                    color: isSelected ? Theme.accent + "33" : "transparent"
-                                    border.color: isSelected ? Theme.accent : "transparent"
+                                    radius: width / 2
+                                    color: isSelected ? Theme.accent + "33" : (clientBtn.hovered ? Theme.glassHover : "transparent")
+                                    border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
                                     border.width: 1
                                 }
                                 ToolTip.visible: hovered
@@ -262,9 +257,13 @@ Item {
                     tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
                     contentItem: Image {
-                        source: AppController.quickCopyModel.isAllExpanded ? AppController.getAssetUri("ui/collapse.svg") : AppController.getAssetUri("ui/expand.svg")
-                        sourceSize.width: 18
-                        sourceSize.height: 18
+                        source: AppController.quickCopyModel.isAllExpanded ?
+                                AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
+                                AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
+                        width: 18
+                        height: 18
+                        sourceSize.width: 72
+                        sourceSize.height: 72
                         fillMode: Image.PreserveAspectFit
                         opacity: qcv_toggleAllBtn.hovered ? 1.0 : 0.7
                         horizontalAlignment: Image.AlignHCenter
@@ -372,7 +371,7 @@ Item {
                                 id: barDeleteBtn
                                 objectName: "quickCopyDeleteSelectedBtn"
                                 labelText: "Delete Selected"
-                                iconText: "Del"
+                                iconText: "🗑️"
                                 role: "destructive"
                                 onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.deleteSelectedSkills())
                             }
@@ -506,7 +505,11 @@ Item {
                         AppController.selectSkill(index)
                     }
                     onRightClicked: {
-                        AppController.selectSkill(index)
+                        if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {
+                            AppController.selectSkill(-1)
+                        } else {
+                            AppController.selectSkill(index)
+                        }
                     }
                     onDeleteRequested: (name, path) => {
                         qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))

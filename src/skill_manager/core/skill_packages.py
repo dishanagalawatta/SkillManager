@@ -46,7 +46,7 @@ def normalize_skill_package_config(data):
     source["install_args"] = source["package_args"]
 
     for key in ("current_version", "latest_version", "last_updated", "managed_folders"):
-        if data.get(key):
+        if data and hasattr(data, "get") and data.get(key):
             source[key] = data.get(key)
 
     if not source["name"]:

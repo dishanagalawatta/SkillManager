@@ -38,9 +38,12 @@ class DiscoveryService:
 
         # 1. Try cache first
         if use_cache:
-            cached_data = load_cache()
-            if cached_data and cache_callback:
-                cache_callback(cached_data)
+            try:
+                cached_data = load_cache()
+                if cached_data and cache_callback:
+                    cache_callback(cached_data)
+            except Exception as e:
+                print(f"[DISCOVERY] Error loading cache: {e}")
 
         # 2a. Discover from master packages
         package_skills_raw = discover_package_skills(
@@ -52,7 +55,7 @@ class DiscoveryService:
 
         all_skills = []
         for skill in package_skills_raw:
-            all_skills.append(self._transform_skill(skill, is_package=True))
+            all_skills.append(self.transform_skill(skill, is_package=True))
 
         # 2b. Discover from project skill folders
         projects_state = discover_project_skills(
@@ -66,7 +69,7 @@ class DiscoveryService:
         for p in projects_state:
             for skill in p.get("skills", []):
                 all_skills.append(
-                    self._transform_skill(
+                    self.transform_skill(
                         skill, is_package=False, project_label=p.get("project_label")
                     )
                 )
@@ -97,7 +100,7 @@ class DiscoveryService:
 
         return result
 
-    def _transform_skill(
+    def transform_skill(
         self, skill: dict[str, Any], is_package: bool, project_label: str = None
     ) -> dict[str, Any]:
         """Normalizes raw skill data into the format expected by the UI models."""
@@ -144,6 +147,7 @@ class DiscoveryService:
 
         return data
 
+
     def _process_command_file(
         self, cmd_file: Path, project: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -179,3 +183,55 @@ class DiscoveryService:
         }
         data["search_text"] = build_skill_search_text(data)
         return data
+
+    def discover_single_skill(self, skill_path: Path, project_path: Path) -> dict[str, Any] | None:
+        """Parses and normalizes a single skill at skill_path belonging to project_path."""
+        import os
+
+        from skill_manager.core.parsing import (
+            build_skill_search_text,
+            categorize_skill,
+            parse_skill_md,
+        )
+        from skill_manager.core.quick_copy import (
+            _classification_text,
+            _project_root_for_project,
+            _resolve_resilient_path,
+            _skill_base_relative,
+            project_label,
+        )
+
+        skill_md_path = skill_path / "SKILL.md"
+        if not skill_md_path.is_file():
+            return None
+
+        resolved_project = _resolve_resilient_path(project_path)
+        if not resolved_project:
+            return None
+        project_key = os.path.normcase(str(resolved_project))
+
+        skill_data = parse_skill_md(str(skill_md_path))
+        if not skill_data.get("name"):
+            skill_data["name"] = skill_path.name
+        skill_data["folder_name"] = skill_path.name
+        skill_data["local_path"] = str(skill_path)
+        skill_data["skill_md_path"] = str(skill_md_path)
+        skill_data["project_key"] = project_key
+        skill_data["project_path"] = str(resolved_project)
+        skill_data["project_root"] = str(_project_root_for_project(resolved_project))
+        skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
+        skill_data["project_label"] = project_label(
+            resolved_project, self.project_aliases, str(project_path)
+        )
+        skill_data.setdefault("metadata", {})
+        cat_info = categorize_skill(
+            skill_data.get("name", ""),
+            _classification_text(skill_data),
+        )
+        skill_data["main_category"] = cat_info.get("main_category", "")
+        skill_data["category"] = cat_info.get("sub_category", "")
+        skill_data["search_text"] = build_skill_search_text(skill_data)
+
+        # Now transform it using public transform_skill
+        return self.transform_skill(skill_data, is_package=False, project_label=skill_data["project_label"])
+

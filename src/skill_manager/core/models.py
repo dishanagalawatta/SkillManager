@@ -27,6 +27,7 @@ class SkillModel(QAbstractListModel):
     IsFirstInSubcategoryRole = Qt.UserRole + 21
     IsMainCollapsedRole = Qt.UserRole + 22
     IsSubCollapsedRole = Qt.UserRole + 23
+    SubCategoryNameRole = Qt.UserRole + 24
 
     filterChanged = Signal()
     showArchivedChanged = Signal()
@@ -39,6 +40,7 @@ class SkillModel(QAbstractListModel):
     showStarredChanged = Signal()
     isPackageOnlyChanged = Signal()
     clientFilterChanged = Signal()
+    filterByClientChanged = Signal()
     userSelectionChanged = Signal()
 
     def __init__(self, parent=None, config=None):
@@ -52,6 +54,7 @@ class SkillModel(QAbstractListModel):
         self._collection_filter = False
         self._project_filter = ""
         self._client_filter = ""
+        self._filter_by_client = True
         self._show_commands = True
         self._show_starred = True
         self._is_package_only = None  # None = All, True = Packages, False = Projects
@@ -127,6 +130,8 @@ class SkillModel(QAbstractListModel):
             return self._is_main_collapsed(skill)
         if role == self.IsSubCollapsedRole:
             return self._is_sub_collapsed(skill)
+        if role == self.SubCategoryNameRole:
+            return skill.get("_sub_category_name", self._sub_category_for_skill(skill))
 
         return None
 
@@ -155,6 +160,7 @@ class SkillModel(QAbstractListModel):
             self.IsFirstInSubcategoryRole: b"isFirstInSubcategory",
             self.IsMainCollapsedRole: b"isMainCollapsed",
             self.IsSubCollapsedRole: b"isSubCollapsed",
+            self.SubCategoryNameRole: b"subCategoryName",
         }
 
     @Property(str, notify=filterChanged)
@@ -224,9 +230,21 @@ class SkillModel(QAbstractListModel):
     def clientFilter(self, value):
         if self._client_filter != value:
             self._client_filter = value
-            self._apply_filter()
+            if self._filter_by_client:
+                self._apply_filter()
             self._save_filters()
             self.clientFilterChanged.emit()
+
+    @Property(bool, notify=filterByClientChanged)
+    def filterByClient(self):
+        return self._filter_by_client
+
+    @filterByClient.setter
+    def filterByClient(self, value):
+        if self._filter_by_client != value:
+            self._filter_by_client = value
+            self._apply_filter()
+            self.filterByClientChanged.emit()
 
     @Property(bool, notify=showCommandsChanged)
     def showCommands(self):
@@ -342,8 +360,11 @@ class SkillModel(QAbstractListModel):
         self._apply_filter()
         self.selectedCountChanged.emit()
 
-    def _apply_filter(self):
-        self.beginResetModel()
+    def _apply_filter(self, reset=False):
+        if reset:
+            self.beginResetModel()
+        else:
+            self.layoutAboutToBeChanged.emit()
 
         if self._filter_text and self._search_engine:
             valid_skill_paths = self._valid_skill_paths_for_search()
@@ -355,7 +376,11 @@ class SkillModel(QAbstractListModel):
 
         self._all_filtered_skills = self._prepare_rows(skills)
         self._filtered_skills = self._build_visible_rows(self._all_filtered_skills)
-        self.endResetModel()
+
+        if reset:
+            self.endResetModel()
+        else:
+            self.layoutChanged.emit()
         self.selectedCountChanged.emit()
 
     def _valid_skill_paths_for_search(self):
@@ -364,7 +389,11 @@ class SkillModel(QAbstractListModel):
     def _filtered_source_skills(self):
         project_filter = self._project_filter
         is_package_only = self._is_package_only
-        client_filter = self._client_filter.lower() if self._client_filter else None
+        client_filter = (
+            self._client_filter.lower()
+            if (self._client_filter and self._filter_by_client)
+            else None
+        )
         category_filter = self._category_filter
         show_archived = self._show_archived
         collection_filter = self._collection_filter
@@ -420,7 +449,7 @@ class SkillModel(QAbstractListModel):
         if skill.get("is_command", False):
             return (f"0_Special|{skill.get('category', 'General')}", skill.get("name", "").lower())
         if skill.get("is_starred", False):
-            return ("0_Special|Starred", skill.get("name", "").lower())
+            return (f"0_Special|{skill.get('category', 'General')}", skill.get("name", "").lower())
         if skill.get("is_bundle", False):
             return ("0_Special|Collections", skill.get("name", "").lower())
 
@@ -442,7 +471,7 @@ class SkillModel(QAbstractListModel):
         if skill.get("is_command", False):
             return skill.get("category", "Custom Commands") or "Custom Commands"
         if skill.get("is_starred", False):
-            return "Starred"
+            return skill.get("category", "General")
         if skill.get("is_bundle", False):
             return "Collections"
         return skill.get("category", "General")
@@ -471,9 +500,8 @@ class SkillModel(QAbstractListModel):
         return main_cat in self._collapsed_categories
 
     def _is_sub_collapsed(self, skill):
-        sub_cat = skill.get("_sub_category_name", self._sub_category_for_skill(skill))
         section = skill.get("_section_name", self._section_for_skill(skill))
-        return sub_cat in self._collapsed_categories or section in self._collapsed_categories
+        return section in self._collapsed_categories
 
     def _build_visible_rows(self, skills):
         visible = []
@@ -501,9 +529,9 @@ class SkillModel(QAbstractListModel):
         return visible
 
     def _rebuild_visible_rows(self):
-        self.beginResetModel()
+        self.layoutAboutToBeChanged.emit()
         self._filtered_skills = self._build_visible_rows(self._all_filtered_skills)
-        self.endResetModel()
+        self.layoutChanged.emit()
         self.selectedCountChanged.emit()
 
     def _emit_selection_data_changed(self):
@@ -525,7 +553,18 @@ class SkillModel(QAbstractListModel):
     def setSkills(self, skills):
         self._all_skills = skills
         self._search_engine = SearchEngine(skills)
-        self._apply_filter()
+        self._apply_filter(reset=True)
+
+    @Slot(list)
+    def addOrUpdateSkills(self, new_skills):
+        """Surgically adds or updates a list of skills in the model without a full reload."""
+        skills_dict = {s["local_path"]: s for s in self._all_skills}
+        for skill in new_skills:
+            skills_dict[skill["local_path"]] = skill
+        self._all_skills = list(skills_dict.values())
+        self._search_engine = SearchEngine(self._all_skills)
+        self._apply_filter(reset=True)
+
 
     @Slot(int, bool)
     def setSelected(self, row, selected):
@@ -542,6 +581,10 @@ class SkillModel(QAbstractListModel):
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self.selectedCountChanged.emit()
+
+    @Property(list, notify=collapsedCategoriesChanged)
+    def collapsedCategories(self):
+        return list(self._collapsed_categories)
 
     @Property(bool, notify=collapsedCategoriesChanged)
     def isAllExpanded(self):

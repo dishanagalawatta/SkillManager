@@ -89,10 +89,16 @@ def test_parse_frontmatter_malformed():
     parsed = parse_frontmatter(fm)
     assert parsed == {"name": ": invalid : yaml"}
 
+    # Mixed invalid content
+    fm_mixed = "name: Valid\n  invalid: indent\n- list: without key"
+    parsed_mixed = parse_frontmatter(fm_mixed)
+    assert parsed_mixed["name"] == "Valid"
+
 
 def test_parse_frontmatter_empty():
     assert parse_frontmatter("") == {}
     assert parse_frontmatter(None) == {}
+    assert parse_frontmatter("   \n   ") == {}
 
 
 def test_parse_skill_md_missing():
@@ -109,6 +115,17 @@ def test_parse_skill_md_no_frontmatter(temp_dir):
     assert data["body_content"].strip() == "# Only Header\nNo frontmatter here."
 
 
+def test_parse_skill_md_malformed_encoding(temp_dir):
+    # Test with mixed/invalid characters if possible, or just non-utf8
+    skill_file = temp_dir / "SKILL_BAD.md"
+    # Write some bytes that aren't valid UTF-8
+    with open(skill_file, "wb") as f:
+        f.write(b"\xff\xfe\x00\x00") # UTF-32 BOM or similar
+
+    data = parse_skill_md(str(skill_file))
+    assert data["raw_content"] == ""
+
+
 def test_categorize_skill_more_keywords():
     assert categorize_skill("docker", "")["sub_category"] == "Cloud Infrastructure"
     assert categorize_skill("python script", "")["sub_category"] == "Programming Languages"
@@ -122,3 +139,56 @@ def test_build_skill_search_text_missing_fields():
     # It adds spaces between default empty parts
     assert build_skill_search_text({}).strip() == ""
     assert build_skill_search_text({"name": "Test"}).strip() == "test"
+
+
+def test_parse_frontmatter_complex_types():
+    # Test lists and other types in frontmatter
+    fm = "tags: [a, b, c]\ncount: 42\nbool: true"
+    parsed = parse_frontmatter(fm)
+    assert parsed["tags"] == ["a", "b", "c"]
+    assert parsed["count"] == 42
+    assert parsed["bool"] is True
+
+
+def test_parse_skill_md_complex_markdown(temp_dir):
+    skill_file = temp_dir / "COMPLEX.md"
+    skill_file.write_text("""# Title
+> This is a quote.
+* List item
+```python
+print("code")
+```
+First real paragraph.
+""", encoding="utf-8")
+
+    data = parse_skill_md(str(skill_file))
+    # It currently extracts all non-header lines as description if no frontmatter
+    assert "First real paragraph." in data["description"]
+    assert "> This is a quote." in data["description"]
+
+
+
+def test_parse_command_md_no_headers(temp_dir):
+    cmd_file = temp_dir / "no_headers.md"
+    cmd_file.write_text("Just some text here without any markdown headers.")
+
+    data = parse_command_md(str(cmd_file))
+    assert data["name"] == "no_headers"
+    assert data["description"] == "Just some text here without any markdown headers."
+
+
+def test_parse_skill_md_with_commands(temp_dir):
+    skill_dir = temp_dir / "skill_with_cmds"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text("# Skill")
+
+    cmds_dir = skill_dir / "commands"
+    cmds_dir.mkdir()
+    (cmds_dir / "cmd1.md").write_text("# Cmd 1")
+    (cmds_dir / "README.md").write_text("# Readme") # Should be ignored
+
+    data = parse_skill_md(str(skill_file))
+    assert len(data["commands"]) == 1
+    assert "cmd1.md" in data["commands"][0]
+

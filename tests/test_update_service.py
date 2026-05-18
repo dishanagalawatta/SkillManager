@@ -100,6 +100,42 @@ def test_run_global_update_recovers_source_failure(
     comp_cb.assert_called_once()
 
 
+@patch("skill_manager.core.update_service.run_skill_package_update")
+@patch("skill_manager.core.update_service.discover_project_skills")
+@patch("skill_manager.core.update_service.discover_package_skills")
+@patch("skill_manager.core.update_service.copy_skill_folders_to_projects")
+def test_run_global_update_partial_failure(
+    mock_copy, mock_src_disc, mock_proj, mock_src_upd, service
+):
+    # Two packages, one fails
+    service.update_packages = [
+        {"name": "S1", "url": "url1"},
+        {"name": "S2", "url": "url2"},
+    ]
+
+    def side_effect(source, output_callback=None):
+        if source["name"] == "S1":
+            raise RuntimeError("fail S1")
+        return {"name": "S2", "removed_folders": []}
+
+    mock_src_upd.side_effect = side_effect
+    mock_proj.return_value = []
+    mock_src_disc.return_value = []
+    mock_copy.return_value = {"merged": 0, "failed": 0}
+
+    status_cb = MagicMock()
+    progress_cb = MagicMock()
+    comp_cb = MagicMock()
+
+    service.run_global_update_sync(status_cb, progress_cb, comp_cb)
+
+    # Progress should be called for BOTH packages
+    assert progress_cb.call_count == 2
+    # One should have error status in its updates
+    # The final completion should still be called
+    comp_cb.assert_called_once()
+
+
 @patch("skill_manager.core.update_service.discover_project_skills")
 def test_cleanup_removed_project_skills_deletes_matches(mock_proj, service):
     mock_proj.return_value = [

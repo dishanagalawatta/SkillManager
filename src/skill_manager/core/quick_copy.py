@@ -1,8 +1,11 @@
 import os
 import shutil
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
-CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Path"}
+CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text"}
 
 
 def _resolve_resilient_path(path_str):
@@ -89,69 +92,140 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
     return skills
 
 
-def discover_project_skills(
-    projects, parse_skill_md, categorize_skill, build_search_text, project_aliases=None
-):
+def discover_single_project(
+    project: str,
+    parse_skill_md: Callable,
+    categorize_skill: Callable,
+    build_search_text: Callable,
+    project_aliases: dict[str, str] = None,
+) -> dict[str, Any] | None:
+    """Discovers skills in a single project path.
+
+    Args:
+        project: Project path to discover.
+        parse_skill_md: Callable to parse SKILL.md.
+        categorize_skill: Callable to categorize a skill.
+        build_search_text: Callable to build search text.
+        project_aliases: Project name/alias mapping.
+
+    Returns:
+        dict with project metadata and discovered skills, or None.
+    """
     if project_aliases is None:
         project_aliases = {}
-    projects_list = []
+
+    resolved_project = _resolve_resilient_path(project)
+    if not resolved_project or not resolved_project.is_dir():
+        return None
+
+    project_key = os.path.normcase(str(resolved_project))
+    skills = []
+
+    for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
+        if not child.is_dir():
+            continue
+        skill_md_path = child / "SKILL.md"
+        if not skill_md_path.is_file():
+            continue
+
+        skill_data = parse_skill_md(str(skill_md_path))
+        if not skill_data.get("name"):
+            skill_data["name"] = child.name
+        skill_data["folder_name"] = child.name
+        skill_data["local_path"] = str(child)
+        skill_data["skill_md_path"] = str(skill_md_path)
+        skill_data["project_key"] = project_key
+        skill_data["project_path"] = str(resolved_project)
+        skill_data["project_root"] = str(_project_root_for_project(resolved_project))
+        skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
+        skill_data["project_label"] = project_label(
+            resolved_project, project_aliases, str(project)
+        )
+        skill_data.setdefault("metadata", {})
+        cat_info = categorize_skill(
+            skill_data.get("name", ""),
+            _classification_text(skill_data),
+        )
+        skill_data["main_category"] = cat_info.get("main_category", "")
+        skill_data["category"] = cat_info.get("sub_category", "")
+        skill_data["search_text"] = build_search_text(skill_data)
+        skills.append(skill_data)
+
+    if skills:
+        project_root = _project_root_for_project(resolved_project)
+        return {
+            "project_path": str(resolved_project),
+            "project_root": str(project_root),
+            "project_label": project_label(resolved_project, project_aliases, str(project)),
+            "skill_base_relative": _skill_base_relative(resolved_project),
+            "project_key": project_key,
+            "skills": skills,
+        }
+    return None
+
+
+def discover_project_skills(
+    projects: list[str],
+    parse_skill_md: Callable,
+    categorize_skill: Callable,
+    build_search_text: Callable,
+    project_aliases: dict[str, str] = None,
+) -> list[dict[str, Any]]:
+    """Discover skills from multiple project folders in parallel.
+
+    Args:
+        projects: List of project folder paths.
+        parse_skill_md: Callable to parse SKILL.md.
+        categorize_skill: Callable to categorize a skill.
+        build_search_text: Callable to build search text.
+        project_aliases: Project name/alias mapping.
+
+    Returns:
+        List of project dicts, each with discovered skills.
+    """
+    if project_aliases is None:
+        project_aliases = {}
+
     seen_projects = set()
+    unique_projects = []
 
     for project in projects:
         resolved_project = _resolve_resilient_path(project)
         if not resolved_project or not resolved_project.is_dir():
             continue
-
         project_key = os.path.normcase(str(resolved_project))
         if project_key in seen_projects:
             continue
         seen_projects.add(project_key)
+        unique_projects.append(project)
 
-        skills = []
-        for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
-            if not child.is_dir():
-                continue
-            skill_md_path = child / "SKILL.md"
-            if not skill_md_path.is_file():
-                continue
+    if not unique_projects:
+        return []
 
-            skill_data = parse_skill_md(str(skill_md_path))
-            if not skill_data.get("name"):
-                skill_data["name"] = child.name
-            skill_data["folder_name"] = child.name
-            skill_data["local_path"] = str(child)
-            skill_data["skill_md_path"] = str(skill_md_path)
-            skill_data["project_key"] = project_key
-            skill_data["project_path"] = str(resolved_project)
-            skill_data["project_root"] = str(_project_root_for_project(resolved_project))
-            skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
-            skill_data["project_label"] = project_label(
-                resolved_project, project_aliases, str(project)
+    # Parallelize project discovery
+    projects_list = []
+    with ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                discover_single_project,
+                project,
+                parse_skill_md,
+                categorize_skill,
+                build_search_text,
+                project_aliases,
             )
-            skill_data.setdefault("metadata", {})
-            cat_info = categorize_skill(
-                skill_data.get("name", ""),
-                _classification_text(skill_data),
-            )
-            skill_data["main_category"] = cat_info.get("main_category", "")
-            skill_data["category"] = cat_info.get("sub_category", "")
-            skill_data["search_text"] = build_search_text(skill_data)
-            skills.append(skill_data)
-
-        if skills:
-            project_root = _project_root_for_project(resolved_project)
-            projects_list.append(
-                {
-                    "project_path": str(resolved_project),
-                    "project_root": str(project_root),
-                    "project_label": project_label(resolved_project, project_aliases, str(project)),
-                    "skill_base_relative": _skill_base_relative(resolved_project),
-                    "project_key": project_key,
-                    "skills": skills,
-                }
-            )
+            for project in unique_projects
+        ]
+        for future in futures:
+            try:
+                res = future.result()
+                if res:
+                    projects_list.append(res)
+            except Exception as e:
+                print(f"[DISCOVERY] Error scanning project: {e}")
 
     return projects_list
+
 
 
 def _normalize_path(path):

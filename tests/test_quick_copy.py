@@ -108,7 +108,7 @@ def test_format_project_skill_reference_error_handling():
         "local_path": "/work/proj/commands/cmd.md",
     }
     # /work/proj/commands/cmd.md is not relative to /other/root
-    ref = format_project_skill_reference(skill, "Plain Path")
+    ref = format_project_skill_reference(skill, "Plain Text")
     assert ref == "cmd.md"
 
 
@@ -366,3 +366,60 @@ def test_delete_project_skill_folders_failure(temp_dir):
     assert result["failed"] == 1
     assert result["details"][0]["status"] == "failed"
     assert "Permission denied" in result["details"][0]["message"]
+
+
+def test_discover_single_project(temp_dir):
+    from skill_manager.core.quick_copy import discover_single_project
+    project_dir = temp_dir / "my-project"
+    skills_dir = project_dir / ".agents" / "skills"
+    skills_dir.mkdir(parents=True)
+
+    skill_a = skills_dir / "alpha"
+    skill_a.mkdir()
+    (skill_a / "SKILL.md").write_text("---\nname: Alpha\n---\n")
+
+    def mock_parse(p):
+        return {"name": "Alpha"}
+
+    def mock_cat(n, d):
+        return {"main_category": "Main", "sub_category": "Cat"}
+
+    def mock_search(s):
+        return "search"
+
+    res = discover_single_project(str(skills_dir), mock_parse, mock_cat, mock_search)
+    assert res is not None
+    assert res["project_label"] == "my-project"
+    assert len(res["skills"]) == 1
+    assert res["skills"][0]["name"] == "Alpha"
+
+
+def test_discover_project_skills_parallel(temp_dir):
+    project_dir1 = temp_dir / "proj1"
+    skills_dir1 = project_dir1 / ".agents" / "skills"
+    skills_dir1.mkdir(parents=True)
+    (skills_dir1 / "alpha").mkdir()
+    (skills_dir1 / "alpha" / "SKILL.md").write_text("---\nname: Alpha\n---\n")
+
+    project_dir2 = temp_dir / "proj2"
+    skills_dir2 = project_dir2 / ".agents" / "skills"
+    skills_dir2.mkdir(parents=True)
+    (skills_dir2 / "beta").mkdir()
+    (skills_dir2 / "beta" / "SKILL.md").write_text("---\nname: Beta\n---\n")
+
+    def mock_parse(p):
+        return {"name": "Alpha" if "alpha" in p else "Beta"}
+
+    def mock_cat(n, d):
+        return {"main_category": "Main", "sub_category": "Cat"}
+
+    def mock_search(s):
+        return "search"
+
+    projects = discover_project_skills(
+        [str(skills_dir1), str(skills_dir2)], mock_parse, mock_cat, mock_search
+    )
+    assert len(projects) == 2
+    assert projects[0]["project_label"] == "proj1"
+    assert projects[1]["project_label"] == "proj2"
+

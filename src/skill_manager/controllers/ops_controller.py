@@ -25,6 +25,15 @@ from skill_manager.core.quick_copy import (
 class OpsController(BaseController):
     """Controller for skill-related operations."""
 
+    def _update_models_source(self, path: str, key: str, value: bool) -> None:
+        """Updates a property for all skills matching the local_path across both models."""
+        for model in (self.app._library_model, self.app._quick_copy_model):
+            all_skills = getattr(model, "_all_skills", None)
+            if isinstance(all_skills, list):
+                for skill in all_skills:
+                    if skill.get("local_path") == path:
+                        skill[key] = value
+
     def toggle_archive(self):
         """Toggles archived status for the currently selected skill."""
         skill = self.app._selected_skill
@@ -39,6 +48,7 @@ class OpsController(BaseController):
         new_state = not is_archived
 
         skill["is_archived"] = new_state
+        self._update_models_source(path, "is_archived", new_state)
 
         if new_state:
             if path not in self.app._archive_paths:
@@ -71,6 +81,7 @@ class OpsController(BaseController):
         new_state = not is_starred
 
         skill["is_starred"] = new_state
+        self._update_models_source(path, "is_starred", new_state)
 
         if new_state:
             if path not in self.app._starred_paths:
@@ -151,6 +162,47 @@ class OpsController(BaseController):
         except Exception as exc:
             print(f"[CACHE] Patch failed: {exc}")
 
+    def _patch_cache_add_or_update(self, new_skills: list[dict]):
+        """Surgically add or update entries in the cache JSON."""
+        try:
+            from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
+
+            cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
+            if not cache_path.exists():
+                return
+
+            with open(cache_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Strip large raw fields when caching
+            cache_excluded = {"raw_content", "body_content"}
+            processed_skills = []
+            for skill in new_skills:
+                processed_skills.append({k: v for k, v in skill.items() if k not in cache_excluded})
+
+            # Create a lookup map of existing cache skills by local_path
+            skills_dict = {s["local_path"]: s for s in data.get("skills", [])}
+            for skill in processed_skills:
+                skills_dict[skill["local_path"]] = skill
+
+            data["skills"] = list(skills_dict.values())
+
+            # Update categories and project_labels if they changed
+            cats = set(data.get("categories", []))
+            proj_labels = set(data.get("project_labels", []))
+            for skill in processed_skills:
+                if skill.get("category"):
+                    cats.add(skill["category"])
+                if skill.get("project_label"):
+                    proj_labels.add(skill["project_label"])
+            data["categories"] = sorted(cats)
+            data["project_labels"] = sorted(proj_labels)
+
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=str)
+        except Exception as exc:
+            print(f"[CACHE] Patch add/update failed: {exc}")
+
     def cleanup_temp_copies(self):
         """Deletes all temporary copies recorded in the registry."""
         temp_paths = load_temp_registry()
@@ -196,6 +248,7 @@ class OpsController(BaseController):
         def run_copy():
             try:
                 from skill_manager.core.copier import copy_skill_folders_to_projects
+                from skill_manager.core.discovery import DiscoveryService
 
                 result = copy_skill_folders_to_projects(selected_skills, [project_path])
 
@@ -219,11 +272,55 @@ class OpsController(BaseController):
                         updated = list(set(existing + new_temp_paths))
                         save_temp_registry(updated)
 
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
-                QTimer.singleShot(0, self.app, self.app.refreshSkills)
-                QTimer.singleShot(0, self.app, self.app.skillModel.clearSelection)
+                # Targeted discovery for the copied skills
+                discovered_skills = []
+                if result["details"]:
+                    service = DiscoveryService(
+                        sources=list(self.app._sources),
+                        projects=self.app._projects,
+                        archive_paths=self.app._archive_paths,
+                        starred_paths=self.app._starred_paths,
+                        project_aliases=self.app._project_aliases,
+                    )
+                    for detail in result["details"]:
+                        if detail["status"] in ("copied", "merged") and detail.get("message"):
+                            skill_path = Path(detail["message"])
+                            proj_path = Path(detail["project"])
+                            try:
+                                skill_data = service.discover_single_skill(skill_path, proj_path)
+                                if skill_data:
+                                    discovered_skills.append(skill_data)
+                            except Exception as exc:
+                                print(f"[TARGETED SCAN] Failed scanning {skill_path}: {exc}")
+
+                if discovered_skills:
+                    # Patch JSON cache on disk
+                    self._patch_cache_add_or_update(discovered_skills)
+
+                    # Dynamic update of models in main UI thread
+                    def update_ui():
+                        # Update category lists in app controller
+                        new_cats = sorted({s["category"] for s in discovered_skills if s.get("category")})
+                        if new_cats:
+                            current_cats = set(self.app._categories)
+                            for cat in new_cats:
+                                current_cats.add(cat)
+                            self.app._categories = sorted(current_cats)
+                            self.app.categoriesChanged.emit()
+
+                        self.app._library_model.addOrUpdateSkills(discovered_skills)
+                        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+                        self.app._set_status(msg)
+                        self.app.skillModel.clearSelection()
+
+                    QTimer.singleShot(0, self.app, update_ui)
+                else:
+                    QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
+                    QTimer.singleShot(0, self.app, self.app.skillModel.clearSelection)
+
             except Exception as e:
                 err_msg = f"Copy failed: {e}"
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
         threading.Thread(target=run_copy, daemon=True).start()
+

@@ -11,7 +11,7 @@ Item {
 
     // Model properties
     property string mainCat: model && model.mainCategoryName ? model.mainCategoryName : ""
-    property string subCat: model && model.category ? model.category : ""
+    property string subCat: model && model.subCategoryName ? model.subCategoryName : ""
     property bool isMainCollapsed: model && model.isMainCollapsed !== undefined ? model.isMainCollapsed : false
     property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
     property bool compactRows: AppController.compactListRows
@@ -52,9 +52,16 @@ Item {
                 spacing: 6
 
                 Image {
-                    source: root.isSubCollapsed ? AppController.getAssetUri("ui/expand.svg") : AppController.getAssetUri("ui/collapse.svg")
-                    sourceSize.width: 10
-                    sourceSize.height: 10
+                    source: root.isSubCollapsed ?
+                            AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
+                            AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
+                    width: 10
+                    height: 10
+                    Layout.preferredWidth: 10
+                    Layout.preferredHeight: 10
+                    Layout.alignment: Qt.AlignVCenter
+                    sourceSize.width: 40
+                    sourceSize.height: 40
                     fillMode: Image.PreserveAspectFit
                     opacity: 0.5
                     horizontalAlignment: Image.AlignHCenter
@@ -84,7 +91,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.subCat)
+                onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
 
                 ToolTip.text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
                 ToolTip.visible: containsMouse

@@ -161,6 +161,89 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
         return 0
 
 
+def patch_cache_add(
+    new_skills: list[dict[str, Any]], projects_state: list[dict[str, Any]] = None
+) -> int:
+    """Surgically adds or updates entries in the on-disk cache without full rescan.
+    Returns the number of added or updated entries.
+    """
+    try:
+        cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
+        if not cache_path.exists():
+            return 0
+
+        with open(cache_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            return 0
+
+        if "skills" not in data:
+            data["skills"] = []
+        if "projects" not in data:
+            data["projects"] = []
+
+        # Strip large fields from new_skills
+        clean_new_skills = []
+        for s in new_skills:
+            clean_s = {k: v for k, v in s.items() if k not in CACHE_EXCLUDED_FIELDS}
+            clean_new_skills.append(clean_s)
+
+        # Update skills list
+        skills_map = {s.get("local_path"): s for s in data["skills"]}
+        updated_count = 0
+        for s in clean_new_skills:
+            path = s.get("local_path")
+            if path:
+                skills_map[path] = s
+                updated_count += 1
+        data["skills"] = list(skills_map.values())
+
+        # Update projects state if provided
+        if projects_state:
+            projects_map = {p.get("project_path"): p for p in data["projects"]}
+            for p in projects_state:
+                path = p.get("project_path")
+                if path:
+                    # Clean the skills inside project
+                    cleaned_p = dict(p)
+                    if "skills" in cleaned_p:
+                        cleaned_p["skills"] = [
+                            {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
+                            for skill in cleaned_p["skills"]
+                        ]
+                    projects_map[path] = cleaned_p
+            data["projects"] = list(projects_map.values())
+
+        # Re-compute categories and project_labels
+        data["categories"] = sorted(
+            {s["category"] for s in data["skills"] if s.get("category")}
+        )
+        data["project_labels"] = sorted(
+            {
+                p["project_label"]
+                for p in data.get("projects", [])
+                if p.get("project_label")
+            }
+        )
+
+        # Update status
+        num_skills = len(data["skills"])
+        num_projects = len(data.get("projects", []))
+        data["status"] = (
+            f"Found {num_skills} skills in master library ({num_projects} projects)"
+        )
+
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, default=str)
+
+        return updated_count
+    except Exception as exc:
+        print(f"[CACHE] Patch add failed: {exc}")
+        return 0
+
+
+
 def save_temp_registry(paths: list[str]) -> None:
     """Saves the list of temporary copy paths to the registry."""
     try:

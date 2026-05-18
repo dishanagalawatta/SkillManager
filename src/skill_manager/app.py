@@ -147,6 +147,8 @@ class AppController(QObject):
         self._quick_copy_model.showCommands = True
         self._quick_copy_model.isPackageOnly = False
         self._quick_copy_model.showStarred = True
+        self._quick_copy_model.filterByClient = False
+
 
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
@@ -265,7 +267,8 @@ class AppController(QObject):
 
     @Property(list, notify=clientFormatsChanged)
     def clientFormats(self):
-        return sorted(CLIENT_FORMATS)
+        order = ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        return [fmt for fmt in order if fmt in CLIENT_FORMATS]
 
     @Property(list, notify=customCollectionsChanged)
     def customCollections(self):

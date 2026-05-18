@@ -660,6 +660,7 @@ CATEGORIES = {
     "Testing": [
         "test",
         "testing",
+        "automation",
         "qa",
         "e2e",
         "playwright",

@@ -117,9 +117,62 @@ def test_controller_sync_project(
 
 
 def test_controller_setters(controller):
-    # searchQuery was removed or renamed in recent refactors, checking current app.py
-    # If it's gone, we skip or adapt. Currently it's gone from app.py.
-    pass
+    controller.setClientFormat("Codex")
+    assert controller.clientFormat == "Codex"
+    assert controller.logoSource.endswith("codex.svg")
+
+    controller.setViewFilter("category", "Dev")
+    assert controller.skillModel.categoryFilter == "Dev"
+
+    controller.currentView = "QuickCopy"
+    controller.setViewFilter("project", "Proj")
+    assert controller.skillModel.projectFilter == "Proj"
+
+    controller.setViewFilter("collection", "true")
+    assert controller.skillModel.collectionFilter is True
+
+    # Test more properties and signals
+    signals_mock = MagicMock()
+    controller.windowWidthChanged.connect(signals_mock.width)
+    controller.windowHeightChanged.connect(signals_mock.height)
+    controller.darkModeChanged.connect(signals_mock.dark)
+    controller.currentViewChanged.connect(signals_mock.view)
+
+    controller.windowWidth = 1200
+    assert controller.windowWidth == 1200
+    signals_mock.width.assert_called()
+
+    controller.windowHeight = 800
+    assert controller.windowHeight == 800
+    signals_mock.height.assert_called()
+
+    controller.darkMode = True
+    assert controller.darkMode is True
+    signals_mock.dark.assert_called()
+
+    controller.currentView = "Library"
+    assert controller.currentView == "Library"
+    signals_mock.view.assert_called()
+
+    controller.startupView = "Updates"
+    assert controller.startupView == "Updates"
+
+    controller.rememberFilters = True
+    assert controller.rememberFilters is True
+
+    controller.defaultProjectFilter = "all"
+    assert controller.defaultProjectFilter == "all"
+
+    controller.reducedMotion = True
+    assert controller.reducedMotion is True
+
+    controller.compactListRows = True
+    assert controller.compactListRows is True
+
+    controller.windowX = 100
+    assert controller.windowX == 100
+    controller.windowY = 200
+    assert controller.windowY == 200
 
 
 def test_controller_toggle_package_only(controller):
@@ -560,3 +613,8 @@ def test_controller_on_quit_flushes_pending_save(controller):
     controller.ui._save_timer.stop.assert_called_once()
     controller.ui.save_ui_state.assert_called_once()
     shutdown.assert_called_once()
+
+
+def test_client_formats_order(controller):
+    assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+

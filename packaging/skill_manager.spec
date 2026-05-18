@@ -2,7 +2,28 @@
 
 import os
 import sys
+import logging
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+# Intercept and rewrite PyInstaller's malformed QtQml logging messages to prevent crash
+class PyInstallerQtQmlLogFilter(logging.Filter):
+    def filter(self, record):
+        if record.msg == "%s: QML plugin binary %r does not exist!":
+            if isinstance(record.args, tuple) and len(record.args) == 1:
+                record.args = (record.args[0], "unknown")
+            elif not isinstance(record.args, tuple):
+                record.args = (record.args, "unknown")
+        return True
+
+# Register the filter on the root logger, PyInstaller logger, and their handlers
+qt_qml_filter = PyInstallerQtQmlLogFilter()
+logging.getLogger().addFilter(qt_qml_filter)
+logging.getLogger('PyInstaller').addFilter(qt_qml_filter)
+
+for handler in logging.getLogger().handlers:
+    handler.addFilter(qt_qml_filter)
+for handler in logging.getLogger('PyInstaller').handlers:
+    handler.addFilter(qt_qml_filter)
 
 block_cipher = None
 
@@ -35,11 +56,19 @@ a = Analysis(
         'pywinstyles',
         'posthog',
         'dotenv',
+        'collections.abc',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Unix-only modules
+        'pwd', 'grp', 'fcntl', 'termios', 'readline', '_scproxy', 'posix', 'resource', '_posixsubprocess', '_posixshmem',
+        # Platform/Internal noise
+        'vms_lib', 'java', 'java.lang', '_frozen_importlib', '_frozen_importlib_external', 'sitecustomize', 'usercustomize',
+        # Optional library features
+        'redis', 'IPython', 'dotenv.ipython', 'brotli', 'brotlicffi', 'h2', 'socks', '_typeshed',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
