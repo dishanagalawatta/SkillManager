@@ -67,12 +67,15 @@ SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously d
 
 SkillManager is distributed as native standalone executables for Windows, macOS, and Linux. The packaging pipeline is fully automated via GitHub Actions.
 
-### 1. Freezing (PyInstaller)
--   The Python code, dependencies (PySide6, pyyaml), and static assets (`assets/`, QML components) are bundled into a standalone binary using PyInstaller (`packaging/skill_manager.spec`).
--   Path resolution uses a custom `resource_path` utility in `app.py` to seamlessly handle both local development paths and PyInstaller's `_internal` temporary extraction folders.
+### 1. Freezing & Compilation (`scripts/build_app.py` / `packaging/skill_manager.spec`)
+-   Compilation is orchestrated by `scripts/build_app.py` which:
+    - Automatically prepares a Windows high-fidelity multi-size icon `logo.ico` from the brand design `logo.png` (holding resolutions: 16x16, 32x32, 48x48, 64x64, 128x128, and 256x256).
+    - Checks the Spec file syntax and invokes PyInstaller securely with `--noconfirm` to overwrite legacy directories.
+-   The spec file `packaging/skill_manager.spec` has been refactored to resolve paths dynamically relative to PyInstaller's native `SPECPATH` variable, avoiding any CWD-dependence.
+-   Path resolution in the running application uses a custom `resource_path` utility in `app.py` to seamlessly handle both local development paths and PyInstaller's `_internal` temporary extraction folders.
 
 ### 2. Native OS Wrappers
--   **Windows**: The PyInstaller output is wrapped into `SkillManager_Setup.exe` using Inno Setup (`packaging/windows/installer.iss`). This creates Start Menu shortcuts and a standard uninstaller.
+-   **Windows**: The PyInstaller output is wrapped into `SkillManager_Setup.exe` using Inno Setup (`packaging/windows/installer.iss`). The installer setup uses the newly-generated high-resolution `logo.ico` file to apply pristine shell/window assets across the user system.
 -   **macOS**: The generated `.app` bundle is converted into a standard `.dmg` image using `create-dmg`.
 -   **Linux**: The output directory is packaged as a `.tar.gz` (with potential future expansion to AppImage).
 

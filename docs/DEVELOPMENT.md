@@ -18,6 +18,7 @@ This guide covers how to set up the SkillManager development environment, run te
    cd SkillManager
    ```
 
+
 2. **Sync dependencies using uv:**
    ```bash
    uv sync
@@ -27,6 +28,10 @@ This guide covers how to set up the SkillManager development environment, run te
 ## Running the Application Locally
 
 You can run the application directly from the source code without compiling it:
+
+```bash
+uv run skill-manager
+```
 
 ## Development Workflow
 
@@ -88,11 +93,26 @@ The quality pipeline in `.github/workflows/quality.yml` runs linting and tests o
 
 If you need to build the executable locally for testing:
 
-1.  **Ensure PyInstaller is installed:**
-    It should be installed via `uv sync`, but if not:
-    ```bash
-    uv pip install pyinstaller pillow
-    ```
+1. **Prerequisites & Virtual Environment**:
+   Verify that all packaging and imaging dependencies (`pyinstaller` and `pillow`) are synced inside your local environment:
+   ```bash
+   uv sync
+   ```
+
+2. **Run the Packaging Script**:
+   Instead of calling raw `pyinstaller` commands, use the unified Python build script. This script automatically handles preparing multi-size icons for the desktop executable and running PyInstaller with the spec configuration:
+   ```bash
+   uv run python scripts/build_app.py
+   ```
+
+3. **Dry-Run Testing**:
+   You can verify that the asset pre-processing pipeline (e.g. converting `logo.png` to a multi-size Windows icon file `logo.ico` supporting resolutions from 16x16 to 256x256) operates correctly without running the long compiling phase:
+   ```bash
+   uv run python scripts/build_app.py --dry-run
+   ```
+
+4. **Inno Setup (Windows Installer)**:
+   The Windows installer script (`packaging/windows/installer.iss`) is fully bound to the generated `assets/brand/logo.ico`. Once the local PyInstaller build finishes, compile the Inno Setup script using the Inno Setup Compiler (`ISCC.exe`) to generate the `SkillManager_Setup.exe` installer.
 
 | Command | Description |
 |---|---|
@@ -100,4 +120,5 @@ If you need to build the executable locally for testing:
 | `uv run ruff check src tests` | Run ruff linter |
 | `uv run ruff format src` | Format code with ruff |
 | `uv run pytest` | Run the unit test suite |
-| `uv run pyinstaller packaging/skill_manager.spec` | Build the standalone executable |
+| `uv run python scripts/build_app.py` | Automate icon conversion and compile executable |
+| `uv run python scripts/build_app.py --dry-run` | Dry-run validation of the build environment |

@@ -116,7 +116,9 @@ class DiscoveryService:
             or ("Master Library" if is_package else "Unknown Project"),
             "project_root": skill.get("project_root", ""),
             "project_path": skill.get("project_path", ""),
-            "is_starred": metadata.get("starred", False) or metadata.get("essential", False) or local_path in self.starred_paths,
+            "is_starred": metadata.get("starred", False)
+            or metadata.get("essential", False)
+            or local_path in self.starred_paths,
             "is_bundle": skill.get("is_bundle", False),
             "commands": skill.get("commands", []),
             "is_selected": False,
