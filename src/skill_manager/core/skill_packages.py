@@ -10,11 +10,14 @@ from pathlib import Path
 
 
 def sanitize_token(text: str) -> str:
-    """Removes sensitive authentication tokens from URLs."""
+    """Removes sensitive authentication tokens from URLs and credential helpers."""
     if not isinstance(text, str):
         return text
     # Matches http://token@ or https://token@ and masks the token part
-    return re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
+    text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
+    # Matches echo password=... in git credential helpers
+    text = re.sub(r"(echo password=)[^;]+", r"\1***", text)
+    return text
 
 
 def normalize_skill_package_config(data):
