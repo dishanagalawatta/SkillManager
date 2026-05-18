@@ -14,6 +14,7 @@ Item {
     property string subCat: model && model.category ? model.category : ""
     property bool isMainCollapsed: AppController.skillModel.isCategoryCollapsed(mainCat)
     property bool isSubCollapsed: AppController.skillModel.isCategoryCollapsed(subCat)
+    property bool compactRows: AppController.compactListRows
 
     // Detect if this is the first item in a new sub-category within the same main category
     property bool isFirstInSub: {
@@ -24,7 +25,7 @@ Item {
     }
 
     // Dynamic height based on visibility of sub-header and item content
-    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : 66)
+    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 42 : 54))
     visible: height > 0
     clip: true
 
@@ -103,7 +104,7 @@ Item {
         // --- SKILL ITEM CONTENT ---
         Item {
             width: parent.width
-            height: 66
+            height: root.compactRows ? 42 : 54
             visible: !root.isMainCollapsed && !root.isSubCollapsed
 
             Rectangle {
@@ -111,12 +112,12 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 48 // Start Level 2 Background
                 anchors.rightMargin: 5
-                anchors.topMargin: 5
-                anchors.bottomMargin: 5
+                anchors.topMargin: root.compactRows ? 3 : 4
+                anchors.bottomMargin: root.compactRows ? 3 : 4
                 radius: Theme.radiusCard
-                color: root.isSelected ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
+                color: root.isSelected ? (mouseArea.containsMouse ? Theme.selectedRowHover : Theme.selectedRow) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
                 border.width: (mouseArea.containsMouse || root.isSelected) ? 1 : 0
-                border.color: root.isSelected ? Theme.accent : Theme.glassOuterBorder
+                border.color: root.isSelected ? Theme.selectedRowBorder : Theme.glassOuterBorder
                 opacity: model && model.isArchived ? 0.5 : 1.0
 
                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -125,7 +126,14 @@ Item {
                     id: mouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: (mouse) => root.clicked()
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: (mouse) => {
+                        if (mouse.button === Qt.RightButton) {
+                            root.rightClicked()
+                        } else {
+                            root.clicked()
+                        }
+                    }
                     onDoubleClicked: (mouse) => root.doubleClicked()
                 }
 
@@ -137,10 +145,10 @@ Item {
 
                     // Multi-select Checkbox
                     Rectangle {
-                        width: 20
-                        height: 20
+                        width: root.compactRows ? 18 : 20
+                        height: root.compactRows ? 18 : 20
                         radius: Theme.radiusSmall
-                        color: model && model.isSelected ? Theme.accent : "transparent"
+                        color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
                         border.width: model && model.isSelected ? 0 : 1
                         border.color: Theme.glassBorder
                         
@@ -148,7 +156,7 @@ Item {
                             anchors.centerIn: parent
                             text: "✓"
                             color: "white"
-                            font.pixelSize: 12
+                            font.pixelSize: root.compactRows ? 11 : 12
                             visible: model && model.isSelected
                         }
 
@@ -167,24 +175,24 @@ Item {
 
                     // Icon Section
                     Rectangle {
-                        width: 36
-                        height: 36
+                        width: root.compactRows ? 26 : 32
+                        height: root.compactRows ? 26 : 32
                         radius: Theme.radiusField
-                        color: model && model.isEssential ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3) : (model && model.isCollection ? (Theme.darkMode ? "#2D3833" : "#F3F4F6") : (model && model.isCommand ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.2) : Theme.glassPill))
+                        color: model && model.isStarred ? Theme.selectedRow : (model && model.isCollection ? Theme.glassActive : (model && model.isCommand ? Theme.glassHover : Theme.glassPill))
                         
                         Text {
                             anchors.centerIn: parent
                             text: {
                                 if (!model) return ""
-                                if (model.isEssential && root.showEssentialIcon) return "★"
+                                if (model.isStarred && root.showStarredIcon) return "★"
                                 if (model.isCollection) return "📦"
                                 if (model.isCommand) return "⚡"
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily
-                            font.pixelSize: (model && model.isEssential) ? 18 : 20
+                            font.pixelSize: root.compactRows ? ((model && model.isStarred) ? 14 : 16) : ((model && model.isStarred) ? 16 : 18)
                             font.weight: Font.Bold
-                            color: (model && (model.isEssential || model.isCommand)) ? Theme.accent : Theme.label
+                            color: (model && (model.isStarred || model.isCommand)) ? Theme.accent : Theme.label
                         }
                     }
 
@@ -196,29 +204,21 @@ Item {
                         Text {
                             text: model ? model.name : ""
                             font.family: Theme.fontFamily
-                            font.pixelSize: 14
+                            font.pixelSize: root.compactRows ? 12 : 14
                             font.weight: Font.DemiBold
                             color: Theme.label
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
                         
-                        Text {
-                            text: model ? ((model.isCommand ? "Command • " : (model.isCollection ? "Collection • " : "")) + model.project + " • " + model.category) : ""
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            color: Theme.secondaryLabel
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
                     }
 
                     // Selection indicator for Inspector
                     Rectangle {
                         width: 4
-                        height: 24
+                        height: root.compactRows ? 20 : 24
                         radius: Theme.radiusSmall
-                        color: Theme.accent
+                        color: Theme.selectedRowBorder
                         visible: root.isSelected
                     }
 
@@ -228,7 +228,7 @@ Item {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
                         flat: true
-                        visible: mouseArea.containsMouse
+                        visible: root.showInlineDelete && mouseArea.containsMouse
                         onClicked: (mouse) => {
                             if (model && model.path) {
                                 root.deleteRequested(model.name, model.path)
@@ -256,9 +256,11 @@ Item {
     }
 
     property bool isSelected: model && model.isSelected !== undefined ? model.isSelected : false
-    property bool showEssentialIcon: true
+    property bool showStarredIcon: true
+    property bool showInlineDelete: true
     
     signal clicked()
     signal doubleClicked()
+    signal rightClicked()
     signal deleteRequested(string name, string path)
 }
