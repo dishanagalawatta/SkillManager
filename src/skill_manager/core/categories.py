@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 
 CATEGORY_EMOJI_MAP = {
     "AI": "🧠",
@@ -82,6 +83,7 @@ CATEGORY_EMOJI_MAP = {
 }
 
 
+@lru_cache(maxsize=1024)
 def get_category_emoji(category_name: str) -> str:
     if not category_name:
         return "📁"

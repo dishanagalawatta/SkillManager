@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -753,6 +754,7 @@ MAIN_CATEGORIES_MAPPING = {
 }
 
 
+@lru_cache(maxsize=1024)
 def get_main_category(sub_category):
     if not sub_category:
         return "⚙️ System & Workflow"
