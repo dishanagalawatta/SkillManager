@@ -108,4 +108,7 @@ ComboBox {
             opacity: 0.95
         }
     }
+
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: control.displayText
 }
