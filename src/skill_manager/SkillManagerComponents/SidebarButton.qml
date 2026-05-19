@@ -59,6 +59,8 @@ Button {
     background: Rectangle {
         color: control.active ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
         radius: Theme.radiusPill
+        border.color: control.visualFocus ? Theme.accent : "transparent"
+        border.width: control.visualFocus ? 2 : 0
     }
     Accessible.role: Accessible.Button
     Accessible.name: control.labelText
