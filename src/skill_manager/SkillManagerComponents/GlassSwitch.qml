@@ -16,10 +16,14 @@ Switch {
         y: parent.height / 2 - height / 2
         radius: height / 2
         color: control.checked ? Theme.accent : Theme.glassHover
-        border.color: Theme.glassBorder
-        border.width: 1
+        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
+        border.width: control.visualFocus ? 2 : 1
 
         Behavior on color {
+            ColorAnimation { duration: 200 }
+        }
+
+        Behavior on border.color {
             ColorAnimation { duration: 200 }
         }
 
