@@ -187,7 +187,7 @@ def run_skill_package_update(source, output_callback=None):
                 )
                 dest_base = Path(os.path.expanduser(package_path)).resolve()
                 for folder_name in sorted(outdated):
-                    folder_path = (dest_base / str(folder_name)).resolve()
+                    folder_path = (dest_base / folder_name).resolve()
 
                     # Prevent path traversal
                     if not folder_path.is_relative_to(dest_base) or folder_path == dest_base:
