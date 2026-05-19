@@ -700,3 +700,30 @@ def test_prevent_path_traversal(mock_rmtree, mock_check_versions, mock_run_shell
     for call in mock_rmtree.call_args_list:
         path_arg = str(call[0][0])
         assert "important_dir" not in path_arg, f"Path traversal allowed! deleted: {path_arg}"
+
+
+@patch("skill_manager.core.skill_packages._run_shell_command")
+@patch("skill_manager.core.skill_packages.check_skill_package_versions")
+@patch("skill_manager.core.skill_packages.shutil.rmtree")
+def test_prevent_base_deletion(mock_rmtree, mock_check_versions, mock_run_shell, temp_dir):
+    mock_check_versions.return_value = {}
+
+    package_path = temp_dir / "package"
+    package_path.mkdir()
+
+    source = {
+        "name": "malicious_pkg",
+        "update_command": "echo done",
+        "package_path": str(package_path),
+        "managed_folders": ["."],
+        "removed_folders": [],
+    }
+
+    with patch("skill_manager.core.skill_packages._relocate_packages_from_output", return_value=[]):
+        run_skill_package_update(source, output_callback=lambda x: None)
+
+    for call in mock_rmtree.call_args_list:
+        path_arg = str(call[0][0])
+        assert path_arg != str(package_path.resolve()), (
+            f"Base directory deletion allowed! deleted: {path_arg}"
+        )
