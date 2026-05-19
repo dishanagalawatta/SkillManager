@@ -190,7 +190,7 @@ def run_skill_package_update(source, output_callback=None):
                     folder_path = (dest_base / str(folder_name)).resolve()
 
                     # Prevent path traversal
-                    if not folder_path.is_relative_to(dest_base):
+                    if folder_path == dest_base or not folder_path.is_relative_to(dest_base):
                         _emit(
                             output_callback,
                             f"[ERROR] Invalid skill folder path detected (path traversal): {folder_name}",
