@@ -185,17 +185,20 @@ def run_skill_package_update(source, output_callback=None):
                     output_callback,
                     f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...",
                 )
-                dest_base = Path(os.path.expanduser(package_path))
-                for raw_name in sorted(outdated):
-                    # Prevent path traversal by ensuring we only use the base folder name
-                    folder_name = Path(raw_name).name
-                    if not folder_name or folder_name in (".", ".."):
-                        _emit(output_callback, f"[ERROR] Invalid skill folder name: {raw_name}")
-                        continue
-
+                dest_base = Path(os.path.expanduser(package_path)).resolve()
+                for folder_name in sorted(outdated):
                     folder_path = dest_base / folder_name
 
-                    if folder_path.is_dir():
+                    # Prevent path traversal lexically without following symlinks
+                    norm_path = Path(os.path.normpath(folder_path))
+                    if not norm_path.is_relative_to(dest_base) or norm_path == dest_base:
+                        _emit(
+                            output_callback,
+                            f"[ERROR] Invalid skill folder path detected (path traversal): {folder_name}",
+                        )
+                        continue
+
+                    if folder_path.is_dir() or folder_path.is_symlink():
                         _emit(
                             output_callback,
                             f"[DEBUG] Deleting outdated skill folder: {folder_name}",
