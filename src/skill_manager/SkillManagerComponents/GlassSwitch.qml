@@ -16,8 +16,8 @@ Switch {
         y: parent.height / 2 - height / 2
         radius: height / 2
         color: control.checked ? Theme.accent : Theme.glassHover
-        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
-        border.width: control.visualFocus ? 2 : 1
+    Accessible.role: Accessible.CheckBox
+    Accessible.name: control.text
 
         Behavior on color {
             ColorAnimation { duration: 200 }
