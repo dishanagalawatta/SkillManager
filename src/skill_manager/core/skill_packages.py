@@ -191,7 +191,7 @@ def run_skill_package_update(source, output_callback=None):
 
                     # Prevent path traversal
                     try:
-                        folder_path.relative_to(dest_base)
+                        _ = folder_path.relative_to(dest_base)
                     except ValueError:
                         _emit(
                             output_callback,
