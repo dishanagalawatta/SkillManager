@@ -300,7 +300,9 @@ class OpsController(BaseController):
                     # Dynamic update of models in main UI thread
                     def update_ui():
                         # Update category lists in app controller
-                        new_cats = sorted({s["category"] for s in discovered_skills if s.get("category")})
+                        new_cats = sorted(
+                            {s["category"] for s in discovered_skills if s.get("category")}
+                        )
                         if new_cats:
                             current_cats = set(self.app._categories)
                             for cat in new_cats:
@@ -323,4 +325,3 @@ class OpsController(BaseController):
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
         threading.Thread(target=run_copy, daemon=True).start()
-

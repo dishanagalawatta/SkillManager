@@ -565,7 +565,6 @@ class SkillModel(QAbstractListModel):
         self._search_engine = SearchEngine(self._all_skills)
         self._apply_filter(reset=True)
 
-
     @Slot(int, bool)
     def setSelected(self, row, selected):
         if 0 <= row < len(self._filtered_skills):

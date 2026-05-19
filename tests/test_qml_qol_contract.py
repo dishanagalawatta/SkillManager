@@ -253,7 +253,9 @@ def test_expand_collapse_arrow_icons_presence_and_dark_mode():
     # 2. Verify legacy icons are not referenced in active QML files
     for qml_file in QML_DIR.rglob("*.qml"):
         text = qml_file.read_text(encoding="utf-8")
-        assert "ui/collapse.svg" not in text, f"Legacy collapse.svg reference found in {qml_file.name}"
+        assert "ui/collapse.svg" not in text, (
+            f"Legacy collapse.svg reference found in {qml_file.name}"
+        )
         assert "ui/expand.svg" not in text, f"Legacy expand.svg reference found in {qml_file.name}"
 
     # 3. Verify new icons are used in QML files and conditionally toggle dark/light variants
@@ -266,24 +268,48 @@ def test_expand_collapse_arrow_icons_presence_and_dark_mode():
         (quick_copy, "QuickCopyView.qml"),
         (library, "LibraryView.qml"),
         (skill_item, "SkillItem.qml"),
-        (category_header, "CategoryHeader.qml")
+        (category_header, "CategoryHeader.qml"),
     ]:
-        assert "ui/collapse-arrow-icon-dark.svg" in file_content, f"Missing dark collapse icon in {file_name}"
-        assert "ui/collapse-arrow-icon-light.svg" in file_content, f"Missing light collapse icon in {file_name}"
-        assert "ui/expand-arrow-icon-dark.svg" in file_content, f"Missing dark expand icon in {file_name}"
-        assert "ui/expand-arrow-icon-light.svg" in file_content, f"Missing light expand icon in {file_name}"
+        assert "ui/collapse-arrow-icon-dark.svg" in file_content, (
+            f"Missing dark collapse icon in {file_name}"
+        )
+        assert "ui/collapse-arrow-icon-light.svg" in file_content, (
+            f"Missing light collapse icon in {file_name}"
+        )
+        assert "ui/expand-arrow-icon-dark.svg" in file_content, (
+            f"Missing dark expand icon in {file_name}"
+        )
+        assert "ui/expand-arrow-icon-light.svg" in file_content, (
+            f"Missing light expand icon in {file_name}"
+        )
 
     # 4. Verify high-resolution/high-DPI SVG rendering quality properties are present
-    assert "sourceSize.width: 72" in quick_copy, "QuickCopyView expand/collapse icon sourceSize should be high resolution (72)"
-    assert "sourceSize.width: 72" in library, "LibraryView expand/collapse icon sourceSize should be high resolution (72)"
-    assert "sourceSize.width: 40" in skill_item, "SkillItem expand/collapse icon sourceSize should be high resolution (40)"
-    assert "sourceSize.width: 56" in category_header, "CategoryHeader expand/collapse icon sourceSize should be high resolution (56)"
+    assert "sourceSize.width: 72" in quick_copy, (
+        "QuickCopyView expand/collapse icon sourceSize should be high resolution (72)"
+    )
+    assert "sourceSize.width: 72" in library, (
+        "LibraryView expand/collapse icon sourceSize should be high resolution (72)"
+    )
+    assert "sourceSize.width: 40" in skill_item, (
+        "SkillItem expand/collapse icon sourceSize should be high resolution (40)"
+    )
+    assert "sourceSize.width: 56" in category_header, (
+        "CategoryHeader expand/collapse icon sourceSize should be high resolution (56)"
+    )
 
     # 5. Verify layout sizing properties are present to prevent stretching inside RowLayouts
-    assert "width: 18" in quick_copy, "QuickCopyView icon needs width to size correctly inside the button"
-    assert "width: 18" in library, "LibraryView icon needs width to size correctly inside the button"
-    assert "Layout.preferredWidth: 10" in skill_item, "SkillItem subcategory icon needs Layout.preferredWidth inside RowLayout"
-    assert "Layout.preferredWidth: 14" in category_header, "CategoryHeader category icon needs Layout.preferredWidth inside RowLayout"
+    assert "width: 18" in quick_copy, (
+        "QuickCopyView icon needs width to size correctly inside the button"
+    )
+    assert "width: 18" in library, (
+        "LibraryView icon needs width to size correctly inside the button"
+    )
+    assert "Layout.preferredWidth: 10" in skill_item, (
+        "SkillItem subcategory icon needs Layout.preferredWidth inside RowLayout"
+    )
+    assert "Layout.preferredWidth: 14" in category_header, (
+        "CategoryHeader category icon needs Layout.preferredWidth inside RowLayout"
+    )
 
 
 def test_search_input_uses_icon_instead_of_text_label():
@@ -347,4 +373,6 @@ def test_search_input_clear_button_placement():
     assert bg_end_index != -1, "Could not find the end of background block"
 
     # The IconButton MUST be defined AFTER the background block has ended to be a direct child of the TextField
-    assert icon_btn_index > bg_end_index, "IconButton (clear button) is nested inside the background block, preventing mouse event propagation!"
+    assert icon_btn_index > bg_end_index, (
+        "IconButton (clear button) is nested inside the background block, preventing mouse event propagation!"
+    )

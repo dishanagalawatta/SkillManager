@@ -277,13 +277,17 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
 
     # Intercept QTimer.singleShot callback execution
     timer_callbacks = []
+
     def mock_single_shot(ms, obj, callback):
         timer_callbacks.append(callback)
 
     mock_timer.side_effect = mock_single_shot
 
     with (
-        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=mock_skill_data) as mock_discover,
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill",
+            return_value=mock_skill_data,
+        ) as mock_discover,
         patch.object(ops_controller, "_patch_cache_add_or_update") as mock_patch_cache,
     ):
         ops_controller.copy_selected_to_project("/project")
@@ -377,4 +381,3 @@ def test_ops_controller_delete_skills_partial_failure(
     ops_controller.delete_skills(items)
 
     mock_app._set_status.assert_called_with("Deletion complete: 1 deleted, 1 failed")
-

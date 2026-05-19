@@ -147,7 +147,6 @@ class DiscoveryService:
 
         return data
 
-
     def _process_command_file(
         self, cmd_file: Path, project: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -233,5 +232,6 @@ class DiscoveryService:
         skill_data["search_text"] = build_skill_search_text(skill_data)
 
         # Now transform it using public transform_skill
-        return self.transform_skill(skill_data, is_package=False, project_label=skill_data["project_label"])
-
+        return self.transform_skill(
+            skill_data, is_package=False, project_label=skill_data["project_label"]
+        )

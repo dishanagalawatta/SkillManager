@@ -116,7 +116,11 @@ def test_load_starred_corrupted(temp_files):
 
 def test_load_project_skill_ownership_corrupted(temp_files):
     from skill_manager.core.persistence import load_project_skill_ownership
-    with patch_config(temp_files), patch("skill_manager.core.persistence.PROJECT_SKILL_OWNERSHIP_FILE", temp_files["cache"]):
+
+    with (
+        patch_config(temp_files),
+        patch("skill_manager.core.persistence.PROJECT_SKILL_OWNERSHIP_FILE", temp_files["cache"]),
+    ):
         with open(temp_files["cache"], "w") as f:
             f.write("bad")
         assert load_project_skill_ownership() == {}
@@ -129,9 +133,9 @@ def test_load_project_skill_ownership_corrupted(temp_files):
 
 def test_save_project_skill_ownership_failure(temp_files):
     from skill_manager.core.persistence import save_project_skill_ownership
+
     with patch_config(temp_files), patch("builtins.open", side_effect=OSError("denied")):
         assert save_project_skill_ownership({}) is False
-
 
 
 def test_patch_cache_remove(temp_files):
@@ -170,18 +174,19 @@ def test_temp_registry_failure(temp_files):
 
 def test_patch_cache_add(temp_files):
     from skill_manager.core.persistence import patch_cache_add
+
     data = {"skills": [{"local_path": "/p1", "category": "Cat1"}]}
     with patch_config(temp_files):
         save_cache(data)
         new_skills = [
             {"local_path": "/p1", "category": "Cat2", "raw_content": "strip-me"},
-            {"local_path": "/p2", "category": "Cat3"}
+            {"local_path": "/p2", "category": "Cat3"},
         ]
         projects_state = [
             {
                 "project_path": "/proj1",
                 "project_label": "Proj 1",
-                "skills": [{"local_path": "/p2", "category": "Cat3"}]
+                "skills": [{"local_path": "/p2", "category": "Cat3"}],
             }
         ]
         added_count = patch_cache_add(new_skills, projects_state)
@@ -204,8 +209,8 @@ def test_patch_cache_add(temp_files):
 
 def test_patch_cache_add_failure(temp_files):
     from skill_manager.core.persistence import patch_cache_add
+
     with patch_config(temp_files):
         # Cache doesn't exist
         count = patch_cache_add([{"local_path": "/p1"}])
         assert count == 0
-

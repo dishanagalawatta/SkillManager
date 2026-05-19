@@ -617,4 +617,3 @@ def test_controller_on_quit_flushes_pending_save(controller):
 
 def test_client_formats_order(controller):
     assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
-

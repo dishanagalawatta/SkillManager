@@ -608,7 +608,9 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
     }
 
     # Simulate conflict / git pull error
-    mock_run.side_effect = subprocess.CalledProcessError(1, ["git", "pull"], stderr="Conflict or network error")
+    mock_run.side_effect = subprocess.CalledProcessError(
+        1, ["git", "pull"], stderr="Conflict or network error"
+    )
     with pytest.raises(subprocess.CalledProcessError):
         _run_git_package_update(source, None)
 
@@ -619,7 +621,9 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
         "clone_path": str(new_clone_path),
         "package_path": str(new_clone_path),
     }
-    mock_run.side_effect = subprocess.CalledProcessError(128, ["git", "clone"], stderr="Could not resolve host")
+    mock_run.side_effect = subprocess.CalledProcessError(
+        128, ["git", "clone"], stderr="Could not resolve host"
+    )
     with pytest.raises(subprocess.CalledProcessError):
         _run_git_package_update(source_new, None)
 
@@ -628,8 +632,10 @@ def test_run_process_timeout_handling():
     # Testing Popen raising TimeoutExpired or subprocess wait timeout
     # Although _run_process doesn't have timeout argument, we can verify subprocess failure or OSError
     with (
-        patch("skill_manager.core.skill_packages._resolve_process_command", return_value=["some-cmd"]),
-        patch("subprocess.Popen") as mock_popen
+        patch(
+            "skill_manager.core.skill_packages._resolve_process_command", return_value=["some-cmd"]
+        ),
+        patch("subprocess.Popen") as mock_popen,
     ):
         mock_popen.side_effect = subprocess.SubprocessError("Process failed to start")
         with pytest.raises(subprocess.SubprocessError):
@@ -646,16 +652,16 @@ def test_detect_command_type_edge_cases():
 def test_run_process_missing_executable(mock_which):
     mock_which.return_value = None
     from skill_manager.core.skill_packages import _run_process
+
     with pytest.raises(FileNotFoundError) as exc:
         _run_process(["non-existent-cmd"], None)
     assert "not found" in str(exc.value)
 
 
-
 @patch("subprocess.Popen")
 def test_run_process_timeout(mock_popen):
     mock_proc = MagicMock()
-    mock_proc.poll.return_value = None # Still running
+    mock_proc.poll.return_value = None  # Still running
     mock_proc.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_proc
 
@@ -663,3 +669,34 @@ def test_run_process_timeout(mock_popen):
     # For now, just ensure it handles the interface
 
 
+@patch("skill_manager.core.skill_packages._run_shell_command")
+@patch("skill_manager.core.skill_packages.check_skill_package_versions")
+@patch("skill_manager.core.skill_packages.shutil.rmtree")
+def test_prevent_path_traversal(mock_rmtree, mock_check_versions, mock_run_shell, temp_dir):
+    mock_check_versions.return_value = {}
+
+    package_path = temp_dir / "package"
+    package_path.mkdir()
+
+    malicious_target = temp_dir / "important_dir"
+    malicious_target.mkdir()
+
+    legit_target = package_path / "legit_folder"
+    legit_target.mkdir()
+
+    source = {
+        "name": "malicious_pkg",
+        "update_command": "echo done",
+        "package_path": str(package_path),
+        "managed_folders": ["../important_dir", "legit_folder"],
+        "removed_folders": [],
+    }
+
+    # We mock _relocate_packages_from_output to return []
+    # so that new_managed is empty, meaning all old folders become outdated.
+    with patch("skill_manager.core.skill_packages._relocate_packages_from_output", return_value=[]):
+        run_skill_package_update(source, output_callback=lambda x: None)
+
+    for call in mock_rmtree.call_args_list:
+        path_arg = str(call[0][0])
+        assert "important_dir" not in path_arg, f"Path traversal allowed! deleted: {path_arg}"

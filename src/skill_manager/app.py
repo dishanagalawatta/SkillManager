@@ -149,7 +149,6 @@ class AppController(QObject):
         self._quick_copy_model.showStarred = True
         self._quick_copy_model.filterByClient = False
 
-
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
         self._starred_paths = load_starred()
