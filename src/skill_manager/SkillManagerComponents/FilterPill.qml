@@ -48,11 +48,15 @@ Button {
         implicitHeight: 32
         radius: Theme.radiusPill
         color: control.isActive ? Theme.glassActive : (control.hovered ? Theme.glassHover : Theme.glassPill)
-        border.color: control.isActive ? Theme.accent : Theme.glassBorder
-        border.width: 1
+        border.color: control.visualFocus ? Theme.accent : (control.isActive ? Theme.accent : Theme.glassBorder)
+        border.width: control.visualFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
+        Behavior on border.color { ColorAnimation { duration: 200 } }
     }
 
     onClicked: isActive = !isActive
+
+    Accessible.role: Accessible.Button
+    Accessible.name: control.text
 }
