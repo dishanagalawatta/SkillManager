@@ -199,6 +199,7 @@ def extract_markdown_description(content):
 
 
 _CATEGORY_PATTERNS = None
+_SEPARATOR_REGEX = re.compile(r"[-_]+")
 
 
 def _get_category_patterns():
@@ -219,14 +220,16 @@ def _get_category_patterns():
 
         patterns = []
         if plain:
+            # Combine all plain keywords into a single regex and drop re.I
             patterns.append(
-                re.compile(r"\b(" + "|".join(re.escape(kw) for kw in plain) + r")\b", re.I)
+                re.compile(r"\b(?:" + "|".join(re.escape(kw.lower()) for kw in plain) + r")\b")
             )
         if special:
-            # Special patterns might need individual matching
-            patterns.extend([re.compile(re.escape(kw), re.I) for kw in special])
+            # Drop re.I, we will lowercase input text
+            patterns.extend([re.compile(re.escape(kw.lower())) for kw in special])
 
-        _CATEGORY_PATTERNS[cat] = patterns
+        if patterns:
+            _CATEGORY_PATTERNS[cat] = patterns
     return _CATEGORY_PATTERNS
 
 
@@ -775,29 +778,21 @@ def categorize_skill(name, description):
     Uses keyword frequency with weighting.
     """
     # Name is high signal, give it more weight (repeat it)
-    text = (name + " " + name + " " + description).lower()
-    norm_text = re.sub(r"[-_]+", " ", text)
+    text = f"{name} {name} {description}".lower()
+    norm_text = _SEPARATOR_REGEX.sub(" ", text)
 
     best_category = "Uncategorized"
     max_matches = 0
 
     patterns = _get_category_patterns()
+    is_same = (text == norm_text)
 
     for category, cat_patterns in patterns.items():
         matches = 0
         for p in cat_patterns:
-            # If pattern has \b, it was a group of plain words
-            if "\\b(" in p.pattern:
-                matches += len(p.findall(text))
-                # Also check normalized if different
-                if text != norm_text:
-                    matches += len(p.findall(norm_text))
-            else:
-                # Special pattern (literal or containing special chars)
-                # Count ALL occurrences of special pattern
-                matches += len(p.findall(text))
-                if text != norm_text:
-                    matches += len(p.findall(norm_text))
+            matches += len(p.findall(text))
+            if not is_same:
+                matches += len(p.findall(norm_text))
 
         if matches > max_matches:
             max_matches = matches
