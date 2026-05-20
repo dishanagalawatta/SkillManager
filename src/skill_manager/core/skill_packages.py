@@ -187,16 +187,17 @@ def run_skill_package_update(source, output_callback=None):
                 )
                 dest_base = Path(os.path.expanduser(package_path))
                 for folder_name in sorted(outdated):
-                    parsed_folder = Path(folder_name)
-                    # Prevent path traversal
-                    if not folder_name or folder_name == "." or parsed_folder.is_absolute() or ".." in parsed_folder.parts:
+                    folder_path = dest_base / folder_name
+
+                    # Prevent path traversal securely
+                    abs_dest = os.path.abspath(dest_base)
+                    abs_folder = os.path.abspath(folder_path)
+                    if not folder_name or not abs_folder.startswith(abs_dest + os.sep):
                         _emit(
                             output_callback,
                             f"[ERROR] Invalid skill folder path detected (path traversal): {folder_name}",
                         )
                         continue
-
-                    folder_path = dest_base / folder_name
 
                     if folder_path.is_dir():
                         _emit(
