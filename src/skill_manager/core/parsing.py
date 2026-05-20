@@ -199,6 +199,7 @@ def extract_markdown_description(content):
 
 
 _CATEGORY_PATTERNS = None
+_SEPARATOR_REGEX = re.compile(r"[-_]+")
 
 
 def _get_category_patterns():
@@ -221,7 +222,7 @@ def _get_category_patterns():
         if plain:
             # Combine all plain keywords into a single regex and drop re.I
             patterns.append(
-                re.compile(r"\b(?:" + "|".join(re.escape(kw.lower()) for kw in sorted(plain, key=len, reverse=True)) + r")\b")
+                re.compile(r"\b(?:" + "|".join(re.escape(kw.lower()) for kw in plain) + r")\b")
             )
         if special:
             # Drop re.I, we will lowercase input text
@@ -778,7 +779,7 @@ def categorize_skill(name, description):
     """
     # Name is high signal, give it more weight (repeat it)
     text = f"{name} {name} {description}".lower()
-    norm_text = text.replace("-", " ").replace("_", " ")
+    norm_text = _SEPARATOR_REGEX.sub(" ", text)
 
     best_category = "Uncategorized"
     max_matches = 0
