@@ -171,7 +171,7 @@ def normalize_description(value):
         value = " ".join(str(item) for item in value)
     elif not isinstance(value, str):
         value = str(value)
-    return re.sub(r"\s+", " ", value).strip().strip(" \"'")
+    return " ".join(value.split()).strip(" \"'")
 
 
 def extract_markdown_description(content):
@@ -199,7 +199,6 @@ def extract_markdown_description(content):
 
 
 _CATEGORY_PATTERNS = None
-_SEPARATOR_REGEX = re.compile(r"[-_]+")
 
 
 def _get_category_patterns():
@@ -779,7 +778,7 @@ def categorize_skill(name, description):
     """
     # Name is high signal, give it more weight (repeat it)
     text = f"{name} {name} {description}".lower()
-    norm_text = _SEPARATOR_REGEX.sub(" ", text)
+    norm_text = text.replace("-", " ").replace("_", " ")
 
     best_category = "Uncategorized"
     max_matches = 0
@@ -803,8 +802,8 @@ def categorize_skill(name, description):
 
 def keyword_matches(text, keyword):
     # This is now mostly unused by categorize_skill but kept for compatibility
-    normalized_text = re.sub(r"[-_]+", " ", text)
-    normalized_keyword = re.sub(r"[-_]+", " ", keyword)
+    normalized_text = text.replace("-", " ").replace("_", " ")
+    normalized_keyword = keyword.replace("-", " ").replace("_", " ")
     if re.search(r"[+#./\s-]", keyword):
         return keyword in text or normalized_keyword in normalized_text
     return (
@@ -826,4 +825,4 @@ def build_skill_search_text(skill_data):
         value = metadata.get(key)
         if value not in (None, ""):
             parts.append(str(value))
-    return re.sub(r"\s+", " ", " ".join(parts)).lower()
+    return " ".join(" ".join(parts).split()).lower()
