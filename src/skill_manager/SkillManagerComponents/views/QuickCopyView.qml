@@ -487,6 +487,52 @@ Item {
                 clip: true
                 spacing: 0
                 
+                // Visual Blink: Dips opacity slightly during background refresh to mask micro-jumps
+                opacity: (AppController.isLoading && _restoringScroll) ? 0.0 : 1.0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                property real savedScrollPos: 0
+                property bool _restoringScroll: false
+
+                function _restoreScroll() {
+                    if (AppController.isLoading && savedScrollPos > 0) {
+                        _restoringScroll = true
+                        
+                        // Force immediate layout to ensure contentHeight is valid for restore
+                        qcv_skillList.forceLayout()
+                        qcv_skillList.contentY = savedScrollPos
+                        
+                        // Second pass: Ensure it stuck (sometimes required for large additions)
+                        Qt.callLater(() => {
+                            if (qcv_skillList.contentY !== savedScrollPos) {
+                                qcv_skillList.forceLayout()
+                                qcv_skillList.contentY = savedScrollPos
+                            }
+                            _restoringScroll = false
+                        })
+                    }
+                }
+
+                Connections {
+                    target: qcv_skillList.model
+                    function onLayoutAboutToBeChanged() {
+                        if (AppController.isLoading) {
+                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        }
+                    }
+                    function onLayoutChanged() {
+                        qcv_skillList._restoreScroll()
+                    }
+                    function onModelAboutToBeReset() {
+                        if (AppController.isLoading) {
+                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        }
+                    }
+                    function onModelReset() {
+                        qcv_skillList._restoreScroll()
+                    }
+                }
+                
                 section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
                 section.delegate: CategoryHeader { 

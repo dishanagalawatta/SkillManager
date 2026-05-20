@@ -322,6 +322,52 @@ Item {
                 clip: true
                 spacing: 0
                 
+                // Visual Blink: Dips opacity slightly during background refresh to mask micro-jumps
+                opacity: (AppController.isLoading && _restoringScroll) ? 0.0 : 1.0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                property real savedScrollPos: 0
+                property bool _restoringScroll: false
+
+                function _restoreScroll() {
+                    if (AppController.isLoading && savedScrollPos > 0) {
+                        _restoringScroll = true
+                        
+                        // Force immediate layout to ensure contentHeight is valid for restore
+                        lv_listView.forceLayout()
+                        lv_listView.contentY = savedScrollPos
+                        
+                        // Second pass: Ensure it stuck (sometimes required for large additions)
+                        Qt.callLater(() => {
+                            if (lv_listView.contentY !== savedScrollPos) {
+                                lv_listView.forceLayout()
+                                lv_listView.contentY = savedScrollPos
+                            }
+                            _restoringScroll = false
+                        })
+                    }
+                }
+
+                Connections {
+                    target: lv_listView.model
+                    function onLayoutAboutToBeChanged() {
+                        if (AppController.isLoading) {
+                            lv_listView.savedScrollPos = lv_listView.contentY
+                        }
+                    }
+                    function onLayoutChanged() {
+                        lv_listView._restoreScroll()
+                    }
+                    function onModelAboutToBeReset() {
+                        if (AppController.isLoading) {
+                            lv_listView.savedScrollPos = lv_listView.contentY
+                        }
+                    }
+                    function onModelReset() {
+                        lv_listView._restoreScroll()
+                    }
+                }
+
                 section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
                 section.delegate: CategoryHeader {

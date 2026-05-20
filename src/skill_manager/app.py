@@ -490,6 +490,7 @@ class AppController(QObject):
                             cached_data.get("categories", []),
                             cached_data.get("project_labels", []),
                             f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
+                            is_final=False,
                         ),
                     )
 
@@ -505,6 +506,7 @@ class AppController(QObject):
                         result["categories"],
                         result["project_labels"],
                         result["status"],
+                        is_final=True,
                     ),
                 )
             except Exception as e:
@@ -516,7 +518,9 @@ class AppController(QObject):
 
         threading.Thread(target=run_discovery, daemon=True).start()
 
-    def _finalize_loading(self, all_skills, _projects_state, cats, proj_labels, status):
+    def _finalize_loading(
+        self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
+    ):
         """Updates model and UI state on the main thread after discovery completes."""
         del proj_labels
 
@@ -537,8 +541,10 @@ class AppController(QObject):
             self._quick_copy_model.projectFilter = ""
 
         self._set_status(status)
-        self._is_loading = False
-        self.isLoadingChanged.emit()
+
+        if is_final:
+            self._is_loading = False
+            self.isLoadingChanged.emit()
 
     def _handle_loading_error(self, error_msg):
         """Handles discovery errors on the main thread."""

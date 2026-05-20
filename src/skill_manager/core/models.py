@@ -551,19 +551,21 @@ class SkillModel(QAbstractListModel):
 
     @Slot(list)
     def setSkills(self, skills):
+        was_empty = len(self._all_skills) == 0
         self._all_skills = skills
         self._search_engine = SearchEngine(skills)
-        self._apply_filter(reset=True)
+        self._apply_filter(reset=was_empty)
 
     @Slot(list)
     def addOrUpdateSkills(self, new_skills):
         """Surgically adds or updates a list of skills in the model without a full reload."""
+        was_empty = len(self._all_skills) == 0
         skills_dict = {s["local_path"]: s for s in self._all_skills}
         for skill in new_skills:
             skills_dict[skill["local_path"]] = skill
         self._all_skills = list(skills_dict.values())
         self._search_engine = SearchEngine(self._all_skills)
-        self._apply_filter(reset=True)
+        self._apply_filter(reset=was_empty)
 
 
     @Slot(int, bool)
