@@ -221,7 +221,7 @@ def _get_category_patterns():
         if plain:
             # Combine all plain keywords into a single regex and drop re.I
             patterns.append(
-                re.compile(r"\b(?:" + "|".join(re.escape(kw.lower()) for kw in plain) + r")\b")
+                re.compile(r"\b(?:" + "|".join(re.escape(kw.lower()) for kw in sorted(plain, key=len, reverse=True)) + r")\b")
             )
         if special:
             # Drop re.I, we will lowercase input text
