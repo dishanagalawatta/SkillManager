@@ -95,4 +95,7 @@ Switch {
     HoverHandler {
         cursorShape: Qt.PointingHandCursor
     }
+
+    Accessible.role: Accessible.CheckBox
+    Accessible.name: control.text
 }

@@ -4,3 +4,6 @@
 ## 2026-05-19 - Focus Styling for Custom Form Elements
 **Learning:** In QML, components like Custom Switches (`GlassSwitch.qml`) and interactive labels (`FilterPill.qml`) also require explicit `control.visualFocus` binding to support keyboard navigation properly, not just buttons. Furthermore, custom interactive items may lack `Accessible.role` and `Accessible.name`, hiding them from screen readers.
 **Action:** Audit and update focus indicators (`border.color`, `border.width`) on all custom interactive elements, and ensure their `Accessible` properties are explicitly set.
+## 2026-05-20 - Accessible Properties for Custom QML Controls
+**Learning:** Custom QML components (like Switches and ComboBoxes built on top of Qt Quick Controls) do not automatically inherit all accessibility attributes, especially when customized. Screen readers need explicit roles (e.g., `Accessible.CheckBox`, `Accessible.ComboBox`) and names to properly identify these controls.
+**Action:** Always verify and set `Accessible.role` and `Accessible.name` (using properties like `control.text` or `control.displayText`) on custom interactive QML components to ensure full screen reader support.
