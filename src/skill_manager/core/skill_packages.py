@@ -113,10 +113,10 @@ def detect_package_config(data):
     # Auto-detect verify command for local paths if not provided
     if package_path and not source.get("verify_command"):
         # Expand user path for the generated command to be more portable
-        # although our interceptor will handle ~ as well.
         expanded = os.path.expanduser(package_path)
+        quoted_path = shlex.quote(expanded)
         source["verify_command"] = (
-            f'test -d {shlex.quote(expanded)} && echo "Skills installed in "{shlex.quote(expanded)}'
+            f'test -d {quoted_path} && echo {shlex.quote(f"Skills installed in {expanded}")}'
         )
 
     return source
