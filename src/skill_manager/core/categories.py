@@ -1,4 +1,3 @@
-import re
 from functools import lru_cache
 
 CATEGORY_EMOJI_MAP = {
@@ -88,7 +87,7 @@ def get_category_emoji(category_name: str) -> str:
     if not category_name:
         return "📁"
 
-    clean_name = re.sub(r"[*_]", "", category_name).strip()
+    clean_name = category_name.replace("*", "").replace("_", "").strip()
     if clean_name in CATEGORY_EMOJI_MAP:
         return CATEGORY_EMOJI_MAP[clean_name]
 
