@@ -302,6 +302,23 @@ def test_intercept_cross_platform_success(temp_dir):
     assert _intercept_cross_platform_command(f"test -d {temp_dir}", None)
 
 
+def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
+    # Create a directory with an apostrophe in its name
+    dir_with_apostrophe = temp_dir / "a'b"
+    dir_with_apostrophe.mkdir()
+
+    import shlex
+    quoted_path = shlex.quote(str(dir_with_apostrophe))
+
+    messages = []
+    # This should succeed without raising a Verification failed exception
+    assert _intercept_cross_platform_command(
+        f"test -d {quoted_path} && echo \"Skills installed in \"{quoted_path}",
+        messages.append
+    )
+    assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
+
+
 def test_intercept_cross_platform_echo_and_tilde_typo(temp_dir, monkeypatch):
     home = temp_dir / "home"
     target = home / ".agents"

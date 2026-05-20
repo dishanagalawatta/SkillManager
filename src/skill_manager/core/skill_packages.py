@@ -720,10 +720,17 @@ def _intercept_cross_platform_command(command, output_callback):
 
     path = test_part[len("test -d ") :].strip()
     # Handle quoted paths
-    if (path.startswith('"') and path.endswith('"')) or (
-        path.startswith("'") and path.endswith("'")
-    ):
-        path = path[1:-1]
+    if "'" in path or '"' in path:
+        try:
+            path_tokens = shlex.split(path)
+            if path_tokens:
+                path = "".join(path_tokens)
+        except ValueError:
+            # Fallback to simple slicing if shlex.split fails (e.g. unbalanced quotes)
+            if (path.startswith('"') and path.endswith('"')) or (
+                path.startswith("'") and path.endswith("'")
+            ):
+                path = path[1:-1]
 
     # Fix common typo where user types ~. instead of ~/.
     if path.startswith("~."):
@@ -742,10 +749,17 @@ def _intercept_cross_platform_command(command, output_callback):
         if echo_part.startswith("echo "):
             msg = echo_part[len("echo ") :].strip()
             # Remove surrounding quotes from message
-            if (msg.startswith('"') and msg.endswith('"')) or (
-                msg.startswith("'") and msg.endswith("'")
-            ):
-                msg = msg[1:-1]
+            if "'" in msg or '"' in msg:
+                try:
+                    msg_tokens = shlex.split(msg)
+                    if msg_tokens:
+                        msg = " ".join(msg_tokens)
+                except ValueError:
+                    # Fallback to simple slicing if shlex.split fails
+                    if (msg.startswith('"') and msg.endswith('"')) or (
+                        msg.startswith("'") and msg.endswith("'")
+                    ):
+                        msg = msg[1:-1]
             _emit(output_callback, msg)
 
     return True
