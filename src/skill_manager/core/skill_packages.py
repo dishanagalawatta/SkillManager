@@ -116,7 +116,7 @@ def detect_package_config(data):
         # although our interceptor will handle ~ as well.
         expanded = os.path.expanduser(package_path)
         source["verify_command"] = (
-            f'test -d {shlex.quote(expanded)} && echo "Skills installed in " {shlex.quote(expanded)}'
+            f'test -d {shlex.quote(expanded)} && echo "Skills installed in "{shlex.quote(expanded)}'
         )
 
     return source
