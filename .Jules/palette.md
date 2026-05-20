@@ -6,4 +6,4 @@
 **Action:** Audit and update focus indicators (`border.color`, `border.width`) on all custom interactive elements, and ensure their `Accessible` properties are explicitly set.
 ## 2026-05-20 - Accessible Properties for Custom QML Controls
 **Learning:** Custom QML components (like Switches and ComboBoxes built on top of Qt Quick Controls) do not automatically inherit all accessibility attributes, especially when customized. Screen readers need explicit roles (e.g., `Accessible.CheckBox`, `Accessible.ComboBox`) and names to properly identify these controls.
-**Action:** Always verify and set `Accessible.role` and `Accessible.name` (using descriptive labels, avoiding dynamic values like `control.displayText` for dropdowns) on custom interactive QML components to ensure full screen reader support.
+**Action:** Always verify and set `Accessible.role` and `Accessible.name` (using properties like `control.text` or `control.displayText`) on custom interactive QML components to ensure full screen reader support.
