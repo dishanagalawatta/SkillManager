@@ -116,7 +116,7 @@ def detect_package_config(data):
         expanded = os.path.expanduser(package_path)
         quoted_path = shlex.quote(expanded)
         source["verify_command"] = (
-            f'test -d {quoted_path} && echo {shlex.quote(f"Skills installed in {expanded}")}'
+            f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}'
         )
 
     return source
