@@ -12,7 +12,13 @@ Rectangle {
     property bool isCollapsed: false
     
     // Calculate width based on selection and collapse state
-    readonly property int targetWidth: (root.skill && root.skill.id !== undefined) ? (isCollapsed ? 32 : (isQuickCopy ? 350 : 400)) : 0
+    readonly property int targetWidth: {
+        if (!root.skill || root.skill.id === undefined) return 0;
+        if (isCollapsed) return 32;
+        
+        let dynamicWidth = parent ? parent.width * 0.5 : (isQuickCopy ? 350 : 400);
+        return Math.min(800, Math.max(isQuickCopy ? 350 : 400, dynamicWidth));
+    }
 
     function cleanBodyContent(content) {
         if (!content) return "";
