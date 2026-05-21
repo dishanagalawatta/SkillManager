@@ -540,7 +540,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                     if token
                     else []
                 )
-                + ["ls-remote", "--tags", "--sort=-v:refname", auth_url],
+                + ["ls-remote", "--tags", "--sort=-v:refname", "--", auth_url],
                 capture_output=True,
                 text=True,
                 timeout=15,
@@ -567,7 +567,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                     if token
                     else []
                 )
-                + ["ls-remote", auth_url, "HEAD"],
+                + ["ls-remote", "--", auth_url, "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=15,
@@ -674,7 +674,7 @@ def _run_git_package_update(source, output_callback):
                 if source.get("github_token")
                 else []
             )
-            + ["clone", auth_url, str(path)],
+            + ["clone", "--", auth_url, str(path)],
             output_callback,
         )
 
