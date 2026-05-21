@@ -174,7 +174,7 @@ class ConfigManager:
             # New config
             self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
             self.save()
-            
+
         return self.data
 
     def save(self) -> None:
