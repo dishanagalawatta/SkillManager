@@ -3,8 +3,6 @@ Purpose: Manages skill operations like copying, deleting, and status toggles.
 Usage: Accessed via AppController.ops
 """
 
-import json
-import threading
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -200,7 +198,7 @@ class OpsController(BaseController):
                     parts.append(f"{result['merged']} updated")
 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
-                
+
                 # Capture analytics
                 capture_event(
                     "skill_copied_to_project",

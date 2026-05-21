@@ -4,7 +4,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtGui import QGuiApplication

@@ -77,7 +77,7 @@ def test_get_or_create_device_id_corrupted(temp_data_dir):
 
 def test_init_posthog_missing_env():
     with patch.dict(os.environ, {
-        "POSTHOG_PROJECT_TOKEN": "", 
+        "POSTHOG_PROJECT_TOKEN": "",
         "POSTHOG_HOST": "",
         "SKILL_MANAGER_TESTING": "0",
         "PYTEST_CURRENT_TEST": ""
@@ -87,7 +87,7 @@ def test_init_posthog_missing_env():
 
 def test_init_posthog_success(mock_posthog):
     with patch.dict(os.environ, {
-        "POSTHOG_PROJECT_TOKEN": "tok", 
+        "POSTHOG_PROJECT_TOKEN": "tok",
         "POSTHOG_HOST": "host",
         "SKILL_MANAGER_TESTING": "0",
         "PYTEST_CURRENT_TEST": ""
