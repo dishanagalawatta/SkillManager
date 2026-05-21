@@ -73,15 +73,7 @@ def test_scan_for_updates(mock_service_class, update_controller, mock_app):
         mock_app._set_status.assert_any_call("Scan complete: 1 skills processed")
 
 
-@patch("skill_manager.controllers.update_controller.threading.Thread")
-def test_update_skill_in_project_success(mock_thread, update_controller, mock_app):
-    # Mocking threading.Thread to run target immediately
-    def thread_side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = thread_side_effect
-
+def test_update_skill_in_project_success(update_controller, mock_app):
     mock_app._library_model._all_skills = [
         {"is_source": True, "name": "Skill1", "local_path": "/p1"}
     ]

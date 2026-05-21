@@ -6,7 +6,7 @@ Usage: Accessed via AppController.config_mgr
 import os
 
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_event, capture_exception
 
 
 class ConfigController(BaseController):
@@ -27,8 +27,10 @@ class ConfigController(BaseController):
                 self.config.set("sources", self.app._sources)
                 self.app.sourcesChanged.emit()
                 self.app._set_status(f"Added source: {resolved_path}")
+                capture_event("skill_package_added", {"source_type": "local"})
         except Exception as e:
             self.app._set_status(f"Failed to add source: {e}")
+            capture_exception(e)
 
     def remove_source(self, path: str):
         """Removes a local skill source directory."""
@@ -37,6 +39,7 @@ class ConfigController(BaseController):
             self.config.set("sources", self.app._sources)
             self.app.sourcesChanged.emit()
             self.app._set_status(f"Removed source: {path}")
+            capture_event("skill_package_removed", {"source_type": "local"})
 
     def add_project(self, url: str):
         """Adds a project directory."""
@@ -48,7 +51,7 @@ class ConfigController(BaseController):
             self.config.set("projects", self.app._projects)
             self.app.projectsChanged.emit()
             self.app._set_status(f"Added project: {path}")
-            capture_event("project_added", {"project_count": len(self.app._projects)})
+            capture_event("project_target_added", {"target_count": len(self.app._projects)})
 
     def remove_project(self, path: str):
         """Removes a project directory."""

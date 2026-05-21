@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_event, capture_exception
 
 
 class UIController(BaseController):
@@ -126,6 +126,7 @@ class UIController(BaseController):
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
+            capture_exception(e)
 
     def launch_skill(self, path: str):
         """Launches a skill by opening its path."""

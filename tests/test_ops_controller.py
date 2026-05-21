@@ -75,21 +75,12 @@ def test_ops_controller_toggle_starred_no_path(ops_controller, mock_app):
 
 @patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_delete_commands(
-    mock_thread, mock_timer, mock_del, ops_controller, mock_app, tmp_path
-):
-    def side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = side_effect
-
+def test_ops_controller_delete_commands(mock_timer, mock_del, ops_controller, mock_app, tmp_path):
     cmd_file = tmp_path / "test.md"
     cmd_file.write_text("content")
 
     items = [{"local_path": str(cmd_file), "is_command": True}]
-    with patch.object(ops_controller, "_patch_cache_remove") as mock_patch:
+    with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
         ops_controller.delete_skills(items)
         assert not cmd_file.exists()
         mock_patch.assert_called_with([str(cmd_file)])
@@ -97,34 +88,15 @@ def test_ops_controller_delete_commands(
 
 @patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_delete_skills(mock_thread, mock_timer, mock_del, ops_controller, mock_app):
-    def side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = side_effect
+def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock_app):
     mock_del.return_value = {"deleted": 1, "failed": 0}
 
     items = [{"local_path": "/p1", "is_command": False}]
-    with patch.object(ops_controller, "_patch_cache_remove") as mock_patch:
+    with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
         ops_controller.delete_skills(items)
         mock_app._library_model.removeSkillsByPath.assert_called_with(["/p1"])
         mock_del.assert_called_once()
         mock_patch.assert_called_with(["/p1"])
-
-
-def test_ops_controller_patch_cache_remove(ops_controller, tmp_path):
-    cache_file = tmp_path / "cache.json"
-    cache_data = {"skills": [{"local_path": "/p1"}, {"local_path": "/p2"}]}
-    cache_file.write_text(json.dumps(cache_data))
-
-    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
-        ops_controller._patch_cache_remove(["/p1"])
-
-        updated_data = json.loads(cache_file.read_text())
-        assert len(updated_data["skills"]) == 1
-        assert updated_data["skills"][0]["local_path"] == "/p2"
 
 
 def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
@@ -149,13 +121,7 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_copy_selected(mock_thread, mock_timer, mock_copy, ops_controller, mock_app):
-    def thread_side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = thread_side_effect
+def test_ops_controller_copy_selected(mock_timer, mock_copy, ops_controller, mock_app):
     mock_copy.return_value = {"copied": 1, "merged": 0, "details": []}
 
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1"]
@@ -169,15 +135,7 @@ def test_ops_controller_copy_selected(mock_thread, mock_timer, mock_copy, ops_co
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_copy_selected_temporary(
-    mock_thread, mock_timer, mock_copy, ops_controller, mock_app
-):
-    def thread_side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = thread_side_effect
+def test_ops_controller_copy_selected_temporary(mock_timer, mock_copy, ops_controller, mock_app):
     mock_copy.return_value = {
         "copied": 1,
         "merged": 0,
@@ -243,15 +201,9 @@ def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, m
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
 def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
-    mock_thread, mock_timer, mock_copy, ops_controller, mock_app
+    mock_timer, mock_copy, ops_controller, mock_app
 ):
-    def thread_side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = thread_side_effect
     mock_copy.return_value = {
         "copied": 1,
         "merged": 0,
@@ -277,14 +229,18 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
 
     # Intercept QTimer.singleShot callback execution
     timer_callbacks = []
+
     def mock_single_shot(ms, obj, callback):
         timer_callbacks.append(callback)
 
     mock_timer.side_effect = mock_single_shot
 
     with (
-        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=mock_skill_data) as mock_discover,
-        patch.object(ops_controller, "_patch_cache_add_or_update") as mock_patch_cache,
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill",
+            return_value=mock_skill_data,
+        ) as mock_discover,
+        patch("skill_manager.controllers.ops_controller.patch_cache_add") as mock_patch_cache,
     ):
         ops_controller.copy_selected_to_project("/project")
 
@@ -315,16 +271,7 @@ def test_ops_controller_copy_selected_no_selection(ops_controller, mock_app):
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_copy_selected_exception(
-    mock_thread, mock_timer, mock_copy, ops_controller, mock_app
-):
-    def thread_side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = thread_side_effect
-
+def test_ops_controller_copy_selected_exception(mock_timer, mock_copy, ops_controller, mock_app):
     # Execute singleShot callbacks immediately
     mock_timer.side_effect = lambda ms, obj, cb: cb()
 
@@ -337,36 +284,9 @@ def test_ops_controller_copy_selected_exception(
     mock_app._set_status.assert_called_with("Copy failed: Disk full")
 
 
-def test_ops_controller_patch_cache_add_or_update(ops_controller, tmp_path):
-    cache_file = tmp_path / "cache.json"
-    cache_data = {
-        "skills": [{"local_path": "/p1", "category": "Old"}],
-        "categories": ["Old"],
-        "project_labels": [],
-    }
-    cache_file.write_text(json.dumps(cache_data))
-
-    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
-        new_skill = {"local_path": "/p1", "category": "New", "project_label": "Proj"}
-        ops_controller._patch_cache_add_or_update([new_skill])
-
-        updated_data = json.loads(cache_file.read_text())
-        assert updated_data["skills"][0]["category"] == "New"
-        assert "New" in updated_data["categories"]
-        assert "Proj" in updated_data["project_labels"]
-
-
 @patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-@patch("threading.Thread")
-def test_ops_controller_delete_skills_partial_failure(
-    mock_thread, mock_timer, mock_del, ops_controller, mock_app
-):
-    def side_effect(target, daemon=True):
-        target()
-        return MagicMock()
-
-    mock_thread.side_effect = side_effect
+def test_ops_controller_delete_skills_partial_failure(mock_timer, mock_del, ops_controller, mock_app):
     # Execute singleShot callbacks immediately
     mock_timer.side_effect = lambda ms, obj, cb: cb()
 
@@ -377,4 +297,3 @@ def test_ops_controller_delete_skills_partial_failure(
     ops_controller.delete_skills(items)
 
     mock_app._set_status.assert_called_with("Deletion complete: 1 deleted, 1 failed")
-

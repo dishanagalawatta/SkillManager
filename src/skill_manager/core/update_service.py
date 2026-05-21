@@ -19,6 +19,7 @@ from skill_manager.core.quick_copy import (
     discover_project_skills,
 )
 from skill_manager.core.skill_packages import check_skill_package_versions, run_skill_package_update
+from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
 
 
 class UpdateService:
@@ -29,6 +30,7 @@ class UpdateService:
         update_packages: list[dict[str, Any]] = None,
         project_aliases: dict[str, str] = None,
         update_sources: list[dict[str, Any]] = None,
+        task_runner: TaskRunner = None,
     ):
         self.sources = sources
         self.projects = projects
@@ -36,6 +38,7 @@ class UpdateService:
             update_packages if update_packages is not None else (update_sources or [])
         )
         self.project_aliases = project_aliases or {}
+        self.task_runner = task_runner or BackgroundTaskRunner()
 
     def run_global_update(
         self,
@@ -45,11 +48,10 @@ class UpdateService:
     ) -> None:
         """Runs a full global update: packages first, then projects."""
 
-        threading.Thread(
-            target=self.run_global_update_sync,
+        self.task_runner.run(
+            self.run_global_update_sync,
             args=(status_callback, source_progress_callback, completion_callback),
-            daemon=True,
-        ).start()
+        )
 
     def run_global_update_sync(
         self,
@@ -273,11 +275,10 @@ class UpdateService:
     ) -> None:
         """Scans for version updates and compares skills across projects."""
 
-        threading.Thread(
-            target=self.scan_for_updates_sync,
+        self.task_runner.run(
+            self.scan_for_updates_sync,
             args=(status_callback, completion_callback),
-            daemon=True,
-        ).start()
+        )
 
     def scan_for_updates_sync(
         self,

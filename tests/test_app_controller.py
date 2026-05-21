@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from skill_manager.app import AppController
+from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
 @pytest.fixture
@@ -30,7 +31,8 @@ def controller(qapp, mock_config, temp_dir):
         (temp_dir / "lib").mkdir(exist_ok=True)
         (temp_dir / "proj").mkdir(exist_ok=True)
 
-        c = AppController()
+        c = AppController(skip_initial_load=True)
+        c.task_runner = SynchronousTaskRunner()
         # Explicitly set values that might have been missed due to timing of __init__
         c._sources = config_data["sources"]
         c._projects = config_data["projects"]
@@ -88,23 +90,14 @@ def test_controller_copy_single_skill(controller):
 
 @patch("skill_manager.app.DiscoveryService")
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
-@patch("threading.Thread")
 @patch("PySide6.QtCore.QTimer.singleShot")
 def test_controller_sync_project(
-    mock_timer, mock_thread, mock_copy, mock_discovery_svc, controller
+    mock_timer, mock_copy, mock_discovery_svc, controller
 ):
     # Mock Timer to run callback immediately
     mock_timer.side_effect = lambda ms, receiver, method: (
         method() if callable(method) else method.call()
     )
-
-    # Mock Thread to return a mock object that executes the target when .start() is called
-    def side_effect(target, daemon=True):
-        mock_inst = MagicMock()
-        mock_inst.start.side_effect = lambda: target()
-        return mock_inst
-
-    mock_thread.side_effect = side_effect
 
     mock_copy.return_value = {"merged": 1, "failed": 0}
 
@@ -459,10 +452,9 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.compactListRows is False
 
 
-@patch("skill_manager.app.threading.Thread")
 @patch("PySide6.QtCore.QTimer.singleShot")
 def test_controller_load_initial_data_success_and_error(
-    mock_timer, mock_thread, controller, temp_dir
+    mock_timer, controller, temp_dir
 ):
     mock_timer.side_effect = lambda _ms, receiver, method=None: (
         receiver()
@@ -472,12 +464,6 @@ def test_controller_load_initial_data_success_and_error(
         else method.call()
     )
 
-    def run_thread(target, daemon=True):
-        mock_inst = MagicMock()
-        mock_inst.start.side_effect = target
-        return mock_inst
-
-    mock_thread.side_effect = run_thread
     update_source_path = temp_dir / "update-source"
     update_source_path.mkdir()
     controller._update_packages = [{"package_path": str(update_source_path)}]
@@ -556,9 +542,8 @@ def test_controller_archive_refresh_and_delegate_actions(controller):
     controller.updates.update_skill_in_project.assert_called_once_with("Skill", "Project")
 
 
-@patch("skill_manager.app.threading.Thread")
 @patch("PySide6.QtCore.QTimer.singleShot")
-def test_controller_run_update_success_and_failure(mock_timer, mock_thread, controller, temp_dir):
+def test_controller_run_update_success_and_failure(mock_timer, controller, temp_dir):
     mock_timer.side_effect = lambda _ms, receiver, method=None: (
         receiver()
         if method is None and callable(receiver)
@@ -567,12 +552,6 @@ def test_controller_run_update_success_and_failure(mock_timer, mock_thread, cont
         else method.call()
     )
 
-    def run_thread(target, daemon=True):
-        mock_inst = MagicMock()
-        mock_inst.start.side_effect = target
-        return mock_inst
-
-    mock_thread.side_effect = run_thread
     controller.load_initial_data = MagicMock()
     controller.updatePackagesChanged = MagicMock()
     controller._config.set = MagicMock()
