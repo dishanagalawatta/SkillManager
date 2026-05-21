@@ -778,7 +778,7 @@ def categorize_skill(name, description):
     """
     # Name is high signal, give it more weight (repeat it)
     text = f"{name} {name} {description}".lower()
-    norm_text = " ".join(text.replace("-", " ").replace("_", " ").split())
+    norm_text = text.replace("-", " ").replace("_", " ")
 
     best_category = "Uncategorized"
     max_matches = 0
@@ -802,8 +802,8 @@ def categorize_skill(name, description):
 
 def keyword_matches(text, keyword):
     # This is now mostly unused by categorize_skill but kept for compatibility
-    normalized_text = " ".join(text.replace("-", " ").replace("_", " ").split())
-    normalized_keyword = " ".join(keyword.replace("-", " ").replace("_", " ").split())
+    normalized_text = text.replace("-", " ").replace("_", " ")
+    normalized_keyword = keyword.replace("-", " ").replace("_", " ")
     if re.search(r"[+#./\s-]", keyword):
         return keyword in text or normalized_keyword in normalized_text
     return (
