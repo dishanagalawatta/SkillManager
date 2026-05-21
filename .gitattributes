@@ -1,0 +1,5 @@
+# Set default behavior for all text files
+* text=auto
+
+# Enforce LF line endings for Markdown files to prevent conflicts
+*.md text eol=lf
