@@ -91,6 +91,8 @@ class AppController(QObject):
     updateResultsChanged = Signal()
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
+    shortcutsChanged = Signal()
+    isRecordingShortcutChanged = Signal()
 
     def __init__(self, skip_initial_load=False):
         super().__init__()
@@ -107,6 +109,7 @@ class AppController(QObject):
         self._discovered_projects = []
         self._categories = []
         self._clipboard = QGuiApplication.clipboard()
+        self._is_recording_shortcut = False
 
         self._client_format = self._config.get("client_format", "Antigravity")
         self._sources = self._config.get("sources", [])
@@ -428,13 +431,74 @@ class AppController(QObject):
     @Property(bool, notify=compactListRowsChanged)
     def compactListRows(self):
         return self.ui._compact_list_rows
-
     @compactListRows.setter
     def compactListRows(self, value):
         if self.ui._compact_list_rows != value:
             self.ui._compact_list_rows = value
             self.ui.trigger_save()
             self.compactListRowsChanged.emit()
+
+    @Property(bool, notify=isRecordingShortcutChanged)
+    def isRecordingShortcut(self):
+        return self._is_recording_shortcut
+
+    @isRecordingShortcut.setter
+    def isRecordingShortcut(self, value):
+        if self._is_recording_shortcut != value:
+            self._is_recording_shortcut = value
+            self.isRecordingShortcutChanged.emit()
+
+    # --- Shortcut Properties ---
+
+    def _get_shortcut(self, key):
+        return self._config.get("shortcuts", {}).get(key, "")
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutSearch(self): return self._get_shortcut("search")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutCopy(self): return self._get_shortcut("copy")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutArchive(self): return self._get_shortcut("archive")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutDelete(self): return self._get_shortcut("delete")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutRefresh(self): return self._get_shortcut("refresh")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutExpandAll(self): return self._get_shortcut("expand_all")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutCollapseAll(self): return self._get_shortcut("collapse_all")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutTopOfList(self): return self._get_shortcut("top_of_list")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutClearSelection(self): return self._get_shortcut("clear_selection")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutThemeToggle(self): return self._get_shortcut("theme_toggle")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutQuickCopyView(self): return self._get_shortcut("quick_copy_view")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutLibraryView(self): return self._get_shortcut("library_view")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutUpdatesView(self): return self._get_shortcut("updates_view")
+    @Property(str, notify=shortcutsChanged)
+    def shortcutSettingsView(self): return self._get_shortcut("settings_view")
+
+    @Slot(str, str)
+    def setShortcut(self, action, sequence):
+        shortcuts = self._config.get("shortcuts", {})
+        if action in shortcuts and shortcuts[action] != sequence:
+            shortcuts[action] = sequence
+            self._config.set("shortcuts", shortcuts)
+            self.shortcutsChanged.emit()
+            self._set_status(f"Shortcut for {action} set to: {sequence}")
+
+    @Slot()
+    def resetShortcuts(self):
+        from skill_manager.core.config import DEFAULT_SHORTCUTS
+        self._config.set("shortcuts", DEFAULT_SHORTCUTS.copy())
+        self.shortcutsChanged.emit()
+        self._set_status("All shortcuts reset to defaults")
+
+    # --- Slots ---
 
     @Property(Qt.CheckState, notify=isPackageOnlyChanged)
     def isPackageOnly(self):
@@ -664,6 +728,27 @@ class AppController(QObject):
             self.ops.delete_skills(selected)
         else:
             self._set_status("No skills selected for deletion")
+
+    @Slot()
+    def archiveSelectedSkills(self):
+        selected_paths = self.skillModel.getSelectedPaths()
+        if not selected_paths:
+            self._set_status("No skills selected for archiving")
+            return
+            
+        count = 0
+        for path in selected_paths:
+            if path and path not in self._archive_paths:
+                self._archive_paths.append(path)
+                count += 1
+        
+        if count > 0:
+            self._save_archive()
+            self.skillModel.clearSelection()
+            self._set_status(f"{count} skills archived")
+            self.load_initial_data()  # Refresh models
+        else:
+            self._set_status("Selected skills are already archived")
 
     @Slot(str)
     def copySelectedSkillsToProject(self, project_path):

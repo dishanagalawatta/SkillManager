@@ -13,6 +13,10 @@ Item {
         lv_searchInput.selectAll()
     }
     
+    function scrollToTop() {
+        lv_listView.positionViewAtBeginning()
+    }
+    
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
     }
@@ -215,7 +219,7 @@ Item {
                     // Always Visible Actions
                     ActionButton {
                         id: lv_addCommandBtn
-                        labelText: "Add Command"
+                        labelText: "Add"
                         iconText: "+"
                         role: "secondary"
                         onClicked: (mouse) => lv_commandDialog.openWithContext("", AppController.clientFormat)
@@ -236,7 +240,7 @@ Item {
                         
                         ActionButton {
                             id: lv_clearBtn
-                            labelText: "Clear Selection"
+                            labelText: "Clear"
                             role: "secondary"
                             onClicked: (mouse) => AppController.libraryModel.clearSelection()
                         }
@@ -259,7 +263,7 @@ Item {
                         
                         ActionButton {
                             id: lv_tempCopyBtn
-                            labelText: "Copy Temporarily"
+                            labelText: "Copy Temp"
                             role: "secondary"
                             enabled: AppController.projects.length > 0
                             tooltipText: enabled ? "Copies selected skills to the project temporarily. They will be deleted when you close this app." : "Add a project in Updates before copying skills."
@@ -272,8 +276,16 @@ Item {
                         }
 
                         ActionButton {
+                            id: lv_archiveBtn
+                            labelText: "Archive"
+                            iconText: "📦"
+                            role: "secondary"
+                            onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.archiveSelectedSkills())
+                        }
+
+                        ActionButton {
                             id: lv_deleteBtn
-                            labelText: "Delete Selected"
+                            labelText: "Delete"
                             iconText: "🗑️"
                             role: "destructive"
                             onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.deleteSelectedSkills())
@@ -445,5 +457,9 @@ Item {
 
     DeleteConfirmDialog {
         id: lv_deleteConfirmDialog
+    }
+
+    ArchiveConfirmDialog {
+        id: lv_archiveConfirmDialog
     }
 }

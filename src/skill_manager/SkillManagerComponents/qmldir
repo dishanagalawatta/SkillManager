@@ -16,9 +16,12 @@ ActionButton 1.0 ActionButton.qml
 IconButton 1.0 IconButton.qml
 CustomTitleBar 1.0 CustomTitleBar.qml
 FrostOverlay 1.0 FrostOverlay.qml
+ShortcutsSettings 1.0 views/ShortcutsSettings.qml
+KeySequenceCapture 1.0 KeySequenceCapture.qml
 
 CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml
 SourceEditDialog 1.0 dialogs/SourceEditDialog.qml
 ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml
 DeleteConfirmDialog 1.0 dialogs/DeleteConfirmDialog.qml
+ArchiveConfirmDialog 1.0 dialogs/ArchiveConfirmDialog.qml

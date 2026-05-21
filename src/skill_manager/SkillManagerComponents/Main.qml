@@ -96,16 +96,23 @@ Window {
         }
     }
 
-    Shortcut { sequences: ["Ctrl+F", "Meta+F"]; onActivated: window.focusCurrentSearch() }
-    Shortcut { sequence: "Escape"; onActivated: AppController.clearViewFilters() }
-    Shortcut { sequences: ["Ctrl+C", "Meta+C"]; onActivated: AppController.copyCurrentSelectionOrFocusedSkill() }
-    Shortcut { sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.selectAllVisibleSkills() }
-    Shortcut { sequences: ["Ctrl+Shift+A", "Meta+Shift+A"]; onActivated: AppController.clearVisibleSelection() }
-    Shortcut { sequences: ["Ctrl+E", "Meta+E"]; onActivated: AppController.toggleAllVisibleCategories() }
-    Shortcut { sequence: "Alt+1"; onActivated: window.navigateTo("QuickCopy") }
-    Shortcut { sequence: "Alt+2"; onActivated: window.navigateTo("Library") }
-    Shortcut { sequence: "Alt+3"; onActivated: window.navigateTo("Updates") }
-    Shortcut { sequence: "Alt+4"; onActivated: window.navigateTo("Settings") }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutSearch; onActivated: window.focusCurrentSearch() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutClearSelection; onActivated: AppController.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutCopy; onActivated: AppController.copyCurrentSelectionOrFocusedSkill() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.selectAllVisibleSkills() }
+    
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutArchive; onActivated: AppController.archiveSelectedSkills() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutDelete; onActivated: AppController.deleteSelectedSkills() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutRefresh; onActivated: AppController.refreshSkills() }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutThemeToggle; onActivated: AppController.darkMode = !AppController.darkMode }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
+
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutLibraryView; onActivated: window.navigateTo("Library") }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
+    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
 
     Rectangle {
         anchors.fill: parent

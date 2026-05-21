@@ -344,35 +344,6 @@ Rectangle {
                 }
             }
 
-            // Actions
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                visible: root.skill.id !== undefined
-
-                ActionButton {
-                    text: "Copy Reference"
-                    Layout.fillWidth: true
-                    visible: root.isQuickCopy
-                    onClicked: (mouse) => {
-                        appController.copySkillReference(root.skill, argField.text)
-                    }
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: Theme.accent
-                    }
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: "white"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-            }
-            
             Item { Layout.preferredHeight: 12 } // Bottom padding
         }
     }
