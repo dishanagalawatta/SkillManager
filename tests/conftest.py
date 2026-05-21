@@ -4,10 +4,18 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtGui import QGuiApplication
+
+from skill_manager.utils.task_runner import SynchronousTaskRunner
+
+# Global test configuration
+os.environ["SKILL_MANAGER_TESTING"] = "1"
+os.environ["POSTHOG_PROJECT_TOKEN"] = ""
+os.environ["POSTHOG_HOST"] = ""
+os.environ["SKILL_MANAGER_SKIP_INITIAL_LOAD"] = "1"
 
 os.environ.setdefault(
     "SKILL_MANAGER_DATA_DIR",
@@ -55,6 +63,7 @@ def mock_config(temp_dir):
 def mock_app():
     """Provides a shared mock for AppController with common attributes."""
     app = MagicMock()
+    app.task_runner = SynchronousTaskRunner()
     # Core state
     app._selected_skill = {}
     app._archive_paths = []

@@ -40,6 +40,11 @@ def _get_or_create_device_id() -> str:
 
 
 def _init_posthog():
+    # Safeguard: Never initialize a real client during tests.
+    # This prevents background threads from hanging pytest on exit.
+    if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SKILL_MANAGER_TESTING") == "1":
+        return None
+
     token = os.getenv("POSTHOG_PROJECT_TOKEN")
     host = os.getenv("POSTHOG_HOST")
     if not token or not host:

@@ -8,6 +8,7 @@ import threading
 from PySide6.QtCore import QTimer
 
 from skill_manager.controllers.base import BaseController
+from skill_manager.core.analytics import capture_event
 from skill_manager.core.update_service import UpdateService
 
 
@@ -35,6 +36,7 @@ class UpdateController(BaseController):
             projects=self.app._projects,
             update_packages=self.app._update_packages,
             project_aliases=self.app._project_aliases,
+            task_runner=self.app.task_runner,
         )
 
         def source_progress_callback(idx, data):
@@ -51,6 +53,13 @@ class UpdateController(BaseController):
                     f"Global update complete: {result['merged']} updated, {result['failed']} failed"
                 )
                 self.app._set_status(msg)
+                
+                # Capture analytics
+                capture_event(
+                    "skill_package_updated",
+                    {"source_type": "global", "success": result["failed"] == 0},
+                )
+
                 self.config.set("skills", self.app._update_packages)
                 self.app._syncing_projects = []
                 self.app.projectsChanged.emit()
@@ -74,6 +83,7 @@ class UpdateController(BaseController):
             projects=self.app._projects,
             update_packages=self.app._update_packages,
             project_aliases=self.app._project_aliases,
+            task_runner=self.app.task_runner,
         )
 
         def completion_callback(results, updated_sources):
@@ -135,9 +145,10 @@ class UpdateController(BaseController):
                 QTimer.singleShot(500, self.app, self.scan_for_updates)
             except Exception as e:
                 err_msg = f"Surgical update failed: {e}"
+                capture_exception(e)
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
-        threading.Thread(target=run_surgical_sync, daemon=True).start()
+        self.app.task_runner.run(run_surgical_sync)
 
     def recalculate_stats(self):
         """Recalculates the up-to-date/outdated/missing stats."""

@@ -62,6 +62,7 @@ from skill_manager.core.resources import (
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
+from skill_manager.utils.task_runner import BackgroundTaskRunner
 
 
 class AppController(QObject):
@@ -92,10 +93,11 @@ class AppController(QObject):
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
 
-    def __init__(self):
+    def __init__(self, skip_initial_load=False):
         super().__init__()
         # 1. Core Models and Configuration
         self._config = ConfigManager()
+        self.task_runner = BackgroundTaskRunner()
         self._library_model = SkillModel(config=self._config)
         self._quick_copy_model = SkillModel(config=self._config)
 
@@ -153,7 +155,12 @@ class AppController(QObject):
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
         self._starred_paths = load_starred()
-        QTimer.singleShot(100, self.load_initial_data)
+        
+        # In tests, we often want to skip the initial background discovery
+        skip_initial = skip_initial_load or os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1"
+        
+        if not skip_initial:
+            QTimer.singleShot(100, self.load_initial_data)
 
     # --- Properties ---
 
@@ -516,7 +523,7 @@ class AppController(QObject):
                 traceback.print_exc()
                 QTimer.singleShot(0, self, lambda: self._handle_loading_error(error_msg))
 
-        threading.Thread(target=run_discovery, daemon=True).start()
+        self.task_runner.run(run_discovery)
 
     def _finalize_loading(
         self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
@@ -880,7 +887,7 @@ class AppController(QObject):
 
                     QTimer.singleShot(0, self, finalize_ui)
 
-            threading.Thread(target=run, daemon=True).start()
+            self.task_runner.run(run)
 
     def _save_archive(self):
         save_archive(self._archive_paths)
@@ -1141,7 +1148,7 @@ class AppController(QObject):
                     self._syncing_projects.remove(path)
                 QTimer.singleShot(0, self, self.projectsChanged.emit)
 
-        threading.Thread(target=run_sync, daemon=True).start()
+        self.task_runner.run(run_sync)
 
     @Slot()
     def updateNow(self):

@@ -21,15 +21,25 @@ from skill_manager.core.config import (
 CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
 
 
-def save_archive(archive_paths: list[str]) -> bool:
-    """Saves archived skill paths to JSON."""
+def _atomic_write_json(file_path: str, data: Any, indent: int = 4) -> bool:
+    """Writes JSON to a temporary file then renames it for atomicity."""
+    file_path = str(file_path)
+    temp_path = f"{file_path}.tmp"
     try:
-        with open(SKILL_LIBRARY_ARCHIVE_FILE, "w") as f:
-            json.dump(archive_paths, f, indent=4)
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, default=str)
+        os.replace(temp_path, file_path)
         return True
     except Exception as e:
-        print(f"Error saving archive: {e}")
+        print(f"Error atomic writing to {file_path}: {e}")
+        with contextlib.suppress(OSError):
+            os.remove(temp_path)
         return False
+
+
+def save_archive(archive_paths: list[str]) -> bool:
+    """Saves archived skill paths to JSON."""
+    return _atomic_write_json(SKILL_LIBRARY_ARCHIVE_FILE, archive_paths)
 
 
 def load_archive() -> list[str]:
@@ -37,7 +47,7 @@ def load_archive() -> list[str]:
     if not os.path.exists(SKILL_LIBRARY_ARCHIVE_FILE):
         return []
     try:
-        with open(SKILL_LIBRARY_ARCHIVE_FILE) as f:
+        with open(SKILL_LIBRARY_ARCHIVE_FILE, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
                 return data.get("archived_skills", [])
@@ -49,13 +59,7 @@ def load_archive() -> list[str]:
 
 def save_starred(starred_paths: list[str]) -> bool:
     """Saves starred skill paths to JSON."""
-    try:
-        with open(SKILL_LIBRARY_STARRED_FILE, "w") as f:
-            json.dump(starred_paths, f, indent=4)
-        return True
-    except Exception as e:
-        print(f"Error saving starred: {e}")
-        return False
+    return _atomic_write_json(SKILL_LIBRARY_STARRED_FILE, starred_paths)
 
 
 def load_starred() -> list[str]:
@@ -63,7 +67,7 @@ def load_starred() -> list[str]:
     if not os.path.exists(SKILL_LIBRARY_STARRED_FILE):
         return []
     try:
-        with open(SKILL_LIBRARY_STARRED_FILE) as f:
+        with open(SKILL_LIBRARY_STARRED_FILE, encoding="utf-8") as f:
             return json.load(f) or []
     except Exception as e:
         print(f"Error loading starred: {e}")
@@ -87,13 +91,7 @@ def load_project_skill_ownership() -> dict[str, dict[str, str]]:
 
 
 def save_project_skill_ownership(data: dict[str, dict[str, str]]) -> bool:
-    try:
-        with open(PROJECT_SKILL_OWNERSHIP_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        return True
-    except Exception as e:
-        print(f"Error saving project skill ownership: {e}")
-        return False
+    return _atomic_write_json(PROJECT_SKILL_OWNERSHIP_FILE, data, indent=2)
 
 
 def save_cache(data: dict[str, Any]) -> bool:
@@ -109,11 +107,7 @@ def save_cache(data: dict[str, Any]) -> bool:
                 {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
                 for skill in slim_data["skills"]
             ]
-
-        # print(f"[CACHE] Saving {len(slim_data.get('skills', []))} skills to {SKILL_LIBRARY_CACHE_FILE}...")
-        with open(SKILL_LIBRARY_CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(slim_data, f, indent=2, default=str)
-        return True
+        return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data, indent=2)
     except Exception as e:
         print(f"Error saving cache: {e}")
         return False
@@ -152,8 +146,7 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
         removed = original_count - len(data["skills"])
 
         if removed > 0:
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, default=str)
+            _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data, indent=2)
 
         return removed
     except Exception as exc:
@@ -234,8 +227,7 @@ def patch_cache_add(
             f"Found {num_skills} skills in master library ({num_projects} projects)"
         )
 
-        with open(cache_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, default=str)
+        _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data, indent=2)
 
         return updated_count
     except Exception as exc:
@@ -243,14 +235,9 @@ def patch_cache_add(
         return 0
 
 
-
 def save_temp_registry(paths: list[str]) -> None:
     """Saves the list of temporary copy paths to the registry."""
-    try:
-        with open(TEMP_COPIES_FILE, "w") as f:
-            json.dump({"temp_paths": paths}, f, indent=4)
-    except Exception as e:
-        print(f"Error saving temp registry: {e}")
+    _atomic_write_json(TEMP_COPIES_FILE, {"temp_paths": paths})
 
 
 def load_temp_registry() -> list[str]:
@@ -258,7 +245,7 @@ def load_temp_registry() -> list[str]:
     if not os.path.exists(TEMP_COPIES_FILE):
         return []
     try:
-        with open(TEMP_COPIES_FILE) as f:
+        with open(TEMP_COPIES_FILE, encoding="utf-8") as f:
             data = json.load(f)
             return data.get("temp_paths", [])
     except Exception as e:

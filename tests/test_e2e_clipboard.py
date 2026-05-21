@@ -9,6 +9,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 
 from skill_manager.app import AppController
+from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
 @pytest.fixture
@@ -40,7 +41,8 @@ def e2e_app(qtbot, mock_config, temp_dir):
         patch("skill_manager.app.DiscoveryService"),
         patch("skill_manager.app.AppController.load_initial_data"),
     ):
-        controller = AppController()
+        controller = AppController(skip_initial_load=True)
+        controller.task_runner = SynchronousTaskRunner()
 
     # Ensure selected IDs are clear
     controller.libraryModel._selected_ids.clear()

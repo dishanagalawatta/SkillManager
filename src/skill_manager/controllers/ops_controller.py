@@ -10,9 +10,11 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.persistence import (
     load_temp_registry,
+    patch_cache_add,
+    patch_cache_remove,
     save_archive,
     save_starred,
     save_temp_registry,
@@ -130,7 +132,7 @@ class OpsController(BaseController):
                     print(f"[DELETE] FAILED {p}: {exc}")
                     failed += 1
 
-            self._patch_cache_remove(paths_to_remove)
+            patch_cache_remove(paths_to_remove)
 
             # ── Step 3: Report back
             parts = [f"{deleted} deleted"] if deleted else []
@@ -139,69 +141,7 @@ class OpsController(BaseController):
             status = f"Deletion complete: {', '.join(parts) or 'nothing happened'}"
             QTimer.singleShot(0, self.app, lambda: self.app._set_status(status))
 
-        threading.Thread(target=_background_delete, daemon=True).start()
-
-    def _patch_cache_remove(self, paths_to_remove: list):
-        """Surgically remove entries from cache JSON."""
-        try:
-            from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
-
-            cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
-            if not cache_path.exists():
-                return
-
-            path_set = set(paths_to_remove)
-            with open(cache_path, encoding="utf-8") as f:
-                data = json.load(f)
-
-            data["skills"] = [
-                s for s in data.get("skills", []) if s.get("local_path") not in path_set
-            ]
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, default=str)
-        except Exception as exc:
-            print(f"[CACHE] Patch failed: {exc}")
-
-    def _patch_cache_add_or_update(self, new_skills: list[dict]):
-        """Surgically add or update entries in the cache JSON."""
-        try:
-            from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
-
-            cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
-            if not cache_path.exists():
-                return
-
-            with open(cache_path, encoding="utf-8") as f:
-                data = json.load(f)
-
-            # Strip large raw fields when caching
-            cache_excluded = {"raw_content", "body_content"}
-            processed_skills = []
-            for skill in new_skills:
-                processed_skills.append({k: v for k, v in skill.items() if k not in cache_excluded})
-
-            # Create a lookup map of existing cache skills by local_path
-            skills_dict = {s["local_path"]: s for s in data.get("skills", [])}
-            for skill in processed_skills:
-                skills_dict[skill["local_path"]] = skill
-
-            data["skills"] = list(skills_dict.values())
-
-            # Update categories and project_labels if they changed
-            cats = set(data.get("categories", []))
-            proj_labels = set(data.get("project_labels", []))
-            for skill in processed_skills:
-                if skill.get("category"):
-                    cats.add(skill["category"])
-                if skill.get("project_label"):
-                    proj_labels.add(skill["project_label"])
-            data["categories"] = sorted(cats)
-            data["project_labels"] = sorted(proj_labels)
-
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, default=str)
-        except Exception as exc:
-            print(f"[CACHE] Patch add/update failed: {exc}")
+        self.app.task_runner.run(_background_delete)
 
     def cleanup_temp_copies(self):
         """Deletes all temporary copies recorded in the registry."""
@@ -223,6 +163,7 @@ class OpsController(BaseController):
                     deleted_count += 1
             except Exception as e:
                 print(f"[TEMP_CLEANUP] Failed to delete {path_str}: {e}")
+                capture_exception(e)
 
         # Clear the registry after cleanup
         save_temp_registry([])
@@ -259,6 +200,17 @@ class OpsController(BaseController):
                     parts.append(f"{result['merged']} updated")
 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
+                
+                # Capture analytics
+                capture_event(
+                    "skill_copied_to_project",
+                    {
+                        "skills_copied": result.get("copied", 0),
+                        "skills_merged": result.get("merged", 0),
+                        "skills_failed": result.get("failed", 0),
+                        "skills_count": len(selected_skills),
+                    },
+                )
 
                 if is_temporary and result["details"]:
                     new_temp_paths = [
@@ -295,7 +247,7 @@ class OpsController(BaseController):
 
                 if discovered_skills:
                     # Patch JSON cache on disk
-                    self._patch_cache_add_or_update(discovered_skills)
+                    patch_cache_add(discovered_skills)
 
                     # Dynamic update of models in main UI thread
                     def update_ui():
@@ -320,7 +272,8 @@ class OpsController(BaseController):
 
             except Exception as e:
                 err_msg = f"Copy failed: {e}"
+                capture_exception(e)
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
-        threading.Thread(target=run_copy, daemon=True).start()
+        self.app.task_runner.run(run_copy)
 
