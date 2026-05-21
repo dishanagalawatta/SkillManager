@@ -735,13 +735,13 @@ class AppController(QObject):
         if not selected_paths:
             self._set_status("No skills selected for archiving")
             return
-            
+
         count = 0
         for path in selected_paths:
             if path and path not in self._archive_paths:
                 self._archive_paths.append(path)
                 count += 1
-        
+
         if count > 0:
             self._save_archive()
             self.skillModel.clearSelection()
