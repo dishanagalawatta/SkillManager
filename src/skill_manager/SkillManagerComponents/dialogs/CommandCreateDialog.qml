@@ -130,6 +130,8 @@ Dialog {
                     TextField { 
                         id: cmdNameInput
                         placeholderText: "e.g. PR Template"
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: "Command Name"
                         Layout.fillWidth: true
                         selectByMouse: true
                         font.family: Theme.fontFamily
@@ -155,6 +157,8 @@ Dialog {
                     TextField { 
                         id: cmdCategoryInput
                         placeholderText: "e.g. Git, Dev"
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: "Category"
                         Layout.fillWidth: true
                         selectByMouse: true
                         font.family: Theme.fontFamily
@@ -225,6 +229,8 @@ Dialog {
                         TextArea {
                             id: cmdBodyInput
                             placeholderText: "Paste your command or system prompt here..."
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: "Command Content"
                             color: Theme.label
                             font.family: "Consolas", "Monospace", "monospace"
                             font.pixelSize: 13
