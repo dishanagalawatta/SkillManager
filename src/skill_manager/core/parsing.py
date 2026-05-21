@@ -178,24 +178,20 @@ def extract_markdown_description(content):
     body = re.sub(
         r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", "", content, count=1, flags=re.DOTALL
     )
-    paragraphs = []
     current = []
 
     for raw_line in body.splitlines():
         line = raw_line.strip()
         if not line:
             if current:
-                paragraphs.append(" ".join(current))
-                current = []
+                break
             continue
         if line.startswith("#") or line.startswith("```") or line.startswith("---"):
             continue
-        current.append(re.sub(r"[*_`]+", "", line))
+        # Replace re.sub for performance in high-frequency parsing
+        current.append(line.replace("*", "").replace("_", "").replace("`", ""))
 
-    if current:
-        paragraphs.append(" ".join(current))
-
-    return normalize_description(paragraphs[0] if paragraphs else "")
+    return normalize_description(" ".join(current) if current else "")
 
 
 _CATEGORY_PATTERNS = None
