@@ -7,7 +7,6 @@ import ctypes
 import json
 import os
 import sys
-import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -155,10 +154,10 @@ class AppController(QObject):
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
         self._starred_paths = load_starred()
-        
+
         # In tests, we often want to skip the initial background discovery
         skip_initial = skip_initial_load or os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1"
-        
+
         if not skip_initial:
             QTimer.singleShot(100, self.load_initial_data)
 

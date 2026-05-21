@@ -3,12 +3,11 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 
-import threading
 
 from PySide6.QtCore import QTimer
 
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.update_service import UpdateService
 
 
@@ -53,7 +52,7 @@ class UpdateController(BaseController):
                     f"Global update complete: {result['merged']} updated, {result['failed']} failed"
                 )
                 self.app._set_status(msg)
-                
+
                 # Capture analytics
                 capture_event(
                     "skill_package_updated",

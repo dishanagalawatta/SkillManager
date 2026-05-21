@@ -2,7 +2,6 @@
 Update service for handling background skill updates and project syncing.
 """
 
-import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
