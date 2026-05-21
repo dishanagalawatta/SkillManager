@@ -778,7 +778,7 @@ def categorize_skill(name, description):
     """
     # Name is high signal, give it more weight (repeat it)
     text = f"{name} {name} {description}".lower()
-    norm_text = text.replace("-", " ").replace("_", " ")
+    norm_text = " ".join(text.replace("-", " ").replace("_", " ").split())
 
     best_category = "Uncategorized"
     max_matches = 0
