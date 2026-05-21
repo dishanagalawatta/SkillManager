@@ -12,3 +12,8 @@
 **Vulnerability:** A command injection vulnerability was present when generating default `verify_command`s (`test -d {package_path}`). User-controlled configuration paths were interpolated into shell strings without escaping, allowing arbitrary shell command execution if the path contained characters like `;` or quotes.
 **Learning:** Shell strings generated dynamically from configuration values must always be sanitized. `shlex.quote()` is necessary, but it breaks shell-native features like tilde `~` expansion, meaning `os.path.expanduser` must be called *before* escaping the path.
 **Prevention:** Use `shlex.quote(os.path.expanduser(path))` for all paths passed into shell command string interpolation.
+
+## 2026-05-21 - [Argument Injection Mitigation in NPM Commands]
+**Vulnerability:** User-provided `package_name` passed directly to `npx` via `subprocess.run` was vulnerable to argument injection if it started with a hyphen (e.g., `-c "malicious command"`).
+**Learning:** `npx` parses leading hyphens as its own options unless explicitly told to stop. Using `["npx", "--yes", package_name]` allows arbitrary code execution via the `-c` flag.
+**Prevention:** Always use the `--` separator in `npx` command lists before passing user-provided package names to ensure they are interpreted strictly as positional package names (e.g., `["npx", "--yes", "--", package_name]`).

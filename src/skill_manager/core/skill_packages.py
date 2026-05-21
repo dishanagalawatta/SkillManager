@@ -689,7 +689,8 @@ def _run_npm_update(source, output_callback):
     if not package_name:
         raise ValueError("Configure an npm package name.")
 
-    command = ["npx", "--yes", package_name]
+    # Security: Use '--' to prevent argument injection if package_name starts with a hyphen
+    command = ["npx", "--yes", "--", package_name]
     if source.get("package_args"):
         command.extend(_split_args(source["package_args"]))
     _run_process(command, output_callback)

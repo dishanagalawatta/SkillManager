@@ -164,7 +164,7 @@ def test_run_npm_update(mock_run):
     _run_npm_update(source, None)
 
     mock_run.assert_called_once()
-    assert mock_run.call_args[0][0] == ["npx", "--yes", "my-pkg", "--dev"]
+    assert mock_run.call_args[0][0] == ["npx", "--yes", "--", "my-pkg", "--dev"]
 
 
 @patch("shutil.which")
