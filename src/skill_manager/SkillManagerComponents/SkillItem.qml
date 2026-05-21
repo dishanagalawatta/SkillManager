@@ -96,6 +96,10 @@ Item {
                 ToolTip.text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
                 ToolTip.visible: containsMouse
                 ToolTip.delay: 400
+
+                Accessible.role: Accessible.Button
+                Accessible.name: root.subCat
+                Accessible.description: ToolTip.text
             }
         }
 
