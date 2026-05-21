@@ -19,6 +19,10 @@ Item {
         searchInput.selectAll()
     }
 
+    function scrollToTop() {
+        qcv_skillList.positionViewAtBeginning()
+    }
+
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
         searchInput.text = AppController.quickCopyModel.filterText

@@ -95,7 +95,7 @@ def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = N
 DATA_DIR = get_app_data_dir()
 CONFIG_FILE = resolve_data_file(CONFIG_FILENAME)
 SKILL_LIBRARY_CACHE_FILE = resolve_data_file(SKILL_LIBRARY_CACHE_FILENAME)
-SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(SKILL_LIBRARY_ARCHIVE_FILENAME)
+SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(SKILL_LIBRARY_ARCHIVE_FILE_NAME := SKILL_LIBRARY_ARCHIVE_FILENAME)
 SKILL_LIBRARY_STARRED_FILE = resolve_data_file(SKILL_LIBRARY_STARRED_FILENAME)
 SKILL_LIBRARY_CLIPBOARD_FILE = resolve_data_file(SKILL_LIBRARY_CLIPBOARD_FILENAME)
 QUICK_COPY_FILE = resolve_data_file(QUICK_COPY_FILENAME)
@@ -103,6 +103,23 @@ PROJECT_SKILL_OWNERSHIP_FILE = resolve_data_file(PROJECT_SKILL_OWNERSHIP_FILENAM
 SKILLS_LOCK_FILE = resolve_data_file(SKILLS_LOCK_FILENAME)
 TEMP_COPIES_FILE = resolve_data_file(TEMP_COPIES_FILENAME)
 SKILL_LIBRARY_CACHE_VERSION = 8
+
+DEFAULT_SHORTCUTS = {
+    "search": "Ctrl+F",
+    "copy": "Ctrl+C",
+    "archive": "Ctrl+Shift+X",
+    "delete": "Delete",
+    "refresh": "F5",
+    "expand_all": "Ctrl+E",
+    "collapse_all": "Ctrl+Shift+E",
+    "top_of_list": "Home",
+    "clear_selection": "Esc",
+    "theme_toggle": "Ctrl+T",
+    "quick_copy_view": "Alt+1",
+    "library_view": "Alt+2",
+    "updates_view": "Alt+3",
+    "settings_view": "Alt+4",
+}
 
 
 class ConfigManager:
@@ -136,8 +153,28 @@ class ConfigManager:
                     if "target_aliases" in self.data:
                         self.data["project_aliases"] = self.data.pop("target_aliases")
                     self.save()
+
+                # Ensure default shortcuts are present
+                if "shortcuts" not in self.data:
+                    self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+                    self.save()
+                else:
+                    # Merge defaults for new shortcuts if any added in future versions
+                    changed = False
+                    for key, val in DEFAULT_SHORTCUTS.items():
+                        if key not in self.data["shortcuts"]:
+                            self.data["shortcuts"][key] = val
+                            changed = True
+                    if changed:
+                        self.save()
+
             except Exception as e:
                 print(f"Error loading config: {e}")
+        else:
+            # New config
+            self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+            self.save()
+            
         return self.data
 
     def save(self) -> None:
