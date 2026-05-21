@@ -455,7 +455,7 @@ Dialog {
                                     id: tokenInput
                                     placeholderText: "ghp_xxxxxxxxxxxx"
                                     Accessible.role: Accessible.EditableText
-                                    Accessible.name: "Authentication Token"
+                                    Accessible.name: "Authentication Token (Optional)"
                                     echoMode: TextInput.Password
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
