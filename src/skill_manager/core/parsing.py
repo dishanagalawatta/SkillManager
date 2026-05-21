@@ -802,8 +802,8 @@ def categorize_skill(name, description):
 
 def keyword_matches(text, keyword):
     # This is now mostly unused by categorize_skill but kept for compatibility
-    normalized_text = text.replace("-", " ").replace("_", " ")
-    normalized_keyword = keyword.replace("-", " ").replace("_", " ")
+    normalized_text = " ".join(text.replace("-", " ").replace("_", " ").split())
+    normalized_keyword = " ".join(keyword.replace("-", " ").replace("_", " ").split())
     if re.search(r"[+#./\s-]", keyword):
         return keyword in text or normalized_keyword in normalized_text
     return (
