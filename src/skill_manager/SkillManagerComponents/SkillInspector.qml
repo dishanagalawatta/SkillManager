@@ -290,6 +290,8 @@ Rectangle {
                         TextArea {
                             id: rawContentArea
                             width: rawContentScroll.availableWidth
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: "Raw Content"
                             text: cleanBodyContent((root.skill && root.skill.body_content) || "")
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
@@ -323,6 +325,8 @@ Rectangle {
                     id: argField
                     Layout.fillWidth: true
                     placeholderText: "Optional argument..."
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: "Quick Copy Argument"
                     font.family: Theme.fontFamily
                     color: Theme.label
                     placeholderTextColor: Theme.secondaryLabel
