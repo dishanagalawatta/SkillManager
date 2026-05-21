@@ -405,6 +405,8 @@ Item {
                             Layout.preferredHeight: 36
                             Layout.preferredWidth: 200
                             placeholderText: "Collection Name"
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: placeholderText
                             text: qcv_root.editingCollectionName
                             color: Theme.label
                             placeholderTextColor: Theme.secondaryLabel

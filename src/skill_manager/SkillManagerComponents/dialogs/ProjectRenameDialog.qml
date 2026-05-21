@@ -119,6 +119,8 @@ Dialog {
             TextField {
                 id: renameInput
                 placeholderText: "Project Name"
+                Accessible.role: Accessible.EditableText
+                Accessible.name: placeholderText
                 Layout.fillWidth: true
                 selectByMouse: true
                 font.family: Theme.fontFamily
