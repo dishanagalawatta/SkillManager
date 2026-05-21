@@ -201,6 +201,8 @@ Dialog {
                                 TextField { 
                                     id: nameInput
                                     placeholderText: "e.g. Community Skills"
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Display Name"
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
@@ -283,6 +285,8 @@ Dialog {
                                 TextField { 
                                     id: packageInput
                                     placeholderText: "@my-org/skill-package"
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Package Name"
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
@@ -304,6 +308,8 @@ Dialog {
                                 TextField { 
                                     id: argsInput
                                     placeholderText: "--force --no-cache"
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Installation Arguments"
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
@@ -328,6 +334,8 @@ Dialog {
                             TextField { 
                                 id: cmdInput
                                 placeholderText: "bash ./update-skills.sh"
+                                Accessible.role: Accessible.EditableText
+                                Accessible.name: "Shell Command"
                                 Layout.fillWidth: true
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 13
@@ -388,6 +396,8 @@ Dialog {
                                 TextField { 
                                     id: repoInput
                                     placeholderText: "https://github.com/user/skills.git"
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Repository URL"
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
@@ -444,6 +454,8 @@ Dialog {
                                 TextField { 
                                     id: tokenInput
                                     placeholderText: "ghp_xxxxxxxxxxxx"
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Authentication Token (Optional)"
                                     echoMode: TextInput.Password
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
@@ -486,6 +498,8 @@ Dialog {
                                         TextField {
                                             id: currentVerCmdInput
                                             placeholderText: "e.g. npm list -g @org/skills --json"
+                                            Accessible.role: Accessible.EditableText
+                                            Accessible.name: "Detect Local Version"
                                             Layout.fillWidth: true
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 12
@@ -501,6 +515,8 @@ Dialog {
                                         TextField {
                                             id: latestVerCmdInput
                                             placeholderText: "e.g. npm show @org/skills version"
+                                            Accessible.role: Accessible.EditableText
+                                            Accessible.name: "Detect Latest Version"
                                             Layout.fillWidth: true
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 12
@@ -550,6 +566,8 @@ Dialog {
                                 TextField { 
                                     id: pathInput
                                     placeholderText: "Select folder where skills will be stored..."
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Package Path"
                                     Layout.fillWidth: true
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
