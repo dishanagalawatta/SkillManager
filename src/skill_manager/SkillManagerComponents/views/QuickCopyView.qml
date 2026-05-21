@@ -474,17 +474,42 @@ Item {
         }
 
         // Main Content Area
-        RowLayout {
+        SplitView {
+            id: qcv_splitView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 0
+            orientation: Qt.Horizontal
+            
+            handle: Rectangle {
+                implicitWidth: 12
+                color: "transparent"
+                
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 40
+                    radius: 1
+                    color: qcv_splitHandleArea.containsMouse ? Theme.accent : Theme.separator
+                    opacity: qcv_splitHandleArea.containsMouse ? 1.0 : 0.3
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                }
+                
+                MouseArea {
+                    id: qcv_splitHandleArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.SizeHorCursor
+                }
+            }
 
             // Skill List
             ListView {
                 id: qcv_skillList
                 objectName: "quickCopyList"
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                SplitView.fillWidth: true
+                SplitView.fillHeight: true
+                SplitView.minimumWidth: 300
                 model: AppController.quickCopyModel
                 clip: true
                 spacing: 0
@@ -572,16 +597,12 @@ Item {
             // Overlay Inspector
             SkillInspector {
                 id: qcv_inspector
-                Layout.fillHeight: true
-                Layout.preferredWidth: qcv_inspector.targetWidth
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: targetWidth
                 skill: AppController.selectedSkill
                 isQuickCopy: true
-                visible: qcv_inspector.targetWidth > 0
+                visible: targetWidth > 0
                 
-                Behavior on Layout.preferredWidth {
-                    NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
-                }
-
                 onClosed: AppController.selectSkill(-1)
             }
         }
