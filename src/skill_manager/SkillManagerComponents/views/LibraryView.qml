@@ -306,18 +306,42 @@ Item {
             }
         }
 
-        // Library Content (Placeholder for now)
-        RowLayout {
+        // Library Content
+        SplitView {
+            id: lv_splitView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 20
+            orientation: Qt.Horizontal
+            
+            handle: Rectangle {
+                implicitWidth: 12
+                color: "transparent"
+                
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 40
+                    radius: 1
+                    color: splitHandleArea.containsMouse ? Theme.accent : Theme.separator
+                    opacity: splitHandleArea.containsMouse ? 1.0 : 0.3
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                }
+                
+                MouseArea {
+                    id: splitHandleArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.SizeHorCursor
+                }
+            }
 
             // Skill List
             ListView {
                 id: lv_listView
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredWidth: 400
+                SplitView.fillWidth: true
+                SplitView.fillHeight: true
+                SplitView.minimumWidth: 300
                 model: AppController.libraryModel
                 clip: true
                 spacing: 0
@@ -405,14 +429,10 @@ Item {
             // Inspector Pane
             SkillInspector {
                 id: lv_inspector
-                Layout.fillHeight: true
-                Layout.preferredWidth: lv_inspector.targetWidth
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: targetWidth
                 skill: AppController.selectedSkill
-                visible: lv_inspector.targetWidth > 0
-
-                Behavior on Layout.preferredWidth {
-                    NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
-                }
+                visible: targetWidth > 0
 
                 onClosed: AppController.selectSkill(-1)
             }
