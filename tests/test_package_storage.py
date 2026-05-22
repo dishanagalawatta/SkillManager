@@ -114,6 +114,17 @@ def test_package_project_path_conflicts_detect_same_final_path(tmp_path):
     assert package_project_path_conflicts(packages, [str(path)]) == [str(path)]
 
 
+def test_package_project_path_conflicts_detect_project_root(tmp_path):
+    project_root = tmp_path / "repo"
+    project_skills = project_root / ".agents" / "skills"
+    project_skills.mkdir(parents=True)
+    packages = [{"resolved_package_path": str(project_skills)}]
+
+    assert package_project_path_conflicts(packages, [str(project_root)]) == [
+        str(project_skills)
+    ]
+
+
 def test_promote_package_storage_aborts_when_destination_not_empty(tmp_path):
     shared = tmp_path / "skills"
     shared.mkdir()

@@ -88,15 +88,22 @@ def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callba
     except Exception as e:
         _emit(output_callback, f"Failed to merge lockfile: {e}")
 
-def relocate_packages_from_output(captured_output: list[str], target_package_path: str, output_callback: Callable[[str], None] | None) -> list[str] | None:
+def relocate_packages_from_output(
+    captured_output: list[str],
+    target_package_path: str,
+    output_callback: Callable[[str], None] | None,
+    *,
+    base_path: str | os.PathLike | None = None,
+) -> list[str] | None:
     """Parses output log for installed paths and moves those folders to target_package_path."""
     if not target_package_path:
         _emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
         return None
 
     dest_base = Path(os.path.expanduser(target_package_path))
+    resolve_base = Path(os.path.expanduser(str(base_path))).resolve() if base_path else Path.cwd()
     path_regex = re.compile(
-        r"(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.\\[^…\n\r]+|~[^…\n\r]+)"
+        r"(?:Installed to|to|at|in|at)\s+([a-zA-Z]:[\\/][^…\n\r]+|[a-zA-Z]:[\\/][^…\n\r]+|/[^…\n\r]+|\.[\\/][^…\n\r]+|~[^…\n\r]+)"
     )
     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -109,7 +116,10 @@ def relocate_packages_from_output(captured_output: list[str], target_package_pat
             raw_path = match.group(1).strip()
             try:
                 raw_path = re.sub(r"[…\s│]+$", "", raw_path).strip()
-                expanded = Path(os.path.expanduser(raw_path)).resolve()
+                candidate = Path(os.path.expanduser(raw_path))
+                if not candidate.is_absolute():
+                    candidate = resolve_base / candidate
+                expanded = candidate.resolve()
                 if expanded.is_dir():
                     detected_paths.add(expanded)
                     _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
