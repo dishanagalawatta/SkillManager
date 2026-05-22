@@ -6,10 +6,9 @@ Usage: Accessed via AppController.discovery
 import os
 import traceback
 
-from PySide6.QtCore import QTimer
-
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.discovery import DiscoveryService
+from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
 
 class DiscoveryController(BaseController):
@@ -20,6 +19,7 @@ class DiscoveryController(BaseController):
         self.app._is_loading = True
         self.app.isLoadingChanged.emit()
         self.app._set_status("Scanning skills...")
+        used_cache_preview = False
 
         discovery_sources = list(self.app._sources)
         for src in self.app._update_packages:
@@ -38,9 +38,10 @@ class DiscoveryController(BaseController):
         def run_discovery():
             try:
                 def cache_callback(cached_data):
+                    nonlocal used_cache_preview
+                    used_cache_preview = True
                     print(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
-                    QTimer.singleShot(
-                        0,
+                    schedule_on_ui_thread(
                         self.app,
                         lambda: self._finalize_loading(
                             cached_data.get("skills", []),
@@ -55,8 +56,8 @@ class DiscoveryController(BaseController):
                 result = service.discover_all(cache_callback=cache_callback)
 
                 # Signal completion back to main thread
-                QTimer.singleShot(
-                    0,
+                final_delay_ms = 200 if used_cache_preview else 0
+                schedule_on_ui_thread(
                     self.app,
                     lambda: self._finalize_loading(
                         result["skills"],
@@ -66,11 +67,12 @@ class DiscoveryController(BaseController):
                         result["status"],
                         is_final=True,
                     ),
+                    delay_ms=final_delay_ms,
                 )
             except Exception as e:
                 error_msg = f"Error scanning skills: {e}"
                 traceback.print_exc()
-                QTimer.singleShot(0, self.app, lambda: self._handle_loading_error(error_msg))
+                schedule_on_ui_thread(self.app, lambda: self._handle_loading_error(error_msg))
 
         self.app.task_runner.run(run_discovery)
 

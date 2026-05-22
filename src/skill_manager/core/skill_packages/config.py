@@ -128,7 +128,15 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
     detected = detect_package_config(data)
-    pkg_path = str(detected.get("package_path") or detected.get("local_path") or "").strip()
+    configured_pkg_path = str(
+        detected.get("configured_package_path")
+        or detected.get("package_path")
+        or detected.get("local_path")
+        or ""
+    ).strip()
+    resolved_pkg_path = str(
+        detected.get("resolved_package_path") or detected.get("package_path") or ""
+    ).strip()
     pkg_args = str(detected.get("package_args") or detected.get("install_args") or "").strip()
 
     source = {
@@ -137,7 +145,9 @@ def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
         "source_type": str(detected.get("source_type") or "auto").strip(),
         "repository_url": str(detected.get("repository_url") or "").strip(),
         "github_token": str(detected.get("github_token") or "").strip(),
-        "package_path": pkg_path,
+        "configured_package_path": configured_pkg_path,
+        "resolved_package_path": resolved_pkg_path,
+        "package_path": resolved_pkg_path or configured_pkg_path,
         "clone_path": str(detected.get("clone_path") or "").strip(),
         "package_name": str(detected.get("package_name") or "").strip(),
         "package_args": pkg_args,
@@ -150,7 +160,13 @@ def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
     source["local_path"] = source["package_path"]
     source["install_args"] = source["package_args"]
 
-    for key in ("current_version", "latest_version", "last_updated", "managed_folders"):
+    for key in (
+        "current_version",
+        "latest_version",
+        "last_updated",
+        "managed_folders",
+        "storage_mode",
+    ):
         if data and hasattr(data, "get") and data.get(key):
             source[key] = data.get(key)
 

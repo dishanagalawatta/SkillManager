@@ -9,7 +9,9 @@ from typing import Any
 from skill_manager.core.copier import copy_skill_folders_to_projects
 from skill_manager.core.parsing import build_skill_search_text, categorize_skill, parse_skill_md
 from skill_manager.core.persistence import (
+    load_package_skill_inventory,
     load_project_skill_ownership,
+    save_package_skill_inventory,
     save_project_skill_ownership,
 )
 from skill_manager.core.quick_copy import (
@@ -17,7 +19,17 @@ from skill_manager.core.quick_copy import (
     discover_package_skills,
     discover_project_skills,
 )
-from skill_manager.core.skill_packages import check_skill_package_versions, run_skill_package_update
+from skill_manager.core.skill_packages import (
+    check_skill_package_versions,
+    diff_package_inventory,
+    inventory_removals_verified,
+    normalize_skill_package_config,
+    package_project_path_conflicts,
+    promote_package_storage,
+    resolve_package_storage,
+    run_skill_package_update,
+    scan_package_inventory,
+)
 from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
 
 
@@ -36,6 +48,9 @@ class UpdateService:
         self.update_packages = (
             update_packages if update_packages is not None else (update_sources or [])
         )
+        self.update_packages = [
+            normalize_skill_package_config(package) for package in self.update_packages
+        ]
         self.project_aliases = project_aliases or {}
         self.task_runner = task_runner or BackgroundTaskRunner()
 
@@ -63,6 +78,14 @@ class UpdateService:
             removed_by_package = []
             updated_skill_folders = set()
             package_id_by_folder = {}
+            inventory = load_package_skill_inventory()
+            self.update_packages = resolve_package_storage(self.update_packages, inventory)
+            conflicts = package_project_path_conflicts(self.update_packages, self.projects)
+            if conflicts:
+                raise RuntimeError(
+                    "Package storage path cannot be the same as a project skills path: "
+                    + ", ".join(conflicts)
+                )
             package_id_by_source = self._package_id_by_source_path()
 
             for index, source in enumerate(self.update_packages):
@@ -86,14 +109,46 @@ class UpdateService:
                         except Exception:
                             source["local_path"] = potential_path
 
-                    updated_source = run_skill_package_update(source, status_callback)
+                    previous_inventory = inventory.get(source.get("package_id"), {})
+                    if source.get("storage_mode") == "grouped":
+                        promote_result = promote_package_storage(source, previous_inventory)
+                        if promote_result.get("skipped"):
+                            raise RuntimeError(
+                                f"Could not promote package storage for {source.get('name')}"
+                            )
+
+                    updated_source = {**source, **run_skill_package_update(source, status_callback)}
                     updated_source["is_updating"] = False
                     updated_source["just_finished"] = True
 
+                    current_inventory = scan_package_inventory(updated_source)
+                    inventory_diff = diff_package_inventory(previous_inventory, current_inventory)
+                    removals_verified = inventory_removals_verified(
+                        previous_inventory, current_inventory
+                    )
+                    if current_inventory.get("scan_ok"):
+                        inventory[updated_source["package_id"]] = current_inventory
+                    elif previous_inventory:
+                        status_callback(
+                            "Skipped package inventory save for "
+                            f"{updated_source.get('name')}: {current_inventory.get('scan_error')}"
+                        )
+                    updated_source["managed_folders"] = sorted(
+                        current_inventory.get("skills", {}).keys()
+                    )
+                    updated_source["removed_folders"] = (
+                        inventory_diff["removed"] if removals_verified else []
+                    )
+                    updated_source["updated_folders"] = sorted(
+                        set(inventory_diff["added"]) | set(inventory_diff["updated"])
+                    )
+                    updated_source["removals_verified"] = removals_verified
+
                     # Track which folders were actually updated/relocated
-                    if updated_source.get("managed_folders"):
-                        updated_skill_folders.update(updated_source["managed_folders"])
-                        for folder_name in updated_source["managed_folders"]:
+                    folders_changed = updated_source.get("updated_folders") or []
+                    if folders_changed:
+                        updated_skill_folders.update(folders_changed)
+                        for folder_name in folders_changed:
                             package_id_by_folder[folder_name] = updated_source.get("package_id")
 
                     if updated_source.get("removed_folders"):
@@ -102,14 +157,23 @@ class UpdateService:
                                 {
                                     "folder_name": folder_name,
                                     "package_id": updated_source.get("package_id"),
+                                    "removal_verified": True,
                                 }
                             )
+                    elif inventory_diff["removed"] and not removals_verified:
+                        status_callback(
+                            "Skipped project deletion for "
+                            f"{updated_source.get('name')}: package inventory scan was unsafe"
+                        )
                     source_progress_callback(index, updated_source)
+                    self.update_packages[index] = updated_source
                     package_id_by_source.update(self._package_id_by_source_path([updated_source]))
                 except Exception as exc:
                     print(f"[UPDATE] Package failed: {source.get('name')} - {exc}")
                     source["is_updating"] = False
                     source_progress_callback(index, source)
+
+            save_package_skill_inventory(inventory)
 
             # Phase 2/2: Syncing to projects
             status_callback("Phase 2/2: Updating project folders...")
@@ -175,7 +239,7 @@ class UpdateService:
         for item in removed_folders:
             if isinstance(item, dict):
                 folder_name = item.get("folder_name")
-                if folder_name:
+                if folder_name and item.get("removal_verified") is True:
                     removed_map[folder_name] = item.get("package_id")
             elif item:
                 removed_map[str(item)] = None

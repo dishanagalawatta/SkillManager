@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from skill_manager.core.config import (
+    PACKAGE_SKILL_INVENTORY_FILE,
     PROJECT_SKILL_OWNERSHIP_FILE,
     SKILL_LIBRARY_ARCHIVE_FILE,
     SKILL_LIBRARY_CACHE_FILE,
@@ -92,6 +93,28 @@ def load_project_skill_ownership() -> dict[str, dict[str, str]]:
 
 def save_project_skill_ownership(data: dict[str, dict[str, str]]) -> bool:
     return _atomic_write_json(PROJECT_SKILL_OWNERSHIP_FILE, data, indent=2)
+
+
+def load_package_skill_inventory() -> dict[str, Any]:
+    """Loads package skill inventory.
+
+    Shape: {package_id: {"configured_package_path": str,
+                         "resolved_package_path": str,
+                         "skills": {folder_name: skill_record}}}
+    """
+    if not os.path.exists(PACKAGE_SKILL_INVENTORY_FILE):
+        return {}
+    try:
+        with open(PACKAGE_SKILL_INVENTORY_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"Error loading package skill inventory: {e}")
+        return {}
+
+
+def save_package_skill_inventory(data: dict[str, Any]) -> bool:
+    return _atomic_write_json(PACKAGE_SKILL_INVENTORY_FILE, data, indent=2)
 
 
 def save_cache(data: dict[str, Any]) -> bool:

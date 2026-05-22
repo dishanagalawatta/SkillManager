@@ -13,7 +13,7 @@ Rectangle {
     
     // Calculate width based on selection and collapse state
     readonly property int targetWidth: {
-        if (!root.skill || root.skill.id === undefined) return 0;
+        if (!root.skill || root.skill.local_path === undefined) return 0;
         if (isCollapsed) return 32;
         
         let dynamicWidth = parent ? parent.width * 0.5 : (isQuickCopy ? 350 : 400);
@@ -69,7 +69,7 @@ Rectangle {
             x: 12
             y: 12
             spacing: 16
-            visible: !root.isCollapsed && root.skill.id !== undefined
+            visible: !root.isCollapsed && root.skill.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
             
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -93,7 +93,7 @@ Rectangle {
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
-                    visible: root.skill && root.skill.id !== undefined
+                    visible: root.skill && root.skill.local_path !== undefined
                     onClicked: (mouse) => AppController.toggleCurrentSkillStarred()
                     
                     contentItem: Text {
@@ -121,7 +121,7 @@ Rectangle {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
-                    visible: root.skill && root.skill.id !== undefined
+                    visible: root.skill && root.skill.local_path !== undefined
                     ToolTip.text: "Close Inspector"
                     ToolTip.visible: hovered
                     ToolTip.delay: 400
@@ -135,7 +135,7 @@ Rectangle {
                 radius: Theme.radiusCard
                 color: Theme.glassPill
                 border.color: Theme.glassBorder
-                visible: root.skill.id !== undefined
+                visible: root.skill.local_path !== undefined
 
                 ColumnLayout {
                     id: metaColumn
@@ -144,7 +144,7 @@ Rectangle {
                     spacing: 4
                     
                     Repeater {
-                        model: root.skill.id ? [
+                        model: root.skill.local_path ? [
                             { label: "Location", value: root.skill.project_label || "Unknown" },
                             { label: "Type", value: root.skill.category || "Unknown" },
                             { label: "Risk", value: root.skill.risk || "Unknown" },
@@ -318,7 +318,7 @@ Rectangle {
             // Quick Copy Argument
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root.isQuickCopy && root.skill.id !== undefined
+                visible: root.isQuickCopy && root.skill.local_path !== undefined
                 spacing: 4
                 Text {
                     text: "Argument (e.g. ultra)"

@@ -14,7 +14,7 @@ def test_skill_inspector_close_button_visibility() -> None:
     content: str = inspector_path.read_text(encoding="utf-8")
 
     # The close button's visible property should not exclude root.isQuickCopy
-    assert "visible: root.skill && root.skill.id !== undefined" in content
+    assert "visible: root.skill && root.skill.local_path !== undefined" in content
     assert "visible: !root.isQuickCopy" not in content
 
 
