@@ -548,7 +548,7 @@ def test_category_expansion_refactor(qapp):
     assert model.isCategoryCollapsed("MainB|General") is False
 
     # Prepare rows so internal names exist
-    rows = model._prepare_rows(skills)
+    rows = model._all_filtered_skills
 
     # Skill A (in main category "General") is collapsed because its main category is collapsed.
     assert model._is_main_collapsed(rows[0]) is True

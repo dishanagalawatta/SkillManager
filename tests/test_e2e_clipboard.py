@@ -38,7 +38,7 @@ def e2e_app(qtbot, mock_config, temp_dir):
 
     # 2. Initialize Controller with patched discovery to prevent real data leaks
     with (
-        patch("skill_manager.app.DiscoveryService"),
+        patch("skill_manager.controllers.discovery_controller.DiscoveryService"),
         patch("skill_manager.app.AppController.load_initial_data"),
     ):
         controller = AppController(skip_initial_load=True)
