@@ -157,7 +157,8 @@ def test_cleanup_removed_project_skills_deletes_matches(mock_proj, service):
         patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
     ):
         service._cleanup_removed_project_skills(
-            [{"folder_name": "old", "package_id": "pkg_1"}], status_cb
+            [{"folder_name": "old", "package_id": "pkg_1", "removal_verified": True}],
+            status_cb,
         )
 
     delete.assert_called_once_with([{"folder_name": "old", "project_path": "/project"}])
@@ -176,10 +177,81 @@ def test_cleanup_removed_project_skills_leaves_unowned_matches(mock_proj, servic
         patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
     ):
         service._cleanup_removed_project_skills(
-            [{"folder_name": "old", "package_id": "pkg_1"}], status_cb
+            [{"folder_name": "old", "package_id": "pkg_1", "removal_verified": True}], status_cb
         )
 
     delete.assert_not_called()
+
+
+@patch("skill_manager.core.update_service.discover_project_skills")
+def test_cleanup_removed_project_skills_requires_verified_removal(mock_proj, service):
+    mock_proj.return_value = [
+        {"project_label": "P", "skills": [{"folder_name": "old", "project_path": "/project"}]}
+    ]
+    ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
+    with (
+        patch("skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership),
+        patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
+    ):
+        service._cleanup_removed_project_skills(
+            [{"folder_name": "old", "package_id": "pkg_1"}], MagicMock()
+        )
+
+    delete.assert_not_called()
+
+
+@patch("skill_manager.core.update_service.save_package_skill_inventory")
+@patch("skill_manager.core.update_service.load_package_skill_inventory")
+@patch("skill_manager.core.update_service.run_skill_package_update")
+@patch("skill_manager.core.update_service.discover_package_skills")
+@patch("skill_manager.core.update_service.delete_project_skill_folders")
+def test_run_global_update_suppresses_deletion_when_inventory_scan_is_unsafe(
+    mock_delete,
+    mock_discover,
+    mock_update,
+    mock_load_inventory,
+    mock_save_inventory,
+    service,
+    temp_dir,
+):
+    package_path = temp_dir / "missing-package"
+    project_path = temp_dir / "project" / ".agents" / "skills"
+    project_skill = project_path / "alpha"
+    project_skill.mkdir(parents=True)
+    (project_skill / "SKILL.md").write_text("project alpha")
+    service.projects = [str(project_path)]
+    service.update_packages = [
+        {
+            "name": "Pkg",
+            "package_id": "pkg_1",
+            "package_path": str(package_path),
+            "resolved_package_path": str(package_path),
+        }
+    ]
+    mock_load_inventory.return_value = {
+        "pkg_1": {
+            "resolved_package_path": str(package_path),
+            "skills": {"alpha": {"fingerprint": "old"}},
+        }
+    }
+    mock_update.return_value = {
+        "name": "Pkg",
+        "package_id": "pkg_1",
+        "package_path": str(package_path),
+        "resolved_package_path": str(package_path),
+    }
+    mock_discover.return_value = []
+    status_cb = MagicMock()
+
+    service.run_global_update_sync(status_cb, MagicMock(), MagicMock())
+
+    assert project_skill.is_dir()
+    mock_delete.assert_not_called()
+    saved_inventory = mock_save_inventory.call_args.args[0]
+    assert saved_inventory["pkg_1"]["skills"] == {"alpha": {"fingerprint": "old"}}
+    assert any(
+        "Skipped project deletion" in call.args[0] for call in status_cb.call_args_list
+    )
 
 
 def test_record_project_skill_ownership_for_merged_results():

@@ -12,6 +12,14 @@ from .relocator import (
     relocate_packages_from_output,
     relocate_packages_from_output as _relocate_packages_from_output,
 )
+from .storage import (
+    diff_package_inventory,
+    inventory_removals_verified,
+    package_project_path_conflicts,
+    promote_package_storage,
+    resolve_package_storage,
+    scan_package_inventory,
+)
 from .updater import (
     _intercept_cross_platform_command,
     _run_git_package_update,
@@ -36,6 +44,12 @@ __all__ = [
     "sanitize_token",
     "relocate_packages_from_output",
     "detect_git_remote",
+    "resolve_package_storage",
+    "scan_package_inventory",
+    "diff_package_inventory",
+    "inventory_removals_verified",
+    "promote_package_storage",
+    "package_project_path_conflicts",
     # Legacy / Internal exports for tests
     "_detect_command_type",
     "_parse_npx_command",

@@ -81,15 +81,23 @@ def test_update_skill_in_project_success(update_controller, mock_app):
 
     with (
         patch("skill_manager.core.copier.copy_skill_folders_to_projects") as mock_copy,
-        patch("skill_manager.controllers.update_controller.QTimer.singleShot") as mock_timer,
+        patch(
+            "skill_manager.controllers.update_controller.schedule_on_ui_thread"
+        ) as schedule_on_ui_thread,
     ):
+        schedule_on_ui_thread.side_effect = (
+            lambda _receiver, callback, *, delay_ms=0: callback() if delay_ms == 0 else None
+        )
         mock_copy.return_value = {"failed": 0}
 
         update_controller.update_skill_in_project("Skill1", "ProjectLabel")
 
         mock_copy.assert_called_once()
-        # Verify timers (status update and re-scan)
-        assert mock_timer.call_count >= 2
+        delays = [
+            call.kwargs.get("delay_ms", 0)
+            for call in schedule_on_ui_thread.call_args_list
+        ]
+        assert delays == [0, 500]
 
 
 def test_recalculate_stats(update_controller, mock_app):

@@ -46,11 +46,16 @@ class ConfigController(BaseController):
         if not url or not str(url).strip():
             return
         path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
-        if path not in self.app._projects:
-            self.app._projects.append(path)
+        from skill_manager.core.copier import normalize_project_skills_path
+
+        resolved_path, error = normalize_project_skills_path(path)
+        if error:
+            resolved_path = os.path.abspath(os.path.expanduser(path))
+        if resolved_path not in self.app._projects:
+            self.app._projects.append(resolved_path)
             self.config.set("projects", self.app._projects)
             self.app.projectsChanged.emit()
-            self.app._set_status(f"Added project: {path}")
+            self.app._set_status(f"Added project: {resolved_path}")
             capture_event("project_target_added", {"target_count": len(self.app._projects)})
 
     def remove_project(self, path: str):

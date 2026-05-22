@@ -453,18 +453,9 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.compactListRows is False
 
 
-@patch("PySide6.QtCore.QTimer.singleShot")
 def test_controller_load_initial_data_success_and_error(
-    mock_timer, controller, temp_dir
+    controller, temp_dir
 ):
-    mock_timer.side_effect = lambda _ms, receiver, method=None: (
-        receiver()
-        if method is None and callable(receiver)
-        else method()
-        if callable(method)
-        else method.call()
-    )
-
     update_source_path = temp_dir / "update-source"
     update_source_path.mkdir()
     controller._update_packages = [{"package_path": str(update_source_path)}]
@@ -482,16 +473,61 @@ def test_controller_load_initial_data_success_and_error(
             "status": "Done",
         }
     )
-    with patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service):
+    def run_scheduled(_receiver, callback, *, delay_ms=0):
+        callback()
+
+    with (
+        patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service),
+        patch(
+            "skill_manager.controllers.discovery_controller.schedule_on_ui_thread",
+            side_effect=run_scheduled,
+        ),
+    ):
         controller.load_initial_data()
     assert controller.categories == ["Dev"]
     assert controller.statusMessage == "Done"
 
     failing_service = MagicMock()
     failing_service.discover_all.side_effect = RuntimeError("boom")
-    with patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=failing_service):
+    with (
+        patch(
+            "skill_manager.controllers.discovery_controller.DiscoveryService",
+            return_value=failing_service,
+        ),
+        patch(
+            "skill_manager.controllers.discovery_controller.schedule_on_ui_thread",
+            side_effect=run_scheduled,
+        ),
+    ):
         controller.load_initial_data()
     assert controller.statusMessage == "Error scanning skills: boom"
+
+
+def test_controller_load_initial_data_delays_final_refresh_after_cache_preview(
+    controller
+):
+    service = MagicMock()
+    service.discover_all.side_effect = lambda cache_callback: (
+        cache_callback({"skills": [], "projects": [], "categories": [], "project_labels": []})
+        or {"skills": [], "projects": [], "categories": [], "project_labels": [], "status": "Done"}
+    )
+
+    scheduled_delays = []
+
+    def run_scheduled(_receiver, callback, *, delay_ms=0):
+        scheduled_delays.append(delay_ms)
+        callback()
+
+    with (
+        patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service),
+        patch(
+            "skill_manager.controllers.discovery_controller.schedule_on_ui_thread",
+            side_effect=run_scheduled,
+        ),
+    ):
+        controller.load_initial_data()
+
+    assert scheduled_delays == [0, 200]
 
 
 def test_controller_cache_save_load_and_corruption(controller, tmp_path):

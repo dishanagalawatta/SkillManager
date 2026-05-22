@@ -9,10 +9,27 @@ from PySide6.QtCore import QTimer
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.update_service import UpdateService
+from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
 
 class UpdateController(BaseController):
     """Controller for skill updates and synchronization."""
+
+    def _resolve_package_storage_state(self):
+        from skill_manager.core.persistence import load_package_skill_inventory
+        from skill_manager.core.skill_packages import (
+            normalize_skill_package_config,
+            resolve_package_storage,
+        )
+
+        packages = [
+            {**normalize_skill_package_config(package), **package}
+            for package in self.app._update_packages
+        ]
+        self.app._update_packages = resolve_package_storage(
+            packages, load_package_skill_inventory()
+        )
+        self.config.set("skills", self.app._update_packages)
 
     def update_now(self):
         """Starts a global update of all skills and projects."""
@@ -140,12 +157,12 @@ class UpdateController(BaseController):
                 if result["failed"] > 0:
                     msg = f"Failed to update {skill_name} in {project_name}"
 
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
-                QTimer.singleShot(500, self.app, self.scan_for_updates)
+                schedule_on_ui_thread(self.app, lambda: self.app._set_status(msg))
+                schedule_on_ui_thread(self.app, self.scan_for_updates, delay_ms=500)
             except Exception as e:
                 err_msg = f"Surgical update failed: {e}"
                 capture_exception(e)
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
+                schedule_on_ui_thread(self.app, lambda: self.app._set_status(err_msg))
 
         self.app.task_runner.run(run_surgical_sync)
 
@@ -200,7 +217,7 @@ class UpdateController(BaseController):
         new_source = check_skill_package_versions(new_source)
 
         self.app._update_packages.append(new_source)
-        self.config.set("skills", self.app._update_packages)
+        self._resolve_package_storage_state()
         self.app.updatePackagesChanged.emit()
         self.app._set_status(f"Added skill package: {new_source.get('name')}")
         capture_event(
@@ -225,7 +242,7 @@ class UpdateController(BaseController):
             updated_source = check_skill_package_versions(updated_source)
 
             self.app._update_packages[index] = updated_source
-            self.config.set("skills", self.app._update_packages)
+            self._resolve_package_storage_state()
             self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Updated skill package: {updated_source.get('name')}")
 
@@ -233,7 +250,7 @@ class UpdateController(BaseController):
         """Removes a skill package."""
         if 0 <= index < len(self.app._update_packages):
             source = self.app._update_packages.pop(index)
-            self.config.set("skills", self.app._update_packages)
+            self._resolve_package_storage_state()
             self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Removed update package: {source.get('name')}")
             capture_event(
@@ -243,6 +260,7 @@ class UpdateController(BaseController):
     def run_package_update(self, index: int):
         """Runs update for a single skill package."""
         if 0 <= index < len(self.app._update_packages):
+            self._resolve_package_storage_state()
             source = self.app._update_packages[index]
             source["is_updating"] = True
             source["just_finished"] = False
@@ -253,10 +271,24 @@ class UpdateController(BaseController):
                 from datetime import datetime
                 from pathlib import Path
 
-                from skill_manager.core.skill_packages import run_skill_package_update
+                from skill_manager.core.persistence import (
+                    load_package_skill_inventory,
+                    save_package_skill_inventory,
+                )
+                from skill_manager.core.skill_packages import (
+                    diff_package_inventory,
+                    inventory_removals_verified,
+                    promote_package_storage,
+                    run_skill_package_update,
+                    scan_package_inventory,
+                )
 
                 try:
-                    pkg_path = source.get("package_path") or source.get("local_path")
+                    pkg_path = (
+                        source.get("resolved_package_path")
+                        or source.get("package_path")
+                        or source.get("local_path")
+                    )
                     if not pkg_path and self.app._sources:
                         potential_path = self.app._sources[0]
                         if Path(potential_path).resolve() == Path.cwd().resolve():
@@ -269,7 +301,34 @@ class UpdateController(BaseController):
                     def log_callback(msg):
                         QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
 
-                    updated_source = run_skill_package_update(source, log_callback)
+                    inventory = load_package_skill_inventory()
+                    previous_inventory = inventory.get(source.get("package_id"), {})
+                    if source.get("storage_mode") == "grouped":
+                        promote_result = promote_package_storage(source, previous_inventory)
+                        if promote_result.get("skipped"):
+                            raise RuntimeError(
+                                f"Could not promote package storage for {source.get('name')}"
+                            )
+
+                    updated_source = {**source, **run_skill_package_update(source, log_callback)}
+                    current_inventory = scan_package_inventory(updated_source)
+                    inventory_diff = diff_package_inventory(previous_inventory, current_inventory)
+                    removals_verified = inventory_removals_verified(
+                        previous_inventory, current_inventory
+                    )
+                    if current_inventory.get("scan_ok"):
+                        inventory[updated_source["package_id"]] = current_inventory
+                    updated_source["managed_folders"] = sorted(
+                        current_inventory.get("skills", {}).keys()
+                    )
+                    updated_source["removed_folders"] = (
+                        inventory_diff["removed"] if removals_verified else []
+                    )
+                    updated_source["updated_folders"] = sorted(
+                        set(inventory_diff["added"]) | set(inventory_diff["updated"])
+                    )
+                    updated_source["removals_verified"] = removals_verified
+                    save_package_skill_inventory(inventory)
                     source.update(updated_source)
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
                     capture_event("skill_package_updated", {"source_type": source.get("source_type", "unknown"), "success": True})

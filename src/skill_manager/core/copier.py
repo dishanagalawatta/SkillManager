@@ -76,6 +76,11 @@ def copy_skill_folders_to_projects(skills, projects, update_only=False):
     return result
 
 
+def normalize_project_skills_path(project):
+    path, error = _normalize_project_path(project)
+    return str(path), error
+
+
 def _normalize_skill_package(skill):
     raw_path = skill.get("local_path") or ""
     if not raw_path:

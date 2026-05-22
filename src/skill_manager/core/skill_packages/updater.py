@@ -14,7 +14,7 @@ from .versioning import check_skill_package_versions
 
 def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
     repository_url = source.get("repository_url")
-    package_path = source.get("package_path")
+    package_path = source.get("resolved_package_path") or source.get("package_path")
     clone_path = source.get("clone_path") or package_path
 
     if not repository_url:
@@ -133,7 +133,7 @@ def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[
     source.setdefault("managed_folders", [])
     source.setdefault("removed_folders", [])
 
-    package_path = source.get("package_path")
+    package_path = source.get("resolved_package_path") or source.get("package_path")
     captured_output = []
 
     def intercept_callback(msg):
