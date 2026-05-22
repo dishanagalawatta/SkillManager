@@ -55,6 +55,10 @@ Rectangle {
                     ToolTip.text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
                     ToolTip.visible: containsMouse
                     ToolTip.delay: 400
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: ToolTip.text
+                    Accessible.description: ToolTip.text
                 }
             }
             
