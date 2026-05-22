@@ -83,5 +83,9 @@ Item {
         ToolTip.text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
         ToolTip.visible: containsMouse
         ToolTip.delay: 400
+
+        Accessible.role: Accessible.Button
+        Accessible.name: root.mainCatName
+        Accessible.description: ToolTip.text
     }
 }
