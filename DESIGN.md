@@ -2,7 +2,7 @@
 
 ## Design Intent
 
-Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-developer tools. It balances the depth of Apple's Liquid Glass with the stability of solid, deeply-tinted materials. The interface prioritizes a "Hybrid Forest" palette—using dark emerald and pine tones—to create a premium, focused workspace. While functional components (pills) maintain frosted translucency, the main window background utilizes solid, non-transparent colors to ensure consistent visual fidelity across all OS configurations and display scales.
+Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-developer tools. It balances the depth of Apple's Liquid Glass with the stability of solid, deeply-tinted materials. The interface prioritizes a "Modern Graphite" palette—using sleek neutral grays and blue accents—to create a premium, focused workspace. While functional components (pills) maintain frosted translucency, the main window background utilizes solid, non-transparent colors to ensure consistent visual fidelity across all OS configurations and display scales.
 
 ## Product Context
 
@@ -27,10 +27,10 @@ The Liquid Glass redesign must not move or weaken these workflows:
 
 The redesign treats the UI as a series of high-contrast, rounded containers floating over a stable, solid base:
 
-- **Solid Matte Foundation:** The primary window utilizes a solid, deeply-tinted material (e.g., `#0E1210` in Dark Mode) instead of full-window transparency. This provides a robust, professional feel and eliminates "glowing" or "leaking" artifacts from the desktop wallpaper.
-- **Glass-Pill Components:** Functional sections (toolbars, sidebars) and content areas remain encapsulated in "frosted glass" pills. These pills use subtle alpha-blending or distinct tinting (`#1A201E`) to stand out against the matte background.
+- **Solid Matte Foundation:** The primary window utilizes a solid, deeply-tinted material (e.g., `#121214` in Dark Mode) instead of full-window transparency. This provides a robust, professional feel and eliminates "glowing" or "leaking" artifacts from the desktop wallpaper.
+- **Glass-Pill Components:** Functional sections (toolbars, sidebars) and content areas remain encapsulated in "frosted glass" pills. These pills use subtle alpha-blending or distinct tinting (`#1E1E22`) to stand out against the matte background.
 - **Synchronized Rounding:** All primary containers and the main window frame use a **12px corner radius**. This value is strictly synchronized with the Windows 11 native DWM corner preference (`DWMWCP_ROUND`) to ensure perfectly aligned shadows and borders.
-- **Inner Reflection Borders:** Components use 1px solid tinted borders (`#2D3531`) to define edges. These act as "reflection" points that give the UI a layered, physical presence without relying on heavy gradients.
+- **Inner Reflection Borders:** Components use 1px solid tinted borders (`#2A2A30`) to define edges. These act as "reflection" points that give the UI a layered, physical presence without relying on heavy gradients.
 - **Premium Micro-Animations:** Interaction is enhanced with subtle 150ms transitions on hover and focus states, making the matte surfaces feel "alive" and responsive.
 
 ## HIG Principles Applied
@@ -113,17 +113,17 @@ Prefer a vibrant, multi-tonal palette that leverages translucency. Use bright, h
 
 | Token | Light (Matte) | Dark (Matte) | Usage |
 |---|---:|---:|---|
-| `--app-bg` | `#F5FAF8` | `#0E1210` | Primary application background |
-| `--glass-pill` | `#FFFFFF` | `#1A201E` | Frosted pill containers (Layer 2) |
+| `--app-bg` | `#F5F7F9` | `#121214` | Primary application background |
+| `--glass-pill` | `#FFFFFF` | `#1E1E22` | Frosted pill containers (Layer 2) |
 | `--glass-hover` | `rgba(0,0,0,0.05)`| `rgba(255,255,255,0.08)`| Hover state for pill items |
-| `--glass-border` | `#DDE5E1` | `#2D3531` | 1px Solid border (Reflection edge) |
+| `--glass-border` | `#DDE5E1` | `#2A2A30` | 1px Solid border (Reflection edge) |
 | `--glass-shadow` | `rgba(0,0,0,0.12)` | `rgba(0,0,0,0.40)` | Depth and elevation shadow |
 | `--separator` | `rgba(0,0,0,0.10)` | `rgba(255,255,255,0.10)` | Hairline dividers |
-| `--label` | `#1A1C1B` | `#F0F5F2` | Primary text (Forest tint) |
+| `--label` | `#111827` | `#F3F4F6` | Primary text (Modern Graphite tint) |
 | `--secondary-label`| `rgba(0,0,0,0.55)` | `rgba(255,255,255,0.55)`| Secondary text and hints |
-| `--accent` | `#00A36C` | `#10B981` | Emerald/Pine active state |
-| `--success` | `#34C759` | `#32D74B` | Completed / Success indicator |
-| `--danger` | `#FF3B30` | `#FF453A` | Destructive / Remove actions |
+| `--accent` | `#059669` | `#3B82F6` | Modern Blue / Sage active state |
+| `--success` | `#10B981` | `#10B981` | Completed / Success indicator |
+| `--danger` | `#DC2626` | `#EF4444` | Destructive / Remove actions |
 
 Do not use blue-purple gradients for ordinary UI chrome. The existing logo gradient can remain in the app icon and about/branding surfaces only.
 
