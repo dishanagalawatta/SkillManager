@@ -169,7 +169,7 @@ def check_skill_package_versions(source: dict[str, Any], force_refresh: bool = F
         if not latest_version or force_refresh:
             package_name = source.get("package_name")
             if package_name:
-                detected_latest = run_version_command(f"npm view {package_name} version")
+                detected_latest = run_version_command(f"npm view -- {package_name} version")
                 if detected_latest:
                     latest_version = clean_v(detected_latest)
 
