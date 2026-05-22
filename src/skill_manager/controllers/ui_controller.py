@@ -133,3 +133,27 @@ class UIController(BaseController):
         self.app._set_status(f"Launching skill: {path}")
         capture_event("skill_launched")
         self.open_path(path)
+
+    def select_skill(self, index: int):
+        """Sets the selected skill based on model index."""
+        if index == -1:
+            self.app._selected_skill = {}
+        else:
+            self.app._selected_skill = self.app.skillModel.get_skill_at(index)
+        self.app.selectedSkillChanged.emit()
+
+    def select_all_visible_skills(self):
+        """Selects all skills currently visible in the active model."""
+        self.app.skillModel.selectAll()
+        self.app._set_status(f"Selected {self.app.skillModel.selectedCount} visible skills")
+
+    def clear_visible_selection(self):
+        """Clears selection in the active model."""
+        self.app.skillModel.clearSelection()
+        self.app._set_status("Selection cleared")
+
+    def toggle_all_visible_categories(self):
+        """Toggles collapse/expand for all categories."""
+        self.app.skillModel.toggleAll()
+        state = "expanded" if self.app.skillModel.isAllExpanded else "collapsed"
+        self.app._set_status(f"All categories {state}")

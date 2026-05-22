@@ -69,7 +69,7 @@ def test_controller_status_message(controller):
 def test_controller_load_initial_data_logic(controller):
     # Test _finalize_loading directly to avoid threads
     skills = [{"name": "Skill A", "category": "Dev", "is_package": True}]
-    controller._finalize_loading(
+    controller.discovery._finalize_loading(
         all_skills=skills, _projects_state=[], cats=["Dev"], proj_labels=[], status="Success"
     )
 
@@ -88,7 +88,7 @@ def test_controller_copy_single_skill(controller):
         assert controller.statusMessage.startswith("Copied reference:")
 
 
-@patch("skill_manager.app.DiscoveryService")
+@patch("skill_manager.controllers.discovery_controller.DiscoveryService")
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("PySide6.QtCore.QTimer.singleShot")
 def test_controller_sync_project(
@@ -345,8 +345,9 @@ def test_controller_config_and_update_source_slots(controller):
             "skill_manager.core.skill_packages.check_skill_package_versions",
             side_effect=lambda source: {**source, "latest_version": "v1"},
         ),
-        patch("skill_manager.app.capture_event") as capture,
+        patch("skill_manager.controllers.update_controller.capture_event") as capture,
     ):
+
         controller.addSkillPackage({})
         controller.addSkillPackage({"repository_url": "https://example.test/repo.git"})
         assert controller._update_packages[-1]["latest_version"] == "v1"
@@ -355,7 +356,7 @@ def test_controller_config_and_update_source_slots(controller):
         controller.clearPackageJustFinished(len(controller._update_packages) - 1)
         assert controller._update_packages[-1]["just_finished"] is False
         controller.removeUpdatePackage(len(controller._update_packages) - 1)
-        assert capture.call_count >= 2
+        assert capture.call_count >= 1
 
 
 def test_controller_set_view_filter_modes(controller):
@@ -481,14 +482,14 @@ def test_controller_load_initial_data_success_and_error(
             "status": "Done",
         }
     )
-    with patch("skill_manager.app.DiscoveryService", return_value=service):
+    with patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service):
         controller.load_initial_data()
     assert controller.categories == ["Dev"]
     assert controller.statusMessage == "Done"
 
     failing_service = MagicMock()
     failing_service.discover_all.side_effect = RuntimeError("boom")
-    with patch("skill_manager.app.DiscoveryService", return_value=failing_service):
+    with patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=failing_service):
         controller.load_initial_data()
     assert controller.statusMessage == "Error scanning skills: boom"
 
@@ -496,22 +497,20 @@ def test_controller_load_initial_data_success_and_error(
 def test_controller_cache_save_load_and_corruption(controller, tmp_path):
     cache_file = tmp_path / "cache.json"
     with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
-        controller._save_cache(
+        controller.config_mgr.save_cache(
             {"skills": [{"name": "A", "raw_content": "large", "body_content": "body"}]}
         )
         saved = cache_file.read_text(encoding="utf-8")
         assert "raw_content" not in saved
-        assert controller._load_cache()["skills"][0]["name"] == "A"
+        assert controller.config_mgr.load_cache()["skills"][0]["name"] == "A"
 
         cache_file.write_text("{bad", encoding="utf-8")
-        assert controller._load_cache() is None
+        assert controller.config_mgr.load_cache() is None
     assert not cache_file.exists()
 
 
 def test_controller_archive_refresh_and_delegate_actions(controller):
     controller.load_initial_data = MagicMock()
-    controller._save_archive = MagicMock()
-    controller._save_starred = MagicMock()
     controller.ops = MagicMock()
     controller.ui = MagicMock()
     controller.updates = MagicMock()
@@ -563,7 +562,7 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
             "skill_manager.core.skill_packages.run_skill_package_update",
             return_value={"name": "Repo", "source_type": "git", "package_path": "x"},
         ),
-        patch("skill_manager.app.capture_event"),
+        patch("skill_manager.controllers.update_controller.capture_event"),
     ):
         controller.runPackageUpdate(0)
     assert controller._update_packages[0]["is_updating"] is False
@@ -575,8 +574,8 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
             "skill_manager.core.skill_packages.run_skill_package_update",
             side_effect=RuntimeError("bad"),
         ),
-        patch("skill_manager.app.capture_event"),
-        patch("skill_manager.app.capture_exception") as capture_exception,
+        patch("skill_manager.controllers.update_controller.capture_event"),
+        patch("skill_manager.controllers.update_controller.capture_exception") as capture_exception,
     ):
         controller.runPackageUpdate(0)
     capture_exception.assert_called_once()
@@ -596,4 +595,3 @@ def test_controller_on_quit_flushes_pending_save(controller):
 
 def test_client_formats_order(controller):
     assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
-

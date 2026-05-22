@@ -26,6 +26,7 @@ except ImportError:
 import contextlib
 
 from skill_manager.controllers.config_controller import ConfigController
+from skill_manager.controllers.discovery_controller import DiscoveryController
 from skill_manager.controllers.ops_controller import OpsController
 from skill_manager.controllers.ui_controller import UIController
 from skill_manager.controllers.update_controller import UpdateController
@@ -35,26 +36,16 @@ from skill_manager.core.analytics import (
     shutdown as posthog_shutdown,
 )
 from skill_manager.core.categories import get_category_emoji
-from skill_manager.core.commands import create_custom_command_file
 from skill_manager.core.config import (
     ConfigManager,
 )
-from skill_manager.core.discovery import DiscoveryService
 from skill_manager.core.models import SkillModel
-from skill_manager.core.parsing import (
-    build_skill_search_text,
-    categorize_skill,
-    parse_skill_md,
-)
 from skill_manager.core.persistence import (
     load_archive,
     load_starred,
-    save_archive,
-    save_starred,
 )
 from skill_manager.core.quick_copy import (
     CLIENT_FORMATS,
-    format_project_skill_reference,
 )
 from skill_manager.core.resources import (
     logo_asset_for_client,
@@ -136,6 +127,7 @@ class AppController(QObject):
         self.config_mgr = ConfigController(self)
         self.ops = OpsController(self)
         self.updates = UpdateController(self)
+        self.discovery = DiscoveryController(self)
 
         # 4. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -152,7 +144,6 @@ class AppController(QObject):
         self._quick_copy_model.isPackageOnly = False
         self._quick_copy_model.showStarred = True
         self._quick_copy_model.filterByClient = False
-
 
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
@@ -206,41 +197,7 @@ class AppController(QObject):
 
     @Property(list, notify=projectsChanged)
     def updateProjects(self):
-        results = []
-        for p in self._projects:
-            count = 0
-            try:
-                # Dynamic Resolution for accurate skill count in UI
-                resolved_path = Path(p)
-                if resolved_path.name.lower() not in ("skills", ".agents"):
-                    found = False
-                    potential = resolved_path / ".agents" / "skills"
-                    if potential.exists() and potential.is_dir():
-                        resolved_path = potential
-                        found = True
-                    if not found:
-                        resolved_path = resolved_path / ".agents" / "skills"
-
-                scan_path = str(resolved_path)
-                if os.path.exists(scan_path):
-                    count = len(
-                        [
-                            d
-                            for d in os.listdir(scan_path)
-                            if os.path.isdir(os.path.join(scan_path, d))
-                        ]
-                    )
-            except Exception:
-                pass
-            results.append(
-                {
-                    "name": self.getProjectLabel(p),
-                    "path": p,
-                    "skill_count": count,
-                    "is_updating": p in self._syncing_projects,
-                }
-            )
-        return results
+        return self.config_mgr.get_update_projects()
 
     @Property(int, notify=statsChanged)
     def statsUpToDate(self):
@@ -297,9 +254,7 @@ class AppController(QObject):
 
     @Slot(str, result=str)
     def getCategoryEmoji(self, category_name: str) -> str:
-        """Returns the standard emoji for a given category name.
-        This is the primary visual identifier for the categorization system.
-        """
+        """Returns the standard emoji for a given category name."""
         return get_category_emoji(category_name)
 
     @Slot(str, result=str)
@@ -316,7 +271,7 @@ class AppController(QObject):
 
     @currentView.setter
     def currentView(self, value):
-        normalized = self._normalize_view_name(value)
+        normalized = self.ui._normalize_view_name(value)
         if self.ui._current_view != normalized:
             self.ui._current_view = normalized
             self.ui.save_ui_state()
@@ -384,7 +339,7 @@ class AppController(QObject):
 
     @startupView.setter
     def startupView(self, value):
-        normalized = self._normalize_view_name(value)
+        normalized = self.ui._normalize_view_name(value)
         if self.ui._startup_view != normalized:
             self.ui._startup_view = normalized
             self.ui.trigger_save()
@@ -431,6 +386,7 @@ class AppController(QObject):
     @Property(bool, notify=compactListRowsChanged)
     def compactListRows(self):
         return self.ui._compact_list_rows
+
     @compactListRows.setter
     def compactListRows(self, value):
         if self.ui._compact_list_rows != value:
@@ -450,53 +406,42 @@ class AppController(QObject):
 
     # --- Shortcut Properties ---
 
-    def _get_shortcut(self, key):
-        return self._config.get("shortcuts", {}).get(key, "")
-
     @Property(str, notify=shortcutsChanged)
-    def shortcutSearch(self): return self._get_shortcut("search")
+    def shortcutSearch(self): return self.config_mgr.get_shortcut("search")
     @Property(str, notify=shortcutsChanged)
-    def shortcutCopy(self): return self._get_shortcut("copy")
+    def shortcutCopy(self): return self.config_mgr.get_shortcut("copy")
     @Property(str, notify=shortcutsChanged)
-    def shortcutArchive(self): return self._get_shortcut("archive")
+    def shortcutArchive(self): return self.config_mgr.get_shortcut("archive")
     @Property(str, notify=shortcutsChanged)
-    def shortcutDelete(self): return self._get_shortcut("delete")
+    def shortcutDelete(self): return self.config_mgr.get_shortcut("delete")
     @Property(str, notify=shortcutsChanged)
-    def shortcutRefresh(self): return self._get_shortcut("refresh")
+    def shortcutRefresh(self): return self.config_mgr.get_shortcut("refresh")
     @Property(str, notify=shortcutsChanged)
-    def shortcutExpandAll(self): return self._get_shortcut("expand_all")
+    def shortcutExpandAll(self): return self.config_mgr.get_shortcut("expand_all")
     @Property(str, notify=shortcutsChanged)
-    def shortcutCollapseAll(self): return self._get_shortcut("collapse_all")
+    def shortcutCollapseAll(self): return self.config_mgr.get_shortcut("collapse_all")
     @Property(str, notify=shortcutsChanged)
-    def shortcutTopOfList(self): return self._get_shortcut("top_of_list")
+    def shortcutTopOfList(self): return self.config_mgr.get_shortcut("top_of_list")
     @Property(str, notify=shortcutsChanged)
-    def shortcutClearSelection(self): return self._get_shortcut("clear_selection")
+    def shortcutClearSelection(self): return self.config_mgr.get_shortcut("clear_selection")
     @Property(str, notify=shortcutsChanged)
-    def shortcutThemeToggle(self): return self._get_shortcut("theme_toggle")
+    def shortcutThemeToggle(self): return self.config_mgr.get_shortcut("theme_toggle")
     @Property(str, notify=shortcutsChanged)
-    def shortcutQuickCopyView(self): return self._get_shortcut("quick_copy_view")
+    def shortcutQuickCopyView(self): return self.config_mgr.get_shortcut("quick_copy_view")
     @Property(str, notify=shortcutsChanged)
-    def shortcutLibraryView(self): return self._get_shortcut("library_view")
+    def shortcutLibraryView(self): return self.config_mgr.get_shortcut("library_view")
     @Property(str, notify=shortcutsChanged)
-    def shortcutUpdatesView(self): return self._get_shortcut("updates_view")
+    def shortcutUpdatesView(self): return self.config_mgr.get_shortcut("updates_view")
     @Property(str, notify=shortcutsChanged)
-    def shortcutSettingsView(self): return self._get_shortcut("settings_view")
+    def shortcutSettingsView(self): return self.config_mgr.get_shortcut("settings_view")
 
     @Slot(str, str)
     def setShortcut(self, action, sequence):
-        shortcuts = self._config.get("shortcuts", {})
-        if action in shortcuts and shortcuts[action] != sequence:
-            shortcuts[action] = sequence
-            self._config.set("shortcuts", shortcuts)
-            self.shortcutsChanged.emit()
-            self._set_status(f"Shortcut for {action} set to: {sequence}")
+        self.config_mgr.set_shortcut(action, sequence)
 
     @Slot()
     def resetShortcuts(self):
-        from skill_manager.core.config import DEFAULT_SHORTCUTS
-        self._config.set("shortcuts", DEFAULT_SHORTCUTS.copy())
-        self.shortcutsChanged.emit()
-        self._set_status("All shortcuts reset to defaults")
+        self.config_mgr.reset_shortcuts()
 
     # --- Slots ---
 
@@ -510,183 +455,33 @@ class AppController(QObject):
         self._quick_copy_model.isPackageOnly = value
         self.isPackageOnlyChanged.emit()
 
-    # --- Methods / Slots ---
-
-    def _normalize_view_name(self, value):
-        view = str(value or "").replace(" ", "").replace("-", "")
-        view_map = {
-            "quickcopy": "QuickCopy",
-            "library": "Library",
-            "updates": "Updates",
-            "settings": "Settings",
-        }
-        return view_map.get(view.lower(), "Library")
-
+    @Slot()
     def load_initial_data(self):
-        """Initial scan of skills on application startup in a background thread."""
-        self._is_loading = True
-        self.isLoadingChanged.emit()
-        self._set_status("Scanning skills...")
-
-        import os
-
-        discovery_sources = list(self._sources)
-        for src in self._update_packages:
-            pkg_path = src.get("package_path") or src.get("local_path")
-            if pkg_path and os.path.exists(pkg_path) and pkg_path not in discovery_sources:
-                discovery_sources.append(pkg_path)
-
-        service = DiscoveryService(
-            sources=discovery_sources,
-            projects=self._projects,
-            archive_paths=self._archive_paths,
-            starred_paths=self._starred_paths,
-            project_aliases=self._project_aliases,
-        )
-
-        def run_discovery():
-            try:
-
-                def cache_callback(cached_data):
-                    print(
-                        f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache..."
-                    )
-                    QTimer.singleShot(
-                        0,
-                        self,
-                        lambda: self._finalize_loading(
-                            cached_data.get("skills", []),
-                            cached_data.get("projects", []),
-                            cached_data.get("categories", []),
-                            cached_data.get("project_labels", []),
-                            f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
-                            is_final=False,
-                        ),
-                    )
-
-                result = service.discover_all(cache_callback=cache_callback)
-
-                # Signal completion back to main thread
-                QTimer.singleShot(
-                    0,
-                    self,
-                    lambda: self._finalize_loading(
-                        result["skills"],
-                        result["projects"],
-                        result["categories"],
-                        result["project_labels"],
-                        result["status"],
-                        is_final=True,
-                    ),
-                )
-            except Exception as e:
-                error_msg = f"Error scanning skills: {e}"
-                import traceback
-
-                traceback.print_exc()
-                QTimer.singleShot(0, self, lambda: self._handle_loading_error(error_msg))
-
-        self.task_runner.run(run_discovery)
-
-    def _finalize_loading(
-        self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
-    ):
-        """Updates model and UI state on the main thread after discovery completes."""
-        del proj_labels
-
-        if self._categories != cats:
-            self._categories = cats
-            self.categoriesChanged.emit()
-
-        # Update both models with the shared skill list
-        self._library_model.setSkills(all_skills)
-        self._quick_copy_model.setSkills(all_skills)
-
-        # Ensure client filters are set
-        self._library_model.clientFilter = self._client_format
-        self._quick_copy_model.clientFilter = self._client_format
-
-        if self.ui._default_project_filter == "all":
-            self._library_model.projectFilter = ""
-            self._quick_copy_model.projectFilter = ""
-
-        self._set_status(status)
-
-        if is_final:
-            self._is_loading = False
-            self.isLoadingChanged.emit()
-
-    def _handle_loading_error(self, error_msg):
-        """Handles discovery errors on the main thread."""
-        self._set_status(error_msg)
-        self._is_loading = False
-        self.isLoadingChanged.emit()
+        self.discovery.load_initial_data()
 
     @Slot(int)
     def selectSkill(self, index):
-        if index == -1:
-            self._selected_skill = {}
-        else:
-            self._selected_skill = self.skillModel.get_skill_at(index)
-        self.selectedSkillChanged.emit()
+        self.ui.select_skill(index)
 
     @Slot(str)
     def copySkillToClipboard(self, path):
-        # Find skill by path in all_skills
-        skill = next((s for s in self.skillModel._all_skills if s.get("local_path") == path), None)
-        if skill:
-            self.copySkillReference(skill)
-        else:
-            self.copyTextToClipboard(path)
+        self.ops.copy_skill_to_clipboard(path)
 
     @Slot()
     def copyCurrentSelectionOrFocusedSkill(self):
-        if self.skillModel.selectedCount > 0:
-            self.copySelectedSkillsToClipboard()
-            return
-        if self._selected_skill and self._selected_skill.get("local_path"):
-            self.copySkillReference(self._selected_skill)
-            return
-        first_skill = self.skillModel.get_skill_at(0)
-        if first_skill:
-            self.copySkillReference(first_skill)
-            return
-        self._set_status("No skill available to copy")
+        self.ops.copy_current_selection_or_focused_skill()
 
     @Slot()
     def copySelectedSkillsToClipboard(self):
-        paths = self.skillModel.getSelectedPaths()
-        if not paths:
-            self._set_status("No skills selected")
-            return
-
-        references = []
-        for path in paths:
-            skill = next(
-                (s for s in self.skillModel._all_skills if s.get("local_path") == path), None
-            )
-            if skill:
-                references.append(format_project_skill_reference(skill, self._client_format))
-            else:
-                references.append(path)
-
-        content = " ".join(references)
-        self._clipboard.setText(content)
-        self._set_status(f"Copied {len(references)} skills to clipboard")
+        self.ops.copy_selected_skills_to_clipboard()
 
     @Slot(str)
     def copyTextToClipboard(self, content):
-        self._clipboard.setText(str(content))
-        self._set_status("Copied to clipboard")
+        self.ops.copy_text_to_clipboard(content)
 
     @Slot(dict, str)
     def copySkillReference(self, skill, arg=""):
-        # Use core formatter
-        ref = format_project_skill_reference(skill, self._client_format)
-        if arg:
-            ref += f"({arg})"
-        self._clipboard.setText(ref)
-        self._set_status(f"Copied reference: {ref}")
+        self.ops.copy_skill_reference(skill, arg)
 
     @Slot()
     def toggleCurrentSkillArchive(self):
@@ -698,19 +493,15 @@ class AppController(QObject):
 
     @Slot()
     def selectAllVisibleSkills(self):
-        self.skillModel.selectAll()
-        self._set_status(f"Selected {self.skillModel.selectedCount} visible skills")
+        self.ui.select_all_visible_skills()
 
     @Slot()
     def clearVisibleSelection(self):
-        self.skillModel.clearSelection()
-        self._set_status("Selection cleared")
+        self.ui.clear_visible_selection()
 
     @Slot()
     def toggleAllVisibleCategories(self):
-        self.skillModel.toggleAll()
-        state = "expanded" if self.skillModel.isAllExpanded else "collapsed"
-        self._set_status(f"All categories {state}")
+        self.ui.toggle_all_visible_categories()
 
     @Slot(str)
     def deleteSkill(self, path):
@@ -735,18 +526,18 @@ class AppController(QObject):
         if not selected_paths:
             self._set_status("No skills selected for archiving")
             return
-            
+
         count = 0
         for path in selected_paths:
             if path and path not in self._archive_paths:
                 self._archive_paths.append(path)
                 count += 1
-        
+
         if count > 0:
-            self._save_archive()
+            self.ops._save_archive()
             self.skillModel.clearSelection()
             self._set_status(f"{count} skills archived")
-            self.load_initial_data()  # Refresh models
+            self.load_initial_data()
         else:
             self._set_status("Selected skills are already archived")
 
@@ -802,233 +593,41 @@ class AppController(QObject):
 
     @Slot(str, str, result=str)
     def verifyGitPackage(self, url, token=None):
-        """Verify a git package and return the latest version tag/hash."""
         return self.config_mgr.verify_git_package(url, token)
 
     @Slot(str)
     def addUpdatePackage(self, package_name):
-        if not package_name:
-            return
-        # Basic NPM-style source
-        new_source = {
-            "name": package_name,
-            "source_type": "npm",
-            "package_name": package_name,
-            "last_updated": "Never",
-            "is_updating": False,
-        }
-        self._update_packages.append(new_source)
-        self._config.set("skills", self._update_packages)
-        self.updatePackagesChanged.emit()
-        self._set_status(f"Added update package: {package_name}")
+        self.updates.add_update_package(package_name)
 
     @Slot(dict)
     def addSkillPackage(self, data):
-        if not data:
-            return
-        from skill_manager.core.skill_packages import (
-            check_skill_package_versions,
-            normalize_skill_package_config,
-        )
-
-        new_source = normalize_skill_package_config(data)
-        new_source["is_updating"] = False
-        new_source["last_updated"] = "Never"
-
-        # Immediate version check
-        new_source = check_skill_package_versions(new_source)
-
-        self._update_packages.append(new_source)
-        self._config.set("skills", self._update_packages)
-        self.updatePackagesChanged.emit()
-        self._set_status(f"Added skill package: {new_source.get('name')}")
-        capture_event(
-            "skill_package_added", {"source_type": new_source.get("source_type", "unknown")}
-        )
+        self.updates.add_skill_package(data)
 
     @Slot(int, dict)
     def updateUpdatePackage(self, index, data):
-        if 0 <= index < len(self._update_packages):
-            # Preserve internal state
-            is_updating = self._update_packages[index].get("is_updating", False)
-
-            # Use core logic to normalize and detect fields
-            from skill_manager.core.skill_packages import (
-                check_skill_package_versions,
-                normalize_skill_package_config,
-            )
-
-            updated_source = normalize_skill_package_config(data)
-            updated_source["is_updating"] = is_updating
-
-            # Refresh versions
-            updated_source = check_skill_package_versions(updated_source)
-
-            self._update_packages[index] = updated_source
-            self._config.set("skills", self._update_packages)
-            self.updatePackagesChanged.emit()
-            self._set_status(f"Updated skill package: {updated_source.get('name')}")
+        self.updates.update_update_package(index, data)
 
     @Slot(int)
     def removeUpdatePackage(self, index):
-        if 0 <= index < len(self._update_packages):
-            source = self._update_packages.pop(index)
-            self._config.set("skills", self._update_packages)
-            self.updatePackagesChanged.emit()
-            self._set_status(f"Removed update package: {source.get('name')}")
-            capture_event(
-                "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
-            )
+        self.updates.remove_update_package(index)
 
     @Slot(int)
     def clearPackageJustFinished(self, index):
         if 0 <= index < len(self._update_packages):
             self._update_packages[index]["just_finished"] = False
-            # Force refresh
             self._update_packages[index] = dict(self._update_packages[index])
             self.updatePackagesChanged.emit()
 
     @Slot(int)
     def runPackageUpdate(self, index):
-        if 0 <= index < len(self._update_packages):
-            source = self._update_packages[index]
-            source["is_updating"] = True
-            source["just_finished"] = False
-            self.updatePackagesChanged.emit()
-            self._set_status(f"Updating {source.get('name')}...")
-
-            def run():
-                from pathlib import Path
-
-                from skill_manager.core.skill_packages import run_skill_package_update
-
-                try:
-                    # If package_path is empty and we have master sources, use the first one as default destination
-                    pkg_path = source.get("package_path") or source.get("local_path")
-                    if not pkg_path and self._sources:
-                        # Safety: ensure we don't accidentally relocate to the project root if it's listed as a source
-                        potential_path = self._sources[0]
-                        if Path(potential_path).resolve() == Path.cwd().resolve():
-                            # If the source is the project root, we should target .agents/skills subfolder
-                            source["package_path"] = str(
-                                Path(potential_path) / ".agents" / "skills"
-                            )
-                        else:
-                            source["package_path"] = potential_path
-                    else:
-                        source["package_path"] = pkg_path
-
-                    # Pass a callback that also updates the status bar
-                    def log_callback(msg):
-                        QTimer.singleShot(0, self, lambda: self._set_status(msg))
-
-                    updated_source = run_skill_package_update(source, log_callback)
-                    source.update(updated_source)
-
-                    # Update timestamp
-                    source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    print(f"[UPDATE] Success: {source.get('name')}")
-                    capture_event(
-                        "skill_package_updated",
-                        {"source_type": source.get("source_type", "unknown"), "success": True},
-                    )
-                except Exception as e:
-                    print(f"[UPDATE] Failed: {source.get('name')} - Error: {e}")
-                    import traceback
-
-                    traceback.print_exc()
-                    error_msg = str(e)
-                    capture_event(
-                        "skill_package_updated",
-                        {"source_type": source.get("source_type", "unknown"), "success": False},
-                    )
-                    capture_exception(e)
-                    err_msg = f"Update failed for {source.get('name')}: {error_msg}"
-                    QTimer.singleShot(0, self, lambda msg=err_msg: self._set_status(msg))
-                finally:
-
-                    def finalize_ui():
-                        try:
-                            source["is_updating"] = False
-                            source["just_finished"] = True
-
-                            # Replace dict in list to force QML to see the change
-                            self._update_packages[index] = dict(source)
-                            self.updatePackagesChanged.emit()
-
-                            self._set_status(f"Update finished for {source.get('name')}")
-                            # Refresh skill library from all sources (background thread)
-                            self.load_initial_data()
-
-                            # Save state
-                            self._config.set("skills", self._update_packages)
-                        except Exception as e:
-                            print(f"[ERROR] Error in finalize_ui for {source.get('name')}: {e}")
-                            import traceback
-
-                            traceback.print_exc()
-                            self._set_status(f"Error finishing update: {e}")
-
-                    QTimer.singleShot(0, self, finalize_ui)
-
-            self.task_runner.run(run)
-
-    def _save_archive(self):
-        save_archive(self._archive_paths)
-
-    def _save_starred(self):
-        save_starred(self._starred_paths)
-
-    # Fields that are expensive to store but read on-demand from disk.
-    _CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
-
-    def _save_cache(self, data):
-        """Saves discovered skills to cache for faster startup.
-
-        Strips raw_content and body_content — these are large per-skill blobs
-        read on-demand from disk, not needed in the index cache.
-        """
-        try:
-            from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
-
-            slim_data = dict(data)
-            if "skills" in slim_data:
-                slim_data["skills"] = [
-                    {k: v for k, v in skill.items() if k not in self._CACHE_EXCLUDED_FIELDS}
-                    for skill in slim_data["skills"]
-                ]
-            print(
-                f"[CACHE] Saving {len(slim_data.get('skills', []))} skills to {SKILL_LIBRARY_CACHE_FILE}..."
-            )
-            with open(SKILL_LIBRARY_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(slim_data, f, indent=2, default=str)
-            size_mb = Path(SKILL_LIBRARY_CACHE_FILE).stat().st_size / 1024 / 1024
-            print(f"[CACHE] Save successful ({size_mb:.1f} MB).")
-        except Exception as e:
-            print(f"Error saving cache: {e}")
-
-    def _load_cache(self):
-        """Loads skills from cache. Auto-deletes the file on corruption."""
-        from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
-
-        cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
-        if not cache_path.exists():
-            return None
-        try:
-            with open(cache_path, encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-            print(f"[CACHE] Corrupted cache deleted ({e}). Will rebuild on next scan.")
-            with contextlib.suppress(OSError):
-                cache_path.unlink(missing_ok=True)
-        return None
+        self.updates.run_package_update(index)
 
     @Slot(str)
     def addToArchive(self, skill_local_path):
         if skill_local_path and skill_local_path not in self._archive_paths:
             self._archive_paths.append(skill_local_path)
-            self._save_archive()
-            self.load_initial_data()  # Refresh UI
+            self.ops._save_archive()
+            self.load_initial_data()
             self._set_status(f"Skill archived: {skill_local_path}")
 
     @Slot(str)
@@ -1036,7 +635,6 @@ class AppController(QObject):
         if self._client_format != fmt:
             self._client_format = fmt
             self._config.set("client_format", fmt)
-            # Update both models
             self._library_model.clientFilter = fmt
             self._quick_copy_model.clientFilter = fmt
             self.clientFormatChanged.emit()
@@ -1044,29 +642,50 @@ class AppController(QObject):
 
     @Slot(str)
     def setStartupView(self, view):
-        self.startupView = view
-        self._set_status(f"Startup view set to: {self.startupView}")
+        normalized = self.ui._normalize_view_name(view)
+        if self.ui._startup_view != normalized:
+            self.ui._startup_view = normalized
+            self.ui.trigger_save()
+            self.startupViewChanged.emit()
+            self._set_status(f"Startup view set to: {self.ui._startup_view}")
 
     @Slot(bool)
     def setRememberFilters(self, remember):
-        self.rememberFilters = remember
-        self._set_status("Filter memory enabled" if remember else "Filter memory disabled")
+        if self.ui._remember_filters != remember:
+            self.ui._remember_filters = remember
+            if not remember:
+                self.clearViewFilters()
+            self.ui.trigger_save()
+            self.rememberFiltersChanged.emit()
+            self._set_status("Filter memory enabled" if remember else "Filter memory disabled")
 
     @Slot(str)
     def setDefaultProjectFilter(self, mode):
-        self.defaultProjectFilter = mode
-        label = "All Projects" if self.defaultProjectFilter == "all" else "Last Project"
-        self._set_status(f"Default project filter: {label}")
+        normalized = mode if mode in {"last", "all"} else "last"
+        if self.ui._default_project_filter != normalized:
+            self.ui._default_project_filter = normalized
+            if self.ui._default_project_filter == "all":
+                self.setViewFilterForView("QuickCopy", "project", "")
+            self.ui.trigger_save()
+            self.defaultProjectFilterChanged.emit()
+            label = "All Projects" if self.ui._default_project_filter == "all" else "Last Project"
+            self._set_status(f"Default project filter: {label}")
 
     @Slot(bool)
     def setReducedMotion(self, reduced):
-        self.reducedMotion = reduced
-        self._set_status("Reduced motion enabled" if reduced else "Reduced motion disabled")
+        if self.ui._reduced_motion != reduced:
+            self.ui._reduced_motion = reduced
+            self.ui.trigger_save()
+            self.reducedMotionChanged.emit()
+            self._set_status("Reduced motion enabled" if reduced else "Reduced motion disabled")
 
     @Slot(bool)
     def setCompactListRows(self, compact):
-        self.compactListRows = compact
-        self._set_status("Compact list rows enabled" if compact else "Compact list rows disabled")
+        if self.ui._compact_list_rows != compact:
+            self.ui._compact_list_rows = compact
+            self.ui.trigger_save()
+            self.compactListRowsChanged.emit()
+            self._set_status("Compact list rows enabled" if compact else "Compact list rows disabled")
 
     @Slot()
     def refreshSkills(self):
@@ -1094,7 +713,6 @@ class AppController(QObject):
     def applyCollectionSelection(self, name):
         if name in self._custom_collections:
             paths = self._custom_collections[name]
-            # Selection is usually specific to the active view
             self.skillModel.clearSelection()
             self.skillModel.selectByPaths(paths)
             self._set_status(f"Applied collection: {name}")
@@ -1105,18 +723,7 @@ class AppController(QObject):
 
     @Slot(str, str, str, str, str)
     def createCustomCommand(self, name, client, body, project_label, category):
-        """Creates a new Custom Command .md file in the project's commands/ directory."""
-        result = create_custom_command_file(
-            name=name,
-            client=client,
-            body=body,
-            project_label_name=project_label,
-            category=category,
-            project_paths=self._projects,
-        )
-        self._set_status(result.message)
-        if result.ok:
-            self.refreshSkills()
+        self.ops.create_custom_command(name, client, body, project_label, category)
 
     @Slot(str, str)
     def setViewFilter(self, filter_type, value):
@@ -1127,14 +734,10 @@ class AppController(QObject):
         self._set_view_filter_for_model(self._model_for_view(view), filter_type, value)
 
     def _model_for_view(self, view):
-        normalized = self._normalize_view_name(view)
+        normalized = self.ui._normalize_view_name(view)
         return self._library_model if normalized == "Library" else self._quick_copy_model
 
     def _set_view_filter_for_model(self, model, filter_type, value):
-        """
-        Sets a specific filter on one view model.
-        Library and Quick Copy filters are intentionally independent.
-        """
         if not self.ui._remember_filters:
             model.filterText = ""
 
@@ -1148,8 +751,6 @@ class AppController(QObject):
             elif value == "true":
                 model.collectionFilter = True
             else:
-                # Custom collection name - handled via applyCollectionSelection usually,
-                # but we keep the active filter property in sync.
                 model.collectionFilter = False
         elif filter_type == "project":
             if model is self._quick_copy_model:
@@ -1159,7 +760,6 @@ class AppController(QObject):
             model.categoryFilter = ""
             model.collectionFilter = False
             model.projectFilter = ""
-        # We ignore "library" and "quick_copy" here as they are handled by currentView setter
 
         self._set_status(f"Filter applied: {filter_type} = {value if value else 'All'}")
 
@@ -1197,42 +797,7 @@ class AppController(QObject):
 
     @Slot(str)
     def syncProject(self, path):
-        if path not in self._projects:
-            return
-
-        self._set_status(f"Updating {self.getProjectLabel(path)}...")
-        if path not in self._syncing_projects:
-            self._syncing_projects.append(path)
-            self.projectsChanged.emit()
-
-        def run_sync():
-            try:
-                # Re-scan sources
-                from skill_manager.core.quick_copy import discover_package_skills
-
-                source_skills = discover_package_skills(
-                    sources=self._sources,
-                    parse_skill_md=parse_skill_md,
-                    categorize_skill=categorize_skill,
-                    build_search_text=build_skill_search_text,
-                )
-
-                # Sync only to this project, update only
-                from skill_manager.core.copier import copy_skill_folders_to_projects
-
-                result = copy_skill_folders_to_projects(source_skills, [path], update_only=True)
-
-                msg = f"Update complete for {self.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"
-                QTimer.singleShot(0, self, lambda: self._set_status(msg))
-            except Exception as e:
-                err_msg = f"Update failed for {path}: {e}"
-                QTimer.singleShot(0, self, lambda: self._set_status(err_msg))
-            finally:
-                if path in self._syncing_projects:
-                    self._syncing_projects.remove(path)
-                QTimer.singleShot(0, self, self.projectsChanged.emit)
-
-        self.task_runner.run(run_sync)
+        self.updates.sync_project(path)
 
     @Slot()
     def updateNow(self):

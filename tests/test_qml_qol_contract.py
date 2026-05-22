@@ -124,15 +124,16 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
 
 def test_skill_rows_use_cached_model_grouping_for_smooth_collapse():
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
-    models_py = (QML_DIR.parent / "core" / "models.py").read_text(encoding="utf-8")
+    qt_model_py = (QML_DIR.parent / "core" / "models" / "qt_model.py").read_text(encoding="utf-8")
+    filter_engine_py = (QML_DIR.parent / "core" / "models" / "filter_engine.py").read_text(encoding="utf-8")
 
     assert "model.isFirstInSubcategory" in skill_item
     assert "model.isMainCollapsed" in skill_item
     assert "model.isSubCollapsed" in skill_item
     assert "get_skill_at(index - 1)" not in skill_item
     assert "Behavior on height" not in skill_item
-    assert "IsFirstInSubcategoryRole" in models_py
-    assert "_build_visible_rows" in models_py
+    assert "IsFirstInSubcategoryRole" in qt_model_py
+    assert "build_visible_rows" in filter_engine_py
 
 
 def test_dark_polish_tokens_drive_shared_components():

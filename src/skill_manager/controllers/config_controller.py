@@ -84,6 +84,46 @@ class ConfigController(BaseController):
                 label = os.path.basename(path)
         return label
 
+    def get_update_projects(self):
+        """Returns a list of project info with skill counts and sync status for the UI."""
+        results = []
+        from pathlib import Path
+
+        for p in self.app._projects:
+            count = 0
+            try:
+                # Dynamic Resolution for accurate skill count in UI
+                resolved_path = Path(p)
+                if resolved_path.name.lower() not in ("skills", ".agents"):
+                    found = False
+                    potential = resolved_path / ".agents" / "skills"
+                    if potential.exists() and potential.is_dir():
+                        resolved_path = potential
+                        found = True
+                    if not found:
+                        resolved_path = resolved_path / ".agents" / "skills"
+
+                scan_path = str(resolved_path)
+                if os.path.exists(scan_path):
+                    count = len(
+                        [
+                            d
+                            for d in os.listdir(scan_path)
+                            if os.path.isdir(os.path.join(scan_path, d))
+                        ]
+                    )
+            except Exception:
+                pass
+            results.append(
+                {
+                    "name": self.get_project_label(p),
+                    "path": p,
+                    "skill_count": count,
+                    "is_updating": p in self.app._syncing_projects,
+                }
+            )
+        return results
+
     def set_project_alias(self, path: str, alias: str):
         """Sets a custom alias for a project."""
         if not path:
@@ -112,3 +152,64 @@ class ConfigController(BaseController):
         else:
             self.app._set_status(f"Verification failed for: {url}")
         return tag or ""
+
+    def get_shortcut(self, key: str) -> str:
+        """Gets a configured shortcut sequence."""
+        return self.config.get("shortcuts", {}).get(key, "")
+
+    def set_shortcut(self, action: str, sequence: str):
+        """Sets a shortcut sequence for an action."""
+        shortcuts = self.config.get("shortcuts", {})
+        if action in shortcuts and shortcuts[action] != sequence:
+            shortcuts[action] = sequence
+            self.config.set("shortcuts", shortcuts)
+            self.app.shortcutsChanged.emit()
+            self.app._set_status(f"Shortcut for {action} set to: {sequence}")
+
+    def reset_shortcuts(self):
+        """Resets all shortcuts to defaults."""
+        from skill_manager.core.config import DEFAULT_SHORTCUTS
+        self.config.set("shortcuts", DEFAULT_SHORTCUTS.copy())
+        self.app.shortcutsChanged.emit()
+        self.app._set_status("All shortcuts reset to defaults")
+
+    def save_cache(self, data: dict):
+        """Saves discovered skills to cache for faster startup."""
+        import json
+        from pathlib import Path
+        from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
+
+        try:
+            excluded = {"raw_content", "body_content"}
+            slim_data = dict(data)
+            if "skills" in slim_data:
+                slim_data["skills"] = [
+                    {k: v for k, v in skill.items() if k not in excluded}
+                    for skill in slim_data["skills"]
+                ]
+            print(f"[CACHE] Saving {len(slim_data.get('skills', []))} skills to {SKILL_LIBRARY_CACHE_FILE}...")
+            with open(SKILL_LIBRARY_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(slim_data, f, indent=2, default=str)
+            size_mb = Path(SKILL_LIBRARY_CACHE_FILE).stat().st_size / 1024 / 1024
+            print(f"[CACHE] Save successful ({size_mb:.1f} MB).")
+        except Exception as e:
+            print(f"Error saving cache: {e}")
+
+    def load_cache(self) -> dict:
+        """Loads skills from cache."""
+        import json
+        import contextlib
+        from pathlib import Path
+        from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
+
+        cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
+        if not cache_path.exists():
+            return None
+        try:
+            with open(cache_path, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
+            print(f"[CACHE] Corrupted cache deleted ({e}). Will rebuild on next scan.")
+            with contextlib.suppress(OSError):
+                cache_path.unlink(missing_ok=True)
+        return None
