@@ -361,7 +361,7 @@ def test_no_color_string_concatenation():
         "secondaryLabel", "success", "danger", "hoverBackground"
     ]
     pattern = re.compile(r"Theme\.(" + "|".join(color_properties) + r")\s*\+")
-    
+
     offenders = []
     for path in QML_DIR.rglob("*.qml"):
         text = path.read_text(encoding="utf-8")
