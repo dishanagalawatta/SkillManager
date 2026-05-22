@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -97,6 +98,28 @@ def test_relocate_packages_from_output(temp_dir):
     assert not source_skill_dir.exists()
 
 
+def test_relocate_packages_from_output_resolves_relative_paths_from_base(tmp_path):
+    staging = tmp_path / "staging"
+    source_skill_dir = staging / ".agents" / "skills" / "safe-skill"
+    source_skill_dir.mkdir(parents=True)
+    (source_skill_dir / "SKILL.md").write_text("content")
+    cwd_skill_dir = tmp_path / "repo" / ".agents" / "skills" / "safe-skill"
+    cwd_skill_dir.mkdir(parents=True)
+    (cwd_skill_dir / "SKILL.md").write_text("repo content")
+    destination = tmp_path / "package"
+    destination.mkdir()
+
+    _relocate_packages_from_output(
+        ["Installed to ./.agents/skills"],
+        str(destination),
+        None,
+        base_path=staging,
+    )
+
+    assert (destination / "safe-skill" / "SKILL.md").read_text() == "content"
+    assert (cwd_skill_dir / "SKILL.md").read_text() == "repo content"
+
+
 @patch("skill_manager.core.skill_packages.updater.run_process")
 @patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
 @patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
@@ -123,6 +146,8 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     assert updated["managed_folders"] == ["new-skill"]
     assert updated["removed_folders"] == ["old-skill"]
     assert updated["current_version"] == "2.0.0"
+    assert mock_run.call_args.kwargs["cwd"]
+    assert mock_relocate.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
 
 
 def test_get_git_tag_remote(mock_run):
@@ -496,7 +521,10 @@ def test_run_skill_package_update_cleanup_failure_and_verify(temp_dir):
     with (
         patch("skill_manager.core.skill_packages.updater._run_shell_command") as shell,
         patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output", return_value=[]),
-        patch("skill_manager.core.skill_packages.updater.shutil.rmtree", side_effect=OSError("locked")),
+        patch(
+            "skill_manager.core.skill_packages.updater._remove_package_folder",
+            side_effect=OSError("locked"),
+        ),
         patch(
             "skill_manager.core.skill_packages.updater.check_skill_package_versions",
             side_effect=lambda s, force_refresh=False: s,
@@ -530,7 +558,43 @@ def test_run_shell_command_intercept_and_process():
     messages = []
     with patch("skill_manager.core.skill_packages.updater.run_process") as run_process:
         _run_shell_command("echo hi", messages.append)
-    run_process.assert_called_once_with("echo hi", messages.append, shell=True)
+    run_process.assert_called_once_with("echo hi", messages.append, shell=True, cwd=None)
+
+
+@patch("skill_manager.core.skill_packages.updater.run_process")
+def test_run_skill_package_update_uses_staging_for_relative_generator_output(
+    mock_run, tmp_path
+):
+    package_path = tmp_path / "package"
+    package_path.mkdir()
+    repo_skill = tmp_path / "repo" / ".agents" / "skills" / "brainstorming"
+    repo_skill.mkdir(parents=True)
+    (repo_skill / "SKILL.md").write_text("repo")
+
+    def fake_run_process(_command, output_callback=None, shell=False, cwd=None):
+        generated = Path(cwd) / ".agents" / "skills" / "brainstorming"
+        generated.mkdir(parents=True)
+        (generated / "SKILL.md").write_text("generated")
+        output_callback("Installed to ./.agents/skills")
+
+    mock_run.side_effect = fake_run_process
+    source = {
+        "name": "custom",
+        "source_type": "custom",
+        "package_path": str(package_path),
+        "update_command": "generate",
+        "managed_folders": [],
+    }
+
+    with patch(
+        "skill_manager.core.skill_packages.updater.check_skill_package_versions",
+        side_effect=lambda s, force_refresh=False: s,
+    ):
+        updated = run_skill_package_update(source)
+
+    assert (package_path / "brainstorming" / "SKILL.md").read_text() == "generated"
+    assert (repo_skill / "SKILL.md").read_text() == "repo"
+    assert updated["managed_folders"] == ["brainstorming"]
 
 
 def test_resolve_process_command_passthrough_and_absolute():

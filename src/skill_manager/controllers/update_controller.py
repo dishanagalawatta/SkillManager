@@ -278,6 +278,7 @@ class UpdateController(BaseController):
                 from skill_manager.core.skill_packages import (
                     diff_package_inventory,
                     inventory_removals_verified,
+                    package_project_path_conflicts,
                     promote_package_storage,
                     run_skill_package_update,
                     scan_package_inventory,
@@ -297,6 +298,14 @@ class UpdateController(BaseController):
                             source["package_path"] = potential_path
                     else:
                         source["package_path"] = pkg_path
+
+                    conflicts = package_project_path_conflicts([source], self.app._projects)
+                    if conflicts:
+                        conflict_path = conflicts[0]
+                        raise RuntimeError(
+                            "Package storage path overlaps a project skills path: "
+                            f"{conflict_path}"
+                        )
 
                     def log_callback(msg):
                         QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))

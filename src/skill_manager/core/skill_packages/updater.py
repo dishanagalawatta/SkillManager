@@ -1,7 +1,9 @@
 import os
 import shlex
 import shutil
+import tempfile
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -10,6 +12,10 @@ from .config import normalize_skill_package_config
 from .process import _emit, run_process
 from .relocator import relocate_packages_from_output
 from .versioning import check_skill_package_versions
+
+
+def _remove_package_folder(path: Path) -> None:
+    shutil.rmtree(path)
 
 
 def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
@@ -62,7 +68,11 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
     if clone_path != package_path:
         _emit(output_callback, f"Installed to {path}")
 
-def _run_npm_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
+def _run_npm_update(
+    source: dict[str, Any],
+    output_callback: Callable[[str], None] | None,
+    cwd: str | os.PathLike | None = None,
+):
     package_name = source.get("package_name")
     if not package_name:
         raise ValueError("Configure an npm package name.")
@@ -72,7 +82,7 @@ def _run_npm_update(source: dict[str, Any], output_callback: Callable[[str], Non
         # Local import or copy _split_args
         from .config import _split_args
         command.extend(_split_args(source["package_args"]))
-    run_process(command, output_callback)
+    run_process(command, output_callback, cwd=cwd)
 
 def _intercept_cross_platform_command(command: str, output_callback: Callable[[str], None] | None) -> bool:
     command = str(command or "").strip()
@@ -121,10 +131,14 @@ def _intercept_cross_platform_command(command: str, output_callback: Callable[[s
 
     return True
 
-def _run_shell_command(command: str, output_callback: Callable[[str], None] | None):
+def _run_shell_command(
+    command: str,
+    output_callback: Callable[[str], None] | None,
+    cwd: str | os.PathLike | None = None,
+):
     if _intercept_cross_platform_command(command, output_callback):
         return
-    run_process(command, output_callback, shell=True)
+    run_process(command, output_callback, shell=True, cwd=cwd)
 
 def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None = None) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
@@ -135,42 +149,58 @@ def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[
 
     package_path = source.get("resolved_package_path") or source.get("package_path")
     captured_output = []
+    staging_path = None
 
     def intercept_callback(msg):
         captured_output.append(msg)
         if output_callback:
             output_callback(msg)
 
-    if source.get("source_type") == "npm":
-        _run_npm_update(source, intercept_callback)
-    elif source.get("update_command"):
-        _run_shell_command(source["update_command"], intercept_callback)
-    else:
-        _run_git_package_update(source, intercept_callback)
+    uses_staging = source.get("source_type") == "npm" or bool(source.get("update_command"))
+    staging_context = (
+        tempfile.TemporaryDirectory(
+            prefix="skillmanager-package-", ignore_cleanup_errors=True
+        )
+        if uses_staging
+        else nullcontext(None)
+    )
+    with staging_context as staging_dir:
+        staging_path = staging_dir
+        if source.get("source_type") == "npm":
+            _run_npm_update(source, intercept_callback, cwd=staging_path)
+        elif source.get("update_command"):
+            _run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
+        else:
+            _run_git_package_update(source, intercept_callback)
 
-    if package_path:
-        _emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
-        new_managed = relocate_packages_from_output(captured_output, package_path, output_callback)
+        if package_path:
+            _emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
+            new_managed = relocate_packages_from_output(
+                captured_output,
+                package_path,
+                output_callback,
+                base_path=staging_path,
+            )
 
-        if new_managed is not None:
-            old_managed = source.get("managed_folders", [])
-            outdated = set(old_managed) - set(new_managed)
-            removed = []
-            if outdated:
-                _emit(output_callback, f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...")
-                dest_base = Path(os.path.expanduser(package_path))
-                for folder_name in sorted(outdated):
-                    folder_path = dest_base / folder_name
-                    if folder_path.is_dir():
-                        _emit(output_callback, f"[DEBUG] Deleting outdated skill folder: {folder_name}")
-                        try:
-                            shutil.rmtree(folder_path)
-                            removed.append(folder_name)
-                        except Exception as e:
-                            _emit(output_callback, f"[ERROR] Failed to delete {folder_name}: {e}")
+            if new_managed is not None:
+                old_managed = source.get("managed_folders", [])
+                outdated = set(old_managed) - set(new_managed)
+                removed = []
+                if outdated:
+                    _emit(output_callback, f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...")
+                    dest_base = Path(os.path.expanduser(package_path))
+                    for folder_name in sorted(outdated):
+                        folder_path = dest_base / folder_name
+                        if folder_path.is_dir():
+                            _emit(output_callback, f"[DEBUG] Deleting outdated skill folder: {folder_name}")
+                            try:
+                                _remove_package_folder(folder_path)
+                                removed.append(folder_name)
+                            except Exception as e:
+                                _emit(output_callback, f"[ERROR] Failed to delete {folder_name}: {e}")
 
-            source["managed_folders"] = new_managed
-            source["removed_folders"] = removed
+                source["managed_folders"] = new_managed
+                source["removed_folders"] = removed
 
     if source.get("verify_command"):
         _emit(output_callback, f"Verifying {source['name']}...")

@@ -200,6 +200,42 @@ def test_cleanup_removed_project_skills_requires_verified_removal(mock_proj, ser
     delete.assert_not_called()
 
 
+@patch("skill_manager.core.update_service.discover_project_skills")
+def test_cleanup_removed_project_skills_skips_package_storage_path(mock_proj, service, tmp_path):
+    package_path = tmp_path / "repo" / ".agents" / "skills"
+    package_path.mkdir(parents=True)
+    service.sources = []
+    service.update_packages = [
+        {
+            "name": "Pkg",
+            "package_id": "pkg_1",
+            "package_path": str(package_path),
+            "resolved_package_path": str(package_path),
+        }
+    ]
+    mock_proj.return_value = [
+        {
+            "project_label": "Repo",
+            "skills": [{"folder_name": "old", "project_path": str(package_path)}],
+        }
+    ]
+    ownership = {UpdateService._ownership_project_key(str(package_path)): {"old": "pkg_1"}}
+
+    with (
+        patch(
+            "skill_manager.core.update_service.load_project_skill_ownership",
+            return_value=ownership,
+        ),
+        patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
+    ):
+        service._cleanup_removed_project_skills(
+            [{"folder_name": "old", "package_id": "pkg_1", "removal_verified": True}],
+            MagicMock(),
+        )
+
+    delete.assert_not_called()
+
+
 @patch("skill_manager.core.update_service.save_package_skill_inventory")
 @patch("skill_manager.core.update_service.load_package_skill_inventory")
 @patch("skill_manager.core.update_service.run_skill_package_update")
@@ -252,6 +288,121 @@ def test_run_global_update_suppresses_deletion_when_inventory_scan_is_unsafe(
     assert any(
         "Skipped project deletion" in call.args[0] for call in status_cb.call_args_list
     )
+
+
+@patch("skill_manager.core.update_service.save_package_skill_inventory")
+@patch("skill_manager.core.update_service.load_project_skill_ownership")
+@patch("skill_manager.core.update_service.load_package_skill_inventory")
+@patch("skill_manager.core.update_service.run_skill_package_update")
+@patch("skill_manager.core.update_service.discover_project_skills")
+@patch("skill_manager.core.update_service.discover_package_skills")
+@patch("skill_manager.core.update_service.copy_skill_folders_to_projects")
+@patch("skill_manager.core.update_service.delete_project_skill_folders")
+def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
+    mock_delete,
+    mock_copy,
+    mock_discover_sources,
+    mock_discover_projects,
+    mock_update,
+    mock_load_inventory,
+    mock_load_ownership,
+    mock_save_inventory,
+    tmp_path,
+    capsys,
+):
+    project_root = tmp_path / "repo"
+    package_path = project_root / ".agents" / "skills"
+    project_skill = package_path / "old"
+    project_skill.mkdir(parents=True)
+    (project_skill / "SKILL.md").write_text("old")
+    service = UpdateService(
+        sources=[],
+        projects=[str(project_root)],
+        update_packages=[
+            {
+                "name": "Pkg",
+                "package_id": "pkg_1",
+                "package_path": str(package_path),
+                "resolved_package_path": str(package_path),
+            }
+        ],
+    )
+    mock_load_inventory.return_value = {
+        "pkg_1": {
+            "resolved_package_path": str(package_path),
+            "skills": {"old": {"fingerprint": "old"}},
+        }
+    }
+    mock_update.return_value = {
+        "name": "Pkg",
+        "package_id": "pkg_1",
+        "package_path": str(package_path),
+        "resolved_package_path": str(package_path),
+    }
+    mock_discover_projects.return_value = [
+        {
+            "project_label": "Repo",
+            "skills": [{"folder_name": "old", "project_path": str(package_path)}],
+        }
+    ]
+    mock_load_ownership.return_value = {
+        UpdateService._ownership_project_key(str(package_path)): {"old": "pkg_1"}
+    }
+    mock_discover_sources.return_value = [{"folder_name": "new", "name": "New"}]
+
+    status_cb = MagicMock()
+    comp_cb = MagicMock()
+    service.run_global_update_sync(status_cb, MagicMock(), comp_cb)
+
+    assert project_skill.is_dir()
+    mock_delete.assert_not_called()
+    mock_copy.assert_not_called()
+    comp_cb.assert_called_once()
+    output = capsys.readouterr().out
+    assert "WARN  update.path_conflict" in output
+    assert "action=skip_project_cleanup_sync" in output
+    assert "WARN  update.project.skipped" in output
+    mock_update.assert_not_called()
+
+
+@patch("skill_manager.core.update_service.save_package_skill_inventory")
+@patch("skill_manager.core.update_service.load_package_skill_inventory")
+@patch("skill_manager.core.update_service.run_skill_package_update")
+@patch("skill_manager.core.update_service.discover_package_skills")
+def test_run_global_update_skips_package_update_for_project_root_conflict(
+    mock_discover_sources,
+    mock_update,
+    mock_load_inventory,
+    mock_save_inventory,
+    tmp_path,
+    capsys,
+):
+    project_root = tmp_path / "repo"
+    package_path = project_root / ".agents" / "skills"
+    package_path.mkdir(parents=True)
+    service = UpdateService(
+        sources=[],
+        projects=[str(project_root)],
+        update_packages=[
+            {
+                "name": "Pkg",
+                "package_id": "pkg_1",
+                "package_path": str(package_path),
+                "resolved_package_path": str(package_path),
+            }
+        ],
+    )
+    mock_load_inventory.return_value = {}
+    mock_discover_sources.return_value = []
+
+    progress_cb = MagicMock()
+    comp_cb = MagicMock()
+    service.run_global_update_sync(MagicMock(), progress_cb, comp_cb)
+
+    mock_update.assert_not_called()
+    progress_cb.assert_called_once()
+    assert progress_cb.call_args.args[1]["is_updating"] is False
+    assert "WARN  update.package.skipped" in capsys.readouterr().out
 
 
 def test_record_project_skill_ownership_for_merged_results():

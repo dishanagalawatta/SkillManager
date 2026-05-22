@@ -30,7 +30,17 @@ from skill_manager.core.skill_packages import (
     run_skill_package_update,
     scan_package_inventory,
 )
+from skill_manager.core.skill_packages.process import sanitize_token
 from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
+
+
+def _log_update(level: str, event: str, **fields: Any) -> None:
+    details = " ".join(
+        f"{key}={sanitize_token(str(value))}"
+        for key, value in fields.items()
+        if value not in (None, "")
+    )
+    print(f"{level.upper():<5} {event}{(' ' + details) if details else ''}")
 
 
 class UpdateService:
@@ -81,15 +91,47 @@ class UpdateService:
             inventory = load_package_skill_inventory()
             self.update_packages = resolve_package_storage(self.update_packages, inventory)
             conflicts = package_project_path_conflicts(self.update_packages, self.projects)
+            unsafe_project_keys = {self._ownership_project_key(path) for path in conflicts}
             if conflicts:
-                raise RuntimeError(
-                    "Package storage path cannot be the same as a project skills path: "
-                    + ", ".join(conflicts)
+                for conflict in conflicts:
+                    _log_update(
+                        "WARN",
+                        "update.path_conflict",
+                        path=conflict,
+                        action="skip_project_cleanup_sync",
+                    )
+                status_callback(
+                    "Skipped project cleanup/sync for package paths that overlap project skills."
                 )
             package_id_by_source = self._package_id_by_source_path()
 
             for index, source in enumerate(self.update_packages):
                 try:
+                    source_path = (
+                        source.get("resolved_package_path")
+                        or source.get("package_path")
+                        or source.get("local_path")
+                    )
+                    if source_path and self._ownership_project_key(source_path) in unsafe_project_keys:
+                        _log_update(
+                            "WARN",
+                            "update.package.skipped",
+                            name=source.get("name"),
+                            path=source_path,
+                            reason="path_conflict",
+                        )
+                        source["is_updating"] = False
+                        source["just_finished"] = False
+                        source_progress_callback(index, source)
+                        self.update_packages[index] = source
+                        continue
+
+                    _log_update(
+                        "INFO",
+                        "update.package.start",
+                        name=source.get("name"),
+                        path=source_path,
+                    )
                     # Fallback for local_path if not set on the source
                     if not source.get("local_path") and self.sources:
                         # Safety: ensure we don't accidentally relocate to the project root
@@ -168,8 +210,20 @@ class UpdateService:
                     source_progress_callback(index, updated_source)
                     self.update_packages[index] = updated_source
                     package_id_by_source.update(self._package_id_by_source_path([updated_source]))
+                    _log_update(
+                        "INFO",
+                        "update.package.done",
+                        name=updated_source.get("name"),
+                        updated=len(updated_source.get("updated_folders") or []),
+                        removed=len(updated_source.get("removed_folders") or []),
+                    )
                 except Exception as exc:
-                    print(f"[UPDATE] Package failed: {source.get('name')} - {exc}")
+                    _log_update(
+                        "ERROR",
+                        "update.package.failed",
+                        name=source.get("name"),
+                        error=exc,
+                    )
                     source["is_updating"] = False
                     source_progress_callback(index, source)
 
@@ -177,7 +231,10 @@ class UpdateService:
 
             # Phase 2/2: Syncing to projects
             status_callback("Phase 2/2: Updating project folders...")
-            self._cleanup_removed_project_skills(removed_by_package, status_callback)
+            safe_projects = self._safe_projects_for_update(unsafe_project_keys)
+            self._cleanup_removed_project_skills(
+                removed_by_package, status_callback, projects=safe_projects
+            )
 
             # Discover all skills from packages using the correct package discovery method
             source_skills = discover_package_skills(
@@ -201,12 +258,21 @@ class UpdateService:
                         skill = {**skill, "package_id": package_id}
                     all_raw_skills.append(skill)
 
-            if all_raw_skills:
+            if all_raw_skills and safe_projects:
                 status_callback(f"Syncing {len(all_raw_skills)} updated skills to projects...")
                 result = copy_skill_folders_to_projects(
-                    all_raw_skills, self.projects, update_only=True
+                    all_raw_skills, safe_projects, update_only=True
                 )
                 self._record_project_skill_ownership(all_raw_skills, result)
+            elif all_raw_skills:
+                status_callback("Skipped project sync: no safe project folders to update.")
+                _log_update(
+                    "WARN",
+                    "update.sync.skipped",
+                    reason="no_safe_projects",
+                    skills=len(all_raw_skills),
+                )
+                result = {"copied": 0, "merged": 0, "skipped": 0, "failed": 0, "details": []}
             else:
                 status_callback("No skills needed syncing to projects.")
                 result = {"copied": 0, "merged": 0, "skipped": 0, "failed": 0, "details": []}
@@ -222,14 +288,16 @@ class UpdateService:
         self,
         removed_folders: list[Any],
         status_callback: Callable[[str], None],
+        projects: list[str] | None = None,
     ) -> None:
         if not removed_folders:
             return
 
         status_callback(f"Cleaning up {len(removed_folders)} removed skills from projects...")
+        _log_update("INFO", "update.cleanup.removed", count=len(removed_folders))
         ownership = load_project_skill_ownership()
         projects_state = discover_project_skills(
-            projects=self.projects,
+            projects=projects if projects is not None else self.projects,
             parse_skill_md=parse_skill_md,
             categorize_skill=categorize_skill,
             build_search_text=build_skill_search_text,
@@ -244,11 +312,14 @@ class UpdateService:
             elif item:
                 removed_map[str(item)] = None
 
+        blocked_project_keys = self._package_storage_keys()
         skills_to_delete = [
             skill
             for project in projects_state
             for skill in project.get("skills", [])
-            if self._is_removed_skill_owned_by_package(
+            if self._ownership_project_key(skill.get("project_path", ""))
+            not in blocked_project_keys
+            and self._is_removed_skill_owned_by_package(
                 skill, removed_map.get(skill.get("folder_name")), ownership
             )
         ]
@@ -256,6 +327,8 @@ class UpdateService:
         if skills_to_delete:
             delete_project_skill_folders(skills_to_delete)
             self._remove_project_skill_ownership(skills_to_delete, ownership)
+        else:
+            _log_update("INFO", "update.cleanup.deleted", count=0)
 
     @staticmethod
     def _ownership_project_key(project_path: str) -> str:
@@ -274,6 +347,27 @@ class UpdateService:
                 seen.add(key)
         return sources
 
+    def _safe_projects_for_update(self, unsafe_project_keys: set[str]) -> list[str]:
+        if not unsafe_project_keys:
+            return list(self.projects)
+
+        from skill_manager.core.copier import normalize_project_skills_path
+
+        safe_projects = []
+        for project in self.projects:
+            project_path, error = normalize_project_skills_path(project)
+            candidate = project if error else project_path
+            if self._ownership_project_key(candidate) in unsafe_project_keys:
+                _log_update(
+                    "WARN",
+                    "update.project.skipped",
+                    project=candidate,
+                    reason="path_conflict",
+                )
+                continue
+            safe_projects.append(project)
+        return safe_projects
+
     def _package_id_by_source_path(self, packages=None):
         package_map = {}
         for package in packages or self.update_packages:
@@ -282,6 +376,14 @@ class UpdateService:
             if package_id and package_path:
                 package_map[self._ownership_project_key(package_path)] = package_id
         return package_map
+
+    def _package_storage_keys(self):
+        keys = {self._ownership_project_key(path) for path in self.sources if path}
+        for package in self.update_packages:
+            package_path = package.get("resolved_package_path") or package.get("package_path")
+            if package_path:
+                keys.add(self._ownership_project_key(package_path))
+        return keys
 
     @classmethod
     def _is_removed_skill_owned_by_package(cls, skill, package_id, ownership):

@@ -43,11 +43,17 @@ def _resolve_process_command(command: str | list[str], shell: bool = False) -> s
         )
     return [resolved, *command[1:]]
 
-def run_process(command: str | list[str], output_callback: Callable[[str], None] = None, shell: bool = False):
+def run_process(
+    command: str | list[str],
+    output_callback: Callable[[str], None] = None,
+    shell: bool = False,
+    cwd: str | os.PathLike | None = None,
+):
     command = _resolve_process_command(command, shell)
     process = subprocess.Popen(
         command,
         shell=shell,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,

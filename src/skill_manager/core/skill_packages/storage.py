@@ -78,7 +78,17 @@ def resolve_package_storage(
 
 
 def package_project_path_conflicts(packages: list[dict[str, Any]], projects: list[str]) -> list[str]:
-    project_keys = {normalize_storage_key(project) for project in projects if project}
+    from skill_manager.core.copier import normalize_project_skills_path
+
+    project_keys = set()
+    for project in projects:
+        if not project:
+            continue
+        project_path, error = normalize_project_skills_path(project)
+        if error:
+            project_path = project
+        project_keys.add(normalize_storage_key(project_path))
+
     conflicts = []
     for package in packages:
         package_path = package.get("resolved_package_path") or package.get("package_path")

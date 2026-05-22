@@ -100,6 +100,43 @@ def test_update_skill_in_project_success(update_controller, mock_app):
         assert delays == [0, 500]
 
 
+def test_run_package_update_skips_project_root_conflict(update_controller, mock_app, tmp_path):
+    project_root = tmp_path / "repo"
+    package_path = project_root / ".agents" / "skills"
+    package_path.mkdir(parents=True)
+    mock_app._projects = [str(project_root)]
+    mock_app._update_packages = [
+        {
+            "name": "Pkg",
+            "package_id": "pkg_1",
+            "package_path": str(package_path),
+            "resolved_package_path": str(package_path),
+        }
+    ]
+
+    with (
+        patch(
+            "skill_manager.controllers.update_controller.load_package_skill_inventory",
+            return_value={},
+            create=True,
+        ),
+        patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
+        patch(
+            "skill_manager.controllers.update_controller.QTimer.singleShot",
+            side_effect=lambda _ms, _receiver, callback: callback(),
+        ),
+        patch(
+            "skill_manager.core.skill_packages.run_skill_package_update"
+        ) as run_skill_package_update,
+    ):
+        update_controller.run_package_update(0)
+
+    run_skill_package_update.assert_not_called()
+    mock_app._set_status.assert_any_call(
+        f"Update failed for Pkg: Package storage path overlaps a project skills path: {package_path}"
+    )
+
+
 def test_recalculate_stats(update_controller, mock_app):
     mock_app._update_results = [
         {"status": "up_to_date"},
