@@ -349,3 +349,25 @@ def test_search_input_clear_button_placement():
 
     # The IconButton MUST be defined AFTER the background block has ended to be a direct child of the TextField
     assert icon_btn_index > bg_end_index, "IconButton (clear button) is nested inside the background block, preventing mouse event propagation!"
+
+
+def test_no_color_string_concatenation():
+    """Verify that QML files do not use string concatenation on Theme color properties (which leads to invalid colors)."""
+    color_properties = [
+        "accent", "appBackground", "glassPill", "glassHover", "glassActive",
+        "sidebarBackground", "glassBorder", "glassInnerBorder", "glassOuterBorder",
+        "glassShadow", "separator", "disabledControl", "selectedRow",
+        "selectedRowHover", "selectedRowBorder", "dangerHover", "label",
+        "secondaryLabel", "success", "danger", "hoverBackground"
+    ]
+    pattern = re.compile(r"Theme\.(" + "|".join(color_properties) + r")\s*\+")
+    
+    offenders = []
+    for path in QML_DIR.rglob("*.qml"):
+        text = path.read_text(encoding="utf-8")
+        for line_num, line in enumerate(text.splitlines(), 1):
+            if pattern.search(line):
+                offenders.append(f"{path.name}:{line_num} -> {line.strip()}")
+
+    assert offenders == [], f"Found color string concatenation: {offenders}"
+

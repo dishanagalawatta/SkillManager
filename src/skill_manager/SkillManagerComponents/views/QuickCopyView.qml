@@ -157,7 +157,7 @@ Item {
                                 }
                                 background: Rectangle {
                                     radius: width / 2
-                                    color: isSelected ? Theme.accent + "33" : (clientBtn.hovered ? Theme.glassHover : "transparent")
+                                    color: isSelected ? Theme.alpha(Theme.accent, 0.20) : (clientBtn.hovered ? Theme.glassHover : "transparent")
                                     border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
                                     border.width: 1
                                 }
@@ -242,9 +242,9 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 64
             visible: true
-            color: Theme.accent + "10" // Subtle accent background
+            color: Theme.alpha(Theme.accent, 0.06) // Subtle accent background
             radius: Theme.radiusCard
-            border.color: Theme.accent + "30"
+            border.color: Theme.alpha(Theme.accent, 0.19)
             border.width: 1
             clip: true
             
@@ -444,7 +444,7 @@ Item {
                             }
                             background: Rectangle {
                                 radius: Theme.radiusField
-                                color: qcv_saveColBtn.hovered ? Theme.success + "20" : "transparent"
+                                color: qcv_saveColBtn.hovered ? Theme.alpha(Theme.success, 0.125) : "transparent"
                             }
                         }
 
@@ -469,7 +469,7 @@ Item {
                             }
                             background: Rectangle {
                                 radius: Theme.radiusField
-                                color: qcv_cancelColBtn.hovered ? Theme.danger + "20" : "transparent"
+                                color: qcv_cancelColBtn.hovered ? Theme.alpha(Theme.danger, 0.125) : "transparent"
                             }
                         }
                     }

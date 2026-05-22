@@ -299,7 +299,7 @@ Dialog {
                     
                     background: Rectangle {
                         radius: Theme.radiusButton
-                        color: !parent.enabled ? Theme.secondaryLabel : (parent.down ? Theme.accent : (parent.hovered ? Theme.accent + "EE" : Theme.accent))
+                        color: !parent.enabled ? Theme.secondaryLabel : (parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent))
                     }
                     
                     contentItem: Text {

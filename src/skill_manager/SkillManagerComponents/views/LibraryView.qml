@@ -140,9 +140,9 @@ Item {
             Layout.leftMargin: 4
             Layout.rightMargin: 4
             visible: true
-            color: Theme.accent + "10"
+            color: Theme.alpha(Theme.accent, 0.06)
             radius: Theme.radiusCard
-            border.color: Theme.accent + "30"
+            border.color: Theme.alpha(Theme.accent, 0.19)
             border.width: 1
             clip: true
             

@@ -180,7 +180,7 @@ Item {
                                         width: 28
                                         height: 28
                                         radius: 14
-                                        color: Theme.accent + "11"
+                                        color: Theme.alpha(Theme.accent, 0.07)
                                         Text {
                                             anchors.centerIn: parent
                                             text: modelData.source_type === "git" ? "🌐" : (modelData.source_type === "npm" ? "📦" : "📁")
@@ -352,7 +352,7 @@ Item {
                                         width: 28
                                         height: 28
                                         radius: 14
-                                        color: Theme.accent + "11"
+                                        color: Theme.alpha(Theme.accent, 0.07)
                                         Text {
                                             anchors.centerIn: parent
                                             text: "🚀"

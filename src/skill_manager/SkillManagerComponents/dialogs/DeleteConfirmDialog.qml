@@ -220,7 +220,7 @@ Dialog {
                     
                     background: Rectangle {
                         radius: Theme.radiusButton
-                        color: parent.down ? Theme.danger : (parent.hovered ? Theme.danger + "EE" : Theme.danger)
+                        color: parent.down ? Theme.danger : (parent.hovered ? Theme.alpha(Theme.danger, 0.93) : Theme.danger)
                         border.color: parent.activeFocus ? Theme.label : "transparent"
                         border.width: 2
                     }
