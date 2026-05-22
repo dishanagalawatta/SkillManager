@@ -2,9 +2,11 @@ import json
 import os
 import re
 import shutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import List, Set, Optional, Callable
+
 from .process import _emit
+
 
 def _cleanup_empty_parents(path: Path, levels: int = 3):
     """Recursively removes empty directories starting from path's parent and going up."""
@@ -22,7 +24,7 @@ def _cleanup_empty_parents(path: Path, levels: int = 3):
     except OSError:
         pass
 
-def _relocate_path_internal(src_path: Path, dest_base: Path, output_callback: Optional[Callable[[str], None]]) -> bool:
+def _relocate_path_internal(src_path: Path, dest_base: Path, output_callback: Callable[[str], None] | None) -> bool:
     """Internal helper to move a single directory to dest_base."""
     dest_path = dest_base / src_path.name
     try:
@@ -45,7 +47,7 @@ def _relocate_path_internal(src_path: Path, dest_base: Path, output_callback: Op
         _emit(output_callback, f"Relocation failed for {src_path}: {e}")
         return False
 
-def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callback: Optional[Callable[[str], None]]):
+def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callback: Callable[[str], None] | None):
     """Moves and carefully merges a skill lockfile."""
     if not source_lock.is_file():
         return
@@ -86,7 +88,7 @@ def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callba
     except Exception as e:
         _emit(output_callback, f"Failed to merge lockfile: {e}")
 
-def relocate_packages_from_output(captured_output: List[str], target_package_path: str, output_callback: Optional[Callable[[str], None]]) -> Optional[List[str]]:
+def relocate_packages_from_output(captured_output: list[str], target_package_path: str, output_callback: Callable[[str], None] | None) -> list[str] | None:
     """Parses output log for installed paths and moves those folders to target_package_path."""
     if not target_package_path:
         _emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
@@ -172,7 +174,7 @@ def relocate_packages_from_output(captured_output: List[str], target_package_pat
 
     if relocated_count > 0:
         _emit(output_callback, f"Successfully relocated {relocated_count} folders.")
-    
+
     unique_source_roots = {p.parent.parent for p in detected_paths}
     target_root = dest_base.parent
 

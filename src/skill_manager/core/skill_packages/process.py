@@ -3,7 +3,8 @@ import re
 import shutil
 import subprocess
 import time
-from typing import List, Union, Callable, Any
+from collections.abc import Callable
+
 
 def sanitize_token(text: str) -> str:
     """Removes sensitive authentication tokens from URLs and credential helpers."""
@@ -14,7 +15,7 @@ def sanitize_token(text: str) -> str:
     # Matches echo password=... in git credential helpers
     return re.sub(r"(echo password=)[^;]+", r"\1***", text)
 
-def _emit(output_callback: Union[None, Callable[[str], None]], message: str):
+def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))
     # Print to terminal for debugging and visibility
     if (
@@ -27,7 +28,7 @@ def _emit(output_callback: Union[None, Callable[[str], None]], message: str):
     if output_callback:
         output_callback(message)
 
-def _resolve_process_command(command: Union[str, List[str]], shell: bool = False) -> Union[str, List[str]]:
+def _resolve_process_command(command: str | list[str], shell: bool = False) -> str | list[str]:
     if shell or not isinstance(command, list) or not command:
         return command
 
@@ -42,7 +43,7 @@ def _resolve_process_command(command: Union[str, List[str]], shell: bool = False
         )
     return [resolved, *command[1:]]
 
-def run_process(command: Union[str, List[str]], output_callback: Callable[[str], None] = None, shell: bool = False):
+def run_process(command: str | list[str], output_callback: Callable[[str], None] = None, shell: bool = False):
     command = _resolve_process_command(command, shell)
     process = subprocess.Popen(
         command,

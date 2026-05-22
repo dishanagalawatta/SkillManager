@@ -2,9 +2,10 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
-from .process import sanitize_token
+from typing import Any
+
 from .config import normalize_skill_package_config
+
 
 def detect_git_remote(package_path: str) -> str:
     if not package_path:
@@ -122,7 +123,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
         pass
     return ""
 
-def check_skill_package_versions(source: Dict[str, Any], force_refresh: bool = False) -> Dict[str, Any]:
+def check_skill_package_versions(source: dict[str, Any], force_refresh: bool = False) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
 
     current_version = source.get("current_version", "")

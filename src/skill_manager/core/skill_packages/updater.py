@@ -1,18 +1,18 @@
 import os
-import re
 import shlex
 import shutil
-import subprocess
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable, List
+from typing import Any
 
-from .process import run_process, _emit
 from .config import normalize_skill_package_config
-from .versioning import check_skill_package_versions
+from .process import _emit, run_process
 from .relocator import relocate_packages_from_output
+from .versioning import check_skill_package_versions
 
-def _run_git_package_update(source: Dict[str, Any], output_callback: Optional[Callable[[str], None]]):
+
+def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
     repository_url = source.get("repository_url")
     package_path = source.get("package_path")
     clone_path = source.get("clone_path") or package_path
@@ -62,7 +62,7 @@ def _run_git_package_update(source: Dict[str, Any], output_callback: Optional[Ca
     if clone_path != package_path:
         _emit(output_callback, f"Installed to {path}")
 
-def _run_npm_update(source: Dict[str, Any], output_callback: Optional[Callable[[str], None]]):
+def _run_npm_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
     package_name = source.get("package_name")
     if not package_name:
         raise ValueError("Configure an npm package name.")
@@ -74,7 +74,7 @@ def _run_npm_update(source: Dict[str, Any], output_callback: Optional[Callable[[
         command.extend(_split_args(source["package_args"]))
     run_process(command, output_callback)
 
-def _intercept_cross_platform_command(command: str, output_callback: Optional[Callable[[str], None]]) -> bool:
+def _intercept_cross_platform_command(command: str, output_callback: Callable[[str], None] | None) -> bool:
     command = str(command or "").strip()
     if not command.startswith("test "):
         return False
@@ -121,12 +121,12 @@ def _intercept_cross_platform_command(command: str, output_callback: Optional[Ca
 
     return True
 
-def _run_shell_command(command: str, output_callback: Optional[Callable[[str], None]]):
+def _run_shell_command(command: str, output_callback: Callable[[str], None] | None):
     if _intercept_cross_platform_command(command, output_callback):
         return
     run_process(command, output_callback, shell=True)
 
-def run_skill_package_update(source: Dict[str, Any], output_callback: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None = None) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
     source.setdefault("current_version", "")
     source.setdefault("latest_version", "")

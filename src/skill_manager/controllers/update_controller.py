@@ -252,6 +252,7 @@ class UpdateController(BaseController):
             def run():
                 from datetime import datetime
                 from pathlib import Path
+
                 from skill_manager.core.skill_packages import run_skill_package_update
 
                 try:
@@ -302,8 +303,12 @@ class UpdateController(BaseController):
 
         def run_sync():
             try:
+                from skill_manager.core.parsing import (
+                    build_skill_search_text,
+                    categorize_skill,
+                    parse_skill_md,
+                )
                 from skill_manager.core.quick_copy import discover_package_skills
-                from skill_manager.core.parsing import parse_skill_md, categorize_skill, build_skill_search_text
 
                 source_skills = discover_package_skills(
                     sources=self.app._sources,

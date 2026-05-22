@@ -2,10 +2,11 @@ import hashlib
 import os
 import re
 import shlex
-from typing import Dict, Any, Tuple
 from pathlib import Path
+from typing import Any
 
-def _stable_package_id(source: Dict[str, Any]) -> str:
+
+def _stable_package_id(source: dict[str, Any]) -> str:
     identity = (
         source.get("repository_url")
         or source.get("package_name")
@@ -16,7 +17,7 @@ def _stable_package_id(source: Dict[str, Any]) -> str:
     digest = hashlib.sha1(str(identity).strip().lower().encode("utf-8")).hexdigest()[:12]
     return f"pkg_{digest}"
 
-def _fallback_package_name(source: Dict[str, Any]) -> str:
+def _fallback_package_name(source: dict[str, Any]) -> str:
     package_name = source.get("package_name")
     if package_name:
         return package_name
@@ -34,7 +35,7 @@ def _fallback_package_name(source: Dict[str, Any]) -> str:
 def _split_args(value: Any) -> list[str]:
     return [part for part in str(value or "").split() if part]
 
-def _parse_npx_command(command: str) -> Tuple[str, str]:
+def _parse_npx_command(command: str) -> tuple[str, str]:
     command = command.strip()
     match = re.match(r"^npx\s+(?:--yes\s+)?(?P<package>[^\s]+)(?P<args>.*)$", command)
     if not match:
@@ -48,7 +49,7 @@ def _detect_command_type(command: str) -> str:
         return "npm"
     return "custom"
 
-def _apply_npm_defaults(source: Dict[str, Any]):
+def _apply_npm_defaults(source: dict[str, Any]):
     package_name = str(source.get("package_name") or "").strip()
 
     if package_name:
@@ -80,7 +81,7 @@ def _apply_npm_defaults(source: Dict[str, Any]):
     source["update_command"] = f"npx --yes {package_name}" + (f" {args}" if args else "")
     source["latest_version_command"] = f"npm show {package_name} version"
 
-def detect_package_config(data: Dict[str, Any]) -> Dict[str, Any]:
+def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
     source = dict(data or {})
     source_type = str(source.get("source_type") or "auto").strip().lower()
     source["source_type"] = source_type
@@ -125,7 +126,7 @@ def detect_package_config(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return source
 
-def normalize_skill_package_config(data: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
     detected = detect_package_config(data)
     pkg_path = str(detected.get("package_path") or detected.get("local_path") or "").strip()
     pkg_args = str(detected.get("package_args") or detected.get("install_args") or "").strip()

@@ -1,4 +1,4 @@
-with open('src/skill_manager/SkillManagerComponents/GlassSwitch.qml', 'r') as f:
+with open('src/skill_manager/SkillManagerComponents/GlassSwitch.qml') as f:
     content = f.read()
 
 # Let's see what we can adjust. Maybe we can add a visual focus ring effect similar to FilterPill

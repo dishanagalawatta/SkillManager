@@ -1,6 +1,7 @@
 import re
 from functools import lru_cache
-from typing import Dict, List, Any
+from typing import Any
+
 from .constants import CATEGORIES, MAIN_CATEGORIES_MAPPING
 
 _CATEGORY_PATTERNS = None
@@ -43,7 +44,7 @@ def get_main_category(sub_category: str) -> str:
             return main_cat
     return "⚙️ System & Workflow"
 
-def categorize_skill(name: str, description: str) -> Dict[str, str]:
+def categorize_skill(name: str, description: str) -> dict[str, str]:
     """Determines the best category for a skill based on its name and description."""
     text = f"{name} {name} {description}".lower()
     norm_text = " ".join(text.replace("-", " ").replace("_", " ").split())
@@ -67,7 +68,7 @@ def categorize_skill(name: str, description: str) -> Dict[str, str]:
 
     return {"main_category": get_main_category(best_category), "sub_category": best_category}
 
-def build_skill_search_text(skill_data: Dict[str, Any]) -> str:
+def build_skill_search_text(skill_data: dict[str, Any]) -> str:
     parts = [
         skill_data.get("name", ""),
         skill_data.get("description", ""),

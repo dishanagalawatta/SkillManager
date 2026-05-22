@@ -1,8 +1,7 @@
 import subprocess
 from unittest.mock import MagicMock, patch
-import os
+
 import pytest
-from pathlib import Path
 
 from skill_manager.core.skill_packages.config import (
     _detect_command_type,
@@ -11,6 +10,16 @@ from skill_manager.core.skill_packages.config import (
     detect_package_config,
     normalize_skill_package_config,
 )
+from skill_manager.core.skill_packages.process import (
+    _resolve_process_command,
+    run_process as _run_process,
+    sanitize_token,
+)
+from skill_manager.core.skill_packages.relocator import (
+    _merge_and_move_lockfile,
+    _relocate_path_internal,
+    relocate_packages_from_output as _relocate_packages_from_output,
+)
 from skill_manager.core.skill_packages.updater import (
     _intercept_cross_platform_command,
     _run_git_package_update,
@@ -18,21 +27,11 @@ from skill_manager.core.skill_packages.updater import (
     _run_shell_command,
     run_skill_package_update,
 )
-from skill_manager.core.skill_packages.relocator import (
-    _merge_and_move_lockfile,
-    relocate_packages_from_output as _relocate_packages_from_output,
-    _relocate_path_internal,
-)
-from skill_manager.core.skill_packages.process import (
-    _resolve_process_command,
-    run_process as _run_process,
-    sanitize_token,
-)
 from skill_manager.core.skill_packages.versioning import (
     check_skill_package_versions,
+    detect_git_remote,
     get_git_tag,
     run_version_command,
-    detect_git_remote,
 )
 
 
