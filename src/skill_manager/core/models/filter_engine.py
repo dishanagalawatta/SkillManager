@@ -1,5 +1,4 @@
-from typing import List, Set, Optional, Tuple, Any
-from .entities import Skill, FilterState
+from .entities import FilterState, Skill
 
 MAIN_CATEGORY_ORDER = {
     "⚙️ System & Workflow": "1_⚙️ System & Workflow",
@@ -34,7 +33,7 @@ class FilterEngine:
         return f"{FilterEngine.get_main_category(skill)}|{FilterEngine.get_sub_category(skill)}"
 
     @staticmethod
-    def sort_key(skill: Skill) -> Tuple[str, str]:
+    def sort_key(skill: Skill) -> tuple[str, str]:
         if skill.is_command or skill.is_starred:
             return (f"0_Special|{skill.category or 'General'}", skill.name.lower())
         if skill.is_bundle:
@@ -46,7 +45,7 @@ class FilterEngine:
         order_prefix = MAIN_CATEGORY_ORDER.get(main_cat, f"99_{main_cat}")
         return (f"{order_prefix}|{sub_cat}", name)
 
-    def filter_skills(self, all_skills: List[Skill], state: FilterState) -> List[Skill]:
+    def filter_skills(self, all_skills: list[Skill], state: FilterState) -> list[Skill]:
         """Filters the raw skill list based on the provided FilterState."""
         filtered = []
         client_filter_lower = state.client_filter.lower() if (state.client_filter and state.filter_by_client) else None
@@ -58,10 +57,9 @@ class FilterEngine:
                 continue
             if state.category_filter and skill.category != state.category_filter:
                 continue
-            
-            if state.project_filter and state.is_package_only is not True:
-                if skill.project_label != state.project_filter:
-                    continue
+
+            if state.project_filter and state.is_package_only is not True and skill.project_label != state.project_filter:
+                continue
 
             if not state.show_commands and skill.is_command:
                 continue
@@ -73,21 +71,20 @@ class FilterEngine:
             if state.is_package_only is False and skill.is_package:
                 continue
 
-            if client_filter_lower:
-                if skill.client and skill.client.lower() != client_filter_lower:
-                    continue
+            if client_filter_lower and skill.client and skill.client.lower() != client_filter_lower:
+                continue
 
             filtered.append(skill)
         return filtered
 
-    def prepare_rows(self, skills: List[Skill]) -> List[Skill]:
+    def prepare_rows(self, skills: list[Skill]) -> list[Skill]:
         """Enriches skill objects with UI-specific metadata like sections and group boundaries."""
         previous_section = None
         for skill in skills:
             main_cat = self.get_main_category(skill)
             sub_cat = self.get_sub_category(skill)
             section = f"{main_cat}|{sub_cat}"
-            
+
             skill._main_category_name = main_cat
             skill._sub_category_name = sub_cat
             skill._section_name = section
@@ -95,7 +92,7 @@ class FilterEngine:
             previous_section = section
         return skills
 
-    def build_visible_rows(self, skills: List[Skill], collapsed_categories: Set[str]) -> List[Skill]:
+    def build_visible_rows(self, skills: list[Skill], collapsed_categories: set[str]) -> list[Skill]:
         """Computes the subset of skills that should be visible based on expansion/collapse state."""
         visible = []
         seen_main = set()

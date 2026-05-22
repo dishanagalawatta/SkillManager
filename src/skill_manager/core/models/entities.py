@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Any
+from typing import Any
+
 
 @dataclass
 class Skill:
@@ -21,11 +22,11 @@ class Skill:
     date: str = "Unknown"
     client: str = ""
     main_category: str = "⚙️ System & Workflow"
-    
+
     # Internal UI/Sorting flags
-    _section_name: Optional[str] = None
-    _main_category_name: Optional[str] = None
-    _sub_category_name: Optional[str] = None
+    _section_name: str | None = None
+    _main_category_name: str | None = None
+    _sub_category_name: str | None = None
     _is_first_in_subcategory: bool = False
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -50,11 +51,11 @@ class Skill:
         return hasattr(self, key)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Skill":
+    def from_dict(cls, data: dict[str, Any]) -> "Skill":
         """Factory method to create a Skill from a raw dictionary."""
         # Handle some legacy key mappings
         is_package = data.get("is_package", data.get("is_source", False))
-        
+
         return cls(
             name=str(data.get("name", "")),
             category=data.get("category", "General"),
@@ -87,5 +88,5 @@ class FilterState:
     filter_by_client: bool = True
     show_commands: bool = True
     show_starred: bool = True
-    is_package_only: Optional[bool] = None  # None = All, True = Packages, False = Projects
-    collapsed_categories: Set[str] = field(default_factory=set)
+    is_package_only: bool | None = None  # None = All, True = Packages, False = Projects
+    collapsed_categories: set[str] = field(default_factory=set)

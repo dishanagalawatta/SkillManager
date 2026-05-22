@@ -5,9 +5,12 @@ Usage: Accessed via AppController.discovery
 
 import os
 import traceback
+
 from PySide6.QtCore import QTimer
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.discovery import DiscoveryService
+
 
 class DiscoveryController(BaseController):
     """Controller for background skill discovery and cache handling."""

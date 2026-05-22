@@ -1,5 +1,10 @@
-import pytest
-from skill_manager.core.parsing import parse_frontmatter, normalize_description, extract_markdown_description, categorize_skill
+from skill_manager.core.parsing import (
+    categorize_skill,
+    extract_markdown_description,
+    normalize_description,
+    parse_frontmatter,
+)
+
 
 def test_parse_frontmatter_complex_yaml():
     fm = """
@@ -55,7 +60,7 @@ def test_categorize_skill_weighting():
     desc = "A generic utility for developers"
     cat = categorize_skill(name, desc)
     assert cat["sub_category"] == "Security"
-    
+
     # Test that keyword in description still works
     name = "Helper"
     desc = "This is a system deployment"

@@ -1,9 +1,11 @@
 import re
 from pathlib import Path
-from typing import Dict, Any
-from .base import parse_frontmatter, normalize_description, extract_markdown_description
+from typing import Any
 
-def parse_skill_md(filepath: str) -> Dict[str, Any]:
+from .base import extract_markdown_description, normalize_description, parse_frontmatter
+
+
+def parse_skill_md(filepath: str) -> dict[str, Any]:
     data = {"name": "", "description": "", "raw_content": "", "body_content": "", "metadata": {}}
     try:
         with open(filepath, encoding="utf-8-sig") as f:

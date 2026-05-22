@@ -1,10 +1,12 @@
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
-from .base import parse_frontmatter, normalize_description, extract_markdown_description
+from typing import Any
+
+from .base import extract_markdown_description, normalize_description, parse_frontmatter
 from .categorizer import get_main_category
 
-def parse_command_md(filepath: str) -> Optional[Dict[str, Any]]:
+
+def parse_command_md(filepath: str) -> dict[str, Any] | None:
     data = {"name": "", "description": "", "raw_content": "", "body_content": "", "metadata": {}}
     try:
         stem = Path(filepath).stem

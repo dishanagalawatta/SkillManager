@@ -4,11 +4,8 @@ Usage: python run.py
 """
 
 import ctypes
-import json
 import os
 import sys
-from datetime import datetime
-from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
@@ -23,7 +20,6 @@ try:
 except ImportError:
     HAS_PYWINSTYLES = False
 
-import contextlib
 
 from skill_manager.controllers.config_controller import ConfigController
 from skill_manager.controllers.discovery_controller import DiscoveryController
@@ -32,7 +28,6 @@ from skill_manager.controllers.ui_controller import UIController
 from skill_manager.controllers.update_controller import UpdateController
 from skill_manager.core.analytics import (
     capture_event,
-    capture_exception,
     shutdown as posthog_shutdown,
 )
 from skill_manager.core.categories import get_category_emoji

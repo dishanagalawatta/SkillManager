@@ -177,6 +177,7 @@ class ConfigController(BaseController):
         """Saves discovered skills to cache for faster startup."""
         import json
         from pathlib import Path
+
         from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
 
         try:
@@ -197,9 +198,10 @@ class ConfigController(BaseController):
 
     def load_cache(self) -> dict:
         """Loads skills from cache."""
-        import json
         import contextlib
+        import json
         from pathlib import Path
+
         from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
 
         cache_path = Path(SKILL_LIBRARY_CACHE_FILE)

@@ -1,8 +1,10 @@
 import re
-import yaml
-from typing import Dict, Any, List
+from typing import Any
 
-def parse_frontmatter(frontmatter: str) -> Dict[str, Any]:
+import yaml
+
+
+def parse_frontmatter(frontmatter: str) -> dict[str, Any]:
     if not frontmatter:
         return {}
 
