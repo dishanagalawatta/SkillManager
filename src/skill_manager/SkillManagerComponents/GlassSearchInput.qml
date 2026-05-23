@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import App 1.0
-import SkillManagerComponents 1.0
 
 TextField {
     id: rootSearchField

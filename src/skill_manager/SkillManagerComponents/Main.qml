@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import App 1.0
-import SkillManagerComponents 1.0
 
 Window {
     id: window
@@ -125,18 +124,22 @@ Window {
         // Ensure child components are clipped to the radius
         layer.enabled: true
         
-        FrostOverlay {
+        Loader {
+            active: !AppController.isTesting
             anchors.fill: parent
-            radius: parent.radius
+            source: "FrostOverlay.qml"
+            onLoaded: if (item) item.radius = window.visibility === Window.Maximized ? 0 : Theme.radiusCard
         }
 
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
 
-            CustomTitleBar {
-                id: customTitleBar
+            Loader {
+                active: !AppController.isTesting
                 Layout.fillWidth: true
+                Layout.preferredHeight: 32
+                source: "CustomTitleBar.qml"
             }
 
             TopBar {

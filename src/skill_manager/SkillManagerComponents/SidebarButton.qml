@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import App 1.0
-import SkillManagerComponents 1.0
 
 Button {
     id: control

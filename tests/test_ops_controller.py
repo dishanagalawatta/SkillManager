@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -302,3 +302,95 @@ def test_ops_controller_delete_skills_partial_failure(mock_timer, mock_del, ops_
     ops_controller.deleteSkills(items)
 
     mock_app._set_status.assert_called_with("Deletion complete: 1 deleted, 1 failed")
+
+
+def test_ops_controller_aliases(ops_controller):
+    with patch.object(OpsController, "toggleArchive") as mock_archive:
+        ops_controller.toggleCurrentSkillArchive()
+        mock_archive.assert_called_once()
+
+    with patch.object(OpsController, "toggleStarred") as mock_starred:
+        ops_controller.toggleCurrentSkillStarred()
+        mock_starred.assert_called_once()
+
+
+def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
+    mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
+    mock_app._archive_paths = ["/p1"] # /p1 already archived
+
+    with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
+        ops_controller.archiveSelectedSkills()
+
+        assert "/p2" in mock_app._archive_paths
+        mock_save.assert_called_once()
+        mock_app._set_status.assert_called_with("1 skills archived")
+        mock_app.refreshSkills.assert_called_once()
+
+    # Test already archived case
+    mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
+    mock_app._archive_paths = ["/p1", "/p2"]
+    ops_controller.archiveSelectedSkills()
+    mock_app._set_status.assert_called_with("Selected skills are already archived")
+
+    # Test no selection case
+    mock_app.skillModel.getSelectedPaths.return_value = []
+    ops_controller.archiveSelectedSkills()
+    mock_app._set_status.assert_called_with("No skills selected for archiving")
+
+
+def test_ops_controller_add_to_archive(ops_controller, mock_app):
+    mock_app._archive_paths = []
+    ops_controller.addToArchive("/p3")
+    assert "/p3" in mock_app._archive_paths
+    mock_app.refreshSkills.assert_called_once()
+    mock_app._set_status.assert_called_with("Skill archived: /p3")
+
+
+def test_ops_controller_clipboard_operations(ops_controller, mock_app):
+    mock_app.skillModel._all_skills = [{"local_path": "/p1", "name": "S1"}]
+    mock_app._client_format = "Gemini"
+
+    # Test copySkillToClipboard (skill exists)
+    with patch("skill_manager.core.quick_copy.format_project_skill_reference", return_value="REF"):
+        ops_controller.copySkillToClipboard("/p1")
+        mock_app._clipboard.setText.assert_called_with("REF")
+
+    # Test copySkillToClipboard (raw text)
+    ops_controller.copySkillToClipboard("raw text")
+    mock_app._clipboard.setText.assert_called_with("raw text")
+
+
+def test_ops_controller_copy_selection_orchestration(ops_controller, mock_app):
+    # 1. Selected items
+    mock_app.skillModel.selectedCount = 2
+    with patch.object(ops_controller, "copySelectedSkillsToClipboard") as mock_copy:
+        ops_controller.copyCurrentSelectionOrFocusedSkill()
+        mock_copy.assert_called_once()
+
+    # 2. Focused skill
+    mock_app.skillModel.selectedCount = 0
+    mock_app._selected_skill = {"local_path": "/focused"}
+    with patch.object(ops_controller, "copySkillReference") as mock_ref:
+        ops_controller.copyCurrentSelectionOrFocusedSkill()
+        mock_ref.assert_called_with(mock_app._selected_skill)
+
+    # 3. First skill
+    mock_app._selected_skill = None
+    mock_app.skillModel.get_skill_at.return_value = {"local_path": "/first"}
+    with patch.object(ops_controller, "copySkillReference") as mock_ref:
+        ops_controller.copyCurrentSelectionOrFocusedSkill()
+        mock_ref.assert_called_with({"local_path": "/first"})
+
+    # 4. Nothing
+    mock_app.skillModel.get_skill_at.return_value = None
+    ops_controller.copyCurrentSelectionOrFocusedSkill()
+    mock_app._set_status.assert_called_with("No skill available to copy")
+
+
+@patch("skill_manager.core.commands.create_custom_command_file")
+def test_ops_controller_create_custom_command(mock_create, ops_controller, mock_app):
+    mock_create.return_value = MagicMock(ok=True, message="Success")
+    ops_controller.createCustomCommand("cmd", "G", "body", "proj", "cat")
+    mock_create.assert_called_once()
+    mock_app._set_status.assert_called_with("Success")
+    mock_app.refreshSkills.assert_called_once()

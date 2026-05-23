@@ -159,6 +159,11 @@ class OpsController(BaseController):
             status = f"Deletion complete: {', '.join(parts) or 'nothing happened'}"
             QTimer.singleShot(0, self.app, lambda: self.app._set_status(status))
 
+            # Refresh models to reflect the removal
+            if deleted > 0:
+                QTimer.singleShot(0, self.app, self.app.refreshSkills)
+
+
         self.app.task_runner.run(_background_delete)
 
     @Slot(str)

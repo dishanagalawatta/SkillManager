@@ -36,6 +36,7 @@ class SkillModel(QAbstractListModel):
     IsMainCollapsedRole = Qt.UserRole + 22
     IsSubCollapsedRole = Qt.UserRole + 23
     SubCategoryNameRole = Qt.UserRole + 24
+    IsPackageRole = Qt.UserRole + 25
 
     filterChanged = Signal()
     showArchivedChanged = Signal()
@@ -131,6 +132,8 @@ class SkillModel(QAbstractListModel):
             return self._is_sub_collapsed(skill)
         if role == self.SubCategoryNameRole:
             return skill._sub_category_name or self._engine.get_sub_category(skill)
+        if role == self.IsPackageRole:
+            return skill.is_package
 
         return None
 
@@ -160,6 +163,7 @@ class SkillModel(QAbstractListModel):
             self.IsMainCollapsedRole: b"isMainCollapsed",
             self.IsSubCollapsedRole: b"isSubCollapsed",
             self.SubCategoryNameRole: b"subCategoryName",
+            self.IsPackageRole: b"isPackage",
         }
 
     # Properties
@@ -348,6 +352,7 @@ class SkillModel(QAbstractListModel):
         self.selectedCountChanged.emit()
 
     def _apply_filter(self, reset=False):
+
         if reset:
             self.beginResetModel()
         else:
