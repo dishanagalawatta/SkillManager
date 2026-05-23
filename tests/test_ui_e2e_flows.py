@@ -1,8 +1,7 @@
 import pytest
-from PySide6.QtCore import Qt, QObject
-from PySide6.QtWidgets import QApplication
+from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
-from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonType
+from PySide6.QtWidgets import QApplication
 
 from skill_manager.app import AppController
 from skill_manager.core.resources import qml_components_dir
@@ -17,6 +16,7 @@ def app_controller(session_mock_config, session_temp_dir):
     controller.task_runner = SynchronousTaskRunner()
 
     from contextlib import suppress
+
     import skill_manager.app
     skill_manager.app.current_test_controller = controller
 
@@ -35,7 +35,7 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     # Setup some initial dummy data in a test-scoped directory
     lib_dir = temp_dir / "lib"
     lib_dir.mkdir(exist_ok=True)
-    
+
     # Each skill must be in its own subfolder with a SKILL.md file
     skill_folder = lib_dir / "test-skill"
     skill_folder.mkdir(exist_ok=True)
@@ -61,17 +61,17 @@ def setup_controller_data(qapp, app_controller, temp_dir):
 
     # Trigger refresh
     app_controller.refreshSkills()
-    
+
     # Process events to allow schedule_on_ui_thread callbacks to run
     qapp.processEvents()
-    
+
     # Clear filters on both models to be sure
     app_controller.libraryModel.projectFilter = ""
     app_controller.libraryModel.filterByClient = False
     app_controller.quickCopyModel.projectFilter = ""
     app_controller.quickCopyModel.filterByClient = False
     qapp.processEvents()
-    
+
     print(f"DEBUG: Library count: {app_controller.libraryModel.rowCount()}")
     print(f"DEBUG: Quick Copy count: {app_controller.quickCopyModel.rowCount()}")
 
@@ -79,7 +79,7 @@ def setup_controller_data(qapp, app_controller, temp_dir):
 def qml_engine(qapp, app_controller):
     """Provides a QQmlApplicationEngine with the AppController already registered."""
     engine = QQmlApplicationEngine()
-    
+
     engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
     engine.rootContext().setContextProperty("appController", app_controller)
 
