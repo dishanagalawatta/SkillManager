@@ -15,9 +15,9 @@ Item {
         id: uv_folderPicker
         onFolderSelected: (path) => {
             if (mode === "package") {
-                AppController.addSource(path)
+                AppController.config_controller.addSource(path)
             } else if (mode === "project") {
-                AppController.addProject(path)
+                AppController.config_controller.addProject(path)
             }
         }
     }
@@ -83,7 +83,7 @@ Item {
                         role: "secondary"
                         tooltipText: enabled ? "Check configured projects for available skill updates." : "Update scan is already running."
                         enabled: !AppController.isLoading
-                        onClicked: (mouse) => AppController.scanForUpdates()
+                        onClicked: (mouse) => AppController.update_controller.scanForUpdates()
                     }
 
                     ActionButton {
@@ -91,7 +91,7 @@ Item {
                         role: "primary"
                         tooltipText: enabled ? "Update every skill currently marked outdated." : "No outdated skills are ready to update."
                         enabled: !AppController.isLoading && AppController.statsOutdated > 0
-                        onClicked: (mouse) => AppController.updateAllOutdated()
+                        onClicked: (mouse) => AppController.update_controller.updateAllOutdated()
                     }
                 }
             }
@@ -235,7 +235,7 @@ Item {
                                             role: isLatest ? "secondary" : "primary"
                                             buttonHeight: 26
                                             enabled: !isLatest && !modelData.is_updating
-                                            onClicked: (mouse) => AppController.runPackageUpdate(index)
+                                            onClicked: (mouse) => AppController.update_controller.runPackageUpdate(index)
                                         }
 
 
@@ -260,9 +260,9 @@ Item {
                                             tooltipText: "Remove package"
                                             onClicked: (mouse) => {
                                                 if (modelData.source_type !== undefined) {
-                                                    Qt.callLater(AppController.removeUpdatePackage, index)
+                                                    Qt.callLater(AppController.update_controller.removeUpdatePackage, index)
                                                 } else {
-                                                    Qt.callLater(AppController.removeSourceByIndex, index)
+                                                    Qt.callLater(AppController.config_controller.removeSourceByIndex, index)
                                                 }
                                             }
                                         }
@@ -333,7 +333,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            model: AppController.updateProjects
+                            model: AppController.config_controller.updateProjects
                             spacing: 8
                             delegate: Rectangle {
                                 width: uv_projectsList.width
@@ -409,7 +409,7 @@ Item {
                                             buttonSize: 32
                                             role: "destructive"
                                             tooltipText: "Remove project"
-                                            onClicked: (mouse) => Qt.callLater(AppController.removeUpdateProject, index)
+                                            onClicked: (mouse) => Qt.callLater(AppController.config_controller.removeUpdateProject, index)
                                         }
                                     }
                                 }
@@ -540,7 +540,7 @@ Item {
                             }
                             ActionButton {
                                 text: "Update"
-                                onClicked: (mouse) => AppController.updateSkillInProject(uv_inspector.skillData.name, modelData.name)
+                                onClicked: (mouse) => AppController.update_controller.updateSkillInProject(uv_inspector.skillData.name, modelData.name)
                             }
                         }
                     }

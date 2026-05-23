@@ -16,7 +16,7 @@ ComboBox {
         contentItem: RowLayout {
             spacing: 8
             Text {
-                text: modelData
+                text: modelData !== undefined ? modelData : ""
                 color: Theme.label
                 font.family: Theme.fontFamily
                 elide: Text.ElideRight
@@ -36,7 +36,7 @@ ComboBox {
                 
                 onClicked: {
                     control.popup.close()
-                    control.editCollectionClicked(modelData)
+                    control.editCollectionClicked(modelData !== undefined ? modelData : "")
                 }
             }
         }

@@ -23,7 +23,7 @@ def update_controller(mock_app):
 @patch("skill_manager.controllers.update_controller.UpdateService")
 def test_update_now(mock_service_class, update_controller, mock_app):
     mock_service = mock_service_class.return_value
-    update_controller.update_now()
+    update_controller.updateNow()
 
     # Verify status and state changes
     mock_app._set_status.assert_called_with("Starting global update...")
@@ -46,7 +46,7 @@ def test_update_now(mock_service_class, update_controller, mock_app):
         finalize_func = timer_args[2]
         finalize_func()
 
-        mock_app.load_initial_data.assert_called_once()
+        mock_app.loadInitialData.assert_called_once()
         mock_app._set_status.assert_any_call("Global update complete: 1 updated, 0 failed")
         assert mock_app._syncing_projects == []
 
@@ -54,7 +54,7 @@ def test_update_now(mock_service_class, update_controller, mock_app):
 @patch("skill_manager.controllers.update_controller.UpdateService")
 def test_scan_for_updates(mock_service_class, update_controller, mock_app):
     mock_service = mock_service_class.return_value
-    update_controller.scan_for_updates()
+    update_controller.scanForUpdates()
 
     mock_app._set_status.assert_called_with("Scanning for updates...")
     assert mock_app._is_loading is True
@@ -90,7 +90,7 @@ def test_update_skill_in_project_success(update_controller, mock_app):
         )
         mock_copy.return_value = {"failed": 0}
 
-        update_controller.update_skill_in_project("Skill1", "ProjectLabel")
+        update_controller.updateSkillInProject("Skill1", "ProjectLabel")
 
         mock_copy.assert_called_once()
         delays = [
@@ -129,7 +129,7 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
             "skill_manager.core.skill_packages.run_skill_package_update"
         ) as run_skill_package_update,
     ):
-        update_controller.run_package_update(0)
+        update_controller.runPackageUpdate(0)
 
     run_skill_package_update.assert_not_called()
     mock_app._set_status.assert_any_call(
@@ -144,7 +144,7 @@ def test_recalculate_stats(update_controller, mock_app):
         {"status": "missing"},
         {"status": "outdated"},
     ]
-    update_controller.recalculate_stats()
+    update_controller.recalculateStats()
 
     assert mock_app._stats_up_to_date == 1
     assert mock_app._stats_outdated == 2

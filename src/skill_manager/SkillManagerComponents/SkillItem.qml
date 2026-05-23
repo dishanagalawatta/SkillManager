@@ -14,7 +14,7 @@ Item {
     property string subCat: model && model.subCategoryName ? model.subCategoryName : ""
     property bool isMainCollapsed: model && model.isMainCollapsed !== undefined ? model.isMainCollapsed : false
     property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
-    property bool compactRows: AppController.compactListRows
+    property bool compactRows: AppController.ui_controller.compactListRows
 
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
@@ -53,8 +53,8 @@ Item {
 
                 Image {
                     source: root.isSubCollapsed ?
-                            AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
-                            AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
+                            AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
+                            AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
                     width: 10
                     height: 10
                     Layout.preferredWidth: 10

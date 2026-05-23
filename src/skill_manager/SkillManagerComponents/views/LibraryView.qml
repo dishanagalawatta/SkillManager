@@ -62,7 +62,7 @@ Item {
                 }
                 onActivated: (index) => {
                     let cat = index === 0 ? "" : currentText
-                    AppController.setViewFilterForView("Library", "category", cat)
+                    AppController.ui_controller.setViewFilterForView("Library", "category", cat)
                 }
             }
 
@@ -92,7 +92,7 @@ Item {
             Repeater {
                 model: [
                     { label: lv_searchInput.text ? "Search: " + lv_searchInput.text : "", clear: function() { lv_searchInput.text = ""; AppController.libraryModel.filterText = "" } },
-                    { label: AppController.libraryModel.categoryFilter ? "Category: " + AppController.libraryModel.categoryFilter : "", clear: function() { AppController.setViewFilterForView("Library", "category", "") } }
+                    { label: AppController.libraryModel.categoryFilter ? "Category: " + AppController.libraryModel.categoryFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("Library", "category", "") } }
                 ].filter((item) => item.label !== "")
 
                 delegate: Rectangle {
@@ -160,8 +160,8 @@ Item {
                     onClicked: (mouse) => AppController.libraryModel.toggleAll()
                     contentItem: Image {
                         source: AppController.libraryModel.isAllExpanded ?
-                                AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
-                                AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
+                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
+                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
                         width: 18
                         height: 18
                         sourceSize.width: 72
@@ -270,7 +270,7 @@ Item {
                             onClicked: (mouse) => {
                                 if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
                                     let path = AppController.projects[lv_projectDrop.currentIndex]
-                                    AppController.copySelectedSkillsToProjectTemporarily(path)
+                                    AppController.ops_controller.copySelectedSkillsToProjectTemporarily(path)
                                 }
                             }
                         }
@@ -280,7 +280,7 @@ Item {
                             labelText: "Archive"
                             iconText: "📦"
                             role: "secondary"
-                            onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.archiveSelectedSkills())
+                            onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
                         }
 
                         ActionButton {
@@ -288,7 +288,7 @@ Item {
                             labelText: "Delete"
                             iconText: "🗑️"
                             role: "destructive"
-                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.deleteSelectedSkills())
+                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
                         }
 
                         Rectangle {
@@ -309,7 +309,7 @@ Item {
                             onClicked: (mouse) => {
                                 if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
                                     let path = AppController.projects[lv_projectDrop.currentIndex]
-                                    AppController.copySelectedSkillsToProject(path)
+                                    AppController.ops_controller.copySelectedSkillsToProject(path)
                                 }
                             }
                         }
@@ -419,17 +419,17 @@ Item {
                         AppController.libraryModel.toggleSelection(index)
                     }
                     onDoubleClicked: (mouse) => {
-                        AppController.selectSkill(index)
+                        AppController.ui_controller.selectSkill(index)
                     }
                     onRightClicked: {
                         if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {
-                            AppController.selectSkill(-1)
+                            AppController.ui_controller.selectSkill(-1)
                         } else {
-                            AppController.selectSkill(index)
+                            AppController.ui_controller.selectSkill(index)
                         }
                     }
                     onDeleteRequested: (name, path) => {
-                        lv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))
+                        lv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
                     }
                 }
 
@@ -446,7 +446,7 @@ Item {
                 skill: AppController.selectedSkill
                 visible: targetWidth > 0
 
-                onClosed: AppController.selectSkill(-1)
+                onClosed: AppController.ui_controller.selectSkill(-1)
             }
         }
     }

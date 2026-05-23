@@ -49,96 +49,96 @@ ColumnLayout {
                     // Search
                     Text { text: "Search"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutSearch
-                        onSequenceCaptured: (seq) => AppController.setShortcut("search", seq)
+                        sequence: AppController.config_controller.shortcutSearch
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("search", seq)
                     }
 
                     // Copy
                     Text { text: "Copy Selection"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutCopy
-                        onSequenceCaptured: (seq) => AppController.setShortcut("copy", seq)
+                        sequence: AppController.config_controller.shortcutCopy
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("copy", seq)
                     }
 
                     // Archive
                     Text { text: "Archive Selected"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutArchive
-                        onSequenceCaptured: (seq) => AppController.setShortcut("archive", seq)
+                        sequence: AppController.config_controller.shortcutArchive
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("archive", seq)
                     }
 
                     // Delete
                     Text { text: "Delete Selected"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutDelete
-                        onSequenceCaptured: (seq) => AppController.setShortcut("delete", seq)
+                        sequence: AppController.config_controller.shortcutDelete
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("delete", seq)
                     }
 
                     // Refresh
                     Text { text: "Refresh Library"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutRefresh
-                        onSequenceCaptured: (seq) => AppController.setShortcut("refresh", seq)
+                        sequence: AppController.config_controller.shortcutRefresh
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("refresh", seq)
                     }
 
                     // Expand All
                     Text { text: "Expand All Categories"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutExpandAll
-                        onSequenceCaptured: (seq) => AppController.setShortcut("expand_all", seq)
+                        sequence: AppController.config_controller.shortcutExpandAll
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("expand_all", seq)
                     }
 
                     // Collapse All
                     Text { text: "Collapse All Categories"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutCollapseAll
-                        onSequenceCaptured: (seq) => AppController.setShortcut("collapse_all", seq)
+                        sequence: AppController.config_controller.shortcutCollapseAll
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("collapse_all", seq)
                     }
 
                     // Top of List
                     Text { text: "Scroll to Top"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutTopOfList
-                        onSequenceCaptured: (seq) => AppController.setShortcut("top_of_list", seq)
+                        sequence: AppController.config_controller.shortcutTopOfList
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("top_of_list", seq)
                     }
 
                     // Clear Selection
                     Text { text: "Clear Selection"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutClearSelection
-                        onSequenceCaptured: (seq) => AppController.setShortcut("clear_selection", seq)
+                        sequence: AppController.config_controller.shortcutClearSelection
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("clear_selection", seq)
                     }
 
                     // Theme Toggle
                     Text { text: "Toggle Theme"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutThemeToggle
-                        onSequenceCaptured: (seq) => AppController.setShortcut("theme_toggle", seq)
+                        sequence: AppController.config_controller.shortcutThemeToggle
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("theme_toggle", seq)
                     }
 
                     // Navigation
                     Text { text: "Quick Copy View"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutQuickCopyView
-                        onSequenceCaptured: (seq) => AppController.setShortcut("quick_copy_view", seq)
+                        sequence: AppController.config_controller.shortcutQuickCopyView
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("quick_copy_view", seq)
                     }
 
                     Text { text: "Library View"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutLibraryView
-                        onSequenceCaptured: (seq) => AppController.setShortcut("library_view", seq)
+                        sequence: AppController.config_controller.shortcutLibraryView
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("library_view", seq)
                     }
 
                     Text { text: "Updates View"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutUpdatesView
-                        onSequenceCaptured: (seq) => AppController.setShortcut("updates_view", seq)
+                        sequence: AppController.config_controller.shortcutUpdatesView
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("updates_view", seq)
                     }
 
                     Text { text: "Settings View"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
-                        sequence: AppController.shortcutSettingsView
-                        onSequenceCaptured: (seq) => AppController.setShortcut("settings_view", seq)
+                        sequence: AppController.config_controller.shortcutSettingsView
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("settings_view", seq)
                     }
                 }
 
@@ -152,7 +152,7 @@ ColumnLayout {
                     Layout.alignment: Qt.AlignRight
                     Layout.preferredHeight: 36
                     text: "Reset to Defaults"
-                    onClicked: (mouse) => AppController.resetShortcuts()
+                    onClicked: (mouse) => AppController.config_controller.resetShortcuts()
                     background: Rectangle {
                         radius: Theme.radiusButton
                         color: parent.hovered ? Theme.glassHover : "transparent"
