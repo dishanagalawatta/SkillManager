@@ -11,8 +11,8 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import Qt5Compat.GraphicalEffects
+import ".."
 import App 1.0
-import SkillManagerComponents 1.0
 
 Dialog {
     id: root

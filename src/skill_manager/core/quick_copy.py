@@ -384,6 +384,7 @@ def delete_project_skill_folders(skills):
         source_path = Path(os.path.expanduser(str(skill.get("local_path") or ""))).resolve()
         project_path = Path(os.path.expanduser(str(skill.get("project_path") or ""))).resolve()
         error = _delete_validation_error(source_path, project_path)
+
         if error:
             result["skipped"] += 1
             result["details"].append(

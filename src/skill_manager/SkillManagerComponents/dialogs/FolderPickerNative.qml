@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Dialogs
+import ".."
 
 /**
  * Purpose: A native folder picker dialog wrapper.

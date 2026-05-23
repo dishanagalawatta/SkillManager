@@ -92,3 +92,39 @@ def test_config_controller_verify_git_fail(mock_tag, config_controller, mock_app
     res = config_controller.verifyGitPackage("http://git.com")
     assert res == ""
     mock_app._set_status.assert_any_call("Verification failed for: http://git.com")
+
+
+def test_config_controller_shortcuts(config_controller, mock_app):
+    mock_app._config.get.return_value = {"search": "Ctrl+F"}
+
+    assert config_controller.get_shortcut("search") == "Ctrl+F"
+    assert config_controller.get_shortcut("nonexistent") == ""
+
+    # Test setShortcut
+    config_controller.setShortcut("search", "Ctrl+Shift+F")
+    mock_app._config.set.assert_called_with("shortcuts", {"search": "Ctrl+Shift+F"})
+    mock_app._set_status.assert_called_with("Shortcut for search set to: Ctrl+Shift+F")
+
+    # Test resetShortcuts
+    with patch("skill_manager.core.config.DEFAULT_SHORTCUTS", {"search": "Ctrl+F"}):
+        config_controller.resetShortcuts()
+        mock_app._config.set.assert_called_with("shortcuts", {"search": "Ctrl+F"})
+
+
+def test_config_controller_custom_collections(config_controller, mock_app):
+    mock_app._custom_collections = {}
+
+    # Save collection
+    config_controller.saveCustomCollection("MyColl", ["/path/1", "/path/2"])
+    assert mock_app._custom_collections["MyColl"] == ["/path/1", "/path/2"]
+    mock_app._config.set.assert_called_with("custom_collections", mock_app._custom_collections)
+
+    # Delete collection
+    config_controller.deleteCustomCollection("MyColl")
+    assert "MyColl" not in mock_app._custom_collections
+
+    # Apply selection
+    mock_app._custom_collections = {"MyColl": ["/path/1"]}
+    config_controller.applyCollectionSelection("MyColl")
+    mock_app.skillModel.clearSelection.assert_called_once()
+    mock_app.skillModel.selectByPaths.assert_called_with(["/path/1"])

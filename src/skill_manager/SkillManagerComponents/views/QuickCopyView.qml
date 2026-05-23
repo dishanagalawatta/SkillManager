@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import Qt5Compat.GraphicalEffects
+import ".."
 import App 1.0
-import SkillManagerComponents 1.0
 import ".."
 import "../dialogs"
 
@@ -171,6 +171,7 @@ Item {
                 // Search Group (Flexible, Left-most on first line)
                 GlassSearchInput {
                     id: searchInput
+                    objectName: "quickCopySearchInput"
                     // Dynamic width: Fill remaining space on the line, or take full width if too small
                     readonly property real minSearchWidth: 200
                     readonly property real fixedWidth: fixedControls.width + headerControls.spacing

@@ -10,6 +10,9 @@ class Skill:
     description: str = ""
     local_path: str = ""
     project_label: str = ""
+    project_path: str = ""
+    project_root: str = ""
+    skill_md_path: str = ""
     is_starred: bool = False
     is_archived: bool = False
     is_bundle: bool = False
@@ -62,6 +65,9 @@ class Skill:
             description=data.get("description", ""),
             local_path=data.get("local_path", ""),
             project_label=data.get("project_label", ""),
+            project_path=data.get("project_path", ""),
+            project_root=data.get("project_root", ""),
+            skill_md_path=data.get("skill_md_path", ""),
             is_starred=data.get("is_starred", False),
             is_archived=data.get("is_archived", False),
             is_bundle=data.get("is_bundle", False),
@@ -75,6 +81,7 @@ class Skill:
             client=data.get("client", ""),
             main_category=data.get("main_category", "⚙️ System & Workflow")
         )
+
 
 @dataclass
 class FilterState:

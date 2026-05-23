@@ -76,9 +76,10 @@ class ConfigManagerTests(unittest.TestCase):
             )
 
             os.chdir(workspace)
-            config = self._reload_config(data_dir)
+            with mock.patch.dict(os.environ, {"SKILL_MANAGER_ALLOW_MIGRATION": "1"}):
+                config = self._reload_config(data_dir)
 
-            manager = config.ConfigManager()
+                manager = config.ConfigManager()
 
             # Targets should be migrated to projects
             self.assertEqual(manager.get("projects"), ["target-a"])
@@ -155,8 +156,9 @@ class ConfigManagerTests(unittest.TestCase):
             )
 
             os.chdir(workspace)
-            config = self._reload_config(data_dir)
-            manager = config.ConfigManager()
+            with mock.patch.dict(os.environ, {"SKILL_MANAGER_ALLOW_MIGRATION": "1"}):
+                config = self._reload_config(data_dir)
+                manager = config.ConfigManager()
 
             self.assertEqual(manager.get("projects"), ["repo-data-target"])
             self.assertTrue((data_dir / "config.json").is_file())

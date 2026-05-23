@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import App 1.0
-import SkillManagerComponents 1.0
 
 Item {
     id: root

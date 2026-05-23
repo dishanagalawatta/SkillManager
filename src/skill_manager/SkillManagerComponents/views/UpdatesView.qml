@@ -3,8 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick.Effects
 import QtQuick.Dialogs
+import ".."
 import App 1.0
-import SkillManagerComponents 1.0
 import "../dialogs"
 
 Item {

@@ -63,6 +63,12 @@ def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = N
     """Returns the app-data path, falling back to a legacy root file if migration is blocked."""
     target_dir = data_dir or get_app_data_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
+
+    if os.environ.get("SKILL_MANAGER_TESTING") == "1" and not legacy_dir:
+        if os.environ.get("SKILL_MANAGER_ALLOW_MIGRATION") != "1":
+            # In testing mode, don't fallback to CWD unless explicitly asked or allowed
+            return target_dir / filename
+
     source_dir = legacy_dir or Path.cwd()
     target_path = target_dir / filename
     legacy_path = source_dir / filename
@@ -140,7 +146,7 @@ class ConfigManager:
                 with open(root_config) as f:
                     self.data = json.load(f)
                 self.save()  # Migrate to new location
-                return self.data
+                # Continue loading to handle potential secondary migrations (e.g. targets -> projects)
             except Exception as e:
                 print(f"Error migrating config: {e}")
 

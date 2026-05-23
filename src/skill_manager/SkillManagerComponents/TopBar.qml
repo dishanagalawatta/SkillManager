@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import App 1.0
-import SkillManagerComponents 1.0
 
 Rectangle {
     id: root
@@ -35,6 +34,7 @@ Rectangle {
             spacing: 4
             
             TopBarButton {
+                objectName: "navQuickCopy"
                 iconText: "⚡"
                 labelText: "Quick Copy"
                 active: root.currentView === "Quick Copy" || root.currentView === "QuickCopy"
@@ -45,6 +45,7 @@ Rectangle {
             }
 
             TopBarButton {
+                objectName: "navLibrary"
                 iconText: "📚"
                 labelText: "Library"
                 active: root.currentView === "Library"
@@ -55,6 +56,7 @@ Rectangle {
             }
 
             TopBarButton {
+                objectName: "navUpdates"
                 iconText: "🔄"
                 labelText: "Updates"
                 active: root.currentView === "Updates"
@@ -62,6 +64,7 @@ Rectangle {
             }
 
             TopBarButton {
+                objectName: "navSettings"
                 iconText: "⚙️"
                 labelText: "Settings"
                 active: root.currentView === "Settings"

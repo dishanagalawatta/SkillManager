@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import ".."
 import App 1.0
-import SkillManagerComponents 1.0
 import ".."
 
 Item {
@@ -68,6 +68,7 @@ Item {
 
             GlassSearchInput {
                 id: lv_searchInput
+                objectName: "librarySearchInput"
                 Layout.preferredWidth: 250
                 onTextChanged: AppController.libraryModel.filterText = text
             }

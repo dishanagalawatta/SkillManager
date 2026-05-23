@@ -65,6 +65,10 @@ class AppController(QObject):
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
 
+    @Property(bool, constant=True)
+    def isTesting(self):
+        return os.environ.get("SKILL_MANAGER_TESTING") == "1"
+
     # Legacy UI/Config Signals (Forwarded from sub-controllers)
     currentViewChanged = Signal()
     windowWidthChanged = Signal()
@@ -81,10 +85,10 @@ class AppController(QObject):
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
 
-    def __init__(self, skip_initial_load=False):
+    def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
         # 1. Core Models and Configuration
-        self._config = ConfigManager()
+        self._config = config if config else ConfigManager()
         self.task_runner = BackgroundTaskRunner()
         self._library_model = SkillModel(config=self._config)
         self._quick_copy_model = SkillModel(config=self._config)

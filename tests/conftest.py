@@ -6,10 +6,26 @@ import uuid
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-from PySide6.QtGui import QGuiApplication
+# Force QML style before ANY Qt imports to prevent initialization errors
+os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
+# Use offscreen platform for headless environments by default in tests
+if "QT_QPA_PLATFORM" not in os.environ:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from skill_manager.utils.task_runner import SynchronousTaskRunner
+import pytest
+from PySide6.QtWidgets import QApplication
+from PySide6.QtQuickControls2 import QQuickStyle
+
+# Import QtQuick/QtWidgets to ensure types are registered
+import PySide6.QtQuick  # noqa: F401
+import PySide6.QtWidgets  # noqa: F401
+
+# Automatically add 'src' to PYTHONPATH for all tests
+src_path = str(Path(__file__).parent.parent / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+from skill_manager.utils.task_runner import SynchronousTaskRunner  # noqa: E402
 
 # Global test configuration
 os.environ["SKILL_MANAGER_TESTING"] = "1"
@@ -22,23 +38,16 @@ os.environ.setdefault(
     str(Path(tempfile.gettempdir()) / f"skillmanager-pytest-{uuid.uuid4().hex}" / "data"),
 )
 
-# Automatically add 'src' to PYTHONPATH for all tests
-src_path = str(Path(__file__).parent.parent / "src")
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
-
-
 @pytest.fixture(scope="session")
-def qapp():
-    """Provides a QGuiApplication instance for the test session."""
-    app = QGuiApplication.instance()
-    if app is None:
-        # Use offscreen platform for headless environments
-        if os.environ.get("QT_QPA_PLATFORM") != "offscreen":
-            os.environ["QT_QPA_PLATFORM"] = "offscreen"
-        app = QGuiApplication([])
-    yield app
+def qapp_cls():
+    """Tells pytest-qt to use QApplication instead of QGuiApplication."""
+    return QApplication
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_qml_style(qapp):
+    """Ensures QQuickStyle is set on the qapp instance."""
+    QQuickStyle.setStyle("Basic")
+    yield
 
 @pytest.fixture
 def temp_dir():
@@ -49,14 +58,37 @@ def temp_dir():
     shutil.rmtree(path, ignore_errors=True)
 
 
-@pytest.fixture
-def mock_config(temp_dir):
-    """Sets up a mock environment with a temporary data directory."""
-    data_dir = temp_dir / "data"
+from skill_manager.core.config import ConfigManager  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def session_temp_dir():
+    """Provides a session-scoped temporary directory."""
+    path = Path(tempfile.gettempdir()) / f"skillmanager-session-{uuid.uuid4().hex}"
+    path.mkdir(parents=True)
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
+
+@pytest.fixture(scope="session")
+def session_mock_config(session_temp_dir):
+    """Provides a session-scoped mock config."""
+    data_dir = session_temp_dir / "data"
     data_dir.mkdir()
     os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
-    yield data_dir
+    config = ConfigManager()
+    yield config
     os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+
+@pytest.fixture
+def mock_config(temp_dir):
+    """Provides a function-scoped mock config."""
+    data_dir = temp_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+    os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
+    config = ConfigManager()
+    yield config
+    os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+
 
 
 @pytest.fixture
