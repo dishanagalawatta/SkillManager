@@ -16,11 +16,16 @@ def app_controller(session_mock_config, session_temp_dir):
     controller = AppController(skip_initial_load=True, config=session_mock_config)
     controller.task_runner = SynchronousTaskRunner()
 
-    # Register the singleton type with a factory function
-    def controller_factory(qml_engine):
-        return controller
+    from contextlib import suppress
+    import skill_manager.app
+    skill_manager.app.current_test_controller = controller
 
-    qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
+    def controller_factory(qml_engine):
+        return skill_manager.app.current_test_controller
+
+    with suppress(Exception):
+        from PySide6.QtQml import qmlRegisterSingletonType
+        qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
 
     return controller
 
@@ -74,7 +79,7 @@ def setup_controller_data(qapp, app_controller, temp_dir):
 def qml_engine(qapp, app_controller):
     """Provides a QQmlApplicationEngine with the AppController already registered."""
     engine = QQmlApplicationEngine()
-    engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
+    
     engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
     engine.rootContext().setContextProperty("appController", app_controller)
 

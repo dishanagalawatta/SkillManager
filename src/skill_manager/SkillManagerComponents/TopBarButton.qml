@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import App 1.0
-import SkillManagerComponents 1.0
 
 Button {
     id: control
@@ -49,11 +48,14 @@ Button {
         }
     }
 
-    background: Rectangle {
-        color: control.active ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
-        radius: Theme.radiusPill
-        border.color: control.visualFocus ? Theme.accent : "transparent"
-        border.width: control.visualFocus ? 2 : 0
+    background: Item {
+        Rectangle {
+            anchors.fill: parent
+            color: control.active ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
+            radius: Theme.radiusPill
+            border.color: control.visualFocus ? Theme.accent : "transparent"
+            border.width: control.visualFocus ? 2 : 0
+        }
 
         Rectangle {
             visible: control.active
