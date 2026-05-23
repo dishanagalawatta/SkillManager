@@ -37,7 +37,7 @@ def _split_args(value: Any) -> list[str]:
 
 def _parse_npx_command(command: str) -> tuple[str, str]:
     command = command.strip()
-    match = re.match(r"^npx\s+(?:--yes\s+)?(?P<package>[^\s]+)(?P<args>.*)$", command)
+    match = re.match(r"^npx\s+(?:--yes\s+)?(?:--\s+)?(?P<package>[^\s]+)(?P<args>.*)$", command)
     if not match:
         return "", ""
     package_name = match.group("package").strip()
@@ -57,6 +57,8 @@ def _apply_npm_defaults(source: dict[str, Any]):
         if parts and parts[0] == "npx":
             parts.pop(0)
             if parts and parts[0] == "--yes":
+                parts.pop(0)
+            if parts and parts[0] == "--":
                 parts.pop(0)
 
         if parts:
@@ -78,8 +80,8 @@ def _apply_npm_defaults(source: dict[str, Any]):
         return
 
     args = str(source.get("package_args") or "").strip()
-    source["update_command"] = f"npx --yes {package_name}" + (f" {args}" if args else "")
-    source["latest_version_command"] = f"npm show {package_name} version"
+    source["update_command"] = f"npx --yes -- {package_name}" + (f" {args}" if args else "")
+    source["latest_version_command"] = f"npm show -- {package_name} version"
 
 def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
     source = dict(data or {})

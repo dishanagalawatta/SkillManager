@@ -48,7 +48,7 @@ def test_normalize_skill_package_config():
     assert normalized["name"] == "test-package"
     assert normalized["source_type"] == "npm"
     assert normalized["package_id"].startswith("pkg_")
-    assert "npx --yes test-package" in normalized["update_command"]
+    assert "npx --yes -- test-package" in normalized["update_command"]
 
 
 def test_normalize_skill_package_config_preserves_package_id():
@@ -198,7 +198,7 @@ def test_run_npm_update(mock_run):
     _run_npm_update(source, None)
 
     mock_run.assert_called_once()
-    assert mock_run.call_args[0][0] == ["npx", "--yes", "my-pkg", "--dev"]
+    assert mock_run.call_args[0][0] == ["npx", "--yes", "--", "my-pkg", "--dev"]
 
 
 @patch("shutil.which")
