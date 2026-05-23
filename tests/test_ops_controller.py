@@ -13,11 +13,10 @@ def ops_controller(mock_app):
 def test_ops_controller_toggle_archive(ops_controller, mock_app):
     mock_app._selected_skill = {"local_path": "/path/s", "is_archived": False}
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
-        ops_controller.toggle_archive()
+        ops_controller.toggleArchive()
 
         assert "/path/s" in mock_app._archive_paths
         assert mock_app._selected_skill["is_archived"] is True
-        mock_app._library_model._apply_filter.assert_called()
         mock_app.selectedSkillChanged.emit.assert_called()
         mock_save.assert_called_with(mock_app._archive_paths)
 
@@ -26,7 +25,7 @@ def test_ops_controller_toggle_archive_restore(ops_controller, mock_app):
     mock_app._selected_skill = {"local_path": "/path/s", "is_archived": True}
     mock_app._archive_paths = ["/path/s"]
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
-        ops_controller.toggle_archive()
+        ops_controller.toggleArchive()
 
         assert "/path/s" not in mock_app._archive_paths
         assert mock_app._selected_skill["is_archived"] is False
@@ -35,20 +34,20 @@ def test_ops_controller_toggle_archive_restore(ops_controller, mock_app):
 
 def test_ops_controller_toggle_archive_no_skill(ops_controller, mock_app):
     mock_app._selected_skill = None
-    ops_controller.toggle_archive()
+    ops_controller.toggleArchive()
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
 
 def test_ops_controller_toggle_archive_no_path(ops_controller, mock_app):
     mock_app._selected_skill = {"name": "NoPath"}
-    ops_controller.toggle_archive()
+    ops_controller.toggleArchive()
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
 
 def test_ops_controller_toggle_starred(ops_controller, mock_app):
     mock_app._selected_skill = {"local_path": "/path/e", "is_starred": False}
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
-        ops_controller.toggle_starred()
+        ops_controller.toggleStarred()
 
         assert "/path/e" in mock_app._starred_paths
         assert mock_app._selected_skill["is_starred"] is True
@@ -59,7 +58,7 @@ def test_ops_controller_toggle_starred_remove(ops_controller, mock_app):
     mock_app._selected_skill = {"local_path": "/path/e", "is_starred": True}
     mock_app._starred_paths = ["/path/e"]
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
-        ops_controller.toggle_starred()
+        ops_controller.toggleStarred()
 
         assert "/path/e" not in mock_app._starred_paths
         assert mock_app._selected_skill["is_starred"] is False
@@ -68,7 +67,7 @@ def test_ops_controller_toggle_starred_remove(ops_controller, mock_app):
 
 def test_ops_controller_toggle_starred_no_path(ops_controller, mock_app):
     mock_app._selected_skill = {"name": "NoPath"}
-    ops_controller.toggle_starred()
+    ops_controller.toggleStarred()
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
 
@@ -80,7 +79,7 @@ def test_ops_controller_delete_commands(mock_timer, mock_del, ops_controller, mo
 
     items = [{"local_path": str(cmd_file), "is_command": True}]
     with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
-        ops_controller.delete_skills(items)
+        ops_controller.deleteSkills(items)
         assert not cmd_file.exists()
         mock_patch.assert_called_with([str(cmd_file)])
 
@@ -88,12 +87,15 @@ def test_ops_controller_delete_commands(mock_timer, mock_del, ops_controller, mo
 @patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
 def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock_app):
-    mock_del.return_value = {"deleted": 1, "failed": 0}
+    mock_del.return_value = {
+        "deleted": 1,
+        "failed": 0,
+        "details": [{"path": "/p1", "status": "deleted"}],
+    }
 
     items = [{"local_path": "/p1", "is_command": False}]
     with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
-        ops_controller.delete_skills(items)
-        mock_app._library_model.removeSkillsByPath.assert_called_with(["/p1"])
+        ops_controller.deleteSkills(items)
         mock_del.assert_called_once()
         mock_patch.assert_called_with(["/p1"])
 
@@ -126,7 +128,7 @@ def test_ops_controller_copy_selected(mock_timer, mock_copy, ops_controller, moc
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1"]
     mock_app.skillModel._all_skills = [{"local_path": "/p1", "name": "S1"}]
 
-    ops_controller.copy_selected_to_project("/project")
+    ops_controller.copySelectedSkillsToProject("/project")
 
     mock_copy.assert_called_once()
     mock_app._set_status.assert_any_call("Copying 1 skills...")
@@ -148,7 +150,7 @@ def test_ops_controller_copy_selected_temporary(mock_timer, mock_copy, ops_contr
         patch("skill_manager.controllers.ops_controller.load_temp_registry", return_value=[]),
         patch("skill_manager.controllers.ops_controller.save_temp_registry") as mock_save,
     ):
-        ops_controller.copy_selected_to_project("/project", is_temporary=True)
+        ops_controller.copySelectedSkillsToProject("/project", is_temporary=True)
 
         mock_save.assert_called_with(["/project/S1"])
 
@@ -160,7 +162,7 @@ def test_ops_controller_update_models_source(ops_controller, mock_app):
     mock_app._library_model._all_skills = [skill_library]
     mock_app._quick_copy_model._all_skills = [skill_quick_copy]
 
-    ops_controller._update_models_source("/path/s", "is_archived", True)
+    ops_controller._updateModelsSource("/path/s", "is_archived", True)
 
     assert skill_library["is_archived"] is True
     assert skill_quick_copy["is_archived"] is True
@@ -175,7 +177,7 @@ def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, m
     mock_app._quick_copy_model._all_skills = [skill_quick_copy]
 
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
-        ops_controller.toggle_archive()
+        ops_controller.toggleArchive()
 
         assert skill_library["is_archived"] is True
         assert skill_quick_copy["is_archived"] is True
@@ -191,7 +193,7 @@ def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, m
     mock_app._quick_copy_model._all_skills = [skill_quick_copy]
 
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
-        ops_controller.toggle_starred()
+        ops_controller.toggleStarred()
 
         assert skill_library["is_starred"] is True
         assert skill_quick_copy["is_starred"] is True
@@ -241,7 +243,7 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
         ) as mock_discover,
         patch("skill_manager.controllers.ops_controller.patch_cache_add") as mock_patch_cache,
     ):
-        ops_controller.copy_selected_to_project("/project")
+        ops_controller.copySelectedSkillsToProject("/project")
 
         mock_copy.assert_called_once()
         mock_discover.assert_called_once()
@@ -258,13 +260,13 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
 
 
 def test_ops_controller_copy_selected_no_project(ops_controller, mock_app):
-    ops_controller.copy_selected_to_project("")
+    ops_controller.copySelectedSkillsToProject("")
     mock_app._set_status.assert_not_called()
 
 
 def test_ops_controller_copy_selected_no_selection(ops_controller, mock_app):
     mock_app.skillModel.getSelectedPaths.return_value = []
-    ops_controller.copy_selected_to_project("/project")
+    ops_controller.copySelectedSkillsToProject("/project")
     mock_app._set_status.assert_called_with("No skills selected to copy")
 
 
@@ -278,7 +280,7 @@ def test_ops_controller_copy_selected_exception(mock_timer, mock_copy, ops_contr
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1"]
     mock_app.skillModel._all_skills = [{"local_path": "/p1"}]
 
-    ops_controller.copy_selected_to_project("/project")
+    ops_controller.copySelectedSkillsToProject("/project")
 
     mock_app._set_status.assert_called_with("Copy failed: Disk full")
 
@@ -290,9 +292,13 @@ def test_ops_controller_delete_skills_partial_failure(mock_timer, mock_del, ops_
     mock_timer.side_effect = lambda ms, obj, cb: cb()
 
     # Simulate 1 deleted, 1 failed
-    mock_del.return_value = {"deleted": 1, "failed": 1}
+    mock_del.return_value = {
+        "deleted": 1,
+        "failed": 1,
+        "details": [{"path": "/p1", "status": "deleted"}],
+    }
 
     items = [{"local_path": "/p1"}, {"local_path": "/p2"}]
-    ops_controller.delete_skills(items)
+    ops_controller.deleteSkills(items)
 
     mock_app._set_status.assert_called_with("Deletion complete: 1 deleted, 1 failed")

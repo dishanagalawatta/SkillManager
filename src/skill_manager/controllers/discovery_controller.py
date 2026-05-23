@@ -6,6 +6,8 @@ Usage: Accessed via AppController.discovery
 import os
 import traceback
 
+from PySide6.QtCore import Slot
+
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.discovery import DiscoveryService
 from skill_manager.utils.qt_threading import schedule_on_ui_thread
@@ -14,7 +16,8 @@ from skill_manager.utils.qt_threading import schedule_on_ui_thread
 class DiscoveryController(BaseController):
     """Controller for background skill discovery and cache handling."""
 
-    def load_initial_data(self):
+    @Slot()
+    def loadInitialData(self):
         """Initial scan of skills on application startup in a background thread."""
         self.app._is_loading = True
         self.app.isLoadingChanged.emit()

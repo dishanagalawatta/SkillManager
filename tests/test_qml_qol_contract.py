@@ -101,13 +101,13 @@ def test_shared_buttons_center_content_and_use_role_tokens():
 def test_compact_rows_are_persisted_and_wired_to_skill_items():
     settings = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
-    app_py = (QML_DIR.parent / "app.py").read_text(encoding="utf-8")
+    ui_controller_py = (QML_DIR.parent / "controllers" / "ui_controller.py").read_text(encoding="utf-8")
 
     assert "Compact List Rows" in settings
-    assert "AppController.compactListRows" in settings
-    assert "AppController.setCompactListRows(checked)" in settings
-    assert "property bool compactRows: AppController.compactListRows" in skill_item
-    assert "_compact_list_rows" in app_py
+    assert "AppController.ui_controller.compactListRows" in settings
+    assert "AppController.ui_controller.setCompactListRows(checked)" in settings
+    assert "property bool compactRows: AppController.ui_controller.compactListRows" in skill_item
+    assert "_compact_list_rows" in ui_controller_py
 
 
 def test_raw_skill_rows_show_name_only_and_use_tighter_heights():

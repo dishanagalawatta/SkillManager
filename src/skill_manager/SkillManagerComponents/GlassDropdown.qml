@@ -10,7 +10,7 @@ ComboBox {
     delegate: ItemDelegate {
         width: control.width
         contentItem: Text {
-            text: modelData
+            text: modelData !== undefined ? modelData : ""
             color: Theme.label
             font.family: Theme.fontFamily
             elide: Text.ElideRight

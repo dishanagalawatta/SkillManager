@@ -94,7 +94,7 @@ Rectangle {
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     visible: root.skill && root.skill.local_path !== undefined
-                    onClicked: (mouse) => AppController.toggleCurrentSkillStarred()
+                    onClicked: (mouse) => AppController.ops_controller.toggleCurrentSkillStarred()
                     
                     contentItem: Text {
                         text: starButton.text

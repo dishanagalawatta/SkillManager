@@ -4,7 +4,7 @@ Usage: Accessed via AppController.updates
 """
 
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -15,7 +15,8 @@ from skill_manager.utils.qt_threading import schedule_on_ui_thread
 class UpdateController(BaseController):
     """Controller for skill updates and synchronization."""
 
-    def _resolve_package_storage_state(self):
+    def _resolvePackageStorageState(self):
+        """Internal helper to refresh package state from config."""
         from skill_manager.core.persistence import load_package_skill_inventory
         from skill_manager.core.skill_packages import (
             normalize_skill_package_config,
@@ -31,7 +32,8 @@ class UpdateController(BaseController):
         )
         self.config.set("skills", self.app._update_packages)
 
-    def update_now(self):
+    @Slot()
+    def updateNow(self):
         """Starts a global update of all skills and projects."""
         self.app._set_status("Starting global update...")
 
@@ -57,14 +59,15 @@ class UpdateController(BaseController):
 
         def source_progress_callback(idx, data):
             def update_item():
-                self.app._update_packages[idx] = data
-                self.app.updatePackagesChanged.emit()
+                if 0 <= idx < len(self.app._update_packages):
+                    self.app._update_packages[idx] = data
+                    self.app.updatePackagesChanged.emit()
 
             QTimer.singleShot(0, self.app, update_item)
 
         def completion_callback(result, _updated_sources):
             def finalize():
-                self.app.load_initial_data()
+                self.app.loadInitialData()
                 msg = (
                     f"Global update complete: {result['merged']} updated, {result['failed']} failed"
                 )
@@ -88,7 +91,8 @@ class UpdateController(BaseController):
             completion_callback=completion_callback,
         )
 
-    def scan_for_updates(self):
+    @Slot()
+    def scanForUpdates(self):
         """Scans all sources and projects for potential updates."""
         self.app._set_status("Scanning for updates...")
         self.app._is_loading = True
@@ -106,7 +110,7 @@ class UpdateController(BaseController):
             def finalize():
                 self.app._update_results = results
                 self.app._update_packages = updated_sources
-                self.recalculate_stats()
+                self.recalculateStats()
                 self.app._is_loading = False
                 self.app.isLoadingChanged.emit()
                 self.app.updatePackagesChanged.emit()
@@ -118,7 +122,8 @@ class UpdateController(BaseController):
             status_callback=self.app._set_status, completion_callback=completion_callback
         )
 
-    def update_skill_in_project(self, skill_name: str, project_name: str):
+    @Slot(str, str)
+    def updateSkillInProject(self, skill_name: str, project_name: str):
         """Updates a specific skill in a specific project."""
         self.app._set_status(f"Updating {skill_name} in {project_name}...")
 
@@ -158,7 +163,7 @@ class UpdateController(BaseController):
                     msg = f"Failed to update {skill_name} in {project_name}"
 
                 schedule_on_ui_thread(self.app, lambda: self.app._set_status(msg))
-                schedule_on_ui_thread(self.app, self.scan_for_updates, delay_ms=500)
+                schedule_on_ui_thread(self.app, self.scanForUpdates, delay_ms=500)
             except Exception as e:
                 err_msg = f"Surgical update failed: {e}"
                 capture_exception(e)
@@ -166,7 +171,8 @@ class UpdateController(BaseController):
 
         self.app.task_runner.run(run_surgical_sync)
 
-    def recalculate_stats(self):
+    @Slot()
+    def recalculateStats(self):
         """Recalculates the up-to-date/outdated/missing stats."""
         up_to_date = 0
         outdated = 0
@@ -184,7 +190,8 @@ class UpdateController(BaseController):
         self.app._stats_missing = missing
         self.app.statsChanged.emit()
 
-    def add_update_package(self, package_name: str):
+    @Slot(str)
+    def addUpdatePackage(self, package_name: str):
         """Adds a basic NPM-style source."""
         if not package_name:
             return
@@ -200,7 +207,8 @@ class UpdateController(BaseController):
         self.app.updatePackagesChanged.emit()
         self.app._set_status(f"Added update package: {package_name}")
 
-    def add_skill_package(self, data: dict):
+    @Slot(dict)
+    def addSkillPackage(self, data: dict):
         """Adds a fully configured skill package (git/npm/custom)."""
         if not data:
             return
@@ -217,14 +225,15 @@ class UpdateController(BaseController):
         new_source = check_skill_package_versions(new_source)
 
         self.app._update_packages.append(new_source)
-        self._resolve_package_storage_state()
+        self._resolvePackageStorageState()
         self.app.updatePackagesChanged.emit()
         self.app._set_status(f"Added skill package: {new_source.get('name')}")
         capture_event(
             "skill_package_added", {"source_type": new_source.get("source_type", "unknown")}
         )
 
-    def update_update_package(self, index: int, data: dict):
+    @Slot(int, dict)
+    def updateUpdatePackage(self, index: int, data: dict):
         """Updates configuration for an existing skill package."""
         if 0 <= index < len(self.app._update_packages):
             # Preserve internal state
@@ -242,25 +251,27 @@ class UpdateController(BaseController):
             updated_source = check_skill_package_versions(updated_source)
 
             self.app._update_packages[index] = updated_source
-            self._resolve_package_storage_state()
+            self._resolvePackageStorageState()
             self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Updated skill package: {updated_source.get('name')}")
 
-    def remove_update_package(self, index: int):
+    @Slot(int)
+    def removeUpdatePackage(self, index: int):
         """Removes a skill package."""
         if 0 <= index < len(self.app._update_packages):
             source = self.app._update_packages.pop(index)
-            self._resolve_package_storage_state()
+            self._resolvePackageStorageState()
             self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Removed update package: {source.get('name')}")
             capture_event(
                 "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
             )
 
-    def run_package_update(self, index: int):
+    @Slot(int)
+    def runPackageUpdate(self, index: int):
         """Runs update for a single skill package."""
         if 0 <= index < len(self.app._update_packages):
-            self._resolve_package_storage_state()
+            self._resolvePackageStorageState()
             source = self.app._update_packages[index]
             source["is_updating"] = True
             source["just_finished"] = False
@@ -353,13 +364,14 @@ class UpdateController(BaseController):
                         self.app._update_packages[index] = dict(source)
                         self.app.updatePackagesChanged.emit()
                         self.app._set_status(f"Update finished for {source.get('name')}")
-                        self.app.load_initial_data()
+                        self.app.loadInitialData()
                         self.config.set("skills", self.app._update_packages)
                     QTimer.singleShot(0, self.app, finalize_ui)
 
             self.app.task_runner.run(run)
 
-    def sync_project(self, path: str):
+    @Slot(str)
+    def syncProject(self, path: str):
         """Synchronizes and updates all skills in a specific project."""
         if path not in self.app._projects:
             return
@@ -399,3 +411,17 @@ class UpdateController(BaseController):
                 QTimer.singleShot(0, self.app, self.app.projectsChanged.emit)
 
         self.app.task_runner.run(run_sync)
+
+    @Slot()
+    def updateAllOutdated(self):
+        """Updates all skills that are marked as outdated."""
+        # This was missing in the restored version, let's add it.
+        self.app._set_status("Updating all outdated skills...")
+        # Placeholder for implementation if needed, or call updateNow
+        self.updateNow()
+
+    @Slot(int)
+    def clearPackageJustFinished(self, index: int):
+        if 0 <= index < len(self.app._update_packages):
+            self.app._update_packages[index]["just_finished"] = False
+            self.app.updatePackagesChanged.emit()

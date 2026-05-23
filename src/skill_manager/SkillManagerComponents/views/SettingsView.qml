@@ -147,8 +147,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.darkMode
-                                    onCheckedChanged: AppController.darkMode = checked
+                                    checked: AppController.ui_controller.darkMode
+                                    onCheckedChanged: AppController.ui_controller.darkMode = checked
                                 }
                             }
 
@@ -160,8 +160,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.reducedMotion
-                                    onCheckedChanged: AppController.setReducedMotion(checked)
+                                    checked: AppController.ui_controller.reducedMotion
+                                    onCheckedChanged: AppController.ui_controller.setReducedMotion(checked)
                                 }
                             }
 
@@ -173,8 +173,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.compactListRows
-                                    onCheckedChanged: AppController.setCompactListRows(checked)
+                                    checked: AppController.ui_controller.compactListRows
+                                    onCheckedChanged: AppController.ui_controller.setCompactListRows(checked)
                                 }
                             }
                         }
@@ -217,8 +217,8 @@ Item {
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
                                     model: ["Library", "QuickCopy", "Updates", "Settings"]
-                                    currentIndex: Math.max(0, model.indexOf(AppController.startupView))
-                                    onActivated: (index) => AppController.setStartupView(model[index])
+                                    currentIndex: Math.max(0, model.indexOf(AppController.ui_controller.startupView))
+                                    onActivated: (index) => AppController.ui_controller.setStartupView(model[index])
                                 }
                             }
 
@@ -234,7 +234,7 @@ Item {
                                     Layout.preferredWidth: 170
                                     model: AppController.clientFormats
                                     currentIndex: Math.max(0, model.indexOf(AppController.clientFormat))
-                                    onActivated: (index) => AppController.setClientFormat(model[index])
+                                    onActivated: (index) => AppController.ui_controller.setClientFormat(model[index])
                                 }
                             }
 
@@ -249,8 +249,8 @@ Item {
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
                                     model: ["Last Project", "All Projects"]
-                                    currentIndex: AppController.defaultProjectFilter === "all" ? 1 : 0
-                                    onActivated: (index) => AppController.setDefaultProjectFilter(index === 1 ? "all" : "last")
+                                    currentIndex: AppController.ui_controller.defaultProjectFilter === "all" ? 1 : 0
+                                    onActivated: (index) => AppController.ui_controller.setDefaultProjectFilter(index === 1 ? "all" : "last")
                                 }
                             }
 
@@ -262,8 +262,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.rememberFilters
-                                    onCheckedChanged: AppController.setRememberFilters(checked)
+                                    checked: AppController.ui_controller.rememberFilters
+                                    onCheckedChanged: AppController.ui_controller.setRememberFilters(checked)
                                 }
                             }
 
@@ -271,7 +271,7 @@ Item {
                                 Layout.preferredHeight: 36
                                 Layout.fillWidth: true
                                 text: "Reset UI State"
-                                onClicked: (mouse) => AppController.resetUiState()
+                                onClicked: (mouse) => AppController.ui_controller.resetUiState()
                                 background: Rectangle {
                                     radius: Theme.radiusButton
                                     color: parent.hovered ? Theme.glassHover : "transparent"

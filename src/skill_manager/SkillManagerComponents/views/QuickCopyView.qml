@@ -82,13 +82,13 @@ Item {
                             onCollectionSelected: (collectionName) => {
                                 if (collectionName === "All Collections") {
                                     qcv_root._isInternalSelectionChange = true
-                                    AppController.setViewFilterForView("QuickCopy", "collection", "")
+                                    AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", "")
                                     AppController.quickCopyModel.clearSelection()
                                     qcv_root._isInternalSelectionChange = false
                                 } else {
                                     qcv_root._isInternalSelectionChange = true
-                                    AppController.applyCollectionSelection(collectionName)
-                                    AppController.setViewFilterForView("QuickCopy", "collection", collectionName)
+                                    AppController.config_controller.applyCollectionSelection(collectionName)
+                                    AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", collectionName)
                                     qcv_root._isInternalSelectionChange = false
                                 }
                             }
@@ -96,8 +96,8 @@ Item {
                                 qcv_root.isEditingCollection = true
                                 qcv_root.editingCollectionName = collectionName
                                 qcv_root._isInternalSelectionChange = true
-                                AppController.applyCollectionSelection(collectionName)
-                                AppController.setViewFilterForView("QuickCopy", "collection", collectionName)
+                                AppController.config_controller.applyCollectionSelection(collectionName)
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", collectionName)
                                 qcv_root._isInternalSelectionChange = false
                             }
                         }
@@ -112,7 +112,7 @@ Item {
                             }
                             onActivated: (index) => {
                                 let cat = index === 0 ? "" : currentText
-                                AppController.setViewFilterForView("QuickCopy", "category", cat)
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "category", cat)
                             }
                         }
 
@@ -126,7 +126,7 @@ Item {
                             }
                             onActivated: (index) => {
                                 let proj = index === 0 ? "" : currentText
-                                AppController.setViewFilterForView("QuickCopy", "project", proj)
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "project", proj)
                             }
                         }
                     }
@@ -140,13 +140,13 @@ Item {
                                 id: clientBtn
                                 buttonSize: 32
                                 property bool isSelected: modelData === AppController.clientFormat
-                                onClicked: (mouse) => AppController.setClientFormat(modelData)
+                                onClicked: (mouse) => AppController.ui_controller.setClientFormat(modelData)
                                 contentItem: Item {
                                     implicitWidth: clientBtn.buttonSize
                                     implicitHeight: clientBtn.buttonSize
                                     Image {
                                         anchors.centerIn: parent
-                                        source: AppController.getLogoSource(modelData)
+                                        source: AppController.ui_controller.getLogoSource(modelData)
                                         width: 16
                                         height: 16
                                         sourceSize.width: 16
@@ -195,8 +195,8 @@ Item {
             Repeater {
                 model: [
                     { label: searchInput.text ? "Search: " + searchInput.text : "", clear: function() { searchInput.text = ""; AppController.quickCopyModel.filterText = "" } },
-                    { label: AppController.quickCopyModel.projectFilter ? "Project: " + AppController.quickCopyModel.projectFilter : "", clear: function() { AppController.setViewFilterForView("QuickCopy", "project", "") } },
-                    { label: AppController.quickCopyModel.categoryFilter ? "Category: " + AppController.quickCopyModel.categoryFilter : "", clear: function() { AppController.setViewFilterForView("QuickCopy", "category", "") } }
+                    { label: AppController.quickCopyModel.projectFilter ? "Project: " + AppController.quickCopyModel.projectFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("QuickCopy", "project", "") } },
+                    { label: AppController.quickCopyModel.categoryFilter ? "Category: " + AppController.quickCopyModel.categoryFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("QuickCopy", "category", "") } }
                 ].filter((item) => item.label !== "")
 
                 delegate: Rectangle {
@@ -262,8 +262,8 @@ Item {
                     onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
                     contentItem: Image {
                         source: AppController.quickCopyModel.isAllExpanded ?
-                                AppController.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
-                                AppController.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
+                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
+                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
                         width: 18
                         height: 18
                         sourceSize.width: 72
@@ -330,7 +330,7 @@ Item {
                             labelText: "Add Command"
                             iconText: "+"
                             role: "secondary"
-                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.quickCopyModel.projectFilter, AppController.clientFormat)
+                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.quickCopyModel.projectFilter, AppController.ui_controller.clientFormat)
                         }
 
                         ActionButton {
@@ -377,7 +377,7 @@ Item {
                                 labelText: "Delete Selected"
                                 iconText: "🗑️"
                                 role: "destructive"
-                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.deleteSelectedSkills())
+                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
                             }
 
                             Rectangle {
@@ -394,7 +394,7 @@ Item {
                                 objectName: "copySelectedBtn"
                                 labelText: "Copy Selected"
                                 role: "primary"
-                                onClicked: (mouse) => AppController.copySelectedSkillsToClipboard()
+                                onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
                             }
                         }
                     }
@@ -431,7 +431,7 @@ Item {
                             tooltipText: "Save collection"
                             flat: true
                             onClicked: (mouse) => {
-                                AppController.saveCustomCollection(qcv_root.editingCollectionName, AppController.quickCopyModel.getSelectedPaths())
+                                AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, AppController.quickCopyModel.getSelectedPaths())
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
                             }
@@ -579,17 +579,17 @@ Item {
                         AppController.quickCopyModel.toggleSelection(index)
                     }
                     onDoubleClicked: (mouse) => {
-                        AppController.selectSkill(index)
+                        AppController.ui_controller.selectSkill(index)
                     }
                     onRightClicked: {
                         if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {
-                            AppController.selectSkill(-1)
+                            AppController.ui_controller.selectSkill(-1)
                         } else {
-                            AppController.selectSkill(index)
+                            AppController.ui_controller.selectSkill(index)
                         }
                     }
                     onDeleteRequested: (name, path) => {
-                        qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.deleteSkill(path))
+                        qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
                     }
                 }
 
@@ -607,7 +607,7 @@ Item {
                 isQuickCopy: true
                 visible: targetWidth > 0
                 
-                onClosed: AppController.selectSkill(-1)
+                onClosed: AppController.ui_controller.selectSkill(-1)
             }
         }
     }

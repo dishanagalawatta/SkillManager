@@ -27,9 +27,9 @@ def test_quick_copy_view_right_click_toggle() -> None:
     expected_handler: str = (
         "onRightClicked: {\n"
         "                        if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {\n"
-        "                            AppController.selectSkill(-1)\n"
+        "                            AppController.ui_controller.selectSkill(-1)\n"
         "                        } else {\n"
-        "                            AppController.selectSkill(index)\n"
+        "                            AppController.ui_controller.selectSkill(index)\n"
         "                        }\n"
         "                    }"
     )
@@ -49,9 +49,9 @@ def test_library_view_right_click_toggle() -> None:
     expected_handler: str = (
         "onRightClicked: {\n"
         "                        if (AppController.selectedSkill && AppController.selectedSkill.local_path === model.path) {\n"
-        "                            AppController.selectSkill(-1)\n"
+        "                            AppController.ui_controller.selectSkill(-1)\n"
         "                        } else {\n"
-        "                            AppController.selectSkill(index)\n"
+        "                            AppController.ui_controller.selectSkill(index)\n"
         "                        }\n"
         "                    }"
     )

@@ -7,20 +7,20 @@ Window {
     id: window
     Component.onCompleted: {
         // Set initial geometry from saved state
-        x = AppController.windowX
-        y = AppController.windowY
-        width = AppController.windowWidth
-        height = AppController.windowHeight
+        x = AppController.ui_controller.windowX
+        y = AppController.ui_controller.windowY
+        width = AppController.ui_controller.windowWidth
+        height = AppController.ui_controller.windowHeight
     }
 
-    onWidthChanged: if (window.visibility === Window.Windowed) AppController.windowWidth = width
-    onHeightChanged: if (window.visibility === Window.Windowed) AppController.windowHeight = height
-    onXChanged: if (window.visibility === Window.Windowed) AppController.windowX = x
-    onYChanged: if (window.visibility === Window.Windowed) AppController.windowY = y
+    onWidthChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowWidth = width
+    onHeightChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowHeight = height
+    onXChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowX = x
+    onYChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowY = y
     minimumWidth: 1050
     minimumHeight: 650
 
-    Binding { target: Theme; property: "darkMode"; value: AppController.darkMode }
+    Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }
     visible: true
     title: "Skill Manager"
     flags: Qt.Window | Qt.FramelessWindowHint
@@ -79,8 +79,8 @@ Window {
         }
     }
 
-    property string currentView: AppController.currentView
-    onCurrentViewChanged: AppController.currentView = currentView
+    property string currentView: AppController.ui_controller.currentView
+    onCurrentViewChanged: AppController.ui_controller.currentView = currentView
 
     function navigateTo(view) {
         window.currentView = view
@@ -96,23 +96,23 @@ Window {
         }
     }
 
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutSearch; onActivated: window.focusCurrentSearch() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutClearSelection; onActivated: AppController.clearVisibleSelection() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutCopy; onActivated: AppController.copyCurrentSelectionOrFocusedSkill() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.selectAllVisibleSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
     
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutArchive; onActivated: AppController.archiveSelectedSkills() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutDelete; onActivated: AppController.deleteSelectedSkills() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutRefresh; onActivated: AppController.refreshSkills() }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutThemeToggle; onActivated: AppController.darkMode = !AppController.darkMode }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
 
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutLibraryView; onActivated: window.navigateTo("Library") }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
-    Shortcut { enabled: !AppController.isRecordingShortcut; sequence: AppController.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
 
     Rectangle {
         anchors.fill: parent
