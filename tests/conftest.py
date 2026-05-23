@@ -12,13 +12,12 @@ os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 if "QT_QPA_PLATFORM" not in os.environ:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-import pytest
-from PySide6.QtWidgets import QApplication
-from PySide6.QtQuickControls2 import QQuickStyle
-
 # Import QtQuick/QtWidgets to ensure types are registered
 import PySide6.QtQuick  # noqa: F401
 import PySide6.QtWidgets  # noqa: F401
+import pytest
+from PySide6.QtQuickControls2 import QQuickStyle
+from PySide6.QtWidgets import QApplication
 
 # Automatically add 'src' to PYTHONPATH for all tests
 src_path = str(Path(__file__).parent.parent / "src")

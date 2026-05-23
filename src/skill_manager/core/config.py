@@ -64,10 +64,13 @@ def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = N
     target_dir = data_dir or get_app_data_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    if os.environ.get("SKILL_MANAGER_TESTING") == "1" and not legacy_dir:
-        if os.environ.get("SKILL_MANAGER_ALLOW_MIGRATION") != "1":
-            # In testing mode, don't fallback to CWD unless explicitly asked or allowed
-            return target_dir / filename
+    if (
+        os.environ.get("SKILL_MANAGER_TESTING") == "1"
+        and not legacy_dir
+        and os.environ.get("SKILL_MANAGER_ALLOW_MIGRATION") != "1"
+    ):
+        # In testing mode, don't fallback to CWD unless explicitly asked or allowed
+        return target_dir / filename
 
     source_dir = legacy_dir or Path.cwd()
     target_path = target_dir / filename
