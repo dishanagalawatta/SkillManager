@@ -11,9 +11,12 @@ def sanitize_token(text: str) -> str:
     if not isinstance(text, str):
         return text
     # Matches http://token@ or https://token@ and masks the token part
-    text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
+    if "@" in text and ("http://" in text or "https://" in text):
+        text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
-    return re.sub(r"(echo password=)[^;]+", r"\1***", text)
+    if "echo password=" in text:
+        text = re.sub(r"(echo password=).*", r"\1***", text)
+    return text
 
 def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))

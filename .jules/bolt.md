@@ -9,3 +9,7 @@
 ## 2024-05-20 - String operations vs simple Regex replacements
 **Learning:** In highly frequent loops like text normalization during search indexing or UI rendering, using `re.sub(r"[-_]+", " ", text)` or `re.sub(r"[*_]", "", text)` adds measurable overhead. When the patterns are simple character classes, relying on Python's built-in string methods like `.replace("-", " ").replace("_", " ")` can be 10x to 15x faster. This avoids the overhead of regex engine compilation and execution for basic text transformations.
 **Action:** When doing simple text cleaning and character stripping, prefer native `str.replace()` chains over regex substitutions. Save `re.sub` for complex, dynamic, or multi-condition patterns where string methods would be overly verbose or convoluted.
+
+## 2024-05-21 - [Fast-path substring checks before Regex]
+**Learning:** Functions applying regular expressions over stream outputs like `sanitize_token` evaluate thousands of times, usually on logs without hits. Simply compiling regex isn't enough; unconditionally executing `re.sub` takes measurable time.
+**Action:** Use fast-path native string containment checks (e.g. `if "http://" in text:`) prior to invoking complex regexes to drastically reduce overhead when processing mostly-clean lines.
