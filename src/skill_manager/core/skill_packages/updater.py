@@ -77,7 +77,7 @@ def _run_npm_update(
     if not package_name:
         raise ValueError("Configure an npm package name.")
 
-    command = ["npx", "--yes", package_name]
+    command = ["npx", "--yes", "--", package_name]
     if source.get("package_args"):
         # Local import or copy _split_args
         from .config import _split_args
