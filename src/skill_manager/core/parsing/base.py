@@ -73,7 +73,7 @@ def extract_markdown_description(content: str) -> str:
             continue
         if line.startswith("#") or line.startswith("```") or line.startswith("---"):
             continue
-        current.append(re.sub(r"[*_`]+", "", line))
+        current.append(line.replace("*", "").replace("_", "").replace("`", ""))
 
     if current:
         paragraphs.append(" ".join(current))
