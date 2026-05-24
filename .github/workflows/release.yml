@@ -42,6 +42,7 @@ jobs:
             dist/*.exe
             dist/*.dmg
             dist/*.tar.gz
+            dist/*.zip
 
   release:
     name: Create Release
@@ -67,3 +68,4 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ }}
