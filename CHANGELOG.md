@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-05-24)
+
+### Documentation
+
+- Update [major]
+  ([`ba7f640`](https://github.com/dishanagalawatta/SkillManager/commit/ba7f640f9e04c41d38fe9b0984d5a75482311d29))
+
+
 ## v0.2.0 (2026-05-24)
 
 ### Features
@@ -27,6 +35,11 @@ Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.githu
 
 
 ## v0.1.1 (2026-05-24)
+
+### Features
+
+- Enhance release strategy documentation and update versioning settings
+  ([`9169c22`](https://github.com/dishanagalawatta/SkillManager/commit/9169c224985e467c31df8228cb3fa987aa1c27f6))
 
 
 ## v0.1.0 (2026-05-24)
