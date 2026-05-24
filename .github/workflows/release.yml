@@ -90,6 +90,8 @@ jobs:
     name: Attach Assets to Release
     needs: [version, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: |
       always() && (
         needs.version.outputs.released == 'true' || 
@@ -102,8 +104,14 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List downloaded artifacts
-        run: ls -R artifacts
+      - name: List and Verify Artifacts
+        run: |
+          ls -R artifacts
+          # Fail if no key artifacts were found (sanity check)
+          if [ $(find artifacts -name "*.zip" -o -name "*.exe" -o -name "*.dmg" | wc -l) -eq 0 ]; then
+            echo "Error: No build artifacts found in 'artifacts' directory."
+            exit 1
+          fi
 
       - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
@@ -113,7 +121,6 @@ jobs:
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
-            artifacts/**/*.tar.gz
             artifacts/**/*.zip
           prerelease: true
           fail_on_unmatched_files: false
