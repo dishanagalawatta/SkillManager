@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
     tags:
       - 'v*'
   workflow_dispatch:
@@ -14,8 +15,8 @@ permissions:
 jobs:
   version:
     name: Manage Version and Tags
-    # Only run on main branch pushes (automated release management)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Run on main or develop pushes
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.released }}

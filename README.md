@@ -42,9 +42,10 @@ For full details on the design philosophy and layer structure, see **[DESIGN.md]
 
 If you just want to use the application, you do not need to install Python. Head over to the [Releases](https://github.com/yourusername/SkillManager/releases) page and download the installer for your operating system.
 
-- **Windows**: Download and run `SkillManager_Setup.exe`.
-- **macOS**: Download and open the `.dmg` file, then drag SkillManager to your Applications folder.
-- **Linux**: Download and extract the `.tar.gz` archive.
+- **Windows**: Download `SkillManager_Setup.exe` (Installer) or `SkillManager_Portable_windows.zip`.
+- **macOS**: Download `SkillManager_Portable_macos.zip` (Portable executable).
+- **Linux**: Download `SkillManager_Portable_linux.zip`.
+- **Source Code**: Automatically provided by GitHub as `.zip` and `.tar.gz` archives.
 
 *Note: Since the executables are not currently code-signed, you may need to click "Run anyway" (Windows SmartScreen) or "Right-click -> Open" (macOS Gatekeeper).*
 
@@ -137,15 +138,26 @@ For an in-depth look at the architecture, data flow, and QML integration, see **
 
 ## 🚢 Deployment & CI/CD
 
-SkillManager uses GitHub Actions for both quality gates and automated releases. 
+SkillManager uses a fully automated **Dual-Branch Release Strategy** via GitHub Actions.
 
-### Automated Pre-Releases (Continuous Delivery)
+### Automated Release Pipeline
 
-Every push or merge to the `main` branch triggers a unified automated release pipeline:
-1. **Versioning & Tagging**: `python-semantic-release` analyzes commits, bumps the version, and creates a Git tag and GitHub Release.
-2. **Matrix Build**: The pipeline automatically starts a matrix build across Windows, macOS, and Linux.
-3. **Packaging**: Each runner packages the application into native formats and portable archives.
-4. **Publish**: The resulting artifacts (EXE, DMG, ZIP, TAR.GZ) are automatically attached to the GitHub **Pre-release**.
+The system distinguishes between **Development** and **Stable** releases based on the branch:
+
+1.  **`develop` branch (Pre-releases)**:
+    - Every push/merge to `develop` triggers a **Development** release (e.g., `v1.0.0-dev.1`).
+    - Use this for testing new features before they are finalized.
+2.  **`main` branch (Stable Releases)**:
+    - Every push/merge to `main` triggers a **Stable** release (e.g., `v1.0.0`).
+    - This is the source for official user-facing downloads.
+
+### Unified Release Process
+
+For both branches, the pipeline performs:
+1.  **Versioning**: `python-semantic-release` analyzes commits using Conventional Commits.
+2.  **Matrix Build**: Parallel builds for Windows, macOS, and Linux.
+3.  **Artifact Verification**: Ensuring all native installers and portable ZIPs are generated successfully.
+4.  **Publish**: Attaching platform-specific artifacts (e.g., `SkillManager_Portable_windows.zip`) to the GitHub Release.
 
 ### Commit Convention (Strict)
 
@@ -156,13 +168,10 @@ To ensure accurate semantic versioning, all commits MUST follow [Conventional Co
 | `feat:` | New feature | Minor |
 | `fix:` | Bug fix | Patch |
 | `perf:` | Performance improvement | Patch |
-| `refactor:` | Code refactor | None |
-| `style:` | Formatting, missing semi colons, etc | None |
-| `docs:` | Documentation changes | None |
-| `test:` | Adding missing tests, refactoring tests | None |
-| `chore:` | Updating build tasks, dependencies, etc | None |
+| `feat!:` | Breaking change | **Major** |
+| `chore:`, `docs:`, `test:` | Maintenance | None |
 
-*Note: Append `!` or include `BREAKING CHANGE:` in the footer for a **Major** version bump.*
+*Note: The `!` suffix (e.g., `feat!:`) or `BREAKING CHANGE:` in the footer triggers a **Major** version bump automatically.*
 
 ---
 

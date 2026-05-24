@@ -80,11 +80,13 @@ SkillManager is distributed as native standalone executables for Windows, macOS,
 -   **Linux**: The output directory is packaged as a `.tar.gz` (with potential future expansion to AppImage).
 
 ### 3. CI/CD Pipeline (`.github/workflows/release.yml`)
-1.  Triggered automatically upon pushing a `v*` version tag.
-2.  Runs parallel jobs on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
-3.  Uses `uv` for fast dependency installation and virtual environment management.
-4.  Builds the OS-specific installers and uploads them as workflow artifacts.
-5.  Creates a new GitHub Release and attaches all generated installers.
+The project uses a unified release pipeline that handles both pre-releases and official stable versions:
+1.  **Dual-Branch Strategy**: 
+    - **`develop` branch**: Triggers **Development** pre-releases (e.g., `v1.0.0-dev.1`).
+    - **`main` branch**: Triggers **Stable** official releases (e.g., `v1.0.0`).
+2.  **Versioning**: Uses `python-semantic-release` to analyze commit history and automatically determine the next version bump based on Conventional Commits.
+3.  **Parallel Build Matrix**: Runs parallel packaging jobs on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
+4.  **Artifact Publishing**: Automatically attaches native installers and portable ZIPs (named with platform suffixes) to the GitHub Release.
 
 ---
 
