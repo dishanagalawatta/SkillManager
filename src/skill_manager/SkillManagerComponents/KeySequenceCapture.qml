@@ -55,6 +55,9 @@ Rectangle {
             root.active = !root.active
             if (root.active) root.forceActiveFocus()
         }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: root.active ? "Recording shortcut, press Esc to cancel" : (root.sequence || "Click to record shortcut")
     }
 
     Keys.onPressed: (event) => {

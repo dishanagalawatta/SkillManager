@@ -232,6 +232,8 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: modelData.clear()
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Clear recent search: " + (modelData && modelData.label ? modelData.label : "")
                     }
                 }
             }
@@ -505,6 +507,8 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.SizeHorCursor
+                    Accessible.role: Accessible.Splitter
+                    Accessible.name: "Resize Splitter"
                 }
             }
 
