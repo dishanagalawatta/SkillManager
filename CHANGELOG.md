@@ -1,7 +1,18 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.8 (2026-05-24)
+
+
 ## v0.1.0-dev.7 (2026-05-24)
+
+### Bug Fixes
+
+- Enhance release workflow with artifact verification and remove source zip packaging
+  ([`91b9d19`](https://github.com/dishanagalawatta/SkillManager/commit/91b9d1913fd881825a7448c122f97d34dbcaa201))
+
+- Update skill-manager version to 0.1.0.dev6
+  ([`40fe1fb`](https://github.com/dishanagalawatta/SkillManager/commit/40fe1fb5f303b8b195af99914ec9fb9e0a7a415d))
 
 
 ## v0.1.0-dev.6 (2026-05-24)
