@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-05-24)
+
+
 ## v0.1.0 (2026-05-24)
+
+### Bug Fixes
+
+- Update skill-manager version to 0.1.0.dev8
+  ([`d9eccba`](https://github.com/dishanagalawatta/SkillManager/commit/d9eccba923194ad98523a7e88465538e3680a957))
 
 ### Chores
 
