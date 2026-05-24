@@ -76,7 +76,9 @@ def run_process(
 
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
                 # Fast path check to avoid executing regex unnecessarily (~3x speedup)
-                is_progress = "%" in line_clean and bool(re.search(r"\d+%", line_clean))
+                is_progress = False
+                if "%" in line_clean:
+                    is_progress = bool(re.search(r"\d+%", line_clean))
                 current_time = time.time()
 
                 if not is_progress or (current_time - last_emit_time > 0.5):
