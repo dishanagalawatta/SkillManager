@@ -315,7 +315,7 @@ class UIController(BaseController):
                 safe_path = path
                 if safe_path.startswith("-"):
                     safe_path = f"./{safe_path}"
-                subprocess.run(["xdg-open", safe_path])
+                subprocess.run(["xdg-open", safe_path], check=True)
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
