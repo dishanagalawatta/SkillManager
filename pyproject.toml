@@ -59,7 +59,8 @@ version_toml = [
     "pyproject.toml:project.version",
 ]
 major_on_zero = false
-upload_to_release = true
+vcs_release = true
+upload_to_release = false
 upload_to_pypi = false
 remove_dist = false
 patch_without_tag = true
@@ -78,10 +79,6 @@ patch_tags = ["fix", "perf"]
 [tool.semantic_release.remote]
 name = "origin"
 type = "github"
-
-[tool.semantic_release.publish]
-dist_glob_patterns = ["dist/*"]
-upload_to_vcs_release = true
 
 
 [dependency-groups]

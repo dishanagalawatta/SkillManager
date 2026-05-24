@@ -2,13 +2,51 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
+  version:
+    name: Manage Version and Tags
+    # Only run on main branch pushes (automated release management)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Action | Semantic Version Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v9.19.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: "github-actions"
+          git_committer_email: "actions@users.noreply.github.com"
+
   build:
     name: Build on ${{ matrix.os }}
+    needs: version
+    # Run if:
+    # 1. 'version' job created a new release
+    # 2. OR it was a manual tag push (v*)
+    # 3. OR it was a manual workflow dispatch
+    if: |
+      always() && (
+        needs.version.outputs.released == 'true' || 
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -17,6 +55,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Use the tag from 'version' job if available, otherwise the current ref
+          ref: ${{ needs.version.outputs.tag || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -45,11 +86,14 @@ jobs:
             dist/*.zip
 
   release:
-    name: Create Release
-    needs: build
+    name: Attach Assets to Release
+    needs: [version, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
+    if: |
+      always() && (
+        needs.version.outputs.released == 'true' || 
+        startsWith(github.ref, 'refs/tags/v')
+      )
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -60,12 +104,14 @@ jobs:
       - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # Use the tag from 'version' job if available, otherwise the current tag name
+          tag_name: ${{ needs.version.outputs.tag || github.ref_name }}
           files: |
             artifacts/*.exe
             artifacts/*.dmg
             artifacts/*.tar.gz
+            artifacts/*.zip
           prerelease: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
- }}
