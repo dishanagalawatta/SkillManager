@@ -88,7 +88,7 @@ You MUST explicitly clarify or propose assumptions for:
     - `[major]` -> Major stable bump
     - `[minor]` -> Minor stable bump
     - `[patch]` -> Patch stable bump
-    - `[dev]` -> Pre-release patch bump
+    - `[dev]` -> Pre-release bump (`--prerelease --as-prerelease --prerelease-token dev`)
 
 If the user is unsure:
 

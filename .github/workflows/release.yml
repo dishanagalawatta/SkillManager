@@ -39,7 +39,7 @@ jobs:
           elif [[ "$COMMIT_MSG" == *"[patch]"* ]]; then
             LEVEL="--patch"
           elif [[ "$COMMIT_MSG" == *"[dev]"* ]]; then
-            LEVEL="--patch --as-prerelease"
+            LEVEL="--prerelease --as-prerelease --prerelease-token dev"
           fi
           echo "level=$LEVEL" >> $GITHUB_OUTPUT
           echo "Detected level: $LEVEL"
