@@ -1,7 +1,20 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-05-24)
+
+### Documentation
+
+- Check update [dev]
+  ([`f05c2bd`](https://github.com/dishanagalawatta/SkillManager/commit/f05c2bdc3c016c4db2db20d91d133e96f93697aa))
+
+
 ## v0.3.0 (2026-05-24)
+
+### Bug Fixes
+
+- Github workflow
+  ([`dde72ac`](https://github.com/dishanagalawatta/SkillManager/commit/dde72ac17e31a889aea2d24210dc323b7403db62))
 
 ### Documentation
 
