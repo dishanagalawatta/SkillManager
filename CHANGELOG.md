@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.7 (2026-05-24)
+
+
 ## v0.1.0-dev.6 (2026-05-24)
+
+### Bug Fixes
+
+- Streamline artifact paths and enhance source zip packaging for platform specificity
+  ([`9aa77fd`](https://github.com/dishanagalawatta/SkillManager/commit/9aa77fd26602f8f91b2cb28da59f53420f3b25c4))
 
 
 ## v0.1.0-dev.5 (2026-05-24)
