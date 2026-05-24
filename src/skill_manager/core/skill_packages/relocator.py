@@ -24,7 +24,10 @@ def _cleanup_empty_parents(path: Path, levels: int = 3):
     except OSError:
         pass
 
-def _relocate_path_internal(src_path: Path, dest_base: Path, output_callback: Callable[[str], None] | None) -> bool:
+
+def _relocate_path_internal(
+    src_path: Path, dest_base: Path, output_callback: Callable[[str], None] | None
+) -> bool:
     """Internal helper to move a single directory to dest_base."""
     dest_path = dest_base / src_path.name
     try:
@@ -47,7 +50,10 @@ def _relocate_path_internal(src_path: Path, dest_base: Path, output_callback: Ca
         _emit(output_callback, f"Relocation failed for {src_path}: {e}")
         return False
 
-def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callback: Callable[[str], None] | None):
+
+def _merge_and_move_lockfile(
+    source_lock: Path, target_lock: Path, output_callback: Callable[[str], None] | None
+):
     """Moves and carefully merges a skill lockfile."""
     if not source_lock.is_file():
         return
@@ -88,6 +94,7 @@ def _merge_and_move_lockfile(source_lock: Path, target_lock: Path, output_callba
     except Exception as e:
         _emit(output_callback, f"Failed to merge lockfile: {e}")
 
+
 def relocate_packages_from_output(
     captured_output: list[str],
     target_package_path: str,
@@ -121,6 +128,12 @@ def relocate_packages_from_output(
                     candidate = resolve_base / candidate
                 expanded = candidate.resolve()
                 if expanded.is_dir():
+                    if base_path and not expanded.is_relative_to(resolve_base):
+                        _emit(
+                            output_callback,
+                            f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                        )
+                        continue
                     detected_paths.add(expanded)
                     _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
                     match_found = True
@@ -134,6 +147,12 @@ def relocate_packages_from_output(
                 try:
                     expanded = Path(os.path.expanduser(raw_path)).resolve()
                     if expanded.is_dir():
+                        if base_path and not expanded.is_relative_to(resolve_base):
+                            _emit(
+                                output_callback,
+                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                            )
+                            continue
                         detected_paths.add(expanded)
                         _emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
                 except Exception:
@@ -190,10 +209,15 @@ def relocate_packages_from_output(
 
     if target_root.resolve() == Path.cwd().resolve():
         from skill_manager.core.config import DATA_DIR
+
         target_root = DATA_DIR
 
     for src_root in unique_source_roots:
-        for lock_name in (".skill-lock.json", "skills-lock.json", ".antigravity-install-manifest.json"):
+        for lock_name in (
+            ".skill-lock.json",
+            "skills-lock.json",
+            ".antigravity-install-manifest.json",
+        ):
             src_lock = src_root / lock_name
             if src_lock.is_file():
                 tgt_lock = target_root / lock_name
