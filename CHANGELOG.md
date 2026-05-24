@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.2 (2026-05-24)
+
+
 ## v0.1.0-dev.1 (2026-05-24)
 
 ### Bug Fixes
+
+- Include .zip files in artifact upload for release
+  ([`f065d66`](https://github.com/dishanagalawatta/SkillManager/commit/f065d66ce20a5440bb1477931f2e79f0051ad416))
 
 - Migrate FolderDialog from Qt5 folder to Qt6 selectedFolder property
   ([`dc62b2d`](https://github.com/dishanagalawatta/SkillManager/commit/dc62b2d31e9fb9be0f720f08c77a2a24e27f9235))
