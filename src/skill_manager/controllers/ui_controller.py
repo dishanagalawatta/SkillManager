@@ -307,7 +307,7 @@ class UIController(BaseController):
                 os.startfile(path)
             elif sys.platform == "darwin":
                 import subprocess
-                subprocess.run(["open", "--", path])
+                subprocess.run(["open", "--", path], check=True)
             else:
                 import subprocess
                 # xdg-open doesn't support '--' reliably; prevent argument injection
