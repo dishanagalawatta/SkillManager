@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.0.0"
+version = "0.1.0-dev.1"
 description = "A professional tool for managing reusable agent skills across repositories."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -34,9 +34,11 @@ dev = [
 [project.scripts]
 skill-manager = "skill_manager.__main__:main"
 
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["skill_manager*"]
+
 
 [tool.coverage.run]
 source = ["skill_manager"]
@@ -47,17 +49,6 @@ fail_under = 90
 show_missing = true
 skip_covered = false
 
-[dependency-groups]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "pytest-cov>=5.0.0",
-    "pytest-qt>=4.5.0",
-    "ruff>=0.8.0",
-    "pyinstaller>=6.0.0",
-    "pillow>=10.0.0",
-    "python-semantic-release>=9.0.0",
-]
 
 [tool.semantic_release]
 version_variables = [
@@ -90,3 +81,16 @@ type = "github"
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
 upload_to_vcs_release = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "pytest-qt>=4.5.0",
+    "ruff>=0.8.0",
+    "pyinstaller>=6.0.0",
+    "pillow>=10.0.0",
+    "python-semantic-release>=9.0.0",
+]
+
