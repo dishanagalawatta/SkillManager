@@ -242,7 +242,7 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: (mouse) => Qt.openUrlExternally("file:///" + modelData.path)
                                 Accessible.role: Accessible.Link
-                                Accessible.name: "Open file " + modelData.fileName
+                                Accessible.name: "Open file " + (modelData && modelData.name ? modelData.name : "file")
                             }
                         }
                     }

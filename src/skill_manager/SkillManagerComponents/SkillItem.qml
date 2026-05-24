@@ -138,7 +138,7 @@ Item {
                     onDoubleClicked: (mouse) => root.doubleClicked()
 
                     Accessible.role: Accessible.Button
-                    Accessible.name: root.skillName
+                    Accessible.name: (model && model.name ? model.name : "Item")
                     Accessible.description: "Skill item"
                 }
 
@@ -177,7 +177,7 @@ Item {
                             ToolTip.delay: 400
 
                             Accessible.role: Accessible.CheckBox
-                            Accessible.name: (model && model.isSelected) ? "Deselect " + root.skillName : "Select " + root.skillName
+                            Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
                         }
                     }
 
