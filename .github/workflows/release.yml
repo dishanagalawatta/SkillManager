@@ -31,28 +31,8 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller and Package
         run: uv run python scripts/build_app.py
-
-      # --- Windows Packaging ---
-      - name: Build Inno Setup Installer (Windows)
-        if: matrix.os == 'windows-latest'
-        run: iscc packaging/windows/installer.iss
-
-      # --- macOS Packaging ---
-      - name: Build DMG (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          npm install -g create-dmg
-          create-dmg dist/SkillManager.app dist/
-
-      # --- Linux Packaging ---
-      - name: Build AppImage (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Note: Real AppImage build requires more setup, simplified for template
-          # Often done via appimagetool or specialized actions
-          tar -czvf dist/SkillManager_Linux.tar.gz dist/SkillManager/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -76,12 +56,14 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Create Release
+      - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/*.exe
             artifacts/*.dmg
             artifacts/*.tar.gz
+          prerelease: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

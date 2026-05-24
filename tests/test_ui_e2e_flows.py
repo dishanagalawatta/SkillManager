@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
@@ -21,13 +23,21 @@ def app_controller(session_mock_config, session_temp_dir):
     skill_manager.app.current_test_controller = controller
 
     def controller_factory(qml_engine):
-        return skill_manager.app.current_test_controller
+        from PySide6.QtQml import QQmlEngine
+        ctrl = skill_manager.app.current_test_controller
+        if ctrl:
+            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
+        return ctrl
 
     with suppress(Exception):
         from PySide6.QtQml import qmlRegisterSingletonType
+        # This registration is process-wide
         qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
 
-    return controller
+    yield controller
+
+    # Cleanup session-scoped resources
+    controller.on_quit()
 
 @pytest.fixture
 def setup_controller_data(qapp, app_controller, temp_dir):
@@ -46,9 +56,9 @@ def setup_controller_data(qapp, app_controller, temp_dir):
 
     # Clear previous state
     while app_controller.sources:
-        app_controller.config_mgr.removeSource(0)
+        app_controller.config_mgr.removeSource(app_controller.sources[0])
     while app_controller.projects:
-        app_controller.config_mgr.removeProject(0)
+        app_controller.config_mgr.removeProject(app_controller.projects[0])
 
     # Add new ones
     app_controller.config_mgr.addSource(str(lib_dir))
@@ -58,6 +68,11 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     proj_skill_dir = proj_dir / ".agents" / "skills" / "proj-skill"
     proj_skill_dir.mkdir(parents=True, exist_ok=True)
     (proj_skill_dir / "SKILL.md").write_text("# Project Skill\nDescription here.", encoding="utf-8")
+
+    # Add a dummy update package by adding a source to the config
+    # The AppController should pick it up on refresh.
+    # However, to be absolutely sure for the Updates view, we use the controller method
+    app_controller.updates.addUpdatePackage("test-package")
 
     # Trigger refresh
     app_controller.refreshSkills()
@@ -72,11 +87,8 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     app_controller.quickCopyModel.filterByClient = False
     qapp.processEvents()
 
-    print(f"DEBUG: Library count: {app_controller.libraryModel.rowCount()}")
-    print(f"DEBUG: Quick Copy count: {app_controller.quickCopyModel.rowCount()}")
-
 @pytest.fixture
-def qml_engine(qapp, app_controller):
+def qml_engine(qapp, app_controller, qtbot):
     """Provides a QQmlApplicationEngine with the AppController already registered."""
     engine = QQmlApplicationEngine()
 
@@ -86,12 +98,9 @@ def qml_engine(qapp, app_controller):
     # Resolve QML directory relative to the src/ directory
     import skill_manager
     qml_dir = qml_components_dir(package_file=skill_manager.__file__)
-    print(f"DEBUG: qml_dir={qml_dir}")
-    print(f"DEBUG: qml_dir.parent={qml_dir.parent}")
     engine.addImportPath(str(qml_dir.parent))
 
     qml_file = qml_dir / "Main.qml"
-    print(f"DEBUG: qml_file={qml_file}")
     if not qml_file.exists():
          pytest.fail(f"Main.qml not found at {qml_file}")
 
@@ -102,8 +111,16 @@ def qml_engine(qapp, app_controller):
 
     yield engine
 
-    # Clean up engine to prevent crashes
+    # Clean up engine to prevent crashes and hangs
+    engine.clearComponentCache()
+    # Delete later schedules deletion in the next event loop iteration
     engine.deleteLater()
+
+    # Process events to ensure deletion is processed
+    # Using a small wait loop is more robust for QML cleanup
+    for _ in range(5):
+        qapp.processEvents()
+        qtbot.wait(20)
 
 def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controller_data):
     """Verify navigation, search filtering, and quick copy flow in a single sequence."""
@@ -125,7 +142,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     # --- 2. Search Filtering ---
     # Give Loader time to settle
-    qtbot.wait(500)
+    qtbot.wait(100)
     qapp.processEvents()
 
     # Find search input
@@ -140,7 +157,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     # Manually trigger the model filter
     app_controller.libraryModel.filterText = "xyzzy_no_match"
     qapp.processEvents()
-    qtbot.wait(300)
+    qtbot.wait(50)
 
     # Verify model is filtered
     assert app_controller.libraryModel.rowCount() == 0
@@ -148,7 +165,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     # Clear search
     app_controller.libraryModel.filterText = ""
     qapp.processEvents()
-    qtbot.wait(300)
+    qtbot.wait(50)
     assert app_controller.libraryModel.rowCount() == initial_count
 
     # --- 3. Quick Copy Flow ---
@@ -178,5 +195,43 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     # We added "Project Skill" in a folder named "proj-skill"
     # The copier might copy the name or the command reference like /skill:proj-skill
     text = clipboard.text()
-    print(f"DEBUG: Clipboard text: {text}")
     assert "proj-skill" in text or "Project Skill" in text
+
+def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_data):
+    """Verify navigation to Updates view and interaction with scan/lists."""
+    root = qml_engine.rootObjects()[0]
+    qapp = QApplication.instance()
+
+    # --- 1. Navigation ---
+    nav_updates = root.findChild(QQuickItem, "navUpdates")
+    assert nav_updates is not None
+    nav_updates.clicked.emit()
+    qapp.processEvents()
+    assert app_controller.ui.currentView == "Updates"
+
+    # --- 2. Check Lists ---
+    # Wait for view to load
+    qtbot.wait(200)
+    qapp.processEvents()
+
+    packages_list = root.findChild(QQuickItem, "uv_packagesList")
+    assert packages_list is not None
+    # We added one source via addSource in setup_controller_data
+    assert len(app_controller.updatePackages) >= 1
+
+    projects_list = root.findChild(QQuickItem, "uv_projectsList")
+    assert projects_list is not None
+    assert len(app_controller.config_controller.updateProjects) >= 1
+
+    # --- 3. Scan Action ---
+    scan_btn = root.findChild(QQuickItem, "scanUpdatesBtn")
+    assert scan_btn is not None
+
+    # Mock the scan method to verify call
+    with pytest.MonkeyPatch().context() as m:
+        mock_scan = MagicMock()
+        # In AppController, the controller is self.updates
+        m.setattr(app_controller.updates, "scanForUpdates", mock_scan)
+        scan_btn.clicked.emit()
+        qapp.processEvents()
+        mock_scan.assert_called_once()

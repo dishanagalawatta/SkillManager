@@ -37,7 +37,10 @@ def controller(qapp, mock_config, temp_dir):
         c._sources = config_data["sources"]
         c._projects = config_data["projects"]
         c._client_format = config_data["client_format"]
-        return c
+        yield c
+
+        # Cleanup to prevent dangling timers from saving to deleted temp dirs
+        c.on_quit()
 
 
 def test_controller_initialization(controller):
@@ -511,6 +514,7 @@ def test_controller_load_initial_data_delays_final_refresh_after_cache_preview(
         callback()
 
     with (
+        patch("skill_manager.app.AppController.isTesting", False),
         patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service),
         patch(
             "skill_manager.controllers.discovery_controller.schedule_on_ui_thread",

@@ -6,10 +6,69 @@ Usage:
 """
 
 import os
+import shutil
+import stat
 import subprocess
 import sys
+import time
+import zipfile
 
 from PIL import Image
+
+
+def handle_remove_readonly(func, path, exc_info):
+    """
+    Error handler for shutil.rmtree.
+    If the error is due to an access error (read only file),
+    it attempts to add write permission and then retries.
+    """
+    excvalue = exc_info[1]
+    # Check if the error is a PermissionError (errno 13 on Unix, WinError 5 on Windows)
+    # The onerror callback passes (function, path, exc_info)
+    if func in (os.rmdir, os.remove, os.unlink):
+        try:
+            # On Windows, os.chmod only affects read-only bit. We add write permissions for all.
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+            return
+        except Exception:
+            pass
+    raise excvalue
+
+
+def clean_build_dirs(project_root: str) -> None:
+    """
+    Robustly clean the dist and build directories before PyInstaller runs.
+    Handles read-only files and provides a clear error if files are locked.
+    """
+    dirs_to_clean = [
+        os.path.join(project_root, "dist", "SkillManager"),
+        os.path.join(project_root, "build", "skill_manager")
+    ]
+
+    print("Cleaning previous build directories...")
+    for dir_path in dirs_to_clean:
+        if os.path.exists(dir_path):
+            try:
+                # Retry loop for transient locks (e.g. Windows Defender)
+                for attempt in range(3):
+                    try:
+                        shutil.rmtree(dir_path, onerror=handle_remove_readonly)
+                        break
+                    except (PermissionError, OSError) as e:
+                        if attempt == 2:
+                            raise
+                        time.sleep(0.5)
+            except (PermissionError, OSError) as e:
+                print(f"\nERROR: Failed to clean {dir_path}")
+                print(f"Details: {e}")
+                print("\nPOSSIBLE CAUSES:")
+                print("1. The application (SkillManager.exe) is currently running in the background.")
+                print("2. A terminal or file explorer has the directory open.")
+                print("3. An antivirus program is currently scanning the files.")
+                print("\nACTION: Please close the application and any windows using the folder, then try again.")
+                sys.exit(1)
+    print("Cleaned successfully.")
 
 
 def generate_ico(png_path: str, ico_path: str) -> None:
@@ -58,6 +117,92 @@ def run_pyinstaller(spec_path: str) -> int:
     return result.returncode
 
 
+def package_windows(project_root: str) -> None:
+    """Generate Inno Setup installer for Windows."""
+    iss_path = os.path.join(project_root, "packaging", "windows", "installer.iss")
+    if not os.path.exists(iss_path):
+        print(f"Warning: Inno Setup script not found at {iss_path}. Skipping installer.")
+        return
+
+    iscc = shutil.which("iscc")
+    
+    # Fallback to common installation paths if not in PATH
+    if not iscc:
+        common_paths = [
+            r"C:\Program Files (x86)\Inno Setup 6\iscc.exe",
+            r"C:\Program Files\Inno Setup 6\iscc.exe",
+            r"C:\Program Files (x86)\Inno Setup 5\iscc.exe",
+            r"C:\Program Files\Inno Setup 5\iscc.exe",
+        ]
+        for path in common_paths:
+            if os.path.exists(path):
+                iscc = path
+                break
+
+    if not iscc:
+        print("Error: 'iscc' (Inno Setup Compiler) not found in PATH or standard installation directories.")
+        print("Please ensure Inno Setup is installed. If it is installed in a custom location, add that folder to your system PATH.")
+        print("Download: https://jrsoftware.org/isdl.php")
+        sys.exit(1)
+
+    print(f"Building Windows installer with {iscc}...")
+    subprocess.run([iscc, iss_path], check=True)
+    print("Windows installer built successfully.")
+
+
+def package_macos(project_root: str) -> None:
+    """Generate DMG installer for macOS."""
+    app_path = os.path.join(project_root, "dist", "SkillManager.app")
+    if not os.path.exists(app_path):
+        print(f"Warning: macOS app bundle not found at {app_path}. Skipping DMG.")
+        return
+
+    create_dmg = shutil.which("create-dmg")
+    if not create_dmg:
+        print("Error: 'create-dmg' not found in PATH.")
+        print("Please install it via 'npm install -g create-dmg' to build the macOS installer.")
+        sys.exit(1)
+
+    print(f"Building macOS DMG with {create_dmg}...")
+    subprocess.run([create_dmg, app_path, os.path.join(project_root, "dist")], check=True)
+    print("macOS DMG built successfully.")
+
+
+def package_source_zip(project_root: str) -> None:
+    """Create a zip archive of the project source code, excluding build artifacts and hidden folders."""
+    output_zip = os.path.join(project_root, "dist", "source.zip")
+    
+    # Directories to exclude from the source zip
+    EXCLUDE_DIRS = {
+        ".git", ".venv", "venv", "build", "dist", ".agents", ".pytest_cache", 
+        ".ruff_cache", "__pycache__", ".jules", "node_modules", ".agent", ".claude"
+    }
+    
+    # Files to exclude from the source zip
+    EXCLUDE_FILES = {".env", "TODO.md"}
+    
+    print(f"Creating source code zip at {output_zip}...")
+    
+    # Ensure dist folder exists
+    os.makedirs(os.path.join(project_root, "dist"), exist_ok=True)
+    
+    with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(project_root):
+            # Prune excluded directories in-place so os.walk doesn't visit them
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            
+            for file in files:
+                if file in EXCLUDE_FILES or file.endswith(('.pyc', '.pyo', '.pyd')):
+                    continue
+                    
+                file_path = os.path.join(root, file)
+                # Calculate the relative path for the zip entry
+                arcname = os.path.relpath(file_path, project_root)
+                zipf.write(file_path, arcname)
+                
+    print("Source code zip created successfully.")
+
+
 def main() -> None:
     """Main execution entrypoint for the build process."""
     # Setup paths relative to the script
@@ -76,12 +221,51 @@ def main() -> None:
         print("Dry run mode: skipped PyInstaller invocation.")
         sys.exit(0)
 
+    # 2.1 Robust clean before build
+    clean_build_dirs(project_root)
+
+    # 2.2 Run Build for App Bundle (onedir)
+    print("\n--- Phase 1: Building Application Bundle ---")
     returncode: int = run_pyinstaller(spec_path)
-    if returncode == 0:
-        print("Build completed successfully!")
-    else:
+    if returncode != 0:
         print(f"Build failed with exit code: {returncode}")
         sys.exit(returncode)
+
+    print("\nPyInstaller build completed successfully. Proceeding to packaging...")
+
+    # 3. Create Portable Zip
+    # This provides a fast-launching alternative to the Windows Installer
+    print("\n--- Phase 2: Packaging Portable ZIP ---")
+    dist_dir = os.path.join(project_root, "dist")
+    bundle_name = "SkillManager"
+    bundle_path = os.path.join(dist_dir, bundle_name)
+    
+    if os.path.exists(bundle_path):
+        portable_zip = os.path.join(dist_dir, "SkillManager_Portable")
+        print(f"Creating portable ZIP archive from {bundle_path}...")
+        shutil.make_archive(portable_zip, "zip", root_dir=dist_dir, base_dir=bundle_name)
+        print("Portable ZIP created successfully.")
+    else:
+        print(f"Warning: Build bundle not found at {bundle_path}. Skipping portable ZIP.")
+
+    # 4. OS-Specific Installers (EXE, DMG)
+    if sys.platform == "win32":
+        package_windows(project_root)
+    elif sys.platform == "darwin":
+        package_macos(project_root)
+
+    # 5. Generate source code zip (runs on all platforms)
+    package_source_zip(project_root)
+
+    # 6. Final Cleanup: Remove intermediate build folders from dist
+    print("\n--- Phase 3: Final Cleanup ---")
+    intermediate_bundle = os.path.join(project_root, "dist", "SkillManager")
+    if os.path.exists(intermediate_bundle):
+        print(f"Removing intermediate build folder: {intermediate_bundle}")
+        shutil.rmtree(intermediate_bundle, onerror=handle_remove_readonly)
+
+    print("\nAll build and packaging steps completed successfully!")
+    print(f"Final artifacts are located in: {os.path.join(project_root, 'dist')}")
 
 
 if __name__ == "__main__":

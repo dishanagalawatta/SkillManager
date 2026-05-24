@@ -59,7 +59,11 @@ class DiscoveryController(BaseController):
                 result = service.discover_all(cache_callback=cache_callback)
 
                 # Signal completion back to main thread
-                final_delay_ms = 200 if used_cache_preview else 0
+                # In tests, we skip the artificial delay to avoid hanging event loops
+                final_delay_ms = 0
+                if used_cache_preview and not self.app.isTesting:
+                    final_delay_ms = 200
+
                 schedule_on_ui_thread(
                     self.app,
                     lambda: self._finalize_loading(

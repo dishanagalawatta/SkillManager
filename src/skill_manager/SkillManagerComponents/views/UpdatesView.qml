@@ -79,6 +79,7 @@ Item {
                     spacing: 8
                     
                     ActionButton {
+                        objectName: "scanUpdatesBtn"
                         labelText: "Scan"
                         role: "secondary"
                         tooltipText: enabled ? "Check configured projects for available skill updates." : "Update scan is already running."
@@ -158,6 +159,7 @@ Item {
 
                         ListView {
                             id: uv_packagesList
+                            objectName: "uv_packagesList"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
@@ -330,6 +332,7 @@ Item {
 
                         ListView {
                             id: uv_projectsList
+                            objectName: "uv_projectsList"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
