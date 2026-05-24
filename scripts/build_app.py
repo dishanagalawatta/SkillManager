@@ -168,40 +168,37 @@ def package_macos(project_root: str) -> None:
     print("macOS DMG built successfully.")
 
 
-def package_source_zip(project_root: str) -> None:
+def package_source_zip(project_root: str, output_zip: str) -> None:
     """Create a zip archive of the project source code, excluding build artifacts and hidden folders."""
-    output_zip = os.path.join(project_root, "dist", "source.zip")
-    
     # Directories to exclude from the source zip
     EXCLUDE_DIRS = {
-        ".git", ".venv", "venv", "build", "dist", ".agents", ".pytest_cache", 
+        ".git", ".venv", "venv", "build", "dist", ".agents", ".pytest_cache",
         ".ruff_cache", "__pycache__", ".jules", "node_modules", ".agent", ".claude"
     }
-    
+
     # Files to exclude from the source zip
     EXCLUDE_FILES = {".env", "TODO.md"}
-    
+
     print(f"Creating source code zip at {output_zip}...")
-    
+
     # Ensure dist folder exists
-    os.makedirs(os.path.join(project_root, "dist"), exist_ok=True)
-    
+    os.makedirs(os.path.dirname(output_zip), exist_ok=True)
+
     with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(project_root):
             # Prune excluded directories in-place so os.walk doesn't visit them
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            
+
             for file in files:
                 if file in EXCLUDE_FILES or file.endswith(('.pyc', '.pyo', '.pyd')):
                     continue
-                    
+
                 file_path = os.path.join(root, file)
                 # Calculate the relative path for the zip entry
                 arcname = os.path.relpath(file_path, project_root)
                 zipf.write(file_path, arcname)
-                
-    print("Source code zip created successfully.")
 
+    print("Source code zip created successfully.")
 
 def main() -> None:
     """Main execution entrypoint for the build process."""
@@ -241,10 +238,17 @@ def main() -> None:
     bundle_path = os.path.join(dist_dir, bundle_name)
     
     if os.path.exists(bundle_path):
-        portable_zip = os.path.join(dist_dir, "SkillManager_Portable")
+        # Use platform-specific names to avoid overwriting during CI merge
+        platform_name = sys.platform
+        if platform_name == "win32":
+            platform_name = "windows"
+        elif platform_name == "darwin":
+            platform_name = "macos"
+            
+        portable_zip = os.path.join(dist_dir, f"SkillManager_Portable_{platform_name}")
         print(f"Creating portable ZIP archive from {bundle_path}...")
         shutil.make_archive(portable_zip, "zip", root_dir=dist_dir, base_dir=bundle_name)
-        print("Portable ZIP created successfully.")
+        print(f"Portable ZIP created successfully: {portable_zip}.zip")
     else:
         print(f"Warning: Build bundle not found at {bundle_path}. Skipping portable ZIP.")
 
@@ -255,7 +259,15 @@ def main() -> None:
         package_macos(project_root)
 
     # 5. Generate source code zip (runs on all platforms)
-    package_source_zip(project_root)
+    # We rename it based on platform to avoid collisions in the artifacts merge
+    platform_name = sys.platform
+    if platform_name == "win32":
+        platform_name = "windows"
+    elif platform_name == "darwin":
+        platform_name = "macos"
+        
+    output_zip = os.path.join(project_root, "dist", f"source_{platform_name}.zip")
+    package_source_zip(project_root, output_zip)
 
     # 6. Final Cleanup: Remove intermediate build folders from dist
     print("\n--- Phase 3: Final Cleanup ---")

@@ -84,11 +84,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.os }}
-          path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.tar.gz
-            dist/*.zip
+          path: dist/
 
   release:
     name: Attach Assets to Release
@@ -115,10 +111,10 @@ jobs:
           # Use the tag from 'version' job if available, otherwise the current tag name
           tag_name: ${{ needs.version.outputs.tag || github.ref_name }}
           files: |
-            artifacts/*.exe
-            artifacts/*.dmg
-            artifacts/*.tar.gz
-            artifacts/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
           prerelease: true
           fail_on_unmatched_files: false
         env:
