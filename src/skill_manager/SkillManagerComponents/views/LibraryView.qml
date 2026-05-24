@@ -129,7 +129,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: modelData.clear()
                         Accessible.role: Accessible.Button
-                        Accessible.name: "Clear recent search: " + (modelData ? modelData : "")
+                        Accessible.name: "Clear recent search: " + (modelData && modelData.label ? modelData.label : "")
                     }
                 }
             }
