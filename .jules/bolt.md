@@ -13,3 +13,7 @@
 ## 2024-05-21 - [Fast-path substring checks before Regex]
 **Learning:** Functions applying regular expressions over stream outputs like `sanitize_token` evaluate thousands of times, usually on logs without hits. Simply compiling regex isn't enough; unconditionally executing `re.sub` takes measurable time.
 **Action:** Use fast-path native string containment checks (e.g. `if "http://" in text:`) prior to invoking complex regexes to drastically reduce overhead when processing mostly-clean lines.
+
+## 2024-05-22 - Optimize category lookup mappings
+**Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
+**Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
