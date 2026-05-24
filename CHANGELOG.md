@@ -1,6 +1,9 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.5 (2026-05-24)
+
+
 ## v0.1.0-dev.4 (2026-05-24)
 
 ### Bug Fixes
@@ -38,6 +41,11 @@ Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.githu
 
 
 ## v0.1.0-dev.3 (2026-05-24)
+
+### Bug Fixes
+
+- Unify release workflow and update documentation
+  ([`5e98d34`](https://github.com/dishanagalawatta/SkillManager/commit/5e98d349d7faa6f681108ce66aeefab030b5aa10))
 
 
 ## v0.1.0-dev.2 (2026-05-24)
