@@ -65,12 +65,12 @@ version_variables = [
 version_toml = [
     "pyproject.toml:project.version",
 ]
-major_on_zero = false
+major_on_zero = true
 vcs_release = true
 upload_to_release = false
 upload_to_pypi = false
 remove_dist = false
-patch_without_tag = true
+patch_without_tag = false
 tag_format = "v{version}"
 
 [tool.semantic_release.branches.main]

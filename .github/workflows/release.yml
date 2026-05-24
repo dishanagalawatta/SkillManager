@@ -13,10 +13,42 @@ permissions:
   contents: write
 
 jobs:
-  version:
-    name: Manage Version and Tags
+  check-trigger:
+    name: Check for Release Triggers
     # Run on main or develop pushes
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    outputs:
+      trigger_level: ${{ steps.check.outputs.level }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Extract Trigger Level
+        id: check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          LEVEL=""
+          if [[ "$COMMIT_MSG" == *"[major]"* ]]; then
+            LEVEL="major"
+          elif [[ "$COMMIT_MSG" == *"[minor]"* ]]; then
+            LEVEL="minor"
+          elif [[ "$COMMIT_MSG" == *"[patch]"* ]]; then
+            LEVEL="patch"
+          elif [[ "$COMMIT_MSG" == *"[dev]"* ]]; then
+            LEVEL="prerelease"
+          fi
+          echo "level=$LEVEL" >> $GITHUB_OUTPUT
+          echo "Detected level: $LEVEL"
+
+  version:
+    name: Manage Version and Tags
+    needs: check-trigger
+    # Run only if a trigger was found
+    if: needs.check-trigger.outputs.trigger_level != ''
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.released }}
@@ -34,6 +66,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
+          # Pass the force-level flag based on the detected trigger
+          additional_options: "--${{ needs.check-trigger.outputs.trigger_level }}"
 
   build:
     name: Build on ${{ matrix.os }}
