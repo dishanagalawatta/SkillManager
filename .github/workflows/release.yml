@@ -49,6 +49,7 @@ jobs:
       )
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     
@@ -58,6 +59,10 @@ jobs:
         with:
           # Use the tag from 'version' job if available, otherwise the current ref
           ref: ${{ needs.version.outputs.tag || github.ref }}
+
+      - name: Install macOS Dependencies
+        if: matrix.os == 'macos-latest'
+        run: npm install -g create-dmg
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -100,6 +105,9 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -R artifacts
 
       - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
