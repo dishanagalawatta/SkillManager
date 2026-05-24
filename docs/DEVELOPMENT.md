@@ -122,3 +122,45 @@ If you need to build the executable locally for testing:
 | `uv run pytest` | Run the unit test suite |
 | `uv run python scripts/build_app.py` | Automate icon conversion and compile executable |
 | `uv run python scripts/build_app.py --dry-run` | Dry-run validation of the build environment |
+
+## Release Process
+
+SkillManager uses **python-semantic-release** to automate versioning and releases.
+
+### 1. Automated Releases (CI)
+On every push or merge to the `main` branch, a GitHub Action:
+- Analyzes commit messages using Conventional Commits.
+- Bumps the version in `pyproject.toml` and `src/skill_manager/__init__.py`.
+- Generates/updates `CHANGELOG.md`.
+- Creates a GitHub **Pre-release** with a tag like `v1.2.3-dev.1`.
+- Triggers a secondary build workflow to attach binaries (EXE, DMG, TAR.GZ).
+
+### 2. Manual Release Trigger
+You can manually trigger a release by running `python-semantic-release` locally:
+
+```bash
+# Install tool and dependencies
+uv sync
+
+# Dry-run to see what would happen (calculates next version)
+uv run semantic-release version --print
+
+# Perform local version bump and tag (updates files and creates git tag)
+uv run semantic-release version --no-push
+```
+
+### 3. Commit Guidelines (Conventional Commits)
+We strictly follow [Conventional Commits](https://www.conventionalcommits.org/). The commit message prefix determines the next version bump:
+
+| Prefix | Type of Change | Release Bump |
+|---|---|---|
+| `feat:` | A new feature | Minor |
+| `fix:` | A bug fix | Patch |
+| `perf:` | A code change that improves performance | Patch |
+| `refactor:` | A code change that neither fixes a bug nor adds a feature | None |
+| `style:` | Changes that do not affect the meaning of the code | None |
+| `docs:` | Documentation only changes | None |
+| `test:` | Adding missing tests or correcting existing tests | None |
+| `chore:` | Changes to the build process or auxiliary tools | None |
+
+*Important: To trigger a **Major** release, append `!` to the prefix (e.g., `feat!:`) or include `BREAKING CHANGE:` in the commit footer.*
