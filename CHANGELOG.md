@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.6 (2026-05-24)
+
+
 ## v0.1.0-dev.5 (2026-05-24)
+
+### Bug Fixes
+
+- Update release workflow to prevent early job termination and add macOS dependencies
+  ([`ad3b457`](https://github.com/dishanagalawatta/SkillManager/commit/ad3b457d0efe22b8bd1af5a59df217c132ebaa40))
 
 
 ## v0.1.0-dev.4 (2026-05-24)
