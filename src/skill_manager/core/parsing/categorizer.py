@@ -1,5 +1,4 @@
 import re
-from functools import lru_cache
 from typing import Any
 
 from .constants import CATEGORIES, MAIN_CATEGORIES_MAPPING
@@ -33,16 +32,17 @@ def _get_category_patterns():
             _CATEGORY_PATTERNS[cat] = patterns
     return _CATEGORY_PATTERNS
 
-@lru_cache(maxsize=1024)
+_MAIN_CATEGORY_REVERSE_MAP = {
+    sub.lower(): main
+    for main, sub_cats in MAIN_CATEGORIES_MAPPING.items()
+    for sub in sub_cats
+}
+
+
 def get_main_category(sub_category: str) -> str:
     if not sub_category:
         return "⚙️ System & Workflow"
-    for main_cat, sub_cats in MAIN_CATEGORIES_MAPPING.items():
-        if sub_category in sub_cats:
-            return main_cat
-        if sub_category.lower() in [s.lower() for s in sub_cats]:
-            return main_cat
-    return "⚙️ System & Workflow"
+    return _MAIN_CATEGORY_REVERSE_MAP.get(sub_category.lower(), "⚙️ System & Workflow")
 
 def categorize_skill(name: str, description: str) -> dict[str, str]:
     """Determines the best category for a skill based on its name and description."""
