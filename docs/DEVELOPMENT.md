@@ -128,12 +128,10 @@ If you need to build the executable locally for testing:
 SkillManager uses **python-semantic-release** to automate versioning and releases.
 
 ### 1. Automated Releases (CI)
-On every push or merge to the `main` branch, a GitHub Action:
-- Analyzes commit messages using Conventional Commits.
-- Bumps the version in `pyproject.toml` and `src/skill_manager/__init__.py`.
-- Generates/updates `CHANGELOG.md`.
-- Creates a GitHub **Pre-release** with a tag like `v1.2.3-dev.1`.
-- Triggers a secondary build workflow to attach binaries (EXE, DMG, TAR.GZ).
+On every push or merge to the `main` branch, a unified GitHub Action (`release.yml`):
+- **Stage 1**: Analyzes commit messages using Conventional Commits and handles versioning/tagging via `python-semantic-release`.
+- **Stage 2**: Triggers a parallel matrix build across Windows, macOS, and Linux to generate installers and portable archives.
+- **Stage 3**: Collects all artifacts and attaches them to the GitHub **Pre-release**.
 
 ### 2. Manual Release Trigger
 You can manually trigger a release by running `python-semantic-release` locally:

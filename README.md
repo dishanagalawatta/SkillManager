@@ -141,13 +141,11 @@ SkillManager uses GitHub Actions for both quality gates and automated releases.
 
 ### Automated Pre-Releases (Continuous Delivery)
 
-Every push or merge to the `main` branch triggers an automated release pipeline powered by `python-semantic-release`:
-
-1. **Commit Analysis**: The workflow analyzes commit messages since the last release.
-2. **Versioning & Tagging**: If a new version is warranted, it bumps the version in `pyproject.toml`, updates `CHANGELOG.md`, and creates a new Git tag (e.g., `v1.0.1-dev.1`).
-3. **Matrix Build**: The new tag triggers a secondary workflow (`release.yml`) that spins up Windows, macOS, and Linux runners.
-4. **Packaging**: Each runner executes `scripts/build_app.py` to package the standalone executable.
-5. **Publish**: The resulting artifacts are automatically attached to the GitHub **Pre-release**.
+Every push or merge to the `main` branch triggers a unified automated release pipeline:
+1. **Versioning & Tagging**: `python-semantic-release` analyzes commits, bumps the version, and creates a Git tag and GitHub Release.
+2. **Matrix Build**: The pipeline automatically starts a matrix build across Windows, macOS, and Linux.
+3. **Packaging**: Each runner packages the application into native formats and portable archives.
+4. **Publish**: The resulting artifacts (EXE, DMG, ZIP, TAR.GZ) are automatically attached to the GitHub **Pre-release**.
 
 ### Commit Convention (Strict)
 
