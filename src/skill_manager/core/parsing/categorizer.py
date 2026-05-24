@@ -1,5 +1,4 @@
 import re
-from functools import lru_cache
 from typing import Any
 
 from .constants import CATEGORIES, MAIN_CATEGORIES_MAPPING
