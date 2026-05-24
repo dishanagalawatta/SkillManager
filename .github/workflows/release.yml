@@ -71,7 +71,7 @@ jobs:
 
   build:
     name: Build on ${{ matrix.os }}
-    needs: version
+    needs: [check-trigger, version]
     # Run if:
     # 1. 'version' job created a new release
     # 2. OR it was a manual tag push (v*)
