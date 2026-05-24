@@ -307,10 +307,15 @@ class UIController(BaseController):
                 os.startfile(path)
             elif sys.platform == "darwin":
                 import subprocess
-                subprocess.run(["open", path])
+                subprocess.run(["open", "--", path], check=True)
             else:
                 import subprocess
-                subprocess.run(["xdg-open", path])
+                # xdg-open doesn't support '--' reliably; prevent argument injection
+                # by making sure paths starting with '-' become relative or absolute.
+                safe_path = path
+                if safe_path.startswith("-"):
+                    safe_path = f"./{safe_path}"
+                subprocess.run(["xdg-open", safe_path], check=True)
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")

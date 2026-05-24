@@ -89,7 +89,11 @@ def test_ui_controller_open_path_linux(ui_controller, mock_app):
         patch("subprocess.run") as mock_run,
     ):
         ui_controller.openPath("/path/to/file")
-        mock_run.assert_called_with(["xdg-open", "/path/to/file"])
+        mock_run.assert_called_with(["xdg-open", "/path/to/file"], check=True)
+
+        # Test path starting with '-'
+        ui_controller.openPath("-test")
+        mock_run.assert_called_with(["xdg-open", "./-test"], check=True)
 
 
 def test_ui_controller_open_path_darwin(ui_controller, mock_app):
@@ -98,7 +102,7 @@ def test_ui_controller_open_path_darwin(ui_controller, mock_app):
         patch("subprocess.run") as mock_run,
     ):
         ui_controller.openPath("/path/to/file")
-        mock_run.assert_called_with(["open", "/path/to/file"])
+        mock_run.assert_called_with(["open", "--", "/path/to/file"], check=True)
 
 
 def test_ui_controller_open_path_failure(ui_controller, mock_app):
