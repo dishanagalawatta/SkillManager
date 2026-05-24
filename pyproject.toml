@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "0.1.0-dev.4"
+version = "0.1.0-dev.5"
 description = "A professional tool for managing reusable agent skills across repositories."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -33,6 +33,7 @@ dev = [
 
 [project.scripts]
 skill-manager = "skill_manager.__main__:main"
+
 
 
 
@@ -81,6 +82,7 @@ patch_tags = ["fix", "perf"]
 [tool.semantic_release.remote]
 name = "origin"
 type = "github"
+
 
 
 
