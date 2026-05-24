@@ -40,7 +40,6 @@ _MAIN_CATEGORY_REVERSE_MAP = {
 }
 
 
-@lru_cache(maxsize=1024)
 def get_main_category(sub_category: str) -> str:
     if not sub_category:
         return "⚙️ System & Workflow"
