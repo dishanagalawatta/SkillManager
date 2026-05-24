@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.1.0-dev.4 (2026-05-24)
+
+### Bug Fixes
+
+- **ux**: Resolve missing string properties in a11y labels
+  ([`b927545`](https://github.com/dishanagalawatta/SkillManager/commit/b92754585810d676f30be7421cdeeec4e4094d6d))
+
+* Fixed `modelData.query` causing binding errors (or "undefined") by replacing it with just
+  `modelData`. * Fixed `modelData.fileName` causing errors in SkillInspector. Replaced with
+  `modelData.name`. * Fixed `root.skillName` causing errors in SkillItem. Replaced with
+  `model.name`.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+- **ux**: Update a11y labels to point to correct property
+  ([`fdecd54`](https://github.com/dishanagalawatta/SkillManager/commit/fdecd540e8bdc1fc1dfcf35219987c7fd135845f))
+
+* `modelData` -> `modelData.label` in `LibraryView.qml` and `QuickCopyView.qml` to correctly reflect
+  the history display chip text.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+### Features
+
+- **ux**: Add missing Accessible properties to custom QML components
+  ([`0764b5e`](https://github.com/dishanagalawatta/SkillManager/commit/0764b5e9c62a01375fc022e6d84f8223535be49f))
+
+* Adds Accessible.role, Accessible.name, and Accessible.description properties to several
+  interactive UI components, primarily those using MouseArea as the interactive layer without a
+  native accessible role. * Improved screen reader support in CustomTitleBar, KeySequenceCapture,
+  SkillItem, LibraryView, and QuickCopyView. * Updated UX journal with learnings regarding nested
+  custom button implementations.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+
 ## v0.1.0-dev.3 (2026-05-24)
 
 
