@@ -1,2 +1,5 @@
-https://youtu.be/XgxJH9Aj69k
-overview video link
+Prepare License documents
+
+Readme play on the same window for video
+
+Update readme for better one
