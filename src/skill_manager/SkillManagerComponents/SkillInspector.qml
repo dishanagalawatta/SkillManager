@@ -114,6 +114,10 @@ Rectangle {
                     
                     ToolTip.visible: hovered
                     ToolTip.text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    Accessible.description: ToolTip.text
                 }
 
                 IconButton {
@@ -124,6 +128,10 @@ Rectangle {
                     ToolTip.text: "Close Inspector"
                     ToolTip.visible: hovered
                     ToolTip.delay: 400
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Close Inspector"
+                    Accessible.description: ToolTip.text
                 }
             }
 
@@ -233,6 +241,8 @@ Rectangle {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: (mouse) => Qt.openUrlExternally("file:///" + modelData.path)
+                                Accessible.role: Accessible.Link
+                                Accessible.name: "Open file " + modelData.fileName
                             }
                         }
                     }
@@ -374,6 +384,9 @@ Rectangle {
             ToolTip.text: "Expand Inspector"
             ToolTip.visible: containsMouse
             ToolTip.delay: 400
+
+            Accessible.role: Accessible.Button
+            Accessible.name: "Expand Inspector"
         }
     }
 

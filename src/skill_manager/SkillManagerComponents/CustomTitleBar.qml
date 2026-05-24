@@ -67,6 +67,7 @@ Rectangle {
         // Custom Button: Theme Toggle
         TitleBarButton {
             text: Theme.darkMode ? "☀️" : "🌙"
+            tooltipText: "Toggle Theme"
             onClicked: Theme.darkMode = !Theme.darkMode
             hoverColor: Theme.glassHover
         }
@@ -74,6 +75,7 @@ Rectangle {
         // Standard: Minimize
         TitleBarButton {
             text: "—"
+            tooltipText: "Minimize Window"
             onClicked: window.showMinimized()
             hoverColor: Theme.glassHover
         }
@@ -81,6 +83,7 @@ Rectangle {
         // Standard: Maximize/Restore
         TitleBarButton {
             text: window.visibility === Window.Maximized ? "❐" : "⬜"
+            tooltipText: window.visibility === Window.Maximized ? "Restore Window" : "Maximize Window"
             onClicked: {
                 if (window.visibility === Window.Maximized)
                     window.showNormal()
@@ -93,6 +96,7 @@ Rectangle {
         // Standard: Close
         TitleBarButton {
             text: "✕"
+            tooltipText: "Close Window"
             onClicked: window.close()
             hoverColor: Theme.danger
             textColor: hovered ? "white" : Theme.label
@@ -105,6 +109,7 @@ Rectangle {
         property color hoverColor: Theme.glassHover
         property color textColor: Theme.label
         property real btnSize: 28
+        property string tooltipText: ""
         
         Layout.preferredWidth: btnSize + 8 // Padding for spacing
         Layout.preferredHeight: btnSize
@@ -130,5 +135,13 @@ Rectangle {
             
             Behavior on color { ColorAnimation { duration: 150 } }
         }
+
+        ToolTip.text: btn.tooltipText
+        ToolTip.visible: btn.hovered && btn.tooltipText !== ""
+        ToolTip.delay: 400
+
+        Accessible.role: Accessible.Button
+        Accessible.name: btn.tooltipText
+        Accessible.description: btn.tooltipText
     }
 }

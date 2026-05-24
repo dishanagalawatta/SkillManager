@@ -136,6 +136,10 @@ Item {
                         }
                     }
                     onDoubleClicked: (mouse) => root.doubleClicked()
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.skillName
+                    Accessible.description: "Skill item"
                 }
 
                 RowLayout {
@@ -171,6 +175,9 @@ Item {
                             ToolTip.text: (model && model.isSelected) ? "Deselect" : "Select"
                             ToolTip.visible: containsMouse
                             ToolTip.delay: 400
+
+                            Accessible.role: Accessible.CheckBox
+                            Accessible.name: (model && model.isSelected) ? "Deselect " + root.skillName : "Select " + root.skillName
                         }
                     }
 
