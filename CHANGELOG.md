@@ -1,18 +1,20 @@
 # CHANGELOG
 
 
-## v0.1.0-dev.8 (2026-05-24)
+## v0.1.0 (2026-05-24)
+
+### Chores
+
+- Resolve git case-sensitivity conflict for .jules/palette.md
+  ([`bbf61d6`](https://github.com/dishanagalawatta/SkillManager/commit/bbf61d6d2b3ceb9946a2680bd9051ee31bc55dbb))
 
 ### Features
 
-- **ci**: Implement dual-branch release strategy for stable and development builds
-- **ci**: Refine artifact naming with platform-specific suffixes (e.g., `SkillManager_Portable_windows.zip`)
-- **ci**: Enhance release workflow with automated artifact verification and improved security permissions
+- Implement dual-branch release strategy and enhance CI/CD workflow
+  ([`7ad781b`](https://github.com/dishanagalawatta/SkillManager/commit/7ad781b7503f7244a56fb7bd87ccd5d4b05106fb))
 
-### Documentation
 
-- **docs**: Update `README.md` and `DEVELOPMENT.md` to reflect new release pipeline and branching strategy
-- **docs**: Synchronize `ARCHITECTURE.md` with current CI/CD automation patterns
+## v0.1.0-dev.8 (2026-05-24)
 
 
 ## v0.1.0-dev.7 (2026-05-24)
