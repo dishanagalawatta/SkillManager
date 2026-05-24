@@ -128,7 +128,7 @@ def relocate_packages_from_output(
                     candidate = resolve_base / candidate
                 expanded = candidate.resolve()
                 if expanded.is_dir():
-                    if base_path and not expanded.is_relative_to(resolve_base):
+                    if not expanded.is_relative_to(resolve_base):
                         _emit(
                             output_callback,
                             f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
