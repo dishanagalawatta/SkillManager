@@ -87,7 +87,9 @@ This script extracts keywords and emoji mappings directly from the source code a
 SkillManager is packaged into standalone executables using PyInstaller.
 
 ### Automated Builds (Recommended)
-The quality pipeline in `.github/workflows/quality.yml` runs linting and tests on pushes and pull requests. The release pipeline in `.github/workflows/release.yml` builds installers for Windows, macOS, and Linux when a new `v*` tag is pushed to GitHub.
+The quality pipeline in `.github/workflows/quality.yml` runs linting and tests on pushes and pull requests. 
+
+The release pipeline in `.github/workflows/release.yml` automatically builds installers for Windows, macOS, and Linux whenever a version bump is triggered on the `main` or `develop` branches.
 
 ### Manual Builds
 
@@ -125,15 +127,29 @@ If you need to build the executable locally for testing:
 
 ## Release Process
 
-SkillManager uses **python-semantic-release** to automate versioning and releases.
+SkillManager uses **python-semantic-release** to automate versioning and releases across a dual-branch architecture.
 
-### 1. Automated Releases (CI)
-On every push or merge to the `main` branch, a unified GitHub Action (`release.yml`):
-- **Stage 1**: Analyzes commit messages using Conventional Commits and handles versioning/tagging via `python-semantic-release`.
-- **Stage 2**: Triggers a parallel matrix build across Windows, macOS, and Linux to generate installers and portable archives.
-- **Stage 3**: Collects all artifacts and attaches them to the GitHub **Pre-release**.
+### 1. Dual-Branch Strategy
+We use a two-branch model to distinguish between unstable development builds and official releases:
 
-### 2. Manual Release Trigger
+| Branch | Release Type | Version Pattern | Purpose |
+|---|---|---|---|
+| `develop` | **Development** | `vX.Y.Z-dev.N` | Testing new features and daily builds. |
+| `main` | **Stable** | `vX.Y.Z` | Official production-ready releases. |
+
+### 2. Automated Releases (CI)
+On every push or merge to either `main` or `develop`, the unified GitHub Action (`release.yml`) performs:
+- **Versioning**: Analyzes commit messages using Conventional Commits.
+- **Matrix Build**: Triggers a parallel matrix build across Windows, macOS, and Linux.
+- **Artifact Verification**: Ensures all binaries and portable ZIPs are generated before publishing.
+- **Publish**: Attaches platform-specific artifacts (e.g., `SkillManager_Portable_windows.zip`) to the GitHub Release.
+
+### 3. Triggering a Major Release (v1.0.0)
+To transition from a development phase to a major stable release:
+1.  **Prep on `develop`**: Push a commit with the `!` syntax (e.g., `feat!: final release preparation`). This will trigger a `v1.0.0-dev.1` release.
+2.  **Go Live on `main`**: Create a Pull Request from `develop` to `main`. Once merged, the system will detect the breaking change history and publish the final **`v1.0.0`** stable release.
+
+### 4. Manual Release Trigger
 You can manually trigger a release by running `python-semantic-release` locally:
 
 ```bash
@@ -147,7 +163,7 @@ uv run semantic-release version --print
 uv run semantic-release version --no-push
 ```
 
-### 3. Commit Guidelines (Conventional Commits)
+### 5. Commit Guidelines (Conventional Commits)
 We strictly follow [Conventional Commits](https://www.conventionalcommits.org/). The commit message prefix determines the next version bump:
 
 | Prefix | Type of Change | Release Bump |
@@ -155,10 +171,7 @@ We strictly follow [Conventional Commits](https://www.conventionalcommits.org/).
 | `feat:` | A new feature | Minor |
 | `fix:` | A bug fix | Patch |
 | `perf:` | A code change that improves performance | Patch |
-| `refactor:` | A code change that neither fixes a bug nor adds a feature | None |
-| `style:` | Changes that do not affect the meaning of the code | None |
-| `docs:` | Documentation only changes | None |
-| `test:` | Adding missing tests or correcting existing tests | None |
-| `chore:` | Changes to the build process or auxiliary tools | None |
+| `feat!:` | Breaking change | **Major** |
+| `refactor:`, `style:`, `docs:`, `test:`, `chore:` | Maintenance | None |
 
-*Important: To trigger a **Major** release, append `!` to the prefix (e.g., `feat!:`) or include `BREAKING CHANGE:` in the commit footer.*
+*Note: To trigger a **Major** release, append `!` to the prefix (e.g., `feat!:`) or include `BREAKING CHANGE:` in the commit footer.*

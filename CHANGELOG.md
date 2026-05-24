@@ -3,6 +3,17 @@
 
 ## v0.1.0-dev.8 (2026-05-24)
 
+### Features
+
+- **ci**: Implement dual-branch release strategy for stable and development builds
+- **ci**: Refine artifact naming with platform-specific suffixes (e.g., `SkillManager_Portable_windows.zip`)
+- **ci**: Enhance release workflow with automated artifact verification and improved security permissions
+
+### Documentation
+
+- **docs**: Update `README.md` and `DEVELOPMENT.md` to reflect new release pipeline and branching strategy
+- **docs**: Synchronize `ARCHITECTURE.md` with current CI/CD automation patterns
+
 
 ## v0.1.0-dev.7 (2026-05-24)
 
