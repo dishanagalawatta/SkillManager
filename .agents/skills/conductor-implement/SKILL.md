@@ -162,7 +162,7 @@ SkillManager uses a strictly **Opt-in Release Strategy**. You MUST include one o
 - `[major]`: Stable Major Bump (`--major`)
 - `[minor]`: Stable Minor Bump (`--minor`)
 - `[patch]`: Stable Patch Bump (`--patch`)
-- `[dev]`: Development Pre-release (`--patch --as-prerelease`)
+- `[dev]`: Development Pre-release (`--prerelease --as-prerelease --prerelease-token dev`)
 
 ```bash
 git add -A
