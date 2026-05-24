@@ -85,6 +85,10 @@ You MUST explicitly clarify or propose assumptions for:
 - Reliability / availability needs  
 - Maintenance and ownership expectations  
 - **Release Strategy** (e.g., standard triggers vs. Opt-in `[major/minor/patch/dev]` strategy)
+    - `[major]` -> Major stable bump
+    - `[minor]` -> Minor stable bump
+    - `[patch]` -> Patch stable bump
+    - `[dev]` -> Pre-release patch bump
 
 If the user is unsure:
 

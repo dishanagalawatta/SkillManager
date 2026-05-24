@@ -33,13 +33,13 @@ jobs:
           echo "Commit message: $COMMIT_MSG"
           LEVEL=""
           if [[ "$COMMIT_MSG" == *"[major]"* ]]; then
-            LEVEL="major"
+            LEVEL="--major"
           elif [[ "$COMMIT_MSG" == *"[minor]"* ]]; then
-            LEVEL="minor"
+            LEVEL="--minor"
           elif [[ "$COMMIT_MSG" == *"[patch]"* ]]; then
-            LEVEL="patch"
+            LEVEL="--patch"
           elif [[ "$COMMIT_MSG" == *"[dev]"* ]]; then
-            LEVEL="prerelease"
+            LEVEL="--patch --as-prerelease"
           fi
           echo "level=$LEVEL" >> $GITHUB_OUTPUT
           echo "Detected level: $LEVEL"
@@ -67,7 +67,7 @@ jobs:
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
           # Pass the force-level flag based on the detected trigger
-          additional_options: "--${{ needs.check-trigger.outputs.trigger_level }}"
+          additional_options: "${{ needs.check-trigger.outputs.trigger_level }}"
 
   build:
     name: Build on ${{ matrix.os }}
