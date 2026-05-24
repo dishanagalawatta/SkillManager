@@ -1,3 +1,6 @@
 ## 2024-05-21 - Custom QML Buttons A11y
 **Learning:** Custom interactive QML elements require Accessible.role, Accessible.name properties for screen reader support.
 **Action:** Always check interactive elements to ensure they define Accessible properties.
+## 2024-05-23 - Accessibility of QML Interactive Elements
+**Learning:** Adding interactive accessibility properties like `Accessible.role`, `Accessible.name`, and `Accessible.description` to all custom `MouseArea` items and `AbstractButton` implementations is a crucial step in ensuring custom QML components are well-supported by screen readers, but some areas like subcomponents (buttons in custom TitleBars, custom KeySequenceCapture) were missed in the initial passes.
+**Action:** Always scan for `MouseArea`, `TapHandler`, and custom Button components and explicitly evaluate if they need `Accessible` mappings. Tools relying solely on string matches might miss these if they format multiline uniquely, so manual inspection or advanced parsing is necessary.
