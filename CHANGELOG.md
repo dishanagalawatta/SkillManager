@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-05-24)
+
+### Features
+
+- Add keyboard focus and hover states to QML ComboBoxes
+  ([`a3c576c`](https://github.com/dishanagalawatta/SkillManager/commit/a3c576ce224293508910c55ebab7e67cf99105cc))
+
+Adds explicit `visualFocus` bindings to the background properties of `GlassDropdown` and
+  `GlassCollectionDropdown` to render a focus ring for keyboard users, making them consistent with
+  other interactive QML components. Also added `hovered` bindings to improve the mouse
+  interactivity. Updates the palette journal with this accessibility learning.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+- Add keyboard focus and hover states to QML ComboBoxes
+  ([`0585396`](https://github.com/dishanagalawatta/SkillManager/commit/05853962367820519260e15f29c793c7689ca97e))
+
+Adds explicit `visualFocus` bindings to the background properties of `GlassDropdown` and
+  `GlassCollectionDropdown` to render a focus ring for keyboard users, making them consistent with
+  other interactive QML components. Also added `hovered` bindings to improve the mouse
+  interactivity. Updates the palette journal with this accessibility learning.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+
 ## v0.1.1 (2026-05-24)
 
 
