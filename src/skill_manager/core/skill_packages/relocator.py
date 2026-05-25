@@ -8,6 +8,49 @@ from pathlib import Path
 from .process import _emit
 
 
+def _is_safe_relative_to(expanded: Path, resolve_base: Path) -> bool:
+    """Checks if expanded is inside resolve_base, handling symlinks and Windows 8.3 short paths."""
+    try:
+        if expanded.is_relative_to(resolve_base):
+            return True
+    except AttributeError:
+        try:
+            expanded.relative_to(resolve_base)
+            return True
+        except ValueError:
+            pass
+    except ValueError:
+        pass
+
+    try:
+        p1 = Path(os.path.realpath(expanded))
+        p2 = Path(os.path.realpath(resolve_base))
+        if hasattr(p1, "is_relative_to"):
+            if p1.is_relative_to(p2):
+                return True
+        else:
+            try:
+                p1.relative_to(p2)
+                return True
+            except ValueError:
+                pass
+    except (ValueError, OSError):
+        pass
+
+    # Last resort for test environments: try resolving via absolute path strings.
+    # We do NOT use string `startswith` or `~` matching to avoid traversal bypasses.
+    try:
+        if os.path.abspath(expanded) == os.path.abspath(resolve_base):
+            return True
+        if hasattr(os.path, "commonpath"):
+            return os.path.commonpath([os.path.abspath(expanded), os.path.abspath(resolve_base)]) == os.path.abspath(resolve_base)
+    except Exception:
+        pass
+
+    # If it fails all robust path verifications, it is unsafe.
+    return False
+
+
 def _cleanup_empty_parents(path: Path, levels: int = 3):
     """Recursively removes empty directories starting from path's parent and going up."""
     try:
@@ -128,37 +171,12 @@ def relocate_packages_from_output(
                     candidate = resolve_base / candidate
                 expanded = candidate.resolve()
                 if expanded.is_dir():
-                    if base_path:
-                        try:
-                            expanded.relative_to(resolve_base)
-                        except ValueError:
-                            # In test environments (especially Windows CI), short paths (8.3) vs long paths
-                            # can cause relative_to to fail (e.g. RUNNER~1 vs runneradmin).
-                            # We fallback to a parts-based comparison that allows ~1 approximations.
-                            _is_safe = True
-                            e_parts = expanded.parts
-                            b_parts = resolve_base.parts
-                            if len(e_parts) < len(b_parts):
-                                _is_safe = False
-                            else:
-                                for i in range(len(b_parts)):
-                                    ep = e_parts[i].lower()
-                                    bp = b_parts[i].lower()
-                                    if ep == bp:
-                                        continue
-                                    if "~" in bp and ep.startswith(bp.split("~")[0]):
-                                        continue
-                                    if "~" in ep and bp.startswith(ep.split("~")[0]):
-                                        continue
-                                    _is_safe = False
-                                    break
-
-                            if not _is_safe:
-                                _emit(
-                                    output_callback,
-                                    f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                                )
-                                continue
+                    if base_path and not _is_safe_relative_to(expanded, resolve_base):
+                            _emit(
+                                output_callback,
+                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                            )
+                            continue
                     detected_paths.add(expanded)
                     _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
                     match_found = True
@@ -172,34 +190,12 @@ def relocate_packages_from_output(
                 try:
                     expanded = Path(os.path.expanduser(raw_path)).resolve()
                     if expanded.is_dir():
-                        if base_path:
-                            try:
-                                expanded.relative_to(resolve_base)
-                            except ValueError:
-                                _is_safe = True
-                                e_parts = expanded.parts
-                                b_parts = resolve_base.parts
-                                if len(e_parts) < len(b_parts):
-                                    _is_safe = False
-                                else:
-                                    for i in range(len(b_parts)):
-                                        ep = e_parts[i].lower()
-                                        bp = b_parts[i].lower()
-                                        if ep == bp:
-                                            continue
-                                        if "~" in bp and ep.startswith(bp.split("~")[0]):
-                                            continue
-                                        if "~" in ep and bp.startswith(ep.split("~")[0]):
-                                            continue
-                                        _is_safe = False
-                                        break
-
-                                if not _is_safe:
-                                    _emit(
-                                        output_callback,
-                                        f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                                    )
-                                    continue
+                        if base_path and not _is_safe_relative_to(expanded, resolve_base):
+                                _emit(
+                                    output_callback,
+                                    f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                                )
+                                continue
                         detected_paths.add(expanded)
                         _emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
                 except Exception:
