@@ -10,8 +10,8 @@
 
 ## 📺 Overview & Demo
 
-[![SkillManager Overview](https://img.youtube.com/vi/XgxJH9Aj69k/maxresdefault.jpg)](https://youtu.be/XgxJH9Aj69k)
-*Click the image above to watch the 3-minute overview of SkillManager.*
+<video src="https://github.com/user-attachments/assets/29541600-3647-474d-8a3e-98160cdd37ff" controls="controls" muted="muted" style="max-height:640px;"></video>
+*Watch the 3-minute overview of SkillManager directly inline.*
 
 ---
 
