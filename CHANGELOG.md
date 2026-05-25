@@ -1,7 +1,58 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-05-24)
+
+### Documentation
+
+- Check update [dev]
+  ([`f05c2bd`](https://github.com/dishanagalawatta/SkillManager/commit/f05c2bdc3c016c4db2db20d91d133e96f93697aa))
+
+
+## v0.3.0 (2026-05-24)
+
+### Bug Fixes
+
+- Github workflow
+  ([`dde72ac`](https://github.com/dishanagalawatta/SkillManager/commit/dde72ac17e31a889aea2d24210dc323b7403db62))
+
+### Documentation
+
+- Update [major]
+  ([`ba7f640`](https://github.com/dishanagalawatta/SkillManager/commit/ba7f640f9e04c41d38fe9b0984d5a75482311d29))
+
+
+## v0.2.0 (2026-05-24)
+
+### Features
+
+- Add keyboard focus and hover states to QML ComboBoxes
+  ([`a3c576c`](https://github.com/dishanagalawatta/SkillManager/commit/a3c576ce224293508910c55ebab7e67cf99105cc))
+
+Adds explicit `visualFocus` bindings to the background properties of `GlassDropdown` and
+  `GlassCollectionDropdown` to render a focus ring for keyboard users, making them consistent with
+  other interactive QML components. Also added `hovered` bindings to improve the mouse
+  interactivity. Updates the palette journal with this accessibility learning.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+- Add keyboard focus and hover states to QML ComboBoxes
+  ([`0585396`](https://github.com/dishanagalawatta/SkillManager/commit/05853962367820519260e15f29c793c7689ca97e))
+
+Adds explicit `visualFocus` bindings to the background properties of `GlassDropdown` and
+  `GlassCollectionDropdown` to render a focus ring for keyboard users, making them consistent with
+  other interactive QML components. Also added `hovered` bindings to improve the mouse
+  interactivity. Updates the palette journal with this accessibility learning.
+
+Co-authored-by: dishanagalawatta <113381719+dishanagalawatta@users.noreply.github.com>
+
+
 ## v0.1.1 (2026-05-24)
+
+### Features
+
+- Enhance release strategy documentation and update versioning settings
+  ([`9169c22`](https://github.com/dishanagalawatta/SkillManager/commit/9169c224985e467c31df8228cb3fa987aa1c27f6))
 
 
 ## v0.1.0 (2026-05-24)

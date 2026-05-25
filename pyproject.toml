@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "0.1.1"
+version = "0.5.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -44,6 +44,9 @@ skill-manager = "skill_manager.__main__:main"
 
 
 
+
+
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["skill_manager*"]
@@ -66,17 +69,18 @@ version_variables = [
 version_toml = [
     "pyproject.toml:project.version",
 ]
-major_on_zero = false
+major_on_zero = true
 vcs_release = true
 upload_to_release = false
 upload_to_pypi = false
 remove_dist = false
-patch_without_tag = true
+patch_without_tag = false
 tag_format = "v{version}"
 
 [tool.semantic_release.branches.main]
 match = "main"
 prerelease = false
+prerelease_token = "rc"
 
 [tool.semantic_release.branches.develop]
 match = "develop"
@@ -85,12 +89,15 @@ prerelease_token = "dev"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"]
-minor_tags = ["feat"]
-patch_tags = ["fix", "perf"]
+minor_tags = []
+patch_tags = []
 
 [tool.semantic_release.remote]
 name = "origin"
 type = "github"
+
+
+
 
 
 

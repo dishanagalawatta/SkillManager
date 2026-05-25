@@ -84,9 +84,12 @@ ComboBox {
         implicitWidth: 160
         implicitHeight: 36
         radius: Theme.radiusPill
-        color: Theme.glassPill
-        border.color: Theme.glassBorder
-        border.width: 1
+        color: control.hovered ? Theme.glassHover : Theme.glassPill
+        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
+        border.width: control.visualFocus ? 2 : 1
+
+        Behavior on color { ColorAnimation { duration: 200 } }
+        Behavior on border.color { ColorAnimation { duration: 200 } }
     }
 
     popup: Popup {

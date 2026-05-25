@@ -1,177 +1,142 @@
-# Development Guide
+# 🛠️ Development Guide
 
-This guide covers how to set up the SkillManager development environment, run tests, and build the application locally.
+Welcome to the SkillManager development engine room. This guide covers environment setup, technical workflows, and our automated release pipeline.
 
-## Prerequisites
+---
 
-- **Python 3.12+**
-- **uv**: The ultra-fast Python package installer and resolver.
-  - Install via PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-  - Install via Homebrew: `brew install uv`
-- **Git**
+## 🏗️ Technical Stack
 
-## Setup
+- **Language**: Python 3.12+
+- **GUI Framework**: PySide6 (Qt 6.8+) with QML for declarative UI
+- **Dependency Management**: [uv](https://astral.sh/uv) (Ultra-fast Python package installer)
+- **Linting & Formatting**: `ruff`
+- **Packaging**: PyInstaller & Inno Setup
+- **Testing**: `pytest`
+- **CI/CD**: GitHub Actions with `python-semantic-release`
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/SkillManager.git
-   cd SkillManager
-   ```
+---
 
+## 🚀 Local Development
 
-2. **Sync dependencies using uv:**
-   ```bash
-   uv sync
-   ```
-   This will automatically create a `.venv` directory and install all required dependencies (including PySide6) and development dependencies (pytest, etc.) defined in `pyproject.toml`.
+### 1. Prerequisites
 
-## Running the Application Locally
+- Python 3.12 or higher
+- [uv](https://astral.sh/uv)
+- Git
 
-You can run the application directly from the source code without compiling it:
+### 2. Setup
 
+```bash
+git clone https://github.com/yourusername/SkillManager.git
+cd SkillManager
+uv sync
+```
+This automatically creates a `.venv` and installs all dependencies (PySide6, pytest, ruff, etc.).
+
+### 3. Running Locally
+
+Launch the app directly from source:
 ```bash
 uv run skill-manager
+# OR
+uv run python -m skill_manager
 ```
 
-## Development Workflow
+---
+
+## 🛠️ Development Workflow
 
 ### 1. Code Quality (Linting)
-SkillManager uses **Ruff** for high-performance linting and formatting. It is configured via `ruff.toml`.
+We use **Ruff** for high-performance linting and formatting.
 
 ```bash
-# Check for linting errors
-uv run ruff check src tests
-
-# Automatically fix fixable errors
+# Check and fix errors
 uv run ruff check src tests --fix
 
-# Format the code
+# Format code
 uv run ruff format src
 ```
 
 ### 2. Testing
-SkillManager uses `pytest` for unit testing.
-
 ```bash
 # Run all tests
 uv run pytest
 
-# Run tests with coverage
-uv run pytest --cov=skill_manager
-
-# Run specific tests
-uv run pytest tests/test_parsing.py
+# Run with coverage
+uv run pytest --cov=skill_manager --cov-report=term-missing
 ```
 
-### 3. CI/CD Standards
-All code changes must pass the following criteria:
-1. **Lint-Clean**: `uv run ruff check src tests` must return no errors.
-2. **Type-Safe**: Use Python type hints in all new code.
-3. **Tested**: New features should include unit tests in the `tests/` directory.
-4. **Coverage-Aware**: Run `uv run pytest --cov=skill_manager --cov-report=term-missing` before larger changes.
-
-### 4. Documentation Synchronization
-SkillManager maintains a strict 1:1 mapping between the Python categorization logic and the `CATEGORIES.md` guide. 
-
-If you add or modify categories in `src/skill_manager/core/parsing.py` or `src/skill_manager/app.py`, you must run the verification script to ensure documentation parity:
+### 3. Architecture & Documentation Sync
+SkillManager maintains a strict parity between the Python categorization logic and the `CATEGORIES.md` guide. If you modify `src/skill_manager/core/parsing.py`, run:
 
 ```bash
-# Verify that documentation matches the current codebase logic
 uv run python scratch/verify_sync.py
 ```
 
-This script extracts keywords and emoji mappings directly from the source code and highlights any discrepancies in the documentation.
+---
 
-## Building Executables
+## 📦 Building Executables
 
-SkillManager is packaged into standalone executables using PyInstaller.
-
-### Automated Builds (Recommended)
-The quality pipeline in `.github/workflows/quality.yml` runs linting and tests on pushes and pull requests. 
-
-The release pipeline in `.github/workflows/release.yml` automatically builds installers for Windows, macOS, and Linux whenever a version bump is triggered on the `main` or `develop` branches.
+### Automated Builds
+The GitHub Action `release.yml` automatically builds installers for Windows, macOS, and Linux on version bumps.
 
 ### Manual Builds
+To build locally for testing:
 
-If you need to build the executable locally for testing:
-
-1. **Prerequisites & Virtual Environment**:
-   Verify that all packaging and imaging dependencies (`pyinstaller` and `pillow`) are synced inside your local environment:
-   ```bash
-   uv sync
-   ```
-
-2. **Run the Packaging Script**:
-   Instead of calling raw `pyinstaller` commands, use the unified Python build script. This script automatically handles preparing multi-size icons for the desktop executable and running PyInstaller with the spec configuration:
+1. **Run the Packaging Script**:
    ```bash
    uv run python scripts/build_app.py
    ```
+   *Note: This script handles icon conversion (png -> ico) and invokes PyInstaller using the spec file.*
 
-3. **Dry-Run Testing**:
-   You can verify that the asset pre-processing pipeline (e.g. converting `logo.png` to a multi-size Windows icon file `logo.ico` supporting resolutions from 16x16 to 256x256) operates correctly without running the long compiling phase:
+2. **Dry-Run**:
    ```bash
    uv run python scripts/build_app.py --dry-run
    ```
 
-4. **Inno Setup (Windows Installer)**:
-   The Windows installer script (`packaging/windows/installer.iss`) is fully bound to the generated `assets/brand/logo.ico`. Once the local PyInstaller build finishes, compile the Inno Setup script using the Inno Setup Compiler (`ISCC.exe`) to generate the `SkillManager_Setup.exe` installer.
+3. **Windows Installer**:
+   Compile `packaging/windows/installer.iss` using Inno Setup to generate `SkillManager_Setup.exe`.
+
+---
+
+## 🚢 Release & CI/CD Strategy
+
+SkillManager uses a strictly **Opt-in Release Strategy**. Versions are only bumped when explicit trigger words are included in the commit message.
+
+### 1. Release Triggers
+
+| Trigger | Release Type | Example |
+|---|---|---|
+| **`[major]`** | Stable Major Bump | `feat: final release [major]` |
+| **`[minor]`** | Stable Minor Bump | `feat: add new view [minor]` |
+| **`[patch]`** | Stable Patch Bump | `fix: ui alignment [patch]` |
+| **`[dev]`** | Development Release | `feat: experimental icons [dev]` |
+
+### 2. Branch Strategy
+
+- **`develop` branch**: Merges with any trigger create a **Development** pre-release (e.g., `v1.0.0-dev.1`).
+- **`main` branch**: Merges with `[major/minor/patch]` create a **Stable** release (e.g., `v1.0.0`).
+
+### 3. Commit Convention (Strict)
+
+All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Prefix | Type | Release Bump |
+|---|---|---|
+| `feat:` | New feature | Minor |
+| `fix:` | Bug fix | Patch |
+| `perf:` | Performance improvement | Patch |
+| `feat!:` | Breaking change | **Major** |
+| `chore:`, `docs:`, `test:` | Maintenance | None |
+
+---
+
+## 📜 Available Scripts Reference
 
 | Command | Description |
 |---|---|
-| `uv run skill-manager` | Launch the application locally |
-| `uv run ruff check src tests` | Run ruff linter |
-| `uv run ruff format src` | Format code with ruff |
-| `uv run pytest` | Run the unit test suite |
-| `uv run python scripts/build_app.py` | Automate icon conversion and compile executable |
-| `uv run python scripts/build_app.py --dry-run` | Dry-run validation of the build environment |
-
-## Release Process
-
-SkillManager uses **python-semantic-release** to automate versioning and releases across a dual-branch architecture.
-
-### 1. Dual-Branch Strategy
-We use a two-branch model to distinguish between unstable development builds and official releases:
-
-| Branch | Release Type | Version Pattern | Purpose |
-|---|---|---|---|
-| `develop` | **Development** | `vX.Y.Z-dev.N` | Testing new features and daily builds. |
-| `main` | **Stable** | `vX.Y.Z` | Official production-ready releases. |
-
-### 2. Automated Releases (CI)
-On every push or merge to either `main` or `develop`, the unified GitHub Action (`release.yml`) performs:
-- **Versioning**: Analyzes commit messages using Conventional Commits.
-- **Matrix Build**: Triggers a parallel matrix build across Windows, macOS, and Linux.
-- **Artifact Verification**: Ensures all binaries and portable ZIPs are generated before publishing.
-- **Publish**: Attaches platform-specific artifacts (e.g., `SkillManager_Portable_windows.zip`) to the GitHub Release.
-
-### 3. Triggering a Major Release (v1.0.0)
-To transition from a development phase to a major stable release:
-1.  **Prep on `develop`**: Push a commit with the `!` syntax (e.g., `feat!: final release preparation`). This will trigger a `v1.0.0-dev.1` release.
-2.  **Go Live on `main`**: Create a Pull Request from `develop` to `main`. Once merged, the system will detect the breaking change history and publish the final **`v1.0.0`** stable release.
-
-### 4. Manual Release Trigger
-You can manually trigger a release by running `python-semantic-release` locally:
-
-```bash
-# Install tool and dependencies
-uv sync
-
-# Dry-run to see what would happen (calculates next version)
-uv run semantic-release version --print
-
-# Perform local version bump and tag (updates files and creates git tag)
-uv run semantic-release version --no-push
-```
-
-### 5. Commit Guidelines (Conventional Commits)
-We strictly follow [Conventional Commits](https://www.conventionalcommits.org/). The commit message prefix determines the next version bump:
-
-| Prefix | Type of Change | Release Bump |
-|---|---|---|
-| `feat:` | A new feature | Minor |
-| `fix:` | A bug fix | Patch |
-| `perf:` | A code change that improves performance | Patch |
-| `feat!:` | Breaking change | **Major** |
-| `refactor:`, `style:`, `docs:`, `test:`, `chore:` | Maintenance | None |
-
-*Note: To trigger a **Major** release, append `!` to the prefix (e.g., `feat!:`) or include `BREAKING CHANGE:` in the commit footer.*
+| `uv run skill-manager` | Launch the application |
+| `uv run ruff check src tests`| Run linter |
+| `uv run pytest` | Run unit tests |
+| `uv run python scripts/build_app.py` | Build executable locally |
+| `uv run semantic-release version` | Dry-run version bump |
