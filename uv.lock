@@ -1043,7 +1043,7 @@ wheels = [
 
 [[package]]
 name = "skill-manager"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "packaging" },
