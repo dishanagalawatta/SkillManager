@@ -191,7 +191,7 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.zip
-          prerelease: true
+          prerelease: ${{ contains(needs.version.outputs.tag || github.ref_name, '-dev') }}
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
