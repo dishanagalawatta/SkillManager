@@ -1,2 +1,2 @@
 # Package initialization
-__version__ = "0.3.2-dev.1"
+__version__ = "0.3.3"
