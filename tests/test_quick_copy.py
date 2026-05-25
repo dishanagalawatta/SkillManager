@@ -61,7 +61,7 @@ def test_discover_project_skills_success(temp_dir):
     def mock_parse(p):
         return {"name": "Alpha"}
 
-    def mock_cat(n, d):
+    def mock_cat(n, d, m=None):
         return {"main_category": "Main", "sub_category": "Cat"}
 
     def mock_search(s):
@@ -133,7 +133,7 @@ def test_discover_package_skills_duplicates(temp_dir):
     skills = discover_package_skills(
         [str(source_dir), str(source_dir)],
         lambda p: {},
-        lambda n, d: {"main_category": "M", "sub_category": "C"},
+        lambda n, d, m=None: {"main_category": "M", "sub_category": "C"},
         lambda s: "s",
     )
     # No skills found but should only scan once (seen_sources set)
@@ -281,7 +281,7 @@ def test_discover_package_skills(temp_dir):
     def mock_parse(p):
         return {"name": "Alpha"}
 
-    def mock_cat(n, d):
+    def mock_cat(n, d, m=None):
         return {"main_category": "Main", "sub_category": "Cat"}
 
     def mock_search(s):
@@ -381,7 +381,7 @@ def test_discover_single_project(temp_dir):
     def mock_parse(p):
         return {"name": "Alpha"}
 
-    def mock_cat(n, d):
+    def mock_cat(n, d, m=None):
         return {"main_category": "Main", "sub_category": "Cat"}
 
     def mock_search(s):
@@ -410,7 +410,7 @@ def test_discover_project_skills_parallel(temp_dir):
     def mock_parse(p):
         return {"name": "Alpha" if "alpha" in p else "Beta"}
 
-    def mock_cat(n, d):
+    def mock_cat(n, d, m=None):
         return {"main_category": "Main", "sub_category": "Cat"}
 
     def mock_search(s):

@@ -44,29 +44,71 @@ def get_main_category(sub_category: str) -> str:
         return "⚙️ System & Workflow"
     return _MAIN_CATEGORY_REVERSE_MAP.get(sub_category.lower(), "⚙️ System & Workflow")
 
-def categorize_skill(name: str, description: str) -> dict[str, str]:
-    """Determines the best category for a skill based on its name and description."""
-    text = f"{name} {name} {description}".lower()
-    norm_text = " ".join(text.replace("-", " ").replace("_", " ").split())
+def categorize_skill(name: str, description: str, metadata: dict | None = None) -> dict[str, str]:
+    """Determines the best category for a skill using a weighted, hierarchical algorithm."""
+    metadata = metadata or {}
 
-    best_category = "Uncategorized"
-    max_matches = 0
+    # 1. Exact metadata category match (highest priority)
+    meta_cat = str(metadata.get("category", "")).strip()
+    if meta_cat:
+        for known_cat in CATEGORIES:
+            if known_cat.lower() == meta_cat.lower():
+                return {"main_category": get_main_category(known_cat), "sub_category": known_cat}
+
+    name_text = name.lower()
+    norm_name_text = " ".join(name_text.replace("-", " ").replace("_", " ").split())
+    desc_text = description.lower()
+    norm_desc_text = " ".join(desc_text.replace("-", " ").replace("_", " ").split())
+
+    is_name_same = (name_text == norm_name_text)
+    is_desc_same = (desc_text == norm_desc_text)
 
     patterns = _get_category_patterns()
-    is_same = (text == norm_text)
+    sub_category_scores = {}
 
     for category, cat_patterns in patterns.items():
-        matches = 0
+        score = 0
         for p in cat_patterns:
-            matches += len(p.findall(text))
-            if not is_same:
-                matches += len(p.findall(norm_text))
+            name_matches = sum(len(m) for m in p.findall(name_text))
+            if not is_name_same:
+                name_matches += sum(len(m) for m in p.findall(norm_name_text))
+            score += name_matches * 10
 
-        if matches > max_matches:
-            max_matches = matches
-            best_category = category
+            desc_matches = sum(len(m) for m in p.findall(desc_text))
+            if not is_desc_same:
+                desc_matches += sum(len(m) for m in p.findall(norm_desc_text))
+            score += desc_matches
 
-    return {"main_category": get_main_category(best_category), "sub_category": best_category}
+        sub_category_scores[category] = score
+
+    # 2. Aggregate scores by Main Category
+    main_category_scores = {}
+    for sub, score in sub_category_scores.items():
+        if score > 0:
+            main_cat = get_main_category(sub)
+            main_category_scores[main_cat] = main_category_scores.get(main_cat, 0) + score
+
+    # 3. Find winning Main Category
+    best_main_cat = "⚙️ System & Workflow"
+    if main_category_scores:
+        main_cat_order = {k: i for i, k in enumerate(MAIN_CATEGORIES_MAPPING.keys())}
+        best_main_cat = sorted(
+            main_category_scores.items(),
+            key=lambda x: (-x[1], main_cat_order.get(x[0], 999))
+        )[0][0]
+
+    # 4. Find winning Sub Category within the best Main Category
+    best_sub_cat = "Uncategorized"
+    valid_subs = {sub: score for sub, score in sub_category_scores.items() if get_main_category(sub) == best_main_cat and score > 0}
+
+    if valid_subs:
+        sub_cat_order = {k: i for i, k in enumerate(CATEGORIES.keys())}
+        best_sub_cat = sorted(
+            valid_subs.items(),
+            key=lambda x: (-x[1], sub_cat_order.get(x[0], 999))
+        )[0][0]
+
+    return {"main_category": best_main_cat, "sub_category": best_sub_cat}
 
 def build_skill_search_text(skill_data: dict[str, Any]) -> str:
     parts = [
