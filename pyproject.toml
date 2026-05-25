@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.0.0"
+version = "1.0.1"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
