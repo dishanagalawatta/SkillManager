@@ -15,21 +15,11 @@ def main():
     version = sys.argv[1]
     commit_msg = sys.argv[2]
 
-    # Find explicit bump command in commit message
-    match = re.search(r'\[bump\s+(dev|patch|minor|major|preminor|premajor)\]', commit_msg)
+    # Find explicit command in commit message
+    match = re.search(r'\[(dev|patch|minor|major|preminor|premajor)\]', commit_msg)
     if not match:
-        # Fallback to legacy syntax
-        if "[major]" in commit_msg:
-            cmd = "major"
-        elif "[minor]" in commit_msg:
-            cmd = "minor"
-        elif "[patch]" in commit_msg:
-            cmd = "patch"
-        elif "[dev]" in commit_msg:
-            cmd = "dev"
-        else:
-            print("")
-            sys.exit(0)
+        print("")
+        sys.exit(0)
     else:
         cmd = match.group(1)
 
