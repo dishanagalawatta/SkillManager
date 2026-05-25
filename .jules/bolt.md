@@ -18,6 +18,6 @@
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
 
-## 2024-05-23 - Optimize basic string trimming over regex
-**Learning:** In hot loops, particularly those parsing thousands of lines of output or text (like `relocate_packages_from_output` or `run_process`), using `re.sub` for simple whitespace/character stripping or full regex evaluation for substring checks adds a lot of overhead.
-**Action:** Use native string methods like `.rstrip("chars")` instead of `re.sub(r"[chars]+$")`, and always use fast-path `in` substring checks before full regex evaluation.
+## 2024-05-23 - Regex vs. rstrip for Unicode
+**Learning:** While `.rstrip('chars')` is generally much faster than regex for simple suffix removal, it is purely character-based and misses Unicode whitespace (e.g. `\u2003`). `re.sub(r'[…\s│]+$', '', text)` correctly handles Unicode whitespace and prevents edge cases where paths might fail resolution due to invisible characters embedded between suffix tokens.
+**Action:** When stripping path suffixes that may contain Unicode whitespace from CLI output or progress logs, use `re.sub` instead of `.rstrip` to maintain correctness.

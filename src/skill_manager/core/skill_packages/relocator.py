@@ -115,7 +115,7 @@ def relocate_packages_from_output(
         for match in path_regex.finditer(clean_line):
             raw_path = match.group(1).strip()
             try:
-                raw_path = raw_path.rstrip("… \t\n\r\v\f│").strip()
+                raw_path = re.sub(r"[…\s│]+$", "", raw_path).strip()
                 candidate = Path(os.path.expanduser(raw_path))
                 if not candidate.is_absolute():
                     candidate = resolve_base / candidate
