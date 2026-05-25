@@ -73,3 +73,5 @@ If you want to contribute or build from source, see our **[Development Guide](do
 ## 📄 License
 
 MIT License
+
+Copyright (c) 2026 Don Dishan Kanchuka Agalawatta
