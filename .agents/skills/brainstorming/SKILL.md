@@ -84,6 +84,11 @@ You MUST explicitly clarify or propose assumptions for:
 - Security or privacy constraints  
 - Reliability / availability needs  
 - Maintenance and ownership expectations  
+- **Release Strategy** (e.g., standard triggers vs. Opt-in `[major/minor/patch/dev]` strategy)
+    - `[major]` -> Major stable bump
+    - `[minor]` -> Minor stable bump
+    - `[patch]` -> Patch stable bump
+    - `[dev]` -> Pre-release bump (`--patch --as-prerelease --prerelease-token dev`)
 
 If the user is unsure:
 

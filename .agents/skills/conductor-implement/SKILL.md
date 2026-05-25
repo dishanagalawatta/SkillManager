@@ -155,11 +155,19 @@ Step 3: Refactoring while keeping tests green
 
 ### 5. Task Completion
 
-**Commit changes** (following commit strategy from workflow.md):
+**Commit changes** (following commit strategy from workflow.md).
+
+**CRITICAL: Release Triggers**
+SkillManager uses a strictly **Opt-in Release Strategy**. You MUST include one of the following triggers in your commit message if a version bump is required:
+- `[major]`: Stable Major Bump (`--major`)
+- `[minor]`: Stable Minor Bump (`--minor`)
+- `[patch]`: Stable Patch Bump (`--patch`)
+- `[dev]`: Development Pre-release (`--patch --as-prerelease --prerelease-token dev`)
 
 ```bash
 git add -A
-git commit -m "{commit_prefix}: {task description} ({trackId})"
+# Example with trigger:
+git commit -m "{commit_prefix}: {task description} [patch] ({trackId})"
 ```
 
 **Update plan.md:**
