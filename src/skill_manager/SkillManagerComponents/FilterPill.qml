@@ -59,4 +59,8 @@ Button {
 
     Accessible.role: Accessible.Button
     Accessible.name: control.text
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
 }
