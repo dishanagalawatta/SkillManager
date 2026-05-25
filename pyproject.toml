@@ -6,6 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "skill-manager"
 version = "1.0.0"
 description = "A professional tool for managing reusable agent skills across repositories."
+authors = [
+    { name = "Don Dishan Kanchuka Agalawatta" }
+]
+license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
