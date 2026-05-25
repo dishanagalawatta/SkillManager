@@ -21,6 +21,7 @@ except ImportError:
     HAS_PYWINSTYLES = False
 
 
+from skill_manager.controllers.app_update_controller import AppUpdateController
 from skill_manager.controllers.config_controller import ConfigController
 from skill_manager.controllers.discovery_controller import DiscoveryController
 from skill_manager.controllers.ops_controller import OpsController
@@ -128,6 +129,7 @@ class AppController(QObject):
         self.ops = OpsController(self)
         self.updates = UpdateController(self)
         self.discovery = DiscoveryController(self)
+        self.app_updater = AppUpdateController(self)
 
         # 4. Connect Sub-Controller signals to Proxy Signals
         self.ui.currentViewChanged.connect(self.currentViewChanged.emit)
@@ -173,6 +175,7 @@ class AppController(QObject):
 
         if not skip_initial:
             QTimer.singleShot(100, self.loadInitialData)
+            QTimer.singleShot(500, self.app_updater.checkForUpdates)
 
     # --- Gateway Properties ---
 
@@ -190,6 +193,9 @@ class AppController(QObject):
 
     @Property(QObject, constant=True)
     def discovery_controller(self): return self.discovery
+
+    @Property(QObject, constant=True)
+    def app_update_controller(self): return self.app_updater
 
     # --- Core Properties ---
 
@@ -537,6 +543,11 @@ class AppController(QObject):
 
 
 def main():  # pragma: no cover
+    if sys.platform == "win32":
+        # Acquire mutex so Inno Setup installer can cleanly close the app
+        global _app_mutex
+        _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
+
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
     app.setWindowIcon(QIcon(resolve_resource_path("assets/brand/logo.png")))

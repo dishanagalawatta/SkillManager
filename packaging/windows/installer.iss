@@ -13,6 +13,9 @@
 AppId={{5A1B8C9D-E0F2-4A3B-8C7D-6E5F4A3B2C1D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppMutex=SkillManagerAppMutex
+CloseApplications=yes
+RestartApplications=yes
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}

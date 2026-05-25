@@ -1043,9 +1043,10 @@ wheels = [
 
 [[package]]
 name = "skill-manager"
-version = "0.4.5"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "packaging" },
     { name = "posthog" },
     { name = "pyside6" },
     { name = "python-dotenv" },
@@ -1081,6 +1082,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "packaging" },
     { name = "pillow", marker = "extra == 'dev'" },
     { name = "posthog", specifier = ">=7.14.2" },
     { name = "pyinstaller", marker = "extra == 'dev'" },

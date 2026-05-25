@@ -83,6 +83,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
             cat_info = categorize_skill(
                 skill_data.get("name", ""),
                 _classification_text(skill_data),
+                skill_data.get("metadata", {}),
             )
             skill_data["main_category"] = cat_info.get("main_category", "")
             skill_data["category"] = cat_info.get("sub_category", "")
@@ -145,6 +146,7 @@ def discover_single_project(
         cat_info = categorize_skill(
             skill_data.get("name", ""),
             _classification_text(skill_data),
+            skill_data.get("metadata", {}),
         )
         skill_data["main_category"] = cat_info.get("main_category", "")
         skill_data["category"] = cat_info.get("sub_category", "")

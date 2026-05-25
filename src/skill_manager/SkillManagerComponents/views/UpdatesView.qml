@@ -98,6 +98,39 @@ Item {
             }
         }
 
+        // App Update Banner
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 44
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            color: Theme.accent
+            radius: 8
+            visible: AppController.app_update_controller.updateAvailable
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 8
+                anchors.leftMargin: 16
+                anchors.rightMargin: 8
+                
+                Text {
+                    text: "A new version of SkillManager (v" + AppController.app_update_controller.latestVersion + ") is available!"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    Layout.fillWidth: true
+                }
+                
+                ActionButton {
+                    labelText: "Download Update"
+                    role: "primary"
+                    onClicked: (mouse) => Qt.openUrlExternally(AppController.app_update_controller.downloadUrl)
+                }
+            }
+        }
+
         // Main Layout with SplitView
         SplitView {
             Layout.fillWidth: true
