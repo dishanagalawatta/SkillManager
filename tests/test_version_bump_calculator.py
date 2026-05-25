@@ -1,5 +1,5 @@
 """
-Purpose: Tests for the version bump calculator to ensure Semantic Versioning 
+Purpose: Tests for the version bump calculator to ensure Semantic Versioning
 pre-release state machine rules are correctly implemented.
 Usage: Run via pytest `uv run pytest tests/test_version_bump_calculator.py`
 """
@@ -8,15 +8,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 # Helper to run the script
 def run_calculator(version, commit_msg):
     script_path = Path(__file__).parent.parent / "scripts" / "version_bump_calculator.py"
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, str(script_path), version, commit_msg],
         capture_output=True,
         text=True
     )
-    return result
 
 def test_stable_to_dev():
     # 1.2.3 -> bump dev -> --patch --as-prerelease --prerelease-token dev
