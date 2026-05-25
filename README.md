@@ -30,14 +30,17 @@ SkillManager is designed for developers who need to manage growing libraries of 
 ## 📸 Visual Showcase
 
 ### The Central Library
+
 Manage thousands of skills with ease. Filter by category, search instantly, and preview content in a high-fidelity editor.
 ![Library View](assets/readme/SkillManager_Library.png)
 
 ### Quick Copy Integration
+
 The ultimate developer companion. Keep your most-used skills just a click away while working in your IDE.
 ![Quick Copy](assets/readme/SkillManager_QuickCopy.png)
 
 ### Premium Design
+
 Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design system provide a focused, distraction-free environment.
 ![UI Mockup](assets/readme/SkillManager_UI_mockup.jpeg)
 
@@ -46,16 +49,18 @@ Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design 
 ## 🚀 Getting Started
 
 ### For End Users
+
 You don't need Python or any developer tools to use SkillManager.
 
-1.  Visit the **[Releases](https://github.com/yourusername/SkillManager/releases)** page.
-2.  Download the installer for your OS:
-    -   **Windows**: `SkillManager_Setup.exe`
-    -   **macOS**: `SkillManager_Portable_macos.zip`
-    -   **Linux**: `SkillManager_Portable_linux.zip`
-3.  Install and launch!
+1. Visit the **[Releases](https://github.com/yourusername/SkillManager/releases)** page.
+2. Download the installer for your OS:
+   - **Windows**: `SkillManager_Setup.exe`
+   - **macOS**: `SkillManager_Portable_macos.zip`
+   - **Linux**: `SkillManager_Portable_linux.zip`
+3. Install and launch!
 
 ### For Developers
+
 If you want to contribute or build from source, see our **[Development Guide](docs/DEVELOPMENT.md)**.
 
 ---
@@ -66,12 +71,12 @@ If you want to contribute or build from source, see our **[Development Guide](do
 - **[Architecture](docs/ARCHITECTURE.md)**: How the app is built (Hub & Spoke).
 - **[Design Philosophy](DESIGN.md)**: The "Solid Matte & Liquid Glass" guide.
 - **[Categories](docs/CATEGORIES.md)**: How skills are auto-classified.
-- **[Versioning & Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`).
+- **[Versioning &amp; Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`).
 
 ---
 
 ## 📄 License
 
-MIT License
+[**MIT License**](LICENSE)
 
 Copyright (c) 2026 Don Dishan Kanchuka Agalawatta
