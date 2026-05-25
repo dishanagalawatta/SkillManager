@@ -48,7 +48,7 @@ Use the following structure:
 ## Action Items
 
 [ ] <Step 1: Discovery>
-[ ] <Step 2: Determine Release Trigger ([major], [minor], [patch], [dev] -> --prerelease --as-prerelease --prerelease-token dev, or none)>
+[ ] <Step 2: Determine Release Trigger ([major], [minor], [patch], [dev] -> --patch --as-prerelease --prerelease-token dev, or none)>
 [ ] <Step 3: Implementation>
 [ ] <Step 4: Validation/Testing>
 [ ] <Step 5: Rollout/Commit>
