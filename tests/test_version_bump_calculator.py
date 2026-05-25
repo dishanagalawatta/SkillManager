@@ -19,67 +19,61 @@ def run_calculator(version, commit_msg):
     )
 
 def test_stable_to_dev():
-    # 1.2.3 -> bump dev -> --patch --as-prerelease --prerelease-token dev
-    res = run_calculator("1.2.3", "feat: new thing [bump dev]")
+    # 1.2.3 -> dev -> --patch --as-prerelease --prerelease-token dev
+    res = run_calculator("1.2.3", "feat: new thing [dev]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--patch --as-prerelease --prerelease-token dev"
 
 def test_stable_to_patch():
-    # 1.2.3 -> bump patch -> --patch
-    res = run_calculator("1.2.3", "fix: bug [bump patch]")
+    # 1.2.3 -> patch -> --patch
+    res = run_calculator("1.2.3", "fix: bug [patch]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--patch"
 
 def test_stable_to_minor():
-    res = run_calculator("1.2.3", "feat: feature [bump minor]")
+    res = run_calculator("1.2.3", "feat: feature [minor]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--minor"
 
 def test_stable_to_major():
-    res = run_calculator("1.2.3", "feat!: breaking [bump major]")
+    res = run_calculator("1.2.3", "feat!: breaking [major]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--major"
 
 def test_dev_to_dev():
-    # 1.2.4-dev.2 -> bump dev -> --prerelease --prerelease-token dev
-    res = run_calculator("1.2.4-dev.2", "feat: work [bump dev]")
+    # 1.2.4-dev.2 -> dev -> --prerelease --prerelease-token dev
+    res = run_calculator("1.2.4-dev.2", "feat: work [dev]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--prerelease --prerelease-token dev"
 
 def test_dev_to_patch_graduation():
-    # 1.2.4-dev.2 -> bump patch -> --patch
-    res = run_calculator("1.2.4-dev.2", "fix: finalize [bump patch]")
+    # 1.2.4-dev.2 -> patch -> --patch
+    res = run_calculator("1.2.4-dev.2", "fix: finalize [patch]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--patch"
 
 def test_dev_to_minor():
-    res = run_calculator("1.2.4-dev.2", "feat: switch to minor [bump minor]")
+    res = run_calculator("1.2.4-dev.2", "feat: switch to minor [minor]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--minor"
 
 def test_scope_creep_preminor():
-    # 1.2.4-dev.2 -> bump preminor -> --minor --as-prerelease --prerelease-token dev
-    res = run_calculator("1.2.4-dev.2", "feat: big [bump preminor]")
+    # 1.2.4-dev.2 -> preminor -> --minor --as-prerelease --prerelease-token dev
+    res = run_calculator("1.2.4-dev.2", "feat: big [preminor]")
     assert res.returncode == 0
     assert res.stdout.strip() == "--minor --as-prerelease --prerelease-token dev"
 
 def test_cross_grade_error():
-    # 1.3.0-dev.2 -> bump patch -> ERROR
-    res = run_calculator("1.3.0-dev.2", "fix: cross grade [bump patch]")
+    # 1.3.0-dev.2 -> patch -> ERROR
+    res = run_calculator("1.3.0-dev.2", "fix: cross grade [patch]")
     assert res.returncode != 0
     assert "Cross-grade detected" in res.stderr
 
 def test_cross_grade_major_error():
-    # 2.0.0-dev.1 -> bump patch -> ERROR
-    res = run_calculator("2.0.0-dev.1", "fix: cross grade [bump patch]")
+    # 2.0.0-dev.1 -> patch -> ERROR
+    res = run_calculator("2.0.0-dev.1", "fix: cross grade [patch]")
     assert res.returncode != 0
     assert "Cross-grade detected" in res.stderr
-
-def test_fallback_tags():
-    # Legacy tags support
-    res = run_calculator("1.2.3", "fix: test [patch]")
-    assert res.returncode == 0
-    assert res.stdout.strip() == "--patch"
 
 def test_no_tag():
     res = run_calculator("1.2.3", "fix: nothing")
