@@ -31,16 +31,18 @@ jobs:
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
-          LEVEL=""
-          if [[ "$COMMIT_MSG" == *"[major]"* ]]; then
-            LEVEL="--major"
-          elif [[ "$COMMIT_MSG" == *"[minor]"* ]]; then
-            LEVEL="--minor"
-          elif [[ "$COMMIT_MSG" == *"[patch]"* ]]; then
-            LEVEL="--patch"
-          elif [[ "$COMMIT_MSG" == *"[dev]"* ]]; then
-            LEVEL="--patch --as-prerelease --prerelease-token dev"
+          
+          CURRENT_VERSION=$(grep -oP '(?<=__version__ = ")[^"]*' src/skill_manager/__init__.py)
+          
+          # Call python script to calculate semantic-release arguments
+          LEVEL=$(python3 scripts/version_bump_calculator.py "$CURRENT_VERSION" "$COMMIT_MSG")
+          
+          if [ $? -ne 0 ]; then
+             echo "Version bump calculation failed:"
+             echo "$LEVEL"
+             exit 1
           fi
+          
           echo "level=$LEVEL" >> $GITHUB_OUTPUT
           echo "Detected level: $LEVEL"
 
