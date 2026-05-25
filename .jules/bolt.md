@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-23 - Pre-computing token lists for search indexing
+**Learning:** During profiling of fuzzy search logic, `_calculate_score` was found dynamically constructing `all_doc_tokens = name_tokens + tags + description_tokens` on every query for every skill. This O(N) list concatenation in a tight hot-loop adds a measurable performance penalty, especially when search is executed instantly on user key presses across thousands of skills.
+**Action:** Move expensive data structure assembly from the `query` time loop to the `build_index_data` phase. By pre-computing `all_doc_tokens` once per skill, the fuzzy matcher only performs an O(1) dictionary lookup, noticeably reducing latency for search queries.
