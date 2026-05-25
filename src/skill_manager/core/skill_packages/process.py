@@ -75,7 +75,6 @@ def run_process(
                 print(f"[PROCESS] {line_clean}")
 
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
-                # Fast path check to avoid executing regex unnecessarily (~3x speedup)
                 is_progress = False
                 if "%" in line_clean:
                     is_progress = bool(re.search(r"\d+%", line_clean))
