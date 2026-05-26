@@ -27,3 +27,8 @@
 **Vulnerability:** The application parsed package installation logs for "Installed to <path>" and blindly trusted absolute paths from the output. Since NPM post-install scripts can output arbitrary text, a malicious package could print "Installed to ~/.ssh", tricking the application into moving the user's sensitive directories into the managed skills folder.
 **Learning:** Parsing unstructured command output to determine file paths is inherently dangerous if the command's output can be influenced by untrusted parties.
 **Prevention:** Always enforce a strict directory jail (e.g., ensuring the parsed path `is_relative_to(staging_base)`) when extracting and manipulating paths from process output logs.
+
+## 2026-05-26 - [Arbitrary Command Execution via Git Ext Transport]
+**Vulnerability:** The application was vulnerable to arbitrary command execution when parsing untrusted repository URLs. An attacker could craft a repository URL using Git's `ext::` transport protocol (e.g., `ext::sh -c touch% /tmp/pwned %G`), which would be executed by `git clone`, `git pull`, or `git ls-remote` when invoked via `subprocess.run`.
+**Learning:** Even when avoiding `shell=True` and properly sanitizing arguments (like using `--`), Git still resolves the transport protocol from the URL. Untrusted URLs must explicitly be denied access to the `ext::` protocol, which is inherently dangerous.
+**Prevention:** Always pass `-c protocol.ext.allow=never` as an argument to `git` commands (`subprocess.run(["git", "-c", "protocol.ext.allow=never", ...])`) when operating on user-provided or remote repository URLs.

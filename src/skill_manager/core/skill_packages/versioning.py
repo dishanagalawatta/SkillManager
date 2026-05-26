@@ -55,7 +55,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             auth_url = path_or_url
             # Fetch tags from remote
             result = subprocess.run(
-                ["git"]
+                ["git", "-c", "protocol.ext.allow=never"]
                 + (
                     [
                         "-c",
@@ -81,7 +81,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to latest commit hash on main/master
             result = subprocess.run(
-                ["git"]
+                ["git", "-c", "protocol.ext.allow=never"]
                 + (
                     [
                         "-c",
