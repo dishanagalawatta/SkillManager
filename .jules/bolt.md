@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-27 - [Optimize search engine string matching]
+**Learning:** During the query phase in search indexing, a significant amount of time is spent iterating over document tokens looking for partial fuzz matches. Constructing a single set of all lowercase tokens for each document during index time (e.g. `all_doc_tokens = set(...)`) enables fast O(1) set membership and `isdisjoint()` checks.
+**Action:** When implementing algorithms that involve token-based matching across many items, preprocess item properties into a `set` to bypass expensive matching logic using set disjointness before falling back to full fuzzy string matches. Fast-path matching speeds up search query processing dramatically.

@@ -47,13 +47,24 @@ class SkillIndexer:
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 
+        name_lower = name.lower()
+        name_tokens = self.tokenize(name)
+        category_lower = category.lower()
+        tags_lower = [t.lower() for t in tags]
+        description_tokens = self.tokenize(description)
+
+        all_doc_tokens = set(name_tokens + tags_lower + description_tokens)
+        if category_lower:
+            all_doc_tokens.add(category_lower)
+
         # Weighted components
         return {
-            "name": name.lower(),
-            "name_tokens": self.tokenize(name),
-            "category": category.lower(),
-            "tags": [t.lower() for t in tags],
-            "description_tokens": self.tokenize(description),
+            "name": name_lower,
+            "name_tokens": name_tokens,
+            "category": category_lower,
+            "tags": tags_lower,
+            "description_tokens": description_tokens,
+            "all_doc_tokens": all_doc_tokens,
             "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
         }
 
@@ -112,16 +123,18 @@ class SearchEngine:
         # by ensuring at least one query token matches a document token reasonably well.
         query_tokens = self.indexer.tokenize(query)
         if query_tokens:
-            all_doc_tokens = index_data.get("name_tokens", []) + index_data.get("tags", []) + index_data.get("description_tokens", [])
-            # Also include category as a token if present
-            if index_data.get("category"):
-                all_doc_tokens.append(index_data["category"])
+            all_doc_tokens = index_data.get("all_doc_tokens", set())
 
             if all_doc_tokens:
                 max_token_match = 0
                 for qt in query_tokens:
                     # Exact substring match provides an immediate pass
                     if qt in index_data["full_text"]:
+                        max_token_match = 100
+                        break
+
+                    # Direct token match provides a fast path
+                    if qt in all_doc_tokens:
                         max_token_match = 100
                         break
 
