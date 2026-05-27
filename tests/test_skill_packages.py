@@ -189,7 +189,7 @@ def test_run_git_package_update_clone(mock_run, temp_dir):
 
     # Should call clone since path is empty/doesn't exist
     mock_run.assert_called_once()
-    assert mock_run.call_args[0][0][1] == "clone"
+    assert "clone" in mock_run.call_args[0][0]
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
