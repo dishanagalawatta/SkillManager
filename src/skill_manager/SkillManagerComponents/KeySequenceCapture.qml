@@ -11,10 +11,15 @@ Rectangle {
 
     radius: Theme.radiusButton
     color: active ? Theme.glassActive : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
-    border.color: active ? Theme.accent : Theme.glassBorder
-    border.width: 1
+    border.color: (active || root.activeFocus) ? Theme.accent : Theme.glassBorder
+    border.width: (active || root.activeFocus) ? 2 : 1
     height: 36
     Layout.fillWidth: true
+    activeFocusOnTab: true
+
+    Accessible.role: Accessible.Button
+    Accessible.name: root.active ? "Recording shortcut, press Esc to cancel" : (root.sequence || "Click to record shortcut")
+    Accessible.description: "Press Enter or Space to start recording, Escape to cancel"
 
     focus: active
     onActiveChanged: {
@@ -55,13 +60,17 @@ Rectangle {
             root.active = !root.active
             if (root.active) root.forceActiveFocus()
         }
-
-        Accessible.role: Accessible.Button
-        Accessible.name: root.active ? "Recording shortcut, press Esc to cancel" : (root.sequence || "Click to record shortcut")
     }
 
     Keys.onPressed: (event) => {
-        if (!active) return
+        if (!active) {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                root.active = true
+                root.forceActiveFocus()
+                event.accepted = true
+            }
+            return
+        }
 
         if (event.key === Qt.Key_Escape) {
             active = false
