@@ -17,7 +17,7 @@ def detect_git_remote(package_path: str) -> str:
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(path), "config", "--get", "remote.origin.url"],
+            ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "config", "--get", "remote.origin.url"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -55,7 +55,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             auth_url = path_or_url
             # Fetch tags from remote
             result = subprocess.run(
-                ["git"]
+                ["git", "-c", "protocol.ext.allow=never"]
                 + (
                     [
                         "-c",
@@ -81,7 +81,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to latest commit hash on main/master
             result = subprocess.run(
-                ["git"]
+                ["git", "-c", "protocol.ext.allow=never"]
                 + (
                     [
                         "-c",
@@ -103,7 +103,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 return ""
 
             result = subprocess.run(
-                ["git", "-C", str(path), "describe", "--tags", "--abbrev=0"],
+                ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "describe", "--tags", "--abbrev=0"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -112,7 +112,7 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 return result.stdout.strip()
 
             result = subprocess.run(
-                ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+                ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "rev-parse", "--short", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,
