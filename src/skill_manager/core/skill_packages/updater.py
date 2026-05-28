@@ -34,7 +34,7 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
         run_process(
-            ["git"]
+            ["git", "-c", "protocol.ext.allow=never"]
             + (
                 [
                     "-c",
@@ -52,7 +52,7 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
         run_process(
-            ["git"]
+            ["git", "-c", "protocol.ext.allow=never"]
             + (
                 [
                     "-c",
