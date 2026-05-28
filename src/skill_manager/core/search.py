@@ -47,13 +47,22 @@ class SkillIndexer:
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 
+        name_tokens = self.tokenize(name)
+        description_tokens = self.tokenize(description)
+        tags_lower = [t.lower() for t in tags]
+
+        all_doc_tokens = set(name_tokens + tags_lower + description_tokens)
+        if category:
+            all_doc_tokens.add(category.lower())
+
         # Weighted components
         return {
             "name": name.lower(),
-            "name_tokens": self.tokenize(name),
+            "name_tokens": name_tokens,
             "category": category.lower(),
-            "tags": [t.lower() for t in tags],
-            "description_tokens": self.tokenize(description),
+            "tags": tags_lower,
+            "description_tokens": description_tokens,
+            "all_doc_tokens": all_doc_tokens,
             "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
         }
 
@@ -112,27 +121,30 @@ class SearchEngine:
         # by ensuring at least one query token matches a document token reasonably well.
         query_tokens = self.indexer.tokenize(query)
         if query_tokens:
-            all_doc_tokens = index_data.get("name_tokens", []) + index_data.get("tags", []) + index_data.get("description_tokens", [])
-            # Also include category as a token if present
-            if index_data.get("category"):
-                all_doc_tokens.append(index_data["category"])
+            all_doc_tokens = index_data.get("all_doc_tokens", set())
 
             if all_doc_tokens:
                 max_token_match = 0
-                for qt in query_tokens:
-                    # Exact substring match provides an immediate pass
-                    if qt in index_data["full_text"]:
-                        max_token_match = 100
-                        break
+                query_tokens_set = set(query_tokens)
 
-                    for dt in all_doc_tokens:
-                        score = fuzz.ratio(qt, dt)
-                        if score > max_token_match:
-                            max_token_match = score
+                # Fast path: O(1) intersection check for exact token matches
+                if not query_tokens_set.isdisjoint(all_doc_tokens):
+                    max_token_match = 100
+                else:
+                    for qt in query_tokens:
+                        # Exact substring match provides an immediate pass
+                        if qt in index_data["full_text"]:
+                            max_token_match = 100
+                            break
+
+                        for dt in all_doc_tokens:
+                            score = fuzz.ratio(qt, dt)
+                            if score > max_token_match:
+                                max_token_match = score
+                            if max_token_match > 70:
+                                break
                         if max_token_match > 70:
                             break
-                    if max_token_match > 70:
-                        break
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:
