@@ -53,8 +53,9 @@ class SkillIndexer:
         category_lower = category.lower()
 
         # Pre-compute combined tokens to avoid recreating this list in the hot _calculate_score loop
-        all_doc_tokens = name_tokens + tags_lower + description_tokens
-        if category_lower:
+        # Deduplicate to prevent redundant fuzz.ratio calculations for duplicate tokens
+        all_doc_tokens = list(dict.fromkeys(name_tokens + tags_lower + description_tokens))
+        if category_lower and category_lower not in all_doc_tokens:
             all_doc_tokens.append(category_lower)
 
         # Weighted components
