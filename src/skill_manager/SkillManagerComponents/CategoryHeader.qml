@@ -12,10 +12,20 @@ Item {
 
     height: 44 // Fixed height for main header
     visible: mainCatName !== ""
+    activeFocusOnTab: true
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+            event.accepted = true
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
-        color: mouseAreaMain.containsMouse ? Theme.glassHover : "transparent"
+        color: (mouseAreaMain.containsMouse || root.activeFocus) ? Theme.glassHover : "transparent"
+        border.color: root.activeFocus ? Theme.accent : "transparent"
+        border.width: root.activeFocus ? 2 : 0
         radius: Theme.radiusSmall
         anchors.margins: 2
     }
