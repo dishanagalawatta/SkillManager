@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2024-05-26 - Category Header Focus Accessibility
+**Learning:** Custom interactive list header items built on plain `Item` (like `CategoryHeader.qml`) lack keyboard navigability. They need `activeFocusOnTab: true`, specific key event handling for Space/Enter, and dynamic visual indicators for `activeFocus` mapped to border attributes.
+**Action:** Always add keyboard accessibility features (tab focus, key handlers, focus rings) to list group headers or custom clickable items to ensure they are fully navigable via standard keyboard controls.
