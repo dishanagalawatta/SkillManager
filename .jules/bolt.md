@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-24 - Pre-compute sets for faster O(1) checks
+**Learning:** In the skill search engine, dynamically concatenating token lists during the scoring loop and performing nested fuzzy checks was a major bottleneck.
+**Action:** Pre-compute aggregated token sets during the indexing phase. This enables fast O(1) `isdisjoint()` checks during querying, rapidly bypassing expensive fuzzy string matching when tokens have exact overlap.
