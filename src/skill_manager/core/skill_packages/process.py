@@ -15,6 +15,9 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
+        # Robustly redact multiline passwords within Git credential helpers.
+        text = re.sub(r"(echo password=).*?(?=; \}; f)", r"\1***", text, flags=re.DOTALL)
+        # Fail-safe fallback: redact the rest of the line for any unclosed or plain password logs.
         text = re.sub(r"(echo password=).*", r"\1***", text)
     return text
 
