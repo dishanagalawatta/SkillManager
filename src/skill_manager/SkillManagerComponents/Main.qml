@@ -38,21 +38,33 @@ Window {
             height: 6; anchors { top: parent.top; left: parent.left; right: parent.right } 
             cursorShape: Qt.SizeVerCursor
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Top Edge"
+            Accessible.description: "Resize window from top edge"
         }
         MouseArea { 
             height: 6; anchors { bottom: parent.bottom; left: parent.left; right: parent.right } 
             cursorShape: Qt.SizeVerCursor
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Bottom Edge"
+            Accessible.description: "Resize window from bottom edge"
         }
         MouseArea { 
             width: 6; anchors { left: parent.left; top: parent.top; bottom: parent.bottom } 
             cursorShape: Qt.SizeHorCursor
             onPressed: (mouse) => window.startSystemResize(Qt.LeftEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Left Edge"
+            Accessible.description: "Resize window from left edge"
         }
         MouseArea { 
             width: 6; anchors { right: parent.right; top: parent.top; bottom: parent.bottom } 
             cursorShape: Qt.SizeHorCursor
             onPressed: (mouse) => window.startSystemResize(Qt.RightEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Right Edge"
+            Accessible.description: "Resize window from right edge"
         }
         
         // Corners
@@ -60,21 +72,33 @@ Window {
             width: 12; height: 12; anchors.top: parent.top; anchors.left: parent.left 
             cursorShape: Qt.SizeFDiagCursor
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Top Left Corner"
+            Accessible.description: "Resize window from top left corner"
         }
         MouseArea { 
             width: 12; height: 12; anchors.top: parent.top; anchors.right: parent.right 
             cursorShape: Qt.SizeBDiagCursor
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Top Right Corner"
+            Accessible.description: "Resize window from top right corner"
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.left: parent.left 
             cursorShape: Qt.SizeBDiagCursor
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Bottom Left Corner"
+            Accessible.description: "Resize window from bottom left corner"
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.right: parent.right 
             cursorShape: Qt.SizeFDiagCursor
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
+            Accessible.role: Accessible.Grip
+            Accessible.name: "Bottom Right Corner"
+            Accessible.description: "Resize window from bottom right corner"
         }
     }
 
