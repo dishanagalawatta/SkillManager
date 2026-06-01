@@ -16,6 +16,11 @@ def sanitize_token(text: str) -> str:
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
         text = re.sub(r"(echo password=).*", r"\1***", text)
+
+    # Redact standard GitHub API tokens (e.g. ghp_abc123... or github_pat_abc123...)
+    if "ghp_" in text or "github_pat_" in text:
+        text = re.sub(r"(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})", "***", text)
+
     return text
 
 def _emit(output_callback: None | Callable[[str], None], message: str):
