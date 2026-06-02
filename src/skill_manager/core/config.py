@@ -1,8 +1,15 @@
 import json
+import logging
 import os
 import shutil
 from pathlib import Path
 from typing import Any
+
+from platformdirs import user_data_dir
+
+from skill_manager.core.schemas import AppConfig
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = "SkillManager"
 DATA_DIR_ENV = "SKILL_MANAGER_DATA_DIR"
@@ -39,15 +46,15 @@ def get_app_data_dir() -> Path:
     if override:
         return Path(override).expanduser()
 
-    if os.name == "nt":
-        base_dir = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-        app_dir = (
-            Path(base_dir) / APP_NAME if base_dir else Path.home() / "AppData" / "Local" / APP_NAME
-        )
-    elif xdg_data_home := os.environ.get("XDG_DATA_HOME"):
-        app_dir = Path(xdg_data_home) / APP_NAME
+    if os.name == "nt" and (base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")):
+        app_dir = Path(base_dir) / APP_NAME
+    elif os.name != "nt":
+        if xdg_data_home := os.environ.get("XDG_DATA_HOME"):
+            app_dir = Path(xdg_data_home) / APP_NAME
+        else:
+            app_dir = Path.home() / ".local" / "share" / APP_NAME
     else:
-        app_dir = Path.home() / ".local" / "share" / APP_NAME
+        app_dir = Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
 
     app_dir.mkdir(parents=True, exist_ok=True)
     return app_dir
@@ -151,19 +158,16 @@ class ConfigManager:
                 self.save()  # Migrate to new location
                 # Continue loading to handle potential secondary migrations (e.g. targets -> projects)
             except Exception as e:
-                print(f"Error migrating config: {e}")
+                logger.warning("Error migrating config: %s", e)
 
         if self.config_path.exists():
             try:
                 with open(self.config_path) as f:
                     self.data = json.load(f)
 
-                # Migrate "targets" to "projects"
-                if "targets" in self.data or "target_aliases" in self.data:
-                    if "targets" in self.data:
-                        self.data["projects"] = self.data.pop("targets")
-                    if "target_aliases" in self.data:
-                        self.data["project_aliases"] = self.data.pop("target_aliases")
+                old_data = dict(self.data)
+                self.data = AppConfig.from_legacy(self.data).model_dump(by_alias=True)
+                if self.data != old_data:
                     self.save()
 
                 # Ensure default shortcuts are present
@@ -181,7 +185,7 @@ class ConfigManager:
                         self.save()
 
             except Exception as e:
-                print(f"Error loading config: {e}")
+                logger.warning("Error loading config: %s", e)
         else:
             # New config
             self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
@@ -195,7 +199,7 @@ class ConfigManager:
             with open(self.config_path, "w") as f:
                 json.dump(self.data, f, indent=4)
         except Exception as e:
-            print(f"Error saving config: {e}")
+            logger.warning("Error saving config: %s", e)
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.data.get(key, default)

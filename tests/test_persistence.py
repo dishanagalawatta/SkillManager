@@ -88,7 +88,7 @@ def test_cache_persistence(temp_files):
         save_cache(data)
         loaded = load_cache()
         assert loaded["skills"][0]["name"] == "S1"
-        assert "raw_content" not in loaded["skills"][0]
+        assert loaded["skills"][0]["raw_content"] == ""
 
 
 def test_save_cache_failure(temp_files):
@@ -191,7 +191,7 @@ def test_patch_cache_add(temp_files):
         # Check update
         s1 = next(s for s in loaded["skills"] if s["local_path"] == "/p1")
         assert s1["category"] == "Cat2"
-        assert "raw_content" not in s1
+        assert s1["raw_content"] == ""
         # Check append
         s2 = next(s for s in loaded["skills"] if s["local_path"] == "/p2")
         assert s2["category"] == "Cat3"

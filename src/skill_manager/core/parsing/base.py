@@ -1,52 +1,12 @@
 import re
 from typing import Any
 
+import frontmatter
 import yaml
+from markdown_it import MarkdownIt
 
+_MARKDOWN = MarkdownIt("commonmark")
 
-def parse_frontmatter(frontmatter: str) -> dict[str, Any]:
-    if not frontmatter:
-        return {}
-
-    try:
-        parsed = yaml.safe_load(frontmatter)
-        if isinstance(parsed, dict):
-            return parsed
-    except Exception:
-        pass
-
-    # Fallback to manual parsing if YAML fails
-    parsed = {}
-    current_key = None
-    current_lines = []
-
-    def flush_multiline():
-        nonlocal current_key, current_lines
-        if current_key:
-            parsed[current_key] = " ".join(line.strip() for line in current_lines).strip()
-            current_key = None
-            current_lines = []
-
-    for line in frontmatter.splitlines():
-        if re.match(r"^\s", line) and current_key:
-            current_lines.append(line)
-            continue
-
-        flush_multiline()
-        key_match = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
-        if not key_match:
-            continue
-
-        key, value = key_match.groups()
-        value = value.strip()
-        if value in {">", "|", ">-", "|-"}:
-            current_key = key
-            current_lines = []
-        else:
-            parsed[key] = value.strip(" \"'")
-
-    flush_multiline()
-    return parsed
 
 def normalize_description(value: Any) -> str:
     if value is None:
@@ -58,24 +18,44 @@ def normalize_description(value: Any) -> str:
     return " ".join(value.split()).strip(" \"'")
 
 def extract_markdown_description(content: str) -> str:
-    body = re.sub(
-        r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", "", content, count=1, flags=re.DOTALL
-    )
-    paragraphs = []
-    current = []
+    body = split_frontmatter(content)[1]
+    
+    try:
+        tokens = _MARKDOWN.parse(body)
+    except Exception:
+        return ""
 
-    for raw_line in body.splitlines():
-        line = raw_line.strip()
-        if not line:
-            if current:
-                paragraphs.append(" ".join(current))
-                current = []
-            continue
-        if line.startswith("#") or line.startswith("```") or line.startswith("---"):
-            continue
-        current.append(line.replace("*", "").replace("_", "").replace("`", ""))
+    for index, token in enumerate(tokens):
+        if token.type == "paragraph_open" and token.level == 0:
+            inline = tokens[index + 1]
+            if inline.type == "inline":
+                text = inline.content.replace("*", "").replace("_", "").replace("`", "")
+                return normalize_description(text)
+    return ""
 
-    if current:
-        paragraphs.append(" ".join(current))
 
-    return normalize_description(paragraphs[0] if paragraphs else "")
+def split_frontmatter(content: str) -> tuple[dict[str, Any], str]:
+    """Return parsed metadata and body content using python-frontmatter."""
+    if not content:
+        return {}, ""
+
+    try:
+        post = frontmatter.loads(content)
+        return dict(post.metadata) if post.metadata else {}, post.content.strip()
+    except Exception:
+        return {}, content.strip()
+
+
+def first_heading(content: str) -> str:
+    """Extract the first H1 text using markdown-it-py tokenization."""
+    try:
+        tokens = _MARKDOWN.parse(content or "")
+    except Exception:
+        return ""
+
+    for index, token in enumerate(tokens[:-1]):
+        if token.type == "heading_open" and token.tag == "h1":
+            inline = tokens[index + 1]
+            if inline.type == "inline":
+                return normalize_description(inline.content)
+    return ""

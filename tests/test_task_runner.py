@@ -1,6 +1,11 @@
+import asyncio
 import threading
 
-from skill_manager.utils.task_runner import BackgroundTaskRunner, SynchronousTaskRunner
+from skill_manager.utils.task_runner import (
+    BackgroundTaskRunner,
+    QtAsyncioTaskRunner,
+    SynchronousTaskRunner,
+)
 
 
 def test_synchronous_task_runner():
@@ -50,3 +55,23 @@ def test_background_task_runner_no_args():
 
     runner.run(task)
     assert event.wait(timeout=1.0)
+
+
+def test_task_runner_submit_invokes_callback():
+    seen = []
+    runner = SynchronousTaskRunner()
+
+    runner.submit(lambda: "done", seen.append)
+
+    assert seen == ["done"]
+
+
+def test_qt_asyncio_task_runner_runs_coroutine_without_qtasyncio(monkeypatch):
+    runner = QtAsyncioTaskRunner()
+    monkeypatch.setattr("skill_manager.utils.task_runner.QtAsyncio", None)
+
+    async def work():
+        await asyncio.sleep(0)
+        return "async-done"
+
+    assert runner.run(work) == "async-done"

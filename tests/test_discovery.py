@@ -182,6 +182,36 @@ def test_discovery_symlinks_and_hidden_dirs(mock_save, mock_load, temp_dir):
 
 @patch("skill_manager.core.discovery.load_cache")
 @patch("skill_manager.core.discovery.save_cache")
+def test_discovery_respects_gitignore_patterns(mock_save, mock_load, temp_dir):
+    source_lib = temp_dir / "source_lib"
+    source_lib.mkdir()
+    (source_lib / ".gitignore").write_text("ignored_skill/\n", encoding="utf-8")
+
+    kept = source_lib / "kept_skill"
+    kept.mkdir()
+    (kept / "SKILL.md").write_text("---\nname: Kept Skill\n---", encoding="utf-8")
+
+    ignored = source_lib / "ignored_skill"
+    ignored.mkdir()
+    (ignored / "SKILL.md").write_text("---\nname: Ignored Skill\n---", encoding="utf-8")
+
+    service = DiscoveryService(
+        sources=[str(source_lib)],
+        projects=[],
+        archive_paths=[],
+        starred_paths=[],
+    )
+
+    mock_load.return_value = None
+    result = service.discover_all(use_cache=False)
+    names = {skill["name"] for skill in result["skills"]}
+
+    assert "Kept Skill" in names
+    assert "Ignored Skill" not in names
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
 def test_discovery_cache_behavior(mock_save, mock_load, temp_dir):
     service = DiscoveryService(
         sources=[],

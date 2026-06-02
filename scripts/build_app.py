@@ -11,7 +11,6 @@ import stat
 import subprocess
 import sys
 import time
-import zipfile
 
 from PIL import Image
 
@@ -55,7 +54,7 @@ def clean_build_dirs(project_root: str) -> None:
                     try:
                         shutil.rmtree(dir_path, onerror=handle_remove_readonly)
                         break
-                    except (PermissionError, OSError) as e:
+                    except (PermissionError, OSError):
                         if attempt == 2:
                             raise
                         time.sleep(0.5)
@@ -110,8 +109,15 @@ def run_pyinstaller(spec_path: str) -> int:
     if not os.path.exists(spec_path):
         raise FileNotFoundError(f"Spec file not found at: {spec_path}")
 
+    try:
+        import PyInstaller
+    except ImportError:
+        print("Error: PyInstaller is not installed in the current Python environment.")
+        print("Please run this script inside the uv virtual environment (e.g., `uv run python scripts/build_app.py`).")
+        sys.exit(1)
+
     print(f"Running PyInstaller for spec: {spec_path}...")
-    cmd: list[str] = ["pyinstaller", "--noconfirm", spec_path]
+    cmd: list[str] = [sys.executable, "-m", "PyInstaller", "--noconfirm", spec_path]
 
     result = subprocess.run(cmd, check=True)
     return result.returncode
@@ -125,7 +131,7 @@ def package_windows(project_root: str) -> None:
         return
 
     iscc = shutil.which("iscc")
-    
+
     # Fallback to common installation paths if not in PATH
     if not iscc:
         common_paths = [
@@ -204,7 +210,7 @@ def main() -> None:
     dist_dir = os.path.join(project_root, "dist")
     bundle_name = "SkillManager"
     bundle_path = os.path.join(dist_dir, bundle_name)
-    
+
     if os.path.exists(bundle_path):
         # Use platform-specific names to avoid overwriting during CI merge
         platform_name = sys.platform
@@ -212,7 +218,7 @@ def main() -> None:
             platform_name = "windows"
         elif platform_name == "darwin":
             platform_name = "macos"
-            
+
         portable_zip = os.path.join(dist_dir, f"SkillManager_Portable_{platform_name}")
         print(f"Creating portable ZIP archive from {bundle_path}...")
         shutil.make_archive(portable_zip, "zip", root_dir=dist_dir, base_dir=bundle_name)

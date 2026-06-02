@@ -5,6 +5,7 @@ Handles saving and loading of archive, starred, and skill cache.
 
 import contextlib
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,9 @@ from skill_manager.core.config import (
     SKILL_LIBRARY_STARRED_FILE,
     TEMP_COPIES_FILE,
 )
+from skill_manager.core.schemas import CacheState
+
+logger = logging.getLogger(__name__)
 
 # Fields that are expensive to store but read on-demand from disk.
 CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
@@ -32,7 +36,7 @@ def _atomic_write_json(file_path: str, data: Any, indent: int = 4) -> bool:
         os.replace(temp_path, file_path)
         return True
     except Exception as e:
-        print(f"Error atomic writing to {file_path}: {e}")
+        logger.warning("Error atomic writing to %s: %s", file_path, e)
         with contextlib.suppress(OSError):
             os.remove(temp_path)
         return False
@@ -54,7 +58,7 @@ def load_archive() -> list[str]:
                 return data.get("archived_skills", [])
             return data or []
     except Exception as e:
-        print(f"Error loading archive: {e}")
+        logger.warning("Error loading archive: %s", e)
         return []
 
 
@@ -71,7 +75,7 @@ def load_starred() -> list[str]:
         with open(SKILL_LIBRARY_STARRED_FILE, encoding="utf-8") as f:
             return json.load(f) or []
     except Exception as e:
-        print(f"Error loading starred: {e}")
+        logger.warning("Error loading starred: %s", e)
         return []
 
 
@@ -87,7 +91,7 @@ def load_project_skill_ownership() -> dict[str, dict[str, str]]:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except Exception as e:
-        print(f"Error loading project skill ownership: {e}")
+        logger.warning("Error loading project skill ownership: %s", e)
         return {}
 
 
@@ -109,7 +113,7 @@ def load_package_skill_inventory() -> dict[str, Any]:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except Exception as e:
-        print(f"Error loading package skill inventory: {e}")
+        logger.warning("Error loading package skill inventory: %s", e)
         return {}
 
 
@@ -132,7 +136,7 @@ def save_cache(data: dict[str, Any]) -> bool:
             ]
         return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data, indent=2)
     except Exception as e:
-        print(f"Error saving cache: {e}")
+        logger.warning("Error saving cache: %s", e)
         return False
 
 
@@ -143,9 +147,10 @@ def load_cache() -> dict[str, Any] | None:
         return None
     try:
         with open(cache_path, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        return CacheState.model_validate(data).model_dump()
     except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-        print(f"[CACHE] Corrupted cache ({e}).")
+        logger.warning("[CACHE] Corrupted cache (%s).", e)
         with contextlib.suppress(BaseException):
             cache_path.unlink()
         return None
@@ -173,7 +178,7 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
 
         return removed
     except Exception as exc:
-        print(f"[CACHE] Patch failed: {exc}")
+        logger.warning("[CACHE] Patch failed: %s", exc)
         return 0
 
 
@@ -254,7 +259,7 @@ def patch_cache_add(
 
         return updated_count
     except Exception as exc:
-        print(f"[CACHE] Patch add failed: {exc}")
+        logger.warning("[CACHE] Patch add failed: %s", exc)
         return 0
 
 
@@ -272,5 +277,5 @@ def load_temp_registry() -> list[str]:
             data = json.load(f)
             return data.get("temp_paths", [])
     except Exception as e:
-        print(f"Error loading temp registry: {e}")
+        logger.warning("Error loading temp registry: %s", e)
         return []

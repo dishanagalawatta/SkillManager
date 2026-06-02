@@ -1,6 +1,9 @@
 import argparse
+import logging
 import shutil
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def update_projects(project_paths, source_paths, progress_callback=None):
@@ -18,7 +21,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
         if p.is_dir():
             projects.append(p)
         else:
-            print(f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping.")
+            logger.warning(f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping.")
 
     sources = []
     for sp in source_paths:
@@ -26,14 +29,14 @@ def update_projects(project_paths, source_paths, progress_callback=None):
         if p.is_dir():
             sources.append(p)
         else:
-            print(f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping.")
+            logger.warning(f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping.")
 
     if not projects:
-        print("Error: No valid project directories provided.")
+        logger.error("Error: No valid project directories provided.")
         return None
 
     if not sources:
-        print("Error: No valid source directories provided.")
+        logger.error("Error: No valid source directories provided.")
         return None
 
     # Count total folders to process
@@ -44,14 +47,14 @@ def update_projects(project_paths, source_paths, progress_callback=None):
         project_items.append((project_dir, items))
         total_folders += len(items)
 
-    print("Starting update process...")
-    print("Projects:")
+    logger.info("Starting update process...")
+    logger.info("Projects:")
     for t in projects:
-        print(f"  - {t}")
-    print("\nSources (in order of priority):")
+        logger.info(f"  - {t}")
+    logger.info("\nSources (in order of priority):")
     for s in sources:
-        print(f"  - {s}")
-    print("-" * 40)
+        logger.info(f"  - {s}")
+    logger.info("-" * 40)
 
     updated_count = 0
     skipped_count = 0
@@ -59,7 +62,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
 
     # Iterate through each project directory
     for project_dir, items in project_items:
-        print(f"\nProcessing project directory: '{project_dir.name}'")
+        logger.info(f"\nProcessing project directory: '{project_dir.name}'")
 
         for item in items:
             folder_name = item.name
@@ -77,19 +80,19 @@ def update_projects(project_paths, source_paths, progress_callback=None):
 
             if selected_source_subfolder:
                 msg = f"Updating '{folder_name}'..."
-                print(f"[*] {msg} (using source: '{selected_source_dir.name}')")
+                logger.info(f"[*] {msg} (using source: '{selected_source_dir.name}')")
                 if progress_callback:
                     progress_callback(processed_count, total_folders, msg)
                 try:
                     # dirs_exist_ok=True allows merging into existing directories (Python 3.8+)
                     shutil.copytree(selected_source_subfolder, item, dirs_exist_ok=True)
-                    print(f"    Successfully updated '{folder_name}'.")
+                    logger.info(f"    Successfully updated '{folder_name}'.")
                     updated_count += 1
                 except Exception as e:
-                    print(f"    [!] Error updating '{folder_name}': {e}")
+                    logger.error(f"    [!] Error updating '{folder_name}': {e}")
             else:
                 msg = f"Skipping '{folder_name}'"
-                print(f"[-] {msg} - no matching folder found in any source directory.")
+                logger.info(f"[-] {msg} - no matching folder found in any source directory.")
                 if progress_callback:
                     progress_callback(processed_count, total_folders, msg)
                 skipped_count += 1
@@ -99,10 +102,10 @@ def update_projects(project_paths, source_paths, progress_callback=None):
     if progress_callback:
         progress_callback(total_folders, total_folders, "Update process complete.")
 
-    print("\n" + "=" * 40)
-    print("Update process complete.")
-    print(f"Total projects updated: {updated_count}")
-    print(f"Total projects skipped: {skipped_count}")
+    logger.info("\n" + "=" * 40)
+    logger.info("Update process complete.")
+    logger.info(f"Total projects updated: {updated_count}")
+    logger.info(f"Total projects skipped: {skipped_count}")
     return updated_count, skipped_count
 
 

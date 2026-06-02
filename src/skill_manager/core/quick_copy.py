@@ -1,9 +1,14 @@
+import logging
 import os
 import shutil
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+
+import pathspec
+
+logger = logging.getLogger(__name__)
 
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text"}
 
@@ -57,8 +62,11 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
             continue
         seen_sources.add(source_key)
 
+        ignore_spec = _load_ignore_spec(resolved_source)
         for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
             if not child.is_dir():
+                continue
+            if _is_ignored(child, resolved_source, ignore_spec):
                 continue
             skill_md_path = child / "SKILL.md"
             if not skill_md_path.is_file():
@@ -121,9 +129,12 @@ def discover_single_project(
 
     project_key = os.path.normcase(str(resolved_project))
     skills = []
+    ignore_spec = _load_ignore_spec(resolved_project)
 
     for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
         if not child.is_dir():
+            continue
+        if _is_ignored(child, resolved_project, ignore_spec):
             continue
         skill_md_path = child / "SKILL.md"
         if not skill_md_path.is_file():
@@ -224,7 +235,7 @@ def discover_project_skills(
                 if res:
                     projects_list.append(res)
             except Exception as e:
-                print(f"[DISCOVERY] Error scanning project: {e}")
+                logger.warning("[DISCOVERY] Error scanning project: %s", e)
 
     return projects_list
 
@@ -234,6 +245,28 @@ def _normalize_path(path):
     if not path:
         return ""
     return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
+
+
+def _load_ignore_spec(root: Path):
+    gitignore = root / ".gitignore"
+    if not gitignore.is_file():
+        return None
+    try:
+        return pathspec.PathSpec.from_lines(
+            "gitignore", gitignore.read_text(encoding="utf-8").splitlines()
+        )
+    except OSError:
+        return None
+
+
+def _is_ignored(path: Path, root: Path, spec) -> bool:
+    if spec is None:
+        return False
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError:
+        return False
+    return spec.match_file(relative) or spec.match_file(f"{relative}/")
 
 
 def project_label(project_path, project_aliases=None, original_project=None):

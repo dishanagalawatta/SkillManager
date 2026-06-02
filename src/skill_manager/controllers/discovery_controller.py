@@ -5,6 +5,9 @@ Usage: Accessed via AppController.discovery
 
 import os
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Slot
 
@@ -43,7 +46,7 @@ class DiscoveryController(BaseController):
                 def cache_callback(cached_data):
                     nonlocal used_cache_preview
                     used_cache_preview = True
-                    print(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
+                    logger.info(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
                     schedule_on_ui_thread(
                         self.app,
                         lambda: self._finalize_loading(

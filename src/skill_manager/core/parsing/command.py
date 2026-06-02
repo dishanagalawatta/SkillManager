@@ -1,9 +1,16 @@
-import re
+import logging
 from pathlib import Path
 from typing import Any
 
-from .base import extract_markdown_description, normalize_description, parse_frontmatter
+from .base import (
+    extract_markdown_description,
+    first_heading,
+    normalize_description,
+    split_frontmatter,
+)
 from .categorizer import get_main_category
+
+logger = logging.getLogger(__name__)
 
 
 def parse_command_md(filepath: str) -> dict[str, Any] | None:
@@ -22,16 +29,10 @@ def parse_command_md(filepath: str) -> dict[str, Any] | None:
             content = f.read()
             data["raw_content"] = content
 
-        # Extract body content (without frontmatter)
-        body = re.sub(
-            r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", "", content, count=1, flags=re.DOTALL
-        )
-        data["body_content"] = body.strip()
+        metadata, body = split_frontmatter(content)
+        data["body_content"] = body
 
-        match = re.match(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", content, re.DOTALL)
-        if match:
-            frontmatter = match.group(1)
-            metadata = parse_frontmatter(frontmatter)
+        if metadata:
             data["metadata"] = metadata
             data["name"] = str(metadata.get("name", "") or "").strip()
             data["client"] = metadata.get("client", "")
@@ -42,11 +43,7 @@ def parse_command_md(filepath: str) -> dict[str, Any] | None:
 
         # If no name in frontmatter, look for first H1 header
         if not data["name"]:
-            h1_match = re.search(r"^#\s+(.*)$", content, re.MULTILINE)
-            if h1_match:
-                data["name"] = h1_match.group(1).strip()
-            else:
-                data["name"] = stem
+            data["name"] = first_heading(content) or stem
 
         if not data["description"]:
             data["description"] = extract_markdown_description(content)
@@ -65,6 +62,6 @@ def parse_command_md(filepath: str) -> dict[str, Any] | None:
                     pass
 
     except Exception as e:
-        print(f"Error parsing command {filepath}: {e}")
+        logger.warning("Error parsing command %s: %s", filepath, e)
         return None
     return data
