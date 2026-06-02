@@ -5,8 +5,6 @@ from skill_manager.core.parsing import (
 )
 
 
-
-
 def test_normalize_description_types():
     assert normalize_description(None) == ""
     assert normalize_description(["a", "b"]) == "a b"

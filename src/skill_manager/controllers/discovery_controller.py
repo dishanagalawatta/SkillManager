@@ -3,17 +3,17 @@ Purpose: Manages background discovery of skills and cache synchronization.
 Usage: Accessed via AppController.discovery
 """
 
+import logging
 import os
 import traceback
-import logging
-
-logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.discovery import DiscoveryService
 from skill_manager.utils.qt_threading import schedule_on_ui_thread
+
+logger = logging.getLogger(__name__)
 
 
 class DiscoveryController(BaseController):

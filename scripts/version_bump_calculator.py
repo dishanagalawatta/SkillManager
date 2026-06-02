@@ -1,11 +1,12 @@
 """
-Purpose: Calculates the correct arguments for python-semantic-release to achieve the 
+Purpose: Calculates the correct arguments for python-semantic-release to achieve the
 desired version bump according to SemVer pre-release rules.
 Usage: python scripts/version_bump_calculator.py <current_version> <commit_message>
 """
 
-import sys
 import re
+import sys
+
 
 def main():
     if len(sys.argv) < 3:
@@ -35,10 +36,9 @@ def main():
 
     # Handle Edge Case B: Cross-grade logic
     # If we are working towards a minor/major release (patch == "0") and command is patch, fail.
-    if is_dev:
-        if patch == "0" and cmd == "patch":
-            sys.stderr.write(f"ERROR: Cross-grade detected. Cannot graduate minor/major prerelease {version} via 'bump patch'.\n")
-            sys.exit(1)
+    if is_dev and patch == "0" and cmd == "patch":
+        sys.stderr.write(f"ERROR: Cross-grade detected. Cannot graduate minor/major prerelease {version} via 'bump patch'.\n")
+        sys.exit(1)
 
     # Map commands to python-semantic-release flags
     if cmd == "dev":

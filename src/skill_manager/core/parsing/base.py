@@ -1,8 +1,6 @@
-import re
 from typing import Any
 
 import frontmatter
-import yaml
 from markdown_it import MarkdownIt
 
 _MARKDOWN = MarkdownIt("commonmark")
@@ -19,7 +17,7 @@ def normalize_description(value: Any) -> str:
 
 def extract_markdown_description(content: str) -> str:
     body = split_frontmatter(content)[1]
-    
+
     try:
         tokens = _MARKDOWN.parse(body)
     except Exception:
