@@ -4,11 +4,9 @@ Usage: python run.py
 """
 
 import ctypes
+import logging
 import os
 import sys
-import logging
-
-logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
@@ -38,6 +36,7 @@ from skill_manager.core.categories import get_category_emoji
 from skill_manager.core.config import (
     ConfigManager,
 )
+from skill_manager.core.file_watch import SkillFolderWatcher
 from skill_manager.core.models import SkillModel
 from skill_manager.core.persistence import (
     load_archive,
@@ -47,8 +46,9 @@ from skill_manager.core.resources import (
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
-from skill_manager.core.file_watch import SkillFolderWatcher
 from skill_manager.utils.task_runner import BackgroundTaskRunner
+
+logger = logging.getLogger(__name__)
 
 
 class AppController(QObject):
@@ -183,7 +183,7 @@ class AppController(QObject):
 
         self._watcher = SkillFolderWatcher(
             paths=watch_paths,
-            callback=lambda path: QTimer.singleShot(0, self.refreshSkills)
+            callback=lambda _: QTimer.singleShot(0, self.refreshSkills)
         )
 
         # In tests, we often want to skip the initial background discovery

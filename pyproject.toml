@@ -134,3 +134,8 @@ dev = [
     "python-semantic-release>=9.0.0",
 ]
 
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
+]

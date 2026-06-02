@@ -3,6 +3,7 @@ import logging
 from skill_manager.app import main
 from skill_manager.core.config import DATA_DIR
 
+
 def setup_logging():
     log_file = DATA_DIR / "skill_manager.log"
     logging.basicConfig(

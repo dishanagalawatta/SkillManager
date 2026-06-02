@@ -3,10 +3,8 @@ Purpose: Manages skill operations like copying, deleting, and status toggles.
 Usage: Accessed via AppController.ops
 """
 
-from pathlib import Path
 import logging
-
-logger = logging.getLogger(__name__)
+from pathlib import Path
 
 from PySide6.QtCore import QTimer, Slot
 
@@ -23,6 +21,8 @@ from skill_manager.core.persistence import (
 from skill_manager.core.quick_copy import (
     delete_project_skill_folders,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OpsController(BaseController):

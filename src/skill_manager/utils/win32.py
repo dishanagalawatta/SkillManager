@@ -1,7 +1,11 @@
+import contextlib
 import ctypes
+import logging
 import sys
 from ctypes import wintypes
-import logging
+
+with contextlib.suppress(ImportError):
+    import pywinstyles
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +31,6 @@ if sys.platform == "win32":
             ("ptMaxPosition", POINT),
             ("rcNormalPosition", RECT),
         ]
-
-
-import pywinstyles
 
 
 def apply_native_style(window, style_name: str) -> None:

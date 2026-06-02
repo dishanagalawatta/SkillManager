@@ -2,12 +2,10 @@
 Update service for handling background skill updates and project syncing.
 """
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-import logging
-
-logger = logging.getLogger(__name__)
 
 from skill_manager.core.copier import copy_skill_folders_to_projects
 from skill_manager.core.parsing import build_skill_search_text, categorize_skill, parse_skill_md
@@ -35,6 +33,8 @@ from skill_manager.core.skill_packages import (
 )
 from skill_manager.core.skill_packages.process import sanitize_token
 from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
+
+logger = logging.getLogger(__name__)
 
 
 def _log_update(level: str, event: str, **fields: Any) -> None:
