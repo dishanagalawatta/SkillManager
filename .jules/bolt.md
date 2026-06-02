@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-23 - Optimize search token matching and indexing
+**Learning:** In the search engine's scoring loop, dynamically concatenating token lists (e.g. `index_data.get("name_tokens", []) + index_data.get("tags", []) + ...`) repeatedly on every query iteration incurs heavy list allocation overhead. Furthermore, executing fuzzy string matching against tokens that overlap exactly wastes CPU cycles.
+**Action:** Pre-compute and aggregate all document tokens during the indexing phase. Store them as a list (for JSON serialization) and convert them to a set at runtime for an O(1) `isdisjoint()` check to bypass costly fuzzy iterations completely when query tokens overlap exactly with document tokens. Always ensure new indexed fields have a fallback for legacy non-reindexed documents.
