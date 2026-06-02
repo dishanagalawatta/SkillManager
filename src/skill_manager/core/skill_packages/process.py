@@ -1,9 +1,12 @@
+import logging
 import os
 import re
 import shutil
 import subprocess
 import time
 from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_token(text: str) -> str:
@@ -27,7 +30,7 @@ def _emit(output_callback: None | Callable[[str], None], message: str):
         or "Relocating" in message
         or "Success" in message
     ):
-        print(message)
+        logger.info(message)
     if output_callback:
         output_callback(message)
 
@@ -72,7 +75,7 @@ def run_process(
             line_clean = sanitize_token(line.strip())
             if line_clean:
                 # Always print to terminal for visibility
-                print(f"[PROCESS] {line_clean}")
+                logger.info("[PROCESS] %s", line_clean)
 
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
                 is_progress = bool(re.search(r"\d+%", line_clean))

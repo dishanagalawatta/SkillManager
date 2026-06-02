@@ -4,6 +4,9 @@ Usage: Accessed via AppController.ops
 """
 
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import QTimer, Slot
 
@@ -147,7 +150,7 @@ class OpsController(BaseController):
                         deleted += 1
                         paths_to_remove.append(path_str)
                 except Exception as exc:
-                    print(f"[DELETE] FAILED {p}: {exc}")
+                    logger.error(f"[DELETE] FAILED {p}: {exc}")
                     failed += 1
 
             patch_cache_remove(paths_to_remove)
@@ -234,12 +237,12 @@ class OpsController(BaseController):
                     p.unlink()
                     deleted_count += 1
             except Exception as e:
-                print(f"[TEMP_CLEANUP] Failed to delete {path_str}: {e}")
+                logger.error(f"[TEMP_CLEANUP] Failed to delete {path_str}: {e}")
                 capture_exception(e)
 
         save_temp_registry([])
         if deleted_count > 0:
-            print(f"[TEMP_CLEANUP] Cleaned up {deleted_count} temporary paths.")
+            logger.info(f"[TEMP_CLEANUP] Cleaned up {deleted_count} temporary paths.")
 
     @Slot(str)
     def copySelectedSkillsToProject(self, project_path: str, is_temporary: bool = False):
@@ -312,7 +315,7 @@ class OpsController(BaseController):
                                 if skill_data:
                                     discovered_skills.append(skill_data)
                             except Exception as exc:
-                                print(f"[TARGETED SCAN] Failed scanning {skill_path}: {exc}")
+                                logger.error(f"[TARGETED SCAN] Failed scanning {skill_path}: {exc}")
 
                 if discovered_skills:
                     patch_cache_add(discovered_skills)

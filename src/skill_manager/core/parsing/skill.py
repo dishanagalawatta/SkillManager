@@ -1,8 +1,10 @@
-import re
+import logging
 from pathlib import Path
 from typing import Any
 
-from .base import extract_markdown_description, normalize_description, parse_frontmatter
+from .base import extract_markdown_description, normalize_description, split_frontmatter
+
+logger = logging.getLogger(__name__)
 
 
 def parse_skill_md(filepath: str) -> dict[str, Any]:
@@ -12,16 +14,10 @@ def parse_skill_md(filepath: str) -> dict[str, Any]:
             content = f.read()
             data["raw_content"] = content
 
-        # Extract body content (without frontmatter)
-        body = re.sub(
-            r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", "", content, count=1, flags=re.DOTALL
-        )
-        data["body_content"] = body.strip()
+        metadata, body = split_frontmatter(content)
+        data["body_content"] = body
 
-        match = re.match(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", content, re.DOTALL)
-        if match:
-            frontmatter = match.group(1)
-            metadata = parse_frontmatter(frontmatter)
+        if metadata:
             data["metadata"] = metadata
             data["name"] = str(metadata.get("name", "") or "").strip()
             data["description"] = normalize_description(metadata.get("description", ""))
@@ -41,5 +37,5 @@ def parse_skill_md(filepath: str) -> dict[str, Any]:
                 if md_file.stem.lower() not in {"readme", "license", "changelog"}:
                     data["commands"].append(str(md_file.absolute()))
     except Exception as e:
-        print(f"Error parsing {filepath}: {e}")
+        logger.warning("Error parsing %s: %s", filepath, e)
     return data

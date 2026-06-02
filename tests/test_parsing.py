@@ -4,22 +4,22 @@ from skill_manager.core.parsing import (
     extract_markdown_description,
     normalize_description,
     parse_command_md,
-    parse_frontmatter,
     parse_skill_md,
 )
+from skill_manager.core.parsing.base import split_frontmatter
 
 
 def test_parse_frontmatter_standard():
-    fm = "name: Test Skill\ndescription: A test description\ncategory: Development"
-    parsed = parse_frontmatter(fm)
+    fm = "---\nname: Test Skill\ndescription: A test description\ncategory: Development\n---\n"
+    parsed, _ = split_frontmatter(fm)
     assert parsed["name"] == "Test Skill"
     assert parsed["description"] == "A test description"
     assert parsed["category"] == "Development"
 
 
 def test_parse_frontmatter_multiline():
-    fm = "description: >\n  Line 1\n  Line 2\ncategory: Test"
-    parsed = parse_frontmatter(fm)
+    fm = "---\ndescription: >\n  Line 1\n  Line 2\ncategory: Test\n---\n"
+    parsed, _ = split_frontmatter(fm)
     assert parsed["description"].strip() == "Line 1 Line 2"
     assert parsed["category"] == "Test"
 
@@ -85,20 +85,20 @@ Body here.
 
 def test_parse_frontmatter_malformed():
     # Invalid YAML that yaml.safe_load might still parse as a partial dict or string
-    fm = "name: : invalid : yaml"
-    parsed = parse_frontmatter(fm)
-    assert parsed == {"name": ": invalid : yaml"}
+    fm = "---\nname: : invalid : yaml\n---\n"
+    parsed, _ = split_frontmatter(fm)
+    assert parsed == {}
 
     # Mixed invalid content
-    fm_mixed = "name: Valid\n  invalid: indent\n- list: without key"
-    parsed_mixed = parse_frontmatter(fm_mixed)
-    assert parsed_mixed["name"] == "Valid"
+    fm_mixed = "---\nname: Valid\n  invalid: indent\n- list: without key\n---\n"
+    parsed_mixed, _ = split_frontmatter(fm_mixed)
+    assert parsed_mixed == {}
 
 
 def test_parse_frontmatter_empty():
-    assert parse_frontmatter("") == {}
-    assert parse_frontmatter(None) == {}
-    assert parse_frontmatter("   \n   ") == {}
+    assert split_frontmatter("")[0] == {}
+    assert split_frontmatter(None)[0] == {}
+    assert split_frontmatter("   \n   ")[0] == {}
 
 
 def test_parse_skill_md_missing():
@@ -143,8 +143,8 @@ def test_build_skill_search_text_missing_fields():
 
 def test_parse_frontmatter_complex_types():
     # Test lists and other types in frontmatter
-    fm = "tags: [a, b, c]\ncount: 42\nbool: true"
-    parsed = parse_frontmatter(fm)
+    fm = "---\ntags: [a, b, c]\ncount: 42\nbool: true\n---\n"
+    parsed, _ = split_frontmatter(fm)
     assert parsed["tags"] == ["a", "b", "c"]
     assert parsed["count"] == 42
     assert parsed["bool"] is True
@@ -162,9 +162,8 @@ First real paragraph.
 """, encoding="utf-8")
 
     data = parse_skill_md(str(skill_file))
-    # It currently extracts all non-header lines as description if no frontmatter
-    assert "First real paragraph." in data["description"]
-    assert "> This is a quote." in data["description"]
+    # It extracts the first paragraph (ignoring quotes, lists, code)
+    assert data["description"] == "First real paragraph."
 
 
 

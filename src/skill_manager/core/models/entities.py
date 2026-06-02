@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from skill_manager.core.schemas import SkillRecord
+
 
 @dataclass
 class Skill:
@@ -56,6 +58,8 @@ class Skill:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Skill":
         """Factory method to create a Skill from a raw dictionary."""
+        record = SkillRecord.model_validate(data)
+        data = record.model_dump()
         # Handle some legacy key mappings
         is_package = data.get("is_package", data.get("is_source", False))
 

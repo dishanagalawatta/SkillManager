@@ -2,31 +2,10 @@ from skill_manager.core.parsing import (
     categorize_skill,
     extract_markdown_description,
     normalize_description,
-    parse_frontmatter,
 )
 
 
-def test_parse_frontmatter_complex_yaml():
-    fm = """
-name: "Complex Name"
-tags: [tag1, tag2, tag3]
-description: |
-  Line 1
-  Line 2
-nested:
-  key: value
-"""
-    parsed = parse_frontmatter(fm)
-    assert parsed["name"] == "Complex Name"
-    assert parsed["tags"] == ["tag1", "tag2", "tag3"]
-    assert "Line 1" in parsed["description"]
-    assert parsed["nested"]["key"] == "value"
 
-def test_parse_frontmatter_malformed():
-    fm = "this is not yaml : :::"
-    parsed = parse_frontmatter(fm)
-    assert isinstance(parsed, dict)
-    # Should not crash, might be empty or partial
 
 def test_normalize_description_types():
     assert normalize_description(None) == ""

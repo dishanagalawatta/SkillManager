@@ -92,6 +92,18 @@ The project uses a unified release pipeline that handles both pre-releases and o
 
 ## Development Patterns
 
+### Dependency Boundary Guidelines
+
+The dependency migration keeps third-party libraries behind narrow internal boundaries so QML roles, JSON file names, and the CLI entrypoint remain stable:
+
+- `platformdirs` is used only for platform-aware application data directory resolution, with `SKILL_MANAGER_DATA_DIR` still taking precedence.
+- `pydantic` and `pydantic-settings` define tolerant internal schemas for config, cache, skill, metadata, and package records; controllers and models still receive plain dictionaries where that is the existing contract.
+- `python-frontmatter` and `markdown-it-py` are the approved parsing stack for skill and command Markdown; fallback behavior remains tolerant of malformed frontmatter.
+- `pathspec` is the approved ignore-pattern engine for `.gitignore`-style discovery filtering.
+- `httpx` and `tenacity` are the approved stack for update-check HTTP calls and retry behavior.
+- `watchdog` is currently wrapped by `core/file_watch.py` as an inactive integration boundary. It must not change runtime discovery behavior until a dedicated live-watch feature pass wires it behind an explicit opt-in.
+- `PySide6.QtAsyncio` is the preferred async boundary for future Qt-owned coroutine work; existing background-thread workflows remain valid until migrated intentionally.
+
 ### 1. Signal Handler Best Practices (QML)
 To avoid deprecation warnings in Qt 6.x and ensure scope safety, all QML signal handlers should use formal parameter arrow functions:
 

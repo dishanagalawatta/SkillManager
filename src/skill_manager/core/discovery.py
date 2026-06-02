@@ -2,6 +2,7 @@
 Discovery service for finding and processing skills from sources and projects.
 """
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,8 @@ from skill_manager.core.parsing import (
 )
 from skill_manager.core.persistence import load_cache, save_cache
 from skill_manager.core.quick_copy import discover_package_skills, discover_project_skills
+
+logger = logging.getLogger(__name__)
 
 
 class DiscoveryService:
@@ -43,7 +46,7 @@ class DiscoveryService:
                 if cached_data and cache_callback:
                     cache_callback(cached_data)
             except Exception as e:
-                print(f"[DISCOVERY] Error loading cache: {e}")
+                logger.warning("[DISCOVERY] Error loading cache: %s", e)
 
         # 2a. Discover from master packages
         package_skills_raw = discover_package_skills(

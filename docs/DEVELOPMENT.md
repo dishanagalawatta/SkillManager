@@ -66,7 +66,18 @@ uv run pytest
 uv run pytest --cov=skill_manager --cov-report=term-missing
 ```
 
-### 3. Architecture & Documentation Sync
+### 3. Manual Smoke Checklist
+
+After dependency or migration work, run the automated checks first, then launch the app and verify:
+
+- Library loads saved sources and discovered skills.
+- Search filters skills without UI errors.
+- Quick Copy can select skills and copy references.
+- Archive and star actions update the list state.
+- Copy to project completes for a test project folder.
+- Update check handles the latest-release request without blocking the UI.
+
+### 4. Architecture & Documentation Sync
 SkillManager maintains a strict parity between the Python categorization logic and the `CATEGORIES.md` guide. If you modify `src/skill_manager/core/parsing.py`, run:
 
 ```bash

@@ -5,6 +5,9 @@ Update service for handling background skill updates and project syncing.
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 from skill_manager.core.copier import copy_skill_folders_to_projects
 from skill_manager.core.parsing import build_skill_search_text, categorize_skill, parse_skill_md
@@ -40,7 +43,15 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
         for key, value in fields.items()
         if value not in (None, "")
     )
-    print(f"{level.upper():<5} {event}{(' ' + details) if details else ''}")
+    msg = f"{event}{(' ' + details) if details else ''}"
+    if level.upper() == "ERROR":
+        logger.error(msg)
+    elif level.upper() == "WARN":
+        logger.warning(msg)
+    elif level.upper() == "DEBUG":
+        logger.debug(msg)
+    else:
+        logger.info(msg)
 
 
 class UpdateService:
@@ -471,7 +482,7 @@ class UpdateService:
                 try:
                     updated_sources.append(check_skill_package_versions(source))
                 except Exception as exc:
-                    print(f"[ERROR] Failed to check versions for {source.get('name')}: {exc}")
+                    logger.error(f"[ERROR] Failed to check versions for {source.get('name')}: {exc}")
                     updated_sources.append(source)
 
             completion_callback(

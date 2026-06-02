@@ -14,12 +14,21 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "PySide6",
+    "httpx",
+    "markdown-it-py",
     "pyyaml",
     "pywinstyles",
+    "pathspec",
+    "platformdirs",
     "posthog>=7.14.2",
+    "pydantic>=2",
+    "pydantic-settings",
+    "python-frontmatter",
     "python-dotenv>=1.2.2",
     "rapidfuzz",
     "packaging",
+    "tenacity",
+    "watchdog",
 ]
 
 

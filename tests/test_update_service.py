@@ -308,7 +308,7 @@ def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
     mock_load_ownership,
     mock_save_inventory,
     tmp_path,
-    capsys,
+    caplog,
 ):
     project_root = tmp_path / "repo"
     package_path = project_root / ".agents" / "skills"
@@ -358,10 +358,9 @@ def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
     mock_delete.assert_not_called()
     mock_copy.assert_not_called()
     comp_cb.assert_called_once()
-    output = capsys.readouterr().out
-    assert "WARN  update.path_conflict" in output
-    assert "action=skip_project_cleanup_sync" in output
-    assert "WARN  update.project.skipped" in output
+    assert "update.path_conflict" in caplog.text
+    assert "action=skip_project_cleanup_sync" in caplog.text
+    assert "update.project.skipped" in caplog.text
     mock_update.assert_not_called()
 
 
@@ -375,7 +374,7 @@ def test_run_global_update_skips_package_update_for_project_root_conflict(
     mock_load_inventory,
     mock_save_inventory,
     tmp_path,
-    capsys,
+    caplog,
 ):
     project_root = tmp_path / "repo"
     package_path = project_root / ".agents" / "skills"
@@ -402,7 +401,7 @@ def test_run_global_update_skips_package_update_for_project_root_conflict(
     mock_update.assert_not_called()
     progress_cb.assert_called_once()
     assert progress_cb.call_args.args[1]["is_updating"] is False
-    assert "WARN  update.package.skipped" in capsys.readouterr().out
+    assert "update.package.skipped" in caplog.text
 
 
 def test_record_project_skill_ownership_for_merged_results():

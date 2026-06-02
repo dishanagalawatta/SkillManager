@@ -2,15 +2,19 @@
 Purpose: Checks for application updates from GitHub Releases.
 """
 
+import asyncio
 import json
-import urllib.error
-import urllib.request
+import logging
 
+import httpx
 from packaging.version import parse as parse_version
 from PySide6.QtCore import Property, Signal, Slot
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 import skill_manager
 from skill_manager.controllers.base import BaseController
+
+logger = logging.getLogger(__name__)
 
 
 class AppUpdateController(BaseController):
@@ -38,21 +42,35 @@ class AppUpdateController(BaseController):
 
     @Slot()
     def checkForUpdates(self):
-        self.app.task_runner.submit(self._fetch_latest_release, self._on_release_fetched)
+        asyncio.create_task(self._fetch_latest_release())
 
-    def _fetch_latest_release(self):
+    async def _fetch_latest_release(self):
         url = "https://api.github.com/repos/dishanagalawatta/SkillManager/releases/latest"
-        req = urllib.request.Request(url, headers={'User-Agent': 'SkillManager-AppUpdateChecker'})
         try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                return {
-                    "version": data.get("tag_name", "").lstrip("v"),
-                    "url": data.get("html_url", "")
-                }
+            data = await self._get_release_json(url)
+            result = {
+                "version": data.get("tag_name", "").lstrip("v"),
+                "url": data.get("html_url", "")
+            }
+            self._on_release_fetched(result)
         except Exception as e:
-            print(f"Failed to check for app updates: {e}")
-            return None
+            logger.warning("Failed to check for app updates: %s", e)
+
+    @retry(
+        retry=retry_if_exception_type((httpx.HTTPError, json.JSONDecodeError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.2, max=2),
+        reraise=True,
+    )
+    async def _get_release_json(self, url: str) -> dict:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(5.0),
+            headers={"User-Agent": "SkillManager-AppUpdateChecker"},
+            follow_redirects=True,
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
 
     def _on_release_fetched(self, result):
         if not result:
@@ -73,4 +91,4 @@ class AppUpdateController(BaseController):
                 self.latestVersionChanged.emit()
                 self.downloadUrlChanged.emit()
         except Exception as e:
-            print(f"Error parsing versions: {e}")
+            logger.warning("Error parsing versions: %s", e)

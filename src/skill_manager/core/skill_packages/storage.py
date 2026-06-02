@@ -4,6 +4,9 @@ import re
 import shutil
 from pathlib import Path
 from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_storage_key(path: str | Path) -> str:

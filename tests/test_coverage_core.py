@@ -11,15 +11,14 @@ from skill_manager.core.config import (
 from skill_manager.core.updater import update_projects
 
 
-def test_update_projects_invalid_paths(capsys):
+def test_update_projects_invalid_paths(caplog):
     # Test skipping non-existent paths
     update_projects(["missing_proj"], ["missing_src"])
-    captured = capsys.readouterr()
-    assert "Warning: Project path 'missing_proj' is not a directory" in captured.out
-    assert "Warning: Source path 'missing_src' is not a directory" in captured.out
-    assert "Error: No valid project directories provided." in captured.out
+    assert "Project path 'missing_proj' is not a directory" in caplog.text
+    assert "Source path 'missing_src' is not a directory" in caplog.text
+    assert "No valid project directories provided." in caplog.text
 
-def test_update_projects_error_handling(tmp_path, capsys):
+def test_update_projects_error_handling(tmp_path, caplog):
     proj = tmp_path / "proj"
     proj.mkdir()
     (proj / "item").mkdir()
@@ -31,8 +30,7 @@ def test_update_projects_error_handling(tmp_path, capsys):
     with patch("shutil.copytree", side_effect=RuntimeError("Copy failed")):
         update_projects([str(proj)], [str(src)])
 
-    captured = capsys.readouterr()
-    assert "[!] Error updating 'item': Copy failed" in captured.out
+    assert "Error updating 'item': Copy failed" in caplog.text
 
 def test_get_app_data_dir_fallbacks(monkeypatch):
     monkeypatch.delenv("SKILL_MANAGER_DATA_DIR", raising=False)
@@ -67,7 +65,7 @@ def test_resolve_data_file_copy_error(tmp_path):
         res = resolve_data_file("test.json", data_dir, legacy_dir)
         assert res == legacy_dir / "test.json"
 
-def test_config_manager_migration(tmp_path, capsys):
+def test_config_manager_migration(tmp_path):
     # Create a separate directory for app data
     app_data_dir = tmp_path / "app_data"
     app_data_dir.mkdir()
@@ -76,7 +74,7 @@ def test_config_manager_migration(tmp_path, capsys):
     cwd_dir = tmp_path / "cwd"
     cwd_dir.mkdir()
     root_config = cwd_dir / "config.json"
-    root_config.write_text('{"targets": {"a": 1}}')
+    root_config.write_text('{"targets": ["a"]}')
 
     # Mock get_app_data_dir to return our temp app_data_dir
     with (
@@ -86,7 +84,7 @@ def test_config_manager_migration(tmp_path, capsys):
         # Also need to make sure resolve_data_file sees the mock
         cm = ConfigManager("config.json")
         # Should have migrated targets to projects
-        assert cm.get("projects") == {"a": 1}
+        assert cm.get("projects") == ["a"]
         # New config should exist in app_data_dir
         assert (app_data_dir / "config.json").exists()
 
@@ -100,12 +98,11 @@ def test_config_manager_shortcut_merging(tmp_path):
     assert shortcuts["search"] == "Ctrl+Shift+F" # Preserved
     assert shortcuts["copy"] == DEFAULT_SHORTCUTS["copy"] # Merged from default
 
-def test_config_manager_save_error(tmp_path, capsys):
+def test_config_manager_save_error(tmp_path, caplog):
     config_file = tmp_path / "config.json"
     cm = ConfigManager(str(config_file))
 
     with patch("builtins.open", side_effect=OSError("Permission denied")):
         cm.save()
 
-    captured = capsys.readouterr()
-    assert "Error saving config: Permission denied" in captured.out
+    assert "Error saving config: Permission denied" in caplog.text

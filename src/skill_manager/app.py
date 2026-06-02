@@ -6,6 +6,9 @@ Usage: python run.py
 import ctypes
 import os
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
@@ -44,6 +47,7 @@ from skill_manager.core.resources import (
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
+from skill_manager.core.file_watch import SkillFolderWatcher
 from skill_manager.utils.task_runner import BackgroundTaskRunner
 
 
@@ -170,10 +174,23 @@ class AppController(QObject):
         self._archive_paths = load_archive()
         self._starred_paths = load_starred()
 
+        # Set up file watching for live refreshes
+        watch_paths = self._sources.copy()
+        for src in self._update_packages:
+            pkg_path = src.get("package_path") or src.get("local_path")
+            if pkg_path:
+                watch_paths.append(pkg_path)
+
+        self._watcher = SkillFolderWatcher(
+            paths=watch_paths,
+            callback=lambda path: QTimer.singleShot(0, self.refreshSkills)
+        )
+
         # In tests, we often want to skip the initial background discovery
         skip_initial = skip_initial_load or os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1"
 
         if not skip_initial:
+            self._watcher.start()
             QTimer.singleShot(100, self.loadInitialData)
             QTimer.singleShot(500, self.app_updater.checkForUpdates)
 
@@ -528,7 +545,7 @@ class AppController(QObject):
     def _set_status(self, msg):
         self._status_message = msg
         self.statusMessageChanged.emit()
-        print(f"Status: {msg}")
+        logger.info(f"Status: {msg}")
 
     # Forwarding helper for sub-controllers to access labels
     def getProjectLabel(self, path):
@@ -536,6 +553,8 @@ class AppController(QObject):
 
     def on_quit(self):
         """Ensures all pending state is saved before exit."""
+        if hasattr(self, '_watcher'):
+            self._watcher.stop()
         if self.ui._save_timer.isActive():
             self.ui._save_timer.stop()
             self.ui.saveUiState()
@@ -556,13 +575,13 @@ def main():  # pragma: no cover
     app.aboutToQuit.connect(controller.on_quit)
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("appController", controller)
-    engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
+    engine.warnings.connect(lambda msg: logger.warning(f"QML Warning: {msg}"))
     qml_dir = qml_components_dir(package_file=__file__)
     engine.addImportPath(str(qml_dir.parent))
     qml_file = qml_dir / "Main.qml"
     engine.load(str(qml_file))
     if not engine.rootObjects():
-        print("CRITICAL: Failed to load QML root objects!")
+        logger.error("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
     capture_event("app_opened")
     if HAS_PYWINSTYLES:
@@ -574,7 +593,7 @@ def main():  # pragma: no cover
                     ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4)
                     ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4)
                 except Exception as e:
-                    print(f"Failed to apply native style: {e}")
+                    logger.error(f"Failed to apply native style: {e}")
         QTimer.singleShot(500, apply_native_styles)
     sys.exit(app.exec())
 
