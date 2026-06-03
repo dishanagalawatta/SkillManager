@@ -6,7 +6,7 @@ import App 1.0
 Menu {
     id: root
 
-    property alias blurRadius: frost.blurRadius
+
 
     topPadding: 6
     bottomPadding: 6
@@ -39,7 +39,6 @@ Menu {
                 id: frost
                 anchors.fill: parent
                 radius: Theme.radiusCard
-                blurRadius: 15
                 opacity: 0.9
             }
         }

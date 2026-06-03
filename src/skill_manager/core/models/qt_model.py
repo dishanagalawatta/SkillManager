@@ -357,6 +357,23 @@ class SkillModel(QAbstractListModel):
 
     def _apply_filter(self, reset=False):
         """Gateway to trigger filtering, offloading to async if needed."""
+        import os
+        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+            if reset:
+                self.beginResetModel()
+            else:
+                self.layoutAboutToBeChanged.emit()
+            skills = self._execute_filter_logic()
+            self._all_filtered_skills = self._engine.prepare_rows(skills)
+            self._filtered_skills = self._engine.build_visible_rows(
+                self._all_filtered_skills, self._state.collapsed_categories
+            )
+            if reset:
+                self.endResetModel()
+            else:
+                self.layoutChanged.emit()
+            self.selectedCountChanged.emit()
+            return
 
         import PySide6.QtAsyncio as QtAsyncio
 

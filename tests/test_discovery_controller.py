@@ -28,9 +28,10 @@ def controller(mock_app):
     return DiscoveryController(mock_app)
 
 def test_load_initial_data_success(controller, mock_app):
-    with patch("skill_manager.controllers.discovery_controller.QtAsyncio.run") as mock_run:
+    from unittest.mock import AsyncMock
+    with patch.object(controller, "_do_discovery", new_callable=AsyncMock) as mock_discovery:
         controller.loadInitialData()
-        mock_run.assert_called_once()
+        mock_discovery.assert_called_once()
 
 
 def test_finalize_loading(controller, mock_app):

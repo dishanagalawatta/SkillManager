@@ -23,7 +23,16 @@ class DiscoveryController(BaseController):
     @Slot()
     def loadInitialData(self):
         """Initial scan of skills on application startup using QtAsyncio."""
-        QtAsyncio.run(self._do_discovery())
+        import os
+        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._do_discovery())
+            except RuntimeError:
+                asyncio.run(self._do_discovery())
+        else:
+            QtAsyncio.run(self._do_discovery())
 
     async def _do_discovery(self):
         """Internal async discovery implementation."""

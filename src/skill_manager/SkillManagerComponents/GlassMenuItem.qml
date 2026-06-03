@@ -7,6 +7,7 @@ MenuItem {
     id: control
 
     property string iconText: ""
+    property string shortcut: ""
     property bool showIcon: AppController.config_controller.showMenuIcons
     property bool isCompact: AppController.config_controller.compactMenu
 

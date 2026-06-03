@@ -620,6 +620,10 @@ class AppController(QObject):
         """Ensures all pending state is saved before exit."""
         if hasattr(self, '_watcher'):
             self._watcher.stop()
+        if hasattr(self, '_scheduler') and self._scheduler.running:
+            self._scheduler.shutdown(wait=False)
+        if hasattr(self, '_update_check_timer') and self._update_check_timer.isActive():
+            self._update_check_timer.stop()
         if self.ui._save_timer.isActive():
             self.ui._save_timer.stop()
             self.ui.saveUiState()

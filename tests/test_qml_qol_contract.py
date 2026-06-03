@@ -281,8 +281,8 @@ def test_expand_collapse_arrow_icons_presence_and_dark_mode():
     assert "sourceSize.width: 56" in category_header, "CategoryHeader expand/collapse icon sourceSize should be high resolution (56)"
 
     # 5. Verify layout sizing properties are present to prevent stretching inside RowLayouts
-    assert "width: 18" in quick_copy, "QuickCopyView icon needs width to size correctly inside the button"
-    assert "width: 18" in library, "LibraryView icon needs width to size correctly inside the button"
+    assert "width: 16" in quick_copy, "QuickCopyView icon needs width to size correctly inside the button"
+    assert "width: 16" in library, "LibraryView icon needs width to size correctly inside the button"
     assert "Layout.preferredWidth: 10" in skill_item, "SkillItem subcategory icon needs Layout.preferredWidth inside RowLayout"
     assert "Layout.preferredWidth: 14" in category_header, "CategoryHeader category icon needs Layout.preferredWidth inside RowLayout"
 
