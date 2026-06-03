@@ -189,62 +189,13 @@ Item {
             }
         }
 
-        Flow {
-            Layout.fillWidth: true
-            spacing: 8
-            visible: searchInput.text !== "" || AppController.quickCopyModel.categoryFilter !== "" || AppController.quickCopyModel.projectFilter !== ""
 
-            Repeater {
-                model: [
-                    { label: searchInput.text ? "Search: " + searchInput.text : "", clear: function() { searchInput.text = ""; AppController.quickCopyModel.filterText = "" } },
-                    { label: AppController.quickCopyModel.projectFilter ? "Project: " + AppController.quickCopyModel.projectFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("QuickCopy", "project", "") } },
-                    { label: AppController.quickCopyModel.categoryFilter ? "Category: " + AppController.quickCopyModel.categoryFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("QuickCopy", "category", "") } }
-                ].filter((item) => item.label !== "")
-
-                delegate: Rectangle {
-                    height: 28
-                    width: chipLabel.implicitWidth + 34
-                    radius: Theme.radiusPill
-                    color: Theme.glassPill
-                    border.color: Theme.glassBorder
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 8
-                        spacing: 6
-                        Text {
-                            id: chipLabel
-                            text: modelData.label
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            color: Theme.secondaryLabel
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            text: "x"
-                            font.pixelSize: 13
-                            color: Theme.accent
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: modelData.clear()
-                        Accessible.role: Accessible.Button
-                        Accessible.name: "Clear recent search: " + (modelData && modelData.label ? modelData.label : "")
-                    }
-                }
-            }
-        }
 
         // Selection Action Bar
         Rectangle {
             id: selectionBar
             Layout.fillWidth: true
-            Layout.preferredHeight: 64
+            Layout.preferredHeight: 48
             visible: true
             color: Theme.alpha(Theme.accent, 0.06) // Subtle accent background
             radius: Theme.radiusCard
@@ -255,12 +206,15 @@ Item {
             RowLayout {
                 id: qcv_selectionLayout
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 8
+                anchors.bottomMargin: 8
                 spacing: 12
                 // LEFT: Toggle All
                 IconButton {
                     id: qcv_toggleAllBtn
-                    buttonSize: 32
+                    buttonSize: 28
                     role: "ghost"
                     tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
@@ -268,8 +222,8 @@ Item {
                         source: AppController.quickCopyModel.isAllExpanded ?
                                 AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
                                 AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
-                        width: 18
-                        height: 18
+                        width: 16
+                        height: 16
                         sourceSize.width: 72
                         sourceSize.height: 72
                         fillMode: Image.PreserveAspectFit
@@ -281,7 +235,7 @@ Item {
 
                 Rectangle {
                     width: 1
-                    height: 20
+                    height: 16
                     color: Theme.separator
                     Layout.leftMargin: 4
                     Layout.rightMargin: 4
@@ -294,8 +248,8 @@ Item {
                     visible: AppController.quickCopyModel.selectedCount > 0
                     
                     Rectangle {
-                        width: 28
-                        height: 28
+                        width: 24
+                        height: 24
                         radius: Theme.radiusPill
                         color: Theme.accent
                         Text {
@@ -304,14 +258,14 @@ Item {
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                         }
                     }
 
                     Text {
                         text: "Skills selected"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 13
+                        font.pixelSize: 12
                         color: Theme.label
                         font.weight: Font.Medium
                     }
@@ -331,6 +285,7 @@ Item {
 
                         ActionButton {
                             id: barAddCommandBtn
+                            buttonHeight: 32
                             labelText: "Add Command"
                             iconText: "+"
                             role: "secondary"
@@ -339,6 +294,7 @@ Item {
 
                         ActionButton {
                             id: barSelectAllBtn
+                            buttonHeight: 32
                             labelText: "Select All"
                             role: "secondary"
                             visible: AppController.quickCopyModel.selectedCount < AppController.quickCopyModel.rowCount()
@@ -352,6 +308,7 @@ Item {
                             
                             ActionButton {
                                 id: barClearBtn
+                                buttonHeight: 32
                                 labelText: "Clear Selection"
                                 role: "secondary"
                                 onClicked: (mouse) => AppController.quickCopyModel.clearSelection()
@@ -359,7 +316,7 @@ Item {
 
                             Rectangle {
                                 width: 1
-                                height: 20
+                                height: 16
                                 color: Theme.separator
                                 Layout.leftMargin: 4
                                 Layout.rightMargin: 4
@@ -367,6 +324,7 @@ Item {
 
                             ActionButton {
                                 id: barAddToColBtn
+                                buttonHeight: 32
                                 labelText: "Add to Collection"
                                 role: "secondary"
                                 onClicked: (mouse) => {
@@ -377,6 +335,7 @@ Item {
 
                             ActionButton {
                                 id: barDeleteBtn
+                                buttonHeight: 32
                                 objectName: "quickCopyDeleteSelectedBtn"
                                 labelText: "Delete Selected"
                                 iconText: "🗑️"
@@ -387,7 +346,7 @@ Item {
                             Rectangle {
                                 objectName: "quickCopyDestructiveDivider"
                                 width: 1
-                                height: 20
+                                height: 16
                                 color: Theme.separator
                                 Layout.leftMargin: 4
                                 Layout.rightMargin: 4
@@ -395,6 +354,7 @@ Item {
 
                             ActionButton {
                                 id: barCopyBtn
+                                buttonHeight: 32
                                 objectName: "copySelectedBtn"
                                 labelText: "Copy Selected"
                                 role: "primary"
@@ -410,7 +370,7 @@ Item {
 
                         TextField {
                             id: qcv_colNameField
-                            Layout.preferredHeight: 36
+                            Layout.preferredHeight: 32
                             Layout.preferredWidth: 200
                             placeholderText: "Collection Name"
                             Accessible.role: Accessible.EditableText
@@ -428,7 +388,7 @@ Item {
 
                         IconButton {
                             id: qcv_saveColBtn
-                            buttonSize: 36
+                            buttonSize: 32
                             iconSize: 12
                             iconText: "Save"
                             role: "primary"
@@ -454,7 +414,7 @@ Item {
 
                         IconButton {
                             id: qcv_cancelColBtn
-                            buttonSize: 36
+                            buttonSize: 32
                             iconSize: 10
                             iconText: "Cancel"
                             role: "destructive"

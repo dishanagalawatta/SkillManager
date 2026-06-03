@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 import sys
@@ -36,6 +37,19 @@ os.environ.setdefault(
     "SKILL_MANAGER_DATA_DIR",
     str(Path(tempfile.gettempdir()) / f"skillmanager-pytest-{uuid.uuid4().hex}" / "data"),
 )
+
+# Monkeypatch os.unlink to workaround Python 3.14 + Pytest issue with Windows junctions
+_original_os_unlink = os.unlink
+def _safe_os_unlink(path, *args, **kwargs):
+    try:
+        _original_os_unlink(path, *args, **kwargs)
+    except PermissionError as e:
+        if "pytest-current" in str(path):
+            with contextlib.suppress(Exception):
+                os.rmdir(path)
+            return
+        raise e
+os.unlink = _safe_os_unlink
 
 @pytest.fixture(scope="session")
 def qapp_cls():

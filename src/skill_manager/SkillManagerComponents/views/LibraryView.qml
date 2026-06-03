@@ -84,61 +84,13 @@ Item {
 
         }
 
-        Flow {
-            Layout.fillWidth: true
-            spacing: 8
-            visible: lv_searchInput.text !== "" || AppController.libraryModel.categoryFilter !== ""
 
-            Repeater {
-                model: [
-                    { label: lv_searchInput.text ? "Search: " + lv_searchInput.text : "", clear: function() { lv_searchInput.text = ""; AppController.libraryModel.filterText = "" } },
-                    { label: AppController.libraryModel.categoryFilter ? "Category: " + AppController.libraryModel.categoryFilter : "", clear: function() { AppController.ui_controller.setViewFilterForView("Library", "category", "") } }
-                ].filter((item) => item.label !== "")
-
-                delegate: Rectangle {
-                    height: 28
-                    width: chipLabel.implicitWidth + 34
-                    radius: Theme.radiusPill
-                    color: Theme.glassPill
-                    border.color: Theme.glassBorder
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 8
-                        spacing: 6
-                        Text {
-                            id: chipLabel
-                            text: modelData.label
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            color: Theme.secondaryLabel
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            text: "x"
-                            font.pixelSize: 13
-                            color: Theme.accent
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: modelData.clear()
-                        Accessible.role: Accessible.Button
-                        Accessible.name: "Clear recent search: " + (modelData && modelData.label ? modelData.label : "")
-                    }
-                }
-            }
-        }
         
         // Multi-select Action Bar
         Rectangle {
             id: selectionBar
             Layout.fillWidth: true
-            Layout.preferredHeight: 64
+            Layout.preferredHeight: 48
             Layout.leftMargin: 4
             Layout.rightMargin: 4
             visible: true
@@ -151,12 +103,15 @@ Item {
             RowLayout {
                 id: lv_selectionLayout
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 8
+                anchors.bottomMargin: 8
                 spacing: 12
                 // LEFT: Toggle All
                 IconButton {
                     id: lv_toggleAllBtn
-                    buttonSize: 32
+                    buttonSize: 28
                     role: "ghost"
                     tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.libraryModel.toggleAll()
@@ -164,8 +119,8 @@ Item {
                         source: AppController.libraryModel.isAllExpanded ?
                                 AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
                                 AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
-                        width: 18
-                        height: 18
+                        width: 16
+                        height: 16
                         sourceSize.width: 72
                         sourceSize.height: 72
                         fillMode: Image.PreserveAspectFit
@@ -177,7 +132,7 @@ Item {
 
                 Rectangle {
                     width: 1
-                    height: 20
+                    height: 16
                     color: Theme.separator
                     Layout.leftMargin: 4
                     Layout.rightMargin: 4
@@ -189,8 +144,8 @@ Item {
                     visible: AppController.libraryModel.selectedCount > 0
                     
                     Rectangle {
-                        width: 28
-                        height: 28
+                        width: 24
+                        height: 24
                         radius: Theme.radiusPill
                         color: Theme.accent
                         Text {
@@ -199,14 +154,14 @@ Item {
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                         }
                     }
 
                     Text {
                         text: "Skills selected"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 13
+                        font.pixelSize: 12
                         color: Theme.label
                         font.weight: Font.Medium
                     }
@@ -221,6 +176,7 @@ Item {
                     // Always Visible Actions
                     ActionButton {
                         id: lv_addCommandBtn
+                        buttonHeight: 32
                         labelText: "Add"
                         iconText: "+"
                         role: "secondary"
@@ -229,6 +185,7 @@ Item {
 
                     ActionButton {
                         id: lv_selectAllBtn
+                        buttonHeight: 32
                         labelText: "Select All"
                         role: "secondary"
                         visible: AppController.libraryModel.selectedCount < AppController.libraryModel.rowCount()
@@ -242,6 +199,7 @@ Item {
                         
                         ActionButton {
                             id: lv_clearBtn
+                            buttonHeight: 32
                             labelText: "Clear"
                             role: "secondary"
                             onClicked: (mouse) => AppController.libraryModel.clearSelection()
@@ -249,7 +207,7 @@ Item {
 
                         Rectangle {
                             width: 1
-                            height: 20
+                            height: 16
                             color: Theme.separator
                             Layout.leftMargin: 4
                             Layout.rightMargin: 4
@@ -257,7 +215,7 @@ Item {
 
                         GlassDropdown {
                             id: lv_projectDrop
-                            Layout.preferredHeight: 36
+                            Layout.preferredHeight: 32
                             Layout.preferredWidth: 160
                             model: AppController.projectLabels
                             enabled: AppController.projects.length > 0
@@ -265,6 +223,7 @@ Item {
                         
                         ActionButton {
                             id: lv_tempCopyBtn
+                            buttonHeight: 32
                             labelText: "Copy Temp"
                             role: "secondary"
                             enabled: AppController.projects.length > 0
@@ -279,6 +238,7 @@ Item {
 
                         ActionButton {
                             id: lv_archiveBtn
+                            buttonHeight: 32
                             labelText: "Archive"
                             iconText: "📦"
                             role: "secondary"
@@ -287,6 +247,7 @@ Item {
 
                         ActionButton {
                             id: lv_deleteBtn
+                            buttonHeight: 32
                             labelText: "Delete"
                             iconText: "🗑️"
                             role: "destructive"
@@ -296,7 +257,7 @@ Item {
                         Rectangle {
                             objectName: "libraryDestructiveDivider"
                             width: 1
-                            height: 20
+                            height: 16
                             color: Theme.separator
                             Layout.leftMargin: 4
                             Layout.rightMargin: 4
@@ -304,6 +265,7 @@ Item {
 
                         ActionButton {
                             id: lv_copyBtn
+                            buttonHeight: 32
                             labelText: "Copy to Project"
                             role: "primary"
                             enabled: AppController.projects.length > 0
