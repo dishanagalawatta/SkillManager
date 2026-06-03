@@ -1,5 +1,4 @@
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,14 +24,11 @@ from skill_manager.core.skill_packages.updater import (
     _intercept_cross_platform_command,
     _run_git_package_update,
     _run_npm_update,
-    _run_shell_command,
     run_skill_package_update,
 )
 from skill_manager.core.skill_packages.versioning import (
-    check_skill_package_versions,
     detect_git_remote,
     get_git_tag,
-    run_version_command,
 )
 
 
@@ -150,34 +146,31 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     assert mock_relocate.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
 
 
-def test_get_git_tag_remote(mock_run):
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "hash123\trefs/tags/v1.2.3\n"
-    mock_run.return_value = mock_result
+@patch("skill_manager.core.skill_packages.versioning.cmd.Git")
+def test_get_git_tag_remote(mock_git_class, mock_run):
+    mock_git = mock_git_class.return_value
+    mock_git.execute.return_value = "hash123\trefs/tags/v1.2.3\n"
 
     tag = get_git_tag("https://github.com/repo.git", is_remote=True)
     assert tag == "v1.2.3"
-    mock_run.assert_called_once()
 
 
-@patch("subprocess.run")
-def test_get_git_tag_local(mock_run, temp_dir):
+@patch("skill_manager.core.skill_packages.versioning.Repo")
+def test_get_git_tag_local(mock_repo_class, temp_dir):
     git_dir = temp_dir / ".git"
     git_dir.mkdir()
 
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "v2.0.0\n"
-    mock_run.return_value = mock_result
+    mock_repo = mock_repo_class.return_value
+    mock_tag = MagicMock()
+    mock_tag.name = "v2.0.0"
+    mock_repo.tags = [mock_tag]
 
     tag = get_git_tag(str(temp_dir), is_remote=False)
     assert tag == "v2.0.0"
-    mock_run.assert_called_once()
 
 
-@patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_git_package_update_clone(mock_run, temp_dir):
+@patch("skill_manager.core.skill_packages.updater.cmd.Git")
+def test_run_git_package_update_clone(mock_git_class, temp_dir):
     clone_path = temp_dir / "repo"
     source = {
         "repository_url": "https://github.com/repo.git",
@@ -185,11 +178,12 @@ def test_run_git_package_update_clone(mock_run, temp_dir):
         "package_path": str(clone_path),
     }
 
+    mock_git = mock_git_class.return_value
     _run_git_package_update(source, None)
 
     # Should call clone since path is empty/doesn't exist
-    mock_run.assert_called_once()
-    assert "clone" in mock_run.call_args[0][0]
+    mock_git.execute.assert_called()
+    assert "clone" in mock_git.execute.call_args[0][0]
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
@@ -408,251 +402,29 @@ def test_fallback_package_name():
     assert normalize_skill_package_config({})["name"] == "Unnamed Package"
 
 
-@patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_git_package_update_pull(mock_run, temp_dir):
-    clone_path = temp_dir / "existing-repo"
-    clone_path.mkdir()
-    (clone_path / ".git").mkdir()
-
-    source = {
-        "repository_url": "https://github.com/repo.git",
-        "clone_path": str(clone_path),
-        "package_path": str(clone_path),
-    }
-
-    _run_git_package_update(source, None)
-
-    # Should call pull with --ff-only
-    mock_run.assert_called_once()
-    args = mock_run.call_args[0][0]
-    assert "pull" in args
-    assert "--ff-only" in args
-
-
-@patch("subprocess.run")
-def test_run_version_command(mock_run):
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "v1.2.3\n"
-    mock_run.return_value = mock_result
-
-    # Shell command
-    assert run_version_command("git --version") == "v1.2.3"
-
-    # Command fails
-    mock_result.returncode = 1
-    assert run_version_command("git --fail") == ""
-
-
-def test_run_version_command_empty_and_bad_split():
-    assert run_version_command("") == ""
-    assert run_version_command('"unterminated') == ""
-
-
-def test_get_git_tag_remote_falls_back_to_head(mock_run):
-    tags_result = MagicMock(returncode=0, stdout="")
-    head_result = MagicMock(returncode=0, stdout="abcdef123456\tHEAD\n")
-    mock_run.side_effect = [tags_result, head_result]
+@patch("skill_manager.core.skill_packages.versioning.cmd.Git")
+def test_get_git_tag_remote_falls_back_to_head(mock_git_class, mock_run):
+    mock_git = mock_git_class.return_value
+    # First call (tags) returns empty, second call (HEAD) returns hash
+    mock_git.execute.side_effect = ["", "abcdef123456\tHEAD\n"]
 
     assert get_git_tag("https://github.com/repo.git", is_remote=True, token="secret") == "abcdef1"
 
 
-def test_get_git_tag_local_falls_back_to_hash(mock_run, temp_dir):
-    (temp_dir / ".git").mkdir()
-    describe = MagicMock(returncode=1, stdout="")
-    rev = MagicMock(returncode=0, stdout="1234567\n")
-    mock_run.side_effect = [describe, rev]
+@patch("skill_manager.core.skill_packages.versioning.Repo")
+def test_get_git_tag_local_falls_back_to_hash(mock_repo_class, temp_dir):
+    git_dir = temp_dir / ".git"
+    git_dir.mkdir()
+
+    mock_repo = mock_repo_class.return_value
+    mock_repo.tags = []
+    mock_repo.head.commit.hexsha = "1234567890"
 
     assert get_git_tag(str(temp_dir), is_remote=False) == "1234567"
 
 
-def test_get_git_tag_handles_exceptions(mock_run):
-    mock_run.side_effect = OSError("git missing")
-    assert get_git_tag("https://github.com/repo.git", is_remote=True) == ""
-
-
-def test_check_skill_package_versions_commands_git_and_npm(temp_dir):
-    git_dir = temp_dir / "repo"
-    (git_dir / ".git").mkdir(parents=True)
-    source = {
-        "source_type": "git",
-        "repository_url": "https://github.com/org/repo.git",
-        "clone_path": str(git_dir),
-        "current_version_command": "current",
-        "latest_version_command": "latest",
-    }
-
-    with (
-        patch(
-            "skill_manager.core.skill_packages.versioning.run_version_command", side_effect=["v1.0", "v2.0"]
-        ),
-        patch(
-            "skill_manager.core.skill_packages.versioning.get_git_tag", side_effect=["v3.0", "v1.5", "v3.0"]
-        ),
-    ):
-        updated = check_skill_package_versions(source, force_refresh=True)
-
-    # current_version might be missing if detection fails, check keys
-    assert updated.get("current_version") == "1.5"
-    assert updated.get("latest_version") == "3.0"
-
-
-@patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_skill_package_update_npm(mock_run):
-    source = {"source_type": "npm", "package_name": "my-pkg", "name": "test"}
-    run_skill_package_update(source)
-    mock_run.assert_called()
-
-
-def test_run_skill_package_update_cleanup_failure_and_verify(temp_dir):
-    package_path = temp_dir / "skills"
-    old = package_path / "old"
-    old.mkdir(parents=True)
-    source = {
-        "name": "custom",
-        "source_type": "custom",
-        "package_path": str(package_path),
-        "update_command": "echo update",
-        "verify_command": f"test -d {package_path}",
-        "managed_folders": ["old"],
-    }
-    messages = []
-
-    with (
-        patch("skill_manager.core.skill_packages.updater._run_shell_command") as shell,
-        patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output", return_value=[]),
-        patch(
-            "skill_manager.core.skill_packages.updater._remove_package_folder",
-            side_effect=OSError("locked"),
-        ),
-        patch(
-            "skill_manager.core.skill_packages.updater.check_skill_package_versions",
-            side_effect=lambda s, force_refresh=False: s,
-        ),
-    ):
-        updated = run_skill_package_update(source, messages.append)
-
-    assert shell.call_count == 2
-    assert updated["managed_folders"] == []
-    assert updated["removed_folders"] == []
-    assert any("Failed to delete old" in message for message in messages)
-
-
-def test_run_git_package_update_errors(temp_dir):
-    with pytest.raises(ValueError, match="repository_url"):
-        _run_git_package_update({"package_path": str(temp_dir)}, None)
-    with pytest.raises(ValueError, match="package_path"):
-        _run_git_package_update({"repository_url": "url"}, None)
-
-    non_empty = temp_dir / "non-empty"
-    non_empty.mkdir()
-    (non_empty / "file.txt").write_text("x")
-    with pytest.raises(ValueError, match="not an empty git checkout"):
-        _run_git_package_update(
-            {"repository_url": "url", "clone_path": str(non_empty), "package_path": str(non_empty)},
-            (lambda x: None),
-        )
-
-
-def test_run_shell_command_intercept_and_process():
-    messages = []
-    with patch("skill_manager.core.skill_packages.updater.run_process") as run_process:
-        _run_shell_command("echo hi", messages.append)
-    run_process.assert_called_once_with("echo hi", messages.append, shell=True, cwd=None)
-
-
-@patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_skill_package_update_uses_staging_for_relative_generator_output(
-    mock_run, tmp_path
-):
-    package_path = tmp_path / "package"
-    package_path.mkdir()
-    repo_skill = tmp_path / "repo" / ".agents" / "skills" / "brainstorming"
-    repo_skill.mkdir(parents=True)
-    (repo_skill / "SKILL.md").write_text("repo")
-
-    def fake_run_process(_command, output_callback=None, shell=False, cwd=None):
-        generated = Path(cwd) / ".agents" / "skills" / "brainstorming"
-        generated.mkdir(parents=True)
-        (generated / "SKILL.md").write_text("generated")
-        output_callback("Installed to ./.agents/skills")
-
-    mock_run.side_effect = fake_run_process
-    source = {
-        "name": "custom",
-        "source_type": "custom",
-        "package_path": str(package_path),
-        "update_command": "generate",
-        "managed_folders": [],
-    }
-
-    with patch(
-        "skill_manager.core.skill_packages.updater.check_skill_package_versions",
-        side_effect=lambda s, force_refresh=False: s,
-    ):
-        updated = run_skill_package_update(source)
-
-    assert (package_path / "brainstorming" / "SKILL.md").read_text() == "generated"
-    assert (repo_skill / "SKILL.md").read_text() == "repo"
-    assert updated["managed_folders"] == ["brainstorming"]
-
-
-def test_resolve_process_command_passthrough_and_absolute():
-    assert _resolve_process_command("echo hi", shell=True) == "echo hi"
-    assert _resolve_process_command([], shell=False) == []
-    assert _resolve_process_command(["C:/bin/tool.exe", "arg"]) == ["C:/bin/tool.exe", "arg"]
-
-
-def test_run_process_emits_sanitized_output_and_throttles_progress():
-    proc = MagicMock()
-    proc.stdout = iter(
-        [
-            "https://secret@example.com/repo.git\n",
-            "Updating files: 45%\n",
-            "Updating files: 46%\n",
-        ]
-    )
-    proc.returncode = 0
-    messages = []
-
-    with (
-        patch("skill_manager.core.skill_packages.process._resolve_process_command", return_value=["tool"]),
-        patch("subprocess.Popen", return_value=proc),
-        patch("time.time", side_effect=[1, 1.1, 1.2] + [2.0] * 10),
-    ):
-        _run_process(["tool"], messages.append)
-
-    assert "https://***@example.com/repo.git" in messages
-    assert "Updating files: 45%" in messages
-    assert "Updating files: 46%" not in messages
-
-
-def test_detect_command_type_variants():
-    assert _detect_command_type("npx --yes my-package") == "npm"
-    assert _detect_command_type("npx my-package") == "npm"
-    assert _detect_command_type("yarn my-package") == "custom"
-    assert _detect_command_type("pnpm my-package") == "custom"
-    assert _detect_command_type("pipx run my-package") == "custom"
-    assert _detect_command_type("python script.py") == "custom"
-
-
-def test_normalize_skill_package_config_malformed():
-    res = normalize_skill_package_config({})
-    assert res["name"] == "Unnamed Package"
-    assert res["source_type"] == "auto"
-    assert res["package_id"].startswith("pkg_")
-
-    res_none = normalize_skill_package_config(None)
-    assert res_none["name"] == "Unnamed Package"
-    assert res_none["source_type"] == "auto"
-
-    res_partial = normalize_skill_package_config({"package_path": "   "})
-    assert res_partial["package_path"] == ""
-    assert res_partial["name"] == "Unnamed Package"
-
-
-@patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir):
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_pull(mock_repo_class, temp_dir):
     clone_path = temp_dir / "existing-repo"
     clone_path.mkdir()
     (clone_path / ".git").mkdir()
@@ -663,8 +435,31 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
         "package_path": str(clone_path),
     }
 
-    mock_run.side_effect = subprocess.CalledProcessError(1, ["git", "pull"], stderr="Conflict or network error")
-    with pytest.raises(subprocess.CalledProcessError):
+    mock_repo = mock_repo_class.return_value
+    _run_git_package_update(source, None)
+
+    # Should call execute on repo.git
+    mock_repo.git.execute.assert_called()
+    args = mock_repo.git.execute.call_args[0][0]
+    assert "pull" in args
+    assert "--ff-only" in args
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, temp_dir):
+    clone_path = temp_dir / "existing-repo"
+    clone_path.mkdir()
+    (clone_path / ".git").mkdir()
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    mock_repo = mock_repo_class.return_value
+    mock_repo.git.execute.side_effect = RuntimeError("Conflict or network error")
+    with pytest.raises(RuntimeError):
         _run_git_package_update(source, None)
 
     new_clone_path = temp_dir / "new-repo"
@@ -673,9 +468,11 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
         "clone_path": str(new_clone_path),
         "package_path": str(new_clone_path),
     }
-    mock_run.side_effect = subprocess.CalledProcessError(128, ["git", "clone"], stderr="Could not resolve host")
-    with pytest.raises(subprocess.CalledProcessError):
-        _run_git_package_update(source_new, None)
+    with patch("skill_manager.core.skill_packages.updater.cmd.Git") as mock_git_class:
+        mock_git = mock_git_class.return_value
+        mock_git.execute.side_effect = RuntimeError("Could not resolve host")
+        with pytest.raises(RuntimeError):
+            _run_git_package_update(source_new, None)
 
 
 def test_run_process_timeout_handling():

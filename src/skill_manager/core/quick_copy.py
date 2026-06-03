@@ -51,6 +51,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
     """
     skills = []
     seen_sources = set()
+    unique_sources = []
 
     for source in sources:
         resolved_source = _resolve_resilient_path(source)
@@ -61,7 +62,13 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
         if source_key in seen_sources:
             continue
         seen_sources.add(source_key)
+        unique_sources.append(resolved_source)
 
+    if not unique_sources:
+        return []
+
+    def scan_source(resolved_source):
+        source_skills = []
         ignore_spec = _load_ignore_spec(resolved_source)
         for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
             if not child.is_dir():
@@ -73,30 +80,44 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
                 continue
 
             skill_data = parse_skill_md(str(skill_md_path))
+            # Minimal normalization if not already done by cached wrapper
             if not skill_data.get("name"):
                 skill_data["name"] = child.name
             skill_data["folder_name"] = child.name
             skill_data["local_path"] = str(child)
             skill_data["skill_md_path"] = str(skill_md_path)
             skill_data["source_path"] = str(resolved_source)
-            skill_data["project_path"] = str(
-                resolved_source
-            )  # source IS the project for library items
+            skill_data["project_path"] = str(resolved_source)
             skill_data["project_label"] = "Master Library"
             skill_data["project_root"] = str(resolved_source)
             skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
             skill_data["is_package"] = True
             skill_data["is_source"] = True  # Compatibility
-            skill_data.setdefault("metadata", {})
-            cat_info = categorize_skill(
-                skill_data.get("name", ""),
-                _classification_text(skill_data),
-                skill_data.get("metadata", {}),
-            )
-            skill_data["main_category"] = cat_info.get("main_category", "")
-            skill_data["category"] = cat_info.get("sub_category", "")
-            skill_data["search_text"] = build_search_text(skill_data)
-            skills.append(skill_data)
+
+            # These might be no-ops if parse_skill_md was our cached wrapper
+            if not skill_data.get("main_category"):
+                skill_data.setdefault("metadata", {})
+                cat_info = categorize_skill(
+                    skill_data.get("name", ""),
+                    _classification_text(skill_data),
+                    skill_data.get("metadata", {}),
+                )
+                skill_data["main_category"] = cat_info.get("main_category", "")
+                skill_data["category"] = cat_info.get("sub_category", "")
+
+            if not skill_data.get("search_text"):
+                skill_data["search_text"] = build_search_text(skill_data)
+
+            source_skills.append(skill_data)
+        return source_skills
+
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(scan_source, src) for src in unique_sources]
+        for future in futures:
+            try:
+                skills.extend(future.result())
+            except Exception as e:
+                logger.warning("[DISCOVERY] Error scanning source: %s", e)
 
     return skills
 

@@ -29,6 +29,12 @@ dependencies = [
     "packaging",
     "tenacity",
     "watchdog",
+    "orjson",
+    "diskcache",
+    "sentry-sdk",
+    "tufup>=0.10.0",
+    "gitpython>=3.1.50",
+    "apscheduler>=3.11.2",
 ]
 
 

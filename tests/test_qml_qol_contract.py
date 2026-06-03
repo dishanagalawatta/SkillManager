@@ -117,7 +117,7 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
 
     assert 'text: model ? model.name : ""' in skill_item
     assert 'model.project + " • " + model.category' not in skill_item
-    assert "root.compactRows ? 42 : 54" in skill_item
+    assert "root.compactRows ? 32 : 54" in skill_item
     assert "delegate: SkillItem" in quick_copy
     assert "delegate: SkillItem" in library
 

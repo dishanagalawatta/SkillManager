@@ -21,7 +21,12 @@ Rectangle {
 
     function cleanBodyContent(content) {
         if (!content) return "";
-        let lines = content.split('\n');
+        
+        // 1. Remove YAML frontmatter if present (between first pair of ---)
+        let cleaned = content.replace(/^---[\s\S]*?---/, '');
+        
+        // 2. Remove common metadata prefixes and the skill name header
+        let lines = cleaned.split('\n');
         let result = [];
         let skipPrefixes = ["Name:", "Description:", "Risk:", "Source:", "Date:", "date_added:"];
         
@@ -41,11 +46,14 @@ Rectangle {
             }
             if (shouldSkip) continue;
             
-            // Skip the name header if it matches root.skill.name
-            if (trimmed === "# " + root.skill.name || trimmed === "## " + root.skill.name) continue;
+            // Skip the name header if it matches root.skill.name (case insensitive, allowing for markdown headers)
+            let headerMatch = trimmed.replace(/^#+\s+/, '').trim().toLowerCase();
+            if (headerMatch === (root.skill.name || "").toLowerCase()) continue;
             
             result.push(line);
         }
+        
+        // 3. Join and trim leading/trailing whitespace/newlines
         return result.join('\n').trim();
     }
 
@@ -56,7 +64,7 @@ Rectangle {
     border.color: Theme.glassBorder
     clip: true // Ensure content doesn't bleed out when collapsed
     
-    ScrollView {
+    SmoothScrollView {
         id: mainScroll
         anchors.fill: parent
         anchors.margins: 4
@@ -77,14 +85,17 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
-                Text {
+                TextEdit {
                     text: root.skill.name || "No Selection"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
                     color: Theme.label
                     Layout.fillWidth: true
-                    elide: Text.ElideRight
+                    readOnly: true
+                    selectByMouse: true
+                    cursorVisible: false
+                    wrapMode: TextEdit.Wrap
                 }
                 IconButton {
                     id: starButton
@@ -159,14 +170,17 @@ Rectangle {
                             { label: "Date", value: root.skill.date || "Unknown" }
                         ] : []
                         
-                        Text {
+                        TextEdit {
                             text: "<b>" + modelData.label + ":</b> " + modelData.value
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.sizeCaption
                             color: Theme.secondaryLabel
                             Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            textFormat: Text.StyledText
+                            readOnly: true
+                            selectByMouse: true
+                            cursorVisible: false
+                            wrapMode: TextEdit.Wrap
+                            textFormat: TextEdit.RichText
                         }
                     }
                 }
@@ -187,13 +201,16 @@ Rectangle {
                     opacity: 0.8
                 }
                 
-                Text {
+                TextEdit {
                     text: root.skill.description || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
                     color: Theme.label
-                    wrapMode: Text.Wrap
+                    wrapMode: TextEdit.Wrap
                     Layout.fillWidth: true
+                    readOnly: true
+                    selectByMouse: true
+                    cursorVisible: false
                 }
             }
 
@@ -275,15 +292,14 @@ Rectangle {
                 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 300
-                    Layout.fillHeight: true
+                    Layout.preferredHeight: 400
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
                     border.color: Theme.glassBorder
                     border.width: 1
                     clip: true
 
-                    ScrollView {
+                    SmoothScrollView {
                         id: rawContentScroll
                         anchors.fill: parent
                         anchors.margins: 2
@@ -292,13 +308,14 @@ Rectangle {
                         
                         ScrollBar.vertical: ScrollBar {
                             id: vScroll
-                            active: true
                             width: 6
                             contentItem: Rectangle {
                                 implicitWidth: 6
                                 radius: 3
                                 color: Theme.secondaryLabel
-                                opacity: vScroll.hovered ? 0.8 : 0.4
+                                opacity: vScroll.active ? (vScroll.hovered ? 0.8 : 0.4) : 0
+                                
+                                Behavior on opacity { NumberAnimation { duration: 200 } }
                             }
                         }
 
@@ -314,11 +331,12 @@ Rectangle {
                             wrapMode: TextEdit.Wrap
                             readOnly: true
                             selectByMouse: true
+                            cursorVisible: false
                             background: null
                             padding: 12
                             
                             // Ensure text is correctly aligned
-                            verticalAlignment: Text.AlignTop
+                            verticalAlignment: TextArea.AlignTop
                         }
                     }
                 }

@@ -98,7 +98,7 @@ ComboBox {
         padding: 5
         implicitHeight: Math.min(dropdownList.contentHeight + 10, 250)
 
-        contentItem: ListView {
+        contentItem: SmoothListView {
             id: dropdownList
             clip: true
             model: control.delegateModel

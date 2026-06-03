@@ -1,32 +1,64 @@
 """
-Purpose: Checks for application updates from GitHub Releases.
+Purpose: Checks for application updates from GitHub Pages (TUF repository) using tufup.
 """
 
 import asyncio
-import json
 import logging
+import sys
+from pathlib import Path
 
-import httpx
-from packaging.version import parse as parse_version
 from PySide6.QtCore import Property, Signal, Slot
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tufup.client import Client
 
 import skill_manager
 from skill_manager.controllers.base import BaseController
+from skill_manager.core.config import get_app_data_dir
 
 logger = logging.getLogger(__name__)
+
+# TUF Repository Configuration
+# These will be hosted on GitHub Pages
+TUF_METADATA_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
+TUF_TARGETS_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
 
 
 class AppUpdateController(BaseController):
     updateAvailableChanged = Signal()
     latestVersionChanged = Signal()
     downloadUrlChanged = Signal()
+    isUpdatingChanged = Signal()
+    updateProgressChanged = Signal(float)
 
     def __init__(self, app):
         super().__init__(app)
         self._update_available = False
         self._latest_version = ""
         self._download_url = "https://github.com/dishanagalawatta/SkillManager/releases/latest"
+        self._is_updating = False
+        self._update_progress = 0.0
+
+        # tufup Client initialization
+        # Use the app data directory for TUF metadata storage
+        self._tuf_dir = get_app_data_dir() / "tuf"
+        self._tuf_dir.mkdir(parents=True, exist_ok=True)
+        self._target_dir = get_app_data_dir() / "updates"
+        self._target_dir.mkdir(parents=True, exist_ok=True)
+
+        # In a real app, the public key should be embedded
+        # For now, we'll assume it's in the app bundle or handled by the publish script
+        try:
+            self._client = Client(
+                app_name="SkillManager",
+                app_install_dir=str(Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()),
+                current_version=skill_manager.__version__,
+                metadata_base_url=TUF_METADATA_URL,
+                target_base_url=TUF_TARGETS_URL,
+                metadata_dir=str(self._tuf_dir),
+                target_dir=str(self._target_dir),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize TUF client (updates will be unavailable): {e}")
+            self._client = None
 
     @Property(bool, notify=updateAvailableChanged)
     def updateAvailable(self):
@@ -40,55 +72,80 @@ class AppUpdateController(BaseController):
     def downloadUrl(self):
         return self._download_url
 
+    @Property(bool, notify=isUpdatingChanged)
+    def isUpdating(self):
+        return self._is_updating
+
+    @Property(float, notify=updateProgressChanged)
+    def updateProgress(self):
+        return self._update_progress
+
     @Slot()
     def checkForUpdates(self):
-        asyncio.create_task(self._fetch_latest_release())
-
-    async def _fetch_latest_release(self):
-        url = "https://api.github.com/repos/dishanagalawatta/SkillManager/releases/latest"
-        try:
-            data = await self._get_release_json(url)
-            result = {
-                "version": data.get("tag_name", "").lstrip("v"),
-                "url": data.get("html_url", "")
-            }
-            self._on_release_fetched(result)
-        except Exception as e:
-            logger.warning("Failed to check for app updates: %s", e)
-
-    @retry(
-        retry=retry_if_exception_type((httpx.HTTPError, json.JSONDecodeError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=0.2, max=2),
-        reraise=True,
-    )
-    async def _get_release_json(self, url: str) -> dict:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(5.0),
-            headers={"User-Agent": "SkillManager-AppUpdateChecker"},
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
-
-    def _on_release_fetched(self, result):
-        if not result:
+        """Checks for updates asynchronously using tufup."""
+        if self._is_updating:
             return
+        asyncio.create_task(self._check_tuf_updates())
 
-        latest_ver_str = result["version"]
-        download_url = result["url"]
-
+    async def _check_tuf_updates(self):
+        if not self._client:
+            return
         try:
-            current_ver = parse_version(skill_manager.__version__)
-            latest_ver = parse_version(latest_ver_str)
+            # Running synchronous tufup calls in a thread pool to avoid blocking
+            loop = asyncio.get_running_loop()
+            new_version = await loop.run_in_executor(None, self._client.check_for_updates)
 
-            if latest_ver > current_ver:
-                self._latest_version = latest_ver_str
-                self._download_url = download_url
+            if new_version:
+                logger.info(f"Update available: {new_version}")
+                self._latest_version = str(new_version)
                 self._update_available = True
                 self.updateAvailableChanged.emit()
                 self.latestVersionChanged.emit()
-                self.downloadUrlChanged.emit()
+            else:
+                logger.info("No updates available.")
+                self._update_available = False
+                self.updateAvailableChanged.emit()
+
         except Exception as e:
-            logger.warning("Error parsing versions: %s", e)
+            logger.warning("Failed to check for app updates via tufup: %s", e)
+
+    @Slot()
+    def downloadAndApplyUpdate(self):
+        """Downloads and applies the update."""
+        if not self._client or self._is_updating or not self._update_available:
+            return
+        self._is_updating = True
+        self.isUpdatingChanged.emit()
+        asyncio.create_task(self._apply_update())
+
+    async def _apply_update(self):
+        try:
+            loop = asyncio.get_running_loop()
+
+            def progress_hook(bytes_downloaded, total_bytes):
+                if total_bytes > 0:
+                    self._update_progress = bytes_downloaded / total_bytes
+                    self.updateProgressChanged.emit(self._update_progress)
+
+            # Download updates
+            success = await loop.run_in_executor(
+                None,
+                lambda: self._client.download_and_apply_update(
+                    progress_hook=progress_hook,
+                    # For Windows, we might need a custom install script if file is in use
+                )
+            )
+
+            if success:
+                logger.info("Update applied successfully. Application should be restarted.")
+                self.app._set_status("Update applied. Please restart SkillManager.")
+            else:
+                logger.warning("Update failed or was cancelled.")
+                self.app._set_status("Update failed.")
+
+        except Exception as e:
+            logger.error("Failed to apply update: %s", e)
+            self.app._set_status(f"Update error: {e}")
+        finally:
+            self._is_updating = False
+            self.isUpdatingChanged.emit()

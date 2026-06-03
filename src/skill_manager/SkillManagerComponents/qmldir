@@ -10,12 +10,16 @@ GlassSearchInput 1.0 GlassSearchInput.qml
 SkillItem 1.0 SkillItem.qml
 SkillInspector 1.0 SkillInspector.qml
 FilterPill 1.0 FilterPill.qml
+GlassMenu 1.0 GlassMenu.qml
+GlassMenuItem 1.0 GlassMenuItem.qml
 GlassDropdown 1.0 GlassDropdown.qml
 GlassToggleButton 1.0 GlassToggleButton.qml
 ActionButton 1.0 ActionButton.qml
 IconButton 1.0 IconButton.qml
 CustomTitleBar 1.0 CustomTitleBar.qml
 FrostOverlay 1.0 FrostOverlay.qml
+SmoothListView 1.0 SmoothListView.qml
+SmoothScrollView 1.0 SmoothScrollView.qml
 ShortcutsSettings 1.0 views/ShortcutsSettings.qml
 KeySequenceCapture 1.0 KeySequenceCapture.qml
 

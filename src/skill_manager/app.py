@@ -8,10 +8,20 @@ import logging
 import os
 import sys
 
+import sentry_sdk
+from apscheduler.schedulers.qt import QtScheduler
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
+
+try:
+    from sentry_sdk.integrations.pyside6 import PySide6Integration
+    HAS_SENTRY_PYSIDE6 = True
+except ImportError:
+    HAS_SENTRY_PYSIDE6 = False
+
+import skill_manager
 
 # Try to import pywinstyles for Mica/Acrylic
 try:
@@ -86,6 +96,11 @@ class AppController(QObject):
     defaultProjectFilterChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
+    autoCheckUpdatesChanged = Signal()
+    autoDownloadUpdatesChanged = Signal()
+    updateCheckIntervalHoursChanged = Signal()
+    skillPackageAutoUpdateChanged = Signal()
+    skillPackageAutoUpdateModeChanged = Signal()
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
@@ -153,6 +168,9 @@ class AppController(QObject):
         self.config_mgr.updateProjectsChanged.connect(self.projectsChanged.emit)
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
+        self.config_mgr.autoCheckUpdatesChanged.connect(self.autoCheckUpdatesChanged.emit)
+        self.config_mgr.autoDownloadUpdatesChanged.connect(self.autoDownloadUpdatesChanged.emit)
+        self.config_mgr.updateCheckIntervalHoursChanged.connect(self.updateCheckIntervalHoursChanged.emit)
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -192,7 +210,54 @@ class AppController(QObject):
         if not skip_initial:
             self._watcher.start()
             QTimer.singleShot(100, self.loadInitialData)
-            QTimer.singleShot(500, self.app_updater.checkForUpdates)
+
+            # Application Update Checks
+            if self._config.get("auto_check_updates", True):
+                QTimer.singleShot(500, self.app_updater.checkForUpdates)
+
+            # Setup periodic check timer
+            self._update_check_timer = QTimer(self)
+            self._update_check_timer.timeout.connect(self.app_updater.checkForUpdates)
+            self._update_periodic_check()
+            self.config_mgr.autoCheckUpdatesChanged.connect(self._update_periodic_check)
+            self.config_mgr.updateCheckIntervalHoursChanged.connect(self._update_periodic_check)
+
+            # Skill Package Update Scheduler
+            self._scheduler = QtScheduler()
+            self._scheduler.start()
+
+            # Initial Startup Check
+            if self._config.get("skill_package_auto_update", True):
+                QTimer.singleShot(2000, self._run_startup_package_scan)
+
+            self.config_mgr.skillPackageAutoUpdateChanged.connect(self._update_package_scheduler)
+
+    def _run_startup_package_scan(self):
+        """Runs the initial scan for skill package updates."""
+        logger.info("Running startup skill package update scan...")
+        self.updates.scanForUpdates()
+
+        # If mode is silent, we might want to auto-update if outdated.
+        # But we need to wait for scan to complete.
+        # For now, scanForUpdates handles the logic of finding updates.
+        # We can enhance scanForUpdates completion to check for auto-update mode.
+
+    def _update_package_scheduler(self):
+        """Placeholder for periodic skill package updates if we decide to add them later."""
+        pass
+
+    def _update_periodic_check(self):
+        """Starts or stops the periodic update check timer based on config."""
+        enabled = self._config.get("auto_check_updates", True)
+        interval_hours = self._config.get("update_check_interval_hours", 24)
+
+        if enabled and interval_hours > 0:
+            interval_ms = interval_hours * 60 * 60 * 1000
+            self._update_check_timer.start(interval_ms)
+            logger.info(f"Periodic update check enabled (every {interval_hours}h)")
+        else:
+            self._update_check_timer.stop()
+            logger.info("Periodic update check disabled")
 
     # --- Gateway Properties ---
 
@@ -562,6 +627,16 @@ class AppController(QObject):
 
 
 def main():  # pragma: no cover
+    # Initialize Sentry as early as possible
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN", ""),  # Placeholder for user's DSN
+        integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        environment="production" if getattr(sys, 'frozen', False) else "development",
+        release=f"skill-manager@{skill_manager.__version__}",
+    )
+
     if sys.platform == "win32":
         # Acquire mutex so Inno Setup installer can cleanly close the app
         global _app_mutex

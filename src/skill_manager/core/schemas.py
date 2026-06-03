@@ -90,6 +90,14 @@ class AppConfig(BaseSettings):
     projects: list[str] = Field(default_factory=list)
     project_aliases: dict[str, str] = Field(default_factory=dict)
     shortcuts: dict[str, str] = Field(default_factory=dict)
+    scroll_speed_multiplier: float = 1.0
+    show_menu_icons: bool = True
+    compact_menu: bool = False
+    auto_check_updates: bool = True
+    auto_download_updates: bool = False
+    update_check_interval_hours: int = 24
+    skill_package_auto_update: bool = True
+    skill_package_auto_update_mode: str = "prompt"
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod

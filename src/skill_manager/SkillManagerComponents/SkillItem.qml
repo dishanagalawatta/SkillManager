@@ -19,7 +19,7 @@ Item {
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
 
     // Dynamic height based on visibility of sub-header and item content
-    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 42 : 54))
+    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 32 : 54))
     visible: height > 0
     clip: true
 
@@ -64,7 +64,7 @@ Item {
                     fillMode: Image.PreserveAspectFit
                     opacity: 0.5
                     horizontalAlignment: Image.AlignHCenter
-                    verticalAlignment: Image.AlignVCenter
+                    verticalAlignment: Image.AlignHCenter
                 }
                 
                 Text {
@@ -105,7 +105,7 @@ Item {
         // --- SKILL ITEM CONTENT ---
         Item {
             width: parent.width
-            height: root.compactRows ? 42 : 54
+            height: root.compactRows ? 32 : 54
             visible: !root.isMainCollapsed && !root.isSubCollapsed
 
             Rectangle {
@@ -113,8 +113,8 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 48 // Start Level 2 Background
                 anchors.rightMargin: 5
-                anchors.topMargin: root.compactRows ? 3 : 4
-                anchors.bottomMargin: root.compactRows ? 3 : 4
+                anchors.topMargin: root.compactRows ? 2 : 4
+                anchors.bottomMargin: root.compactRows ? 2 : 4
                 radius: Theme.radiusCard
                 color: root.isSelected ? (mouseArea.containsMouse ? Theme.selectedRowHover : Theme.selectedRow) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
                 border.width: (mouseArea.containsMouse || root.isSelected) ? 1 : 0
@@ -131,6 +131,7 @@ Item {
                     onClicked: (mouse) => {
                         if (mouse.button === Qt.RightButton) {
                             root.rightClicked()
+                            contextMenu.popup()
                         } else {
                             root.clicked()
                         }
@@ -142,6 +143,58 @@ Item {
                     Accessible.description: "Skill item"
                 }
 
+                GlassMenu {
+                    id: contextMenu
+                    
+                    GlassMenuItem {
+                        text: "Edit " + (model && model.isCommand ? "Command" : "Skill")
+                        iconText: "📝"
+                        onTriggered: AppController.ui_controller.selectSkill(index)
+                    }
+                    
+                    GlassMenuItem {
+                        text: "Copy Path"
+                        iconText: "📋"
+                        shortcut: AppController.config_controller.shortcutCopy
+                        onTriggered: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill()
+                    }
+                    
+                    MenuSeparator {
+                        contentItem: Rectangle {
+                            implicitWidth: 180
+                            implicitHeight: 1
+                            color: Theme.separator
+                        }
+                    }
+                    
+                    GlassMenuItem {
+                        text: model && model.isArchived ? "Unarchive" : "Archive"
+                        iconText: "📦"
+                        shortcut: AppController.config_controller.shortcutArchive
+                        onTriggered: AppController.ops_controller.archiveSelectedSkills()
+                    }
+                    
+                    GlassMenuItem {
+                        text: "Delete"
+                        iconText: "🗑️"
+                        shortcut: AppController.config_controller.shortcutDelete
+                        onTriggered: {
+                            if (model && model.path) {
+                                root.deleteRequested(model.name, model.path)
+                            }
+                        }
+                        
+                        // Override background to show danger color on hover
+                        background: Rectangle {
+                            implicitWidth: 200
+                            implicitHeight: AppController.config_controller.compactMenu ? 32 : 40
+                            color: parent.highlighted ? Theme.dangerHover : "transparent"
+                            radius: Theme.radiusSmall
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12// Level 2 Indent (Includes checkbox)
@@ -150,8 +203,8 @@ Item {
 
                     // Multi-select Checkbox
                     Rectangle {
-                        width: root.compactRows ? 18 : 20
-                        height: root.compactRows ? 18 : 20
+                        width: root.compactRows ? 16 : 20
+                        height: root.compactRows ? 16 : 20
                         radius: Theme.radiusSmall
                         color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
                         border.width: model && model.isSelected ? 0 : 1
@@ -161,7 +214,7 @@ Item {
                             anchors.centerIn: parent
                             text: "✓"
                             color: "white"
-                            font.pixelSize: root.compactRows ? 11 : 12
+                            font.pixelSize: root.compactRows ? 10 : 12
                             visible: model && model.isSelected
                         }
 
@@ -183,8 +236,8 @@ Item {
 
                     // Icon Section
                     Rectangle {
-                        width: root.compactRows ? 26 : 32
-                        height: root.compactRows ? 26 : 32
+                        width: root.compactRows ? 22 : 32
+                        height: root.compactRows ? 22 : 32
                         radius: Theme.radiusField
                         color: model && model.isStarred ? Theme.selectedRow : (model && model.isCollection ? Theme.glassActive : (model && model.isCommand ? Theme.glassHover : Theme.glassPill))
                         
@@ -198,7 +251,7 @@ Item {
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily
-                            font.pixelSize: root.compactRows ? ((model && model.isStarred) ? 14 : 16) : ((model && model.isStarred) ? 16 : 18)
+                            font.pixelSize: root.compactRows ? ((model && model.isStarred) ? 12 : 14) : ((model && model.isStarred) ? 16 : 18)
                             font.weight: Font.Bold
                             color: (model && (model.isStarred || model.isCommand)) ? Theme.accent : Theme.label
                         }
@@ -212,7 +265,7 @@ Item {
                         Text {
                             text: model ? model.name : ""
                             font.family: Theme.fontFamily
-                            font.pixelSize: root.compactRows ? 12 : 14
+                            font.pixelSize: root.compactRows ? 11 : 14
                             font.weight: Font.DemiBold
                             color: Theme.label
                             elide: Text.ElideRight
@@ -224,7 +277,7 @@ Item {
                     // Selection indicator for Inspector
                     Rectangle {
                         width: 4
-                        height: root.compactRows ? 20 : 24
+                        height: root.compactRows ? 16 : 24
                         radius: Theme.radiusSmall
                         color: Theme.selectedRowBorder
                         visible: root.isSelected

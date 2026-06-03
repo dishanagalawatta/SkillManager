@@ -70,9 +70,8 @@ Item {
                 id: lv_searchInput
                 objectName: "librarySearchInput"
                 Layout.preferredWidth: 250
-                onTextChanged: AppController.libraryModel.filterText = text
+                onDebouncedTextChanged: (text) => AppController.libraryModel.filterText = text
             }
-
             GlassToggleButton {
                 text: "Show Archived"
                 checked: AppController.libraryModel.showArchived
@@ -354,7 +353,7 @@ Item {
             }
 
             // Skill List
-            ListView {
+            SmoothListView {
                 id: lv_listView
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
@@ -439,7 +438,6 @@ Item {
                 }
 
                 ScrollBar.vertical: ScrollBar {
-                    active: true
                 }
             }
 

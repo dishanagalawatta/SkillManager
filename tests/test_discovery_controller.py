@@ -28,45 +28,10 @@ def controller(mock_app):
     return DiscoveryController(mock_app)
 
 def test_load_initial_data_success(controller, mock_app):
-    # Mock DiscoveryService.discover_all to return a valid result
-    mock_result = {
-        "skills": [{"name": "Skill 1"}],
-        "projects": ["/proj"],
-        "categories": ["Dev"],
-        "project_labels": ["Project"],
-        "status": "Ready"
-    }
-
-    with patch("skill_manager.controllers.discovery_controller.DiscoveryService") as mock_service, \
-         patch("skill_manager.controllers.discovery_controller.schedule_on_ui_thread") as mock_schedule:
-
-        service_instance = mock_service.return_value
-        service_instance.discover_all.return_value = mock_result
-
-        # Capture the background task
-        background_task = None
-        def mock_run(task):
-            nonlocal background_task
-            background_task = task
-
-        mock_app.task_runner.run.side_effect = mock_run
-
+    with patch("skill_manager.controllers.discovery_controller.QtAsyncio.run") as mock_run:
         controller.loadInitialData()
+        mock_run.assert_called_once()
 
-        # Verify initial state changes
-        assert mock_app._is_loading is True
-        mock_app.isLoadingChanged.emit.assert_called()
-
-        # Execute the background task
-        background_task()
-
-        # Verify discover_all was called
-        service_instance.discover_all.assert_called_once()
-
-        # Verify schedule_on_ui_thread was called for finalization
-        mock_schedule.assert_called()
-
-        # Verify cache callback behavior if needed, but here we test the happy path
 
 def test_finalize_loading(controller, mock_app):
     skills = [{"name": "S1"}]

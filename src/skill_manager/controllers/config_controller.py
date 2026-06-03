@@ -19,6 +19,94 @@ class ConfigController(BaseController):
     updateProjectsChanged = Signal()
     clientFormatsChanged = Signal()
     customCollectionsChanged = Signal()
+    scrollSpeedMultiplierChanged = Signal()
+    showMenuIconsChanged = Signal()
+    compactMenuChanged = Signal()
+    autoCheckUpdatesChanged = Signal()
+    autoDownloadUpdatesChanged = Signal()
+    updateCheckIntervalHoursChanged = Signal()
+    skillPackageAutoUpdateChanged = Signal()
+    skillPackageAutoUpdateModeChanged = Signal()
+
+    @Property(float, notify=scrollSpeedMultiplierChanged)
+    def scrollSpeedMultiplier(self):
+        return self.config.get("scroll_speed_multiplier", 1.0)
+
+    @scrollSpeedMultiplier.setter
+    def scrollSpeedMultiplier(self, value):
+        if self.scrollSpeedMultiplier != value:
+            self.config.set("scroll_speed_multiplier", float(value))
+            self.scrollSpeedMultiplierChanged.emit()
+
+    @Property(bool, notify=showMenuIconsChanged)
+    def showMenuIcons(self):
+        return self.config.get("show_menu_icons", True)
+
+    @showMenuIcons.setter
+    def showMenuIcons(self, value):
+        if self.showMenuIcons != value:
+            self.config.set("show_menu_icons", bool(value))
+            self.showMenuIconsChanged.emit()
+
+    @Property(bool, notify=compactMenuChanged)
+    def compactMenu(self):
+        return self.config.get("compact_menu", False)
+
+    @compactMenu.setter
+    def compactMenu(self, value):
+        if self.compactMenu != value:
+            self.config.set("compact_menu", bool(value))
+            self.compactMenuChanged.emit()
+
+    @Property(bool, notify=autoCheckUpdatesChanged)
+    def autoCheckUpdates(self):
+        return self.config.get("auto_check_updates", True)
+
+    @autoCheckUpdates.setter
+    def autoCheckUpdates(self, value):
+        if self.autoCheckUpdates != value:
+            self.config.set("auto_check_updates", bool(value))
+            self.autoCheckUpdatesChanged.emit()
+
+    @Property(bool, notify=autoDownloadUpdatesChanged)
+    def autoDownloadUpdates(self):
+        return self.config.get("auto_download_updates", False)
+
+    @autoDownloadUpdates.setter
+    def autoDownloadUpdates(self, value):
+        if self.autoDownloadUpdates != value:
+            self.config.set("auto_download_updates", bool(value))
+            self.autoDownloadUpdatesChanged.emit()
+
+    @Property(int, notify=updateCheckIntervalHoursChanged)
+    def updateCheckIntervalHours(self):
+        return self.config.get("update_check_interval_hours", 24)
+
+    @updateCheckIntervalHours.setter
+    def updateCheckIntervalHours(self, value):
+        if self.updateCheckIntervalHours != value:
+            self.config.set("update_check_interval_hours", int(value))
+            self.updateCheckIntervalHoursChanged.emit()
+
+    @Property(bool, notify=skillPackageAutoUpdateChanged)
+    def skillPackageAutoUpdate(self):
+        return self.config.get("skill_package_auto_update", True)
+
+    @skillPackageAutoUpdate.setter
+    def skillPackageAutoUpdate(self, value):
+        if self.skillPackageAutoUpdate != value:
+            self.config.set("skill_package_auto_update", bool(value))
+            self.skillPackageAutoUpdateChanged.emit()
+
+    @Property(str, notify=skillPackageAutoUpdateModeChanged)
+    def skillPackageAutoUpdateMode(self):
+        return self.config.get("skill_package_auto_update_mode", "prompt")
+
+    @skillPackageAutoUpdateMode.setter
+    def skillPackageAutoUpdateMode(self, value):
+        if self.skillPackageAutoUpdateMode != value:
+            self.config.set("skill_package_auto_update_mode", str(value))
+            self.skillPackageAutoUpdateModeChanged.emit()
 
     @Property(str, notify=shortcutsChanged)
     def shortcutSearch(self): return self.get_shortcut("search")

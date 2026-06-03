@@ -21,6 +21,7 @@ SkillManager is designed for developers who need to manage growing libraries of 
 
 - **🚀 Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard.
 - **🔄 Surgical Sync**: Intelligent synchronization that updates outdated skills across multiple repositories without full rescans.
+- **🛡️ Secure Auto-Update**: Background application updates powered by TUF (The Update Framework) for robust and secure delivery.
 - **📚 Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
 - **🎨 Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
 - **📦 Zero-Config Entry**: Professional installers for Windows, macOS, and Linux.

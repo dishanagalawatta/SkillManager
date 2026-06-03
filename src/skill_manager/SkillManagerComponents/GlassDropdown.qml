@@ -76,7 +76,7 @@ ComboBox {
         // Use contentHeight from ListView for the popup's implicitHeight
         implicitHeight: Math.min(dropdownList.contentHeight + (topPadding + bottomPadding), 250)
 
-        contentItem: ListView {
+        contentItem: SmoothListView {
             id: dropdownList
             clip: true
             model: control.delegateModel

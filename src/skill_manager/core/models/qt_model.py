@@ -348,16 +348,58 @@ class SkillModel(QAbstractListModel):
         path_set = set(paths)
         self._all_skills = [s for s in self._all_skills if s.local_path not in path_set]
         self._selected_ids -= path_set
+
+        if self._search_engine:
+            self._search_engine.remove_from_index(list(path_set))
+
         self._apply_filter()
         self.selectedCountChanged.emit()
 
     def _apply_filter(self, reset=False):
+        """Gateway to trigger filtering, offloading to async if needed."""
+
+        import PySide6.QtAsyncio as QtAsyncio
+
+        # Cancel any pending filter task to prevent race conditions
+        if hasattr(self, "_filter_task") and self._filter_task and not self._filter_task.done():
+            self._filter_task.cancel()
+
+        self._filter_task = QtAsyncio.run(self._apply_filter_async(reset))
+
+    async def _apply_filter_async(self, reset=False):
+        """Asynchronous implementation of filtering and sorting."""
+        import asyncio
 
         if reset:
             self.beginResetModel()
         else:
             self.layoutAboutToBeChanged.emit()
 
+        try:
+            loop = asyncio.get_running_loop()
+
+            # Execute the heavy filtering/searching in a background thread
+            skills = await loop.run_in_executor(None, self._execute_filter_logic)
+
+            self._all_filtered_skills = self._engine.prepare_rows(skills)
+            self._filtered_skills = self._engine.build_visible_rows(
+                self._all_filtered_skills, self._state.collapsed_categories
+            )
+        except asyncio.CancelledError:
+            # Task was cancelled by a newer filter request, just exit
+            return
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error in async filter: {e}")
+        finally:
+            if reset:
+                self.endResetModel()
+            else:
+                self.layoutChanged.emit()
+            self.selectedCountChanged.emit()
+
+    def _execute_filter_logic(self) -> list[Skill]:
+        """Internal synchronous logic for filtering and searching."""
         if self._state.filter_text and self._search_engine:
             valid_paths = {
                 s.local_path for s in self._engine.filter_skills(self._all_skills, self._state)
@@ -370,20 +412,10 @@ class SkillModel(QAbstractListModel):
                     skills.append(Skill.from_dict(s))
                 else:
                     skills.append(s)
-        else:
-            skills = self._engine.filter_skills(self._all_skills, self._state)
-            skills.sort(key=self._engine.sort_key)
-
-        self._all_filtered_skills = self._engine.prepare_rows(skills)
-        self._filtered_skills = self._engine.build_visible_rows(
-            self._all_filtered_skills, self._state.collapsed_categories
-        )
-
-        if reset:
-            self.endResetModel()
-        else:
-            self.layoutChanged.emit()
-        self.selectedCountChanged.emit()
+            return skills
+        skills = self._engine.filter_skills(self._all_skills, self._state)
+        skills.sort(key=self._engine.sort_key)
+        return skills
 
     def _is_main_collapsed(self, skill: Skill):
         return (
@@ -430,10 +462,13 @@ class SkillModel(QAbstractListModel):
             skill = Skill.from_dict(s_dict)
             skills_dict[skill.local_path] = skill
         self._all_skills = list(skills_dict.values())
-        # Re-initialize search engine with dicts for now
-        self._search_engine = SearchEngine(
-            [s if isinstance(s, dict) else s.__dict__ for s in self._all_skills]
-        )
+
+        # Use incremental update if engine exists, else full init
+        if self._search_engine:
+            self._search_engine.update_index(new_skills)
+        else:
+            self._search_engine = SearchEngine(new_skills)
+
         self._apply_filter(reset=was_empty)
 
     @Slot(int, bool)

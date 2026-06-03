@@ -221,7 +221,7 @@ Dialog {
                     border.color: cmdBodyInput.activeFocus ? Theme.accent : Theme.glassBorder
                     border.width: cmdBodyInput.activeFocus ? 2 : 1
                     
-                    ScrollView {
+                    SmoothScrollView {
                         anchors.fill: parent
                         anchors.margins: 12
                         clip: true

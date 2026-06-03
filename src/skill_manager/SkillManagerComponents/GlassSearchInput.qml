@@ -52,6 +52,20 @@ TextField {
     leftPadding: 36
     rightPadding: rootSearchField.text === "" ? 12 : 36
 
+    signal debouncedTextChanged(string text)
+    property int debounceDelay: 200
+
+    Timer {
+        id: debounceTimer
+        interval: rootSearchField.debounceDelay
+        repeat: false
+        onTriggered: rootSearchField.debouncedTextChanged(rootSearchField.text)
+    }
+
+    onTextChanged: {
+        debounceTimer.restart()
+    }
+
     Accessible.role: Accessible.EditableText
     Accessible.name: "Search skills"
 }

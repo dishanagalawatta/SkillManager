@@ -19,3 +19,8 @@ _references/
 scratch
 conductor
 .env
+
+# TUF Auto-Updater
+tuf_keys/
+tuf_repo/
+.tufup-repo-config
