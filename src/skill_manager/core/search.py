@@ -47,14 +47,25 @@ class SkillIndexer:
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 
+        # Pre-compute token list for fast intersection checks in search scoring
+        name_tokens = self.tokenize(name)
+        desc_tokens = self.tokenize(description)
+        lower_tags = [t.lower() for t in tags]
+        lower_category = category.lower()
+
+        all_doc_tokens = name_tokens + lower_tags + desc_tokens
+        if lower_category:
+            all_doc_tokens.append(lower_category)
+
         # Weighted components
         return {
             "name": name.lower(),
-            "name_tokens": self.tokenize(name),
-            "category": category.lower(),
-            "tags": [t.lower() for t in tags],
-            "description_tokens": self.tokenize(description),
+            "name_tokens": name_tokens,
+            "category": lower_category,
+            "tags": lower_tags,
+            "description_tokens": desc_tokens,
             "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
+            "all_doc_tokens": all_doc_tokens,
         }
 
 
@@ -132,27 +143,37 @@ class SearchEngine:
         # by ensuring at least one query token matches a document token reasonably well.
         query_tokens = self.indexer.tokenize(query)
         if query_tokens:
-            all_doc_tokens = index_data.get("name_tokens", []) + index_data.get("tags", []) + index_data.get("description_tokens", [])
-            # Also include category as a token if present
-            if index_data.get("category"):
-                all_doc_tokens.append(index_data["category"])
+            all_doc_tokens = index_data.get("all_doc_tokens")
+            if all_doc_tokens is None:
+                # Fallback for old index data without pre-computed tokens
+                all_doc_tokens = index_data.get("name_tokens", []) + index_data.get("tags", []) + index_data.get("description_tokens", [])
+                if index_data.get("category"):
+                    all_doc_tokens.append(index_data["category"])
 
             if all_doc_tokens:
                 max_token_match = 0
-                for qt in query_tokens:
-                    # Exact substring match provides an immediate pass
-                    if qt in index_data["full_text"]:
-                        max_token_match = 100
-                        break
 
-                    for dt in all_doc_tokens:
-                        score = fuzz.ratio(qt, dt)
-                        if score > max_token_match:
-                            max_token_match = score
+                # Fast path O(1) intersection check using query_tokens_set.isdisjoint(all_doc_tokens)
+                query_tokens_set = set(query_tokens)
+                if not query_tokens_set.isdisjoint(all_doc_tokens):
+                    max_token_match = 100
+                else:
+                    # Convert to set to avoid duplicate fuzz.ratio calculations
+                    unique_doc_tokens = set(all_doc_tokens)
+                    for qt in query_tokens:
+                        # Exact substring match provides an immediate pass
+                        if qt in index_data["full_text"]:
+                            max_token_match = 100
+                            break
+
+                        for dt in unique_doc_tokens:
+                            score = fuzz.ratio(qt, dt)
+                            if score > max_token_match:
+                                max_token_match = score
+                            if max_token_match > 70:
+                                break
                         if max_token_match > 70:
                             break
-                    if max_token_match > 70:
-                        break
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:

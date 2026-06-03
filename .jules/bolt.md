@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-18 - [Python Set Serialization Risk in Search Indexes]
+**Learning:** Adding native Python `set` objects directly into search index data dictionaries (e.g., `index_data["tokens_set"] = set(...)`) causes fatal `TypeError: Object of type set is not JSON serializable` crashes if the index is persisted to disk or sent over an API.
+**Action:** When pre-computing token data for search indexing, always store it as a native `list`. During the active query phase, convert the list to a `set` at runtime (e.g., `set(all_doc_tokens)`) to leverage fast O(1) intersection checks (`isdisjoint()`) while maintaining safe JSON serialization.
