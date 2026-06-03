@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2026-05-28 - Fast-path Set Intersection for Exact Search Queries
+**Learning:** In the search engine's scoring loop, evaluating `fuzz.ratio` for every token combination is incredibly slow for exact word matches. By pre-computing an `all_doc_tokens` Python `set` during index generation, we enable $O(1)$ set intersection checks (`query_tokens_set.isdisjoint(all_doc_tokens)`) at query time. This completely bypasses the expensive $O(N \times M)$ fuzzy matching loop for the happy path where users type an exact word present in the document.
+**Action:** When performing fuzzy search or keyword matching across large document sets, always extract tokens into a `set` at index time and perform an initial fast-path `isdisjoint()` check before falling back to more complex distance algorithms.
