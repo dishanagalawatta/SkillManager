@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -28,10 +28,9 @@ def controller(mock_app):
     return DiscoveryController(mock_app)
 
 def test_load_initial_data_success(controller, mock_app):
-    from unittest.mock import AsyncMock
-    with patch.object(controller, "_do_discovery", new_callable=AsyncMock) as mock_discovery:
-        controller.loadInitialData()
-        mock_discovery.assert_called_once()
+    mock_app.task_runner = MagicMock()
+    controller.loadInitialData()
+    mock_app.task_runner.submit.assert_called_once_with(controller._run_discovery_sync, controller._on_discovery_done)
 
 
 def test_finalize_loading(controller, mock_app):

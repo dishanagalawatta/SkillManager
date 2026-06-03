@@ -42,6 +42,11 @@ def run_version_command(command: str) -> str:
 
     try:
         command_list = shlex.split(command)
+        import shutil
+        executable = shutil.which(command_list[0])
+        if executable:
+            command_list[0] = executable
+
         result = subprocess.run(
             command_list, shell=False, capture_output=True, text=True, timeout=30
         )

@@ -72,16 +72,14 @@ async def test_properties():
 @pytest.mark.asyncio
 async def test_check_for_updates_slots():
     mock_app = MagicMock()
+    mock_app.task_runner = MagicMock()
     controller = AppUpdateController(mock_app)
     controller._is_updating = True
     controller.checkForUpdates()  # Should return early
 
     controller._is_updating = False
-    with patch('skill_manager.controllers.app_update_controller.asyncio.create_task') as mock_task:
-        controller.checkForUpdates()
-        mock_task.assert_called_once()
-        coro = mock_task.call_args[0][0]
-        coro.close()
+    controller.checkForUpdates()
+    mock_app.task_runner.submit.assert_called_once_with(controller._sync_check_updates, controller._on_updates_checked)
 
 @pytest.mark.asyncio
 async def test_check_tuf_updates_no_client():

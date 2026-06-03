@@ -44,8 +44,23 @@ class AppUpdateController(BaseController):
         self._target_dir = get_app_data_dir() / "updates"
         self._target_dir.mkdir(parents=True, exist_ok=True)
 
+        # Seed the metadata_dir with bundled root.json if it doesn't exist
+        tuf_root_dest = self._tuf_dir / "root.json"
+        if not tuf_root_dest.exists():
+            import shutil
+            if getattr(sys, 'frozen', False):
+                bundled_root = Path(sys._MEIPASS) / "skill_manager" / "assets" / "tuf" / "root.json"
+            else:
+                bundled_root = Path(__file__).parent.parent / "assets" / "tuf" / "root.json"
+
+            if bundled_root.exists():
+                shutil.copy(bundled_root, tuf_root_dest)
+            else:
+                logger.warning(f"Bundled root.json not found at {bundled_root}")
+
         # In a real app, the public key should be embedded
         # For now, we'll assume it's in the app bundle or handled by the publish script
+        logger.debug("Initializing tufup Client...")
         try:
             self._client = Client(
                 app_name="SkillManager",
@@ -56,6 +71,7 @@ class AppUpdateController(BaseController):
                 metadata_dir=str(self._tuf_dir),
                 target_dir=str(self._target_dir),
             )
+            logger.debug("tufup Client initialized successfully.")
         except Exception as e:
             logger.warning(f"Failed to initialize TUF client (updates will be unavailable): {e}")
             self._client = None
@@ -83,9 +99,36 @@ class AppUpdateController(BaseController):
     @Slot()
     def checkForUpdates(self):
         """Checks for updates asynchronously using tufup."""
+        logger.debug(f"checkForUpdates called. is_updating={self._is_updating}")
         if self._is_updating:
             return
-        asyncio.create_task(self._check_tuf_updates())
+
+        # We need a BackgroundTaskRunner for threading, not asyncio.create_task
+        # since PySide6 app doesn't have an asyncio loop running by default.
+        if hasattr(self.app, 'task_runner'):
+            logger.debug("Submitting update check to task runner.")
+            self.app.task_runner.submit(self._sync_check_updates, self._on_updates_checked)
+        else:
+            logger.warning("No task_runner found on app to check for updates.")
+
+    def _sync_check_updates(self):
+        logger.debug("_sync_check_updates running in thread.")
+        if not self._client:
+            return None
+        return self._client.check_for_updates()
+
+    def _on_updates_checked(self, new_version):
+        logger.debug(f"_on_updates_checked received version: {new_version}")
+        if new_version:
+            logger.info(f"Update available: {new_version}")
+            self._latest_version = str(new_version)
+            self._update_available = True
+            self.updateAvailableChanged.emit()
+            self.latestVersionChanged.emit()
+        else:
+            logger.info("No updates available.")
+            self._update_available = False
+            self.updateAvailableChanged.emit()
 
     async def _check_tuf_updates(self):
         if not self._client:

@@ -147,8 +147,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.ui_controller.darkMode
-                                    onCheckedChanged: AppController.ui_controller.darkMode = checked
+                                    checked: AppController.ui_controller ? AppController.ui_controller.darkMode : false
+                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.darkMode = checked
                                 }
                             }
 
@@ -160,8 +160,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.ui_controller.reducedMotion
-                                    onCheckedChanged: AppController.ui_controller.setReducedMotion(checked)
+                                    checked: AppController.ui_controller ? AppController.ui_controller.reducedMotion : false
+                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setReducedMotion(checked)
                                 }
                             }
 
@@ -173,8 +173,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.ui_controller.compactListRows
-                                    onCheckedChanged: AppController.ui_controller.setCompactListRows(checked)
+                                    checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
+                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
                                 }
                             }
 
@@ -195,7 +195,7 @@ Item {
                                         color: Theme.label
                                     }
                                     Text {
-                                        text: "Multiplier: " + AppController.config_mgr.scrollSpeedMultiplier.toFixed(1) + "x"
+                                        text: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 10
                                         color: Theme.secondaryLabel
@@ -206,8 +206,8 @@ Item {
                                     from: 0.5
                                     to: 5.0
                                     stepSize: 0.1
-                                    value: AppController.config_mgr.scrollSpeedMultiplier
-                                    onMoved: AppController.config_mgr.scrollSpeedMultiplier = value
+                                    value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
+                                    onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
                                 }
                             }
                         }
@@ -247,8 +247,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.config_controller.autoCheckUpdates
-                                    onCheckedChanged: AppController.config_controller.autoCheckUpdates = checked
+                                    checked: AppController.config_controller ? AppController.config_controller.autoCheckUpdates : true
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoCheckUpdates = checked
                                 }
                             }
 
@@ -260,8 +260,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.config_controller.autoDownloadUpdates
-                                    onCheckedChanged: AppController.config_controller.autoDownloadUpdates = checked
+                                    checked: AppController.config_controller ? AppController.config_controller.autoDownloadUpdates : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoDownloadUpdates = checked
                                 }
                             }
 
@@ -287,8 +287,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.config_controller.skillPackageAutoUpdate
-                                    onCheckedChanged: AppController.config_controller.skillPackageAutoUpdate = checked
+                                    checked: AppController.config_controller ? AppController.config_controller.skillPackageAutoUpdate : true
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdate = checked
                                 }
                             }
 
@@ -301,9 +301,9 @@ Item {
                                 }
                                 GlassDropdown {
                                     model: ["prompt", "silent"]
-                                    currentIndex: model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)
+                                    currentIndex: AppController.config_controller ? model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode) : 0
                                     onActivated: {
-                                        AppController.config_controller.skillPackageAutoUpdateMode = model[index]
+                                        if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = model[index]
                                     }
                                     Layout.preferredWidth: 100
                                 }
@@ -320,7 +320,7 @@ Item {
                                         color: Theme.label
                                     }
                                     Text {
-                                        text: "Every " + AppController.config_controller.updateCheckIntervalHours + " hours"
+                                        text: "Every " + (AppController.config_controller ? AppController.config_controller.updateCheckIntervalHours : 24) + " hours"
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 10
                                         color: Theme.secondaryLabel
@@ -331,8 +331,8 @@ Item {
                                     from: 1
                                     to: 168
                                     stepSize: 1
-                                    value: AppController.config_controller.updateCheckIntervalHours
-                                    onMoved: AppController.config_controller.updateCheckIntervalHours = value
+                                    value: AppController.config_controller ? AppController.config_controller.updateCheckIntervalHours : 24
+                                    onMoved: if (AppController.config_controller) AppController.config_controller.updateCheckIntervalHours = value
                                 }
                             }
                         }
@@ -372,8 +372,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.config_controller.showMenuIcons
-                                    onCheckedChanged: AppController.config_controller.showMenuIcons = checked
+                                    checked: AppController.config_controller ? AppController.config_controller.showMenuIcons : true
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.showMenuIcons = checked
                                 }
                             }
 
@@ -385,8 +385,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.config_controller.compactMenu
-                                    onCheckedChanged: AppController.config_controller.compactMenu = checked
+                                    checked: AppController.config_controller ? AppController.config_controller.compactMenu : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.compactMenu = checked
                                 }
                             }
                         }
@@ -429,8 +429,8 @@ Item {
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
                                     model: ["Library", "QuickCopy", "Updates", "Settings"]
-                                    currentIndex: Math.max(0, model.indexOf(AppController.ui_controller.startupView))
-                                    onActivated: (index) => AppController.ui_controller.setStartupView(model[index])
+                                    currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.ui_controller.startupView)) : 0
+                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setStartupView(model[index]) }
                                 }
                             }
 
@@ -444,9 +444,9 @@ Item {
                                 }
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
-                                    model: AppController.clientFormats
-                                    currentIndex: Math.max(0, model.indexOf(AppController.clientFormat))
-                                    onActivated: (index) => AppController.ui_controller.setClientFormat(model[index])
+                                    model: AppController.clientFormats ? AppController.clientFormats : []
+                                    currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.clientFormat)) : 0
+                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setClientFormat(model[index]) }
                                 }
                             }
 
@@ -461,8 +461,8 @@ Item {
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
                                     model: ["Last Project", "All Projects"]
-                                    currentIndex: AppController.ui_controller.defaultProjectFilter === "all" ? 1 : 0
-                                    onActivated: (index) => AppController.ui_controller.setDefaultProjectFilter(index === 1 ? "all" : "last")
+                                    currentIndex: AppController.ui_controller && AppController.ui_controller.defaultProjectFilter === "all" ? 1 : 0
+                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setDefaultProjectFilter(index === 1 ? "all" : "last") }
                                 }
                             }
 
@@ -474,8 +474,8 @@ Item {
                                     Layout.fillWidth: true
                                 }
                                 GlassSwitch {
-                                    checked: AppController.ui_controller.rememberFilters
-                                    onCheckedChanged: AppController.ui_controller.setRememberFilters(checked)
+                                    checked: AppController.ui_controller ? AppController.ui_controller.rememberFilters : true
+                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setRememberFilters(checked)
                                 }
                             }
 
@@ -483,7 +483,7 @@ Item {
                                 Layout.preferredHeight: 36
                                 Layout.fillWidth: true
                                 text: "Reset UI State"
-                                onClicked: (mouse) => AppController.ui_controller.resetUiState()
+                                onClicked: (mouse) => { if (AppController.ui_controller) AppController.ui_controller.resetUiState() }
                                 background: Rectangle {
                                     radius: Theme.radiusButton
                                     color: parent.hovered ? Theme.glassHover : "transparent"
