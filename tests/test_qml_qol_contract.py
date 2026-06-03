@@ -106,7 +106,7 @@ def test_compact_rows_are_persisted_and_wired_to_skill_items():
     assert "Compact List Rows" in settings
     assert "AppController.ui_controller.compactListRows" in settings
     assert "AppController.ui_controller.setCompactListRows(checked)" in settings
-    assert "property bool compactRows: AppController.ui_controller.compactListRows" in skill_item
+    assert "property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false" in skill_item
     assert "_compact_list_rows" in ui_controller_py
 
 

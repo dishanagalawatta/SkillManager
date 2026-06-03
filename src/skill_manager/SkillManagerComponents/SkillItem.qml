@@ -13,7 +13,7 @@ Item {
     property string subCat: model && model.subCategoryName ? model.subCategoryName : ""
     property bool isMainCollapsed: model && model.isMainCollapsed !== undefined ? model.isMainCollapsed : false
     property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
-    property bool compactRows: AppController.ui_controller.compactListRows
+    property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
 
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
@@ -187,7 +187,7 @@ Item {
                         // Override background to show danger color on hover
                         background: Rectangle {
                             implicitWidth: 200
-                            implicitHeight: AppController.config_controller.compactMenu ? 32 : 40
+                            implicitHeight: (AppController.config_controller && AppController.config_controller.compactMenu) ? 32 : 40
                             color: parent.highlighted ? Theme.dangerHover : "transparent"
                             radius: Theme.radiusSmall
                             Behavior on color { ColorAnimation { duration: 150 } }

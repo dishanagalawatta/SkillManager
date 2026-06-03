@@ -356,58 +356,21 @@ class SkillModel(QAbstractListModel):
         self.selectedCountChanged.emit()
 
     def _apply_filter(self, reset=False):
-        """Gateway to trigger filtering, offloading to async if needed."""
-        import os
-        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
-            if reset:
-                self.beginResetModel()
-            else:
-                self.layoutAboutToBeChanged.emit()
-            skills = self._execute_filter_logic()
-            self._all_filtered_skills = self._engine.prepare_rows(skills)
-            self._filtered_skills = self._engine.build_visible_rows(
-                self._all_filtered_skills, self._state.collapsed_categories
-            )
-            if reset:
-                self.endResetModel()
-            else:
-                self.layoutChanged.emit()
-            self.selectedCountChanged.emit()
-            return
-
-        import PySide6.QtAsyncio as QtAsyncio
-
-        # Cancel any pending filter task to prevent race conditions
-        if hasattr(self, "_filter_task") and self._filter_task and not self._filter_task.done():
-            self._filter_task.cancel()
-
-        self._filter_task = QtAsyncio.run(self._apply_filter_async(reset))
-
-    async def _apply_filter_async(self, reset=False):
-        """Asynchronous implementation of filtering and sorting."""
-        import asyncio
-
+        """Applies filters and updates the model synchronously."""
         if reset:
             self.beginResetModel()
         else:
             self.layoutAboutToBeChanged.emit()
 
         try:
-            loop = asyncio.get_running_loop()
-
-            # Execute the heavy filtering/searching in a background thread
-            skills = await loop.run_in_executor(None, self._execute_filter_logic)
-
+            skills = self._execute_filter_logic()
             self._all_filtered_skills = self._engine.prepare_rows(skills)
             self._filtered_skills = self._engine.build_visible_rows(
                 self._all_filtered_skills, self._state.collapsed_categories
             )
-        except asyncio.CancelledError:
-            # Task was cancelled by a newer filter request, just exit
-            return
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Error in async filter: {e}")
+            logging.getLogger(__name__).error(f"Error applying filter: {e}")
         finally:
             if reset:
                 self.endResetModel()

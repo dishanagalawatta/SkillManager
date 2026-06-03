@@ -10,12 +10,23 @@ ScrollView {
     WheelHandler {
         target: root.contentItem
         onWheel: (event) => {
-            let multiplier = appController.config_mgr.scrollSpeedMultiplier
+            // Use global appController context property with safety check
+            let ctrl = (typeof appController !== "undefined") ? appController : null
+            let config = (ctrl && ctrl.config_controller) ? ctrl.config_controller : null
+            let multiplier = (config && typeof config.scrollSpeedMultiplier !== "undefined") ? config.scrollSpeedMultiplier : 1.0
+
             if (multiplier !== 1.0 && root.contentItem) {
-                let extra = event.angleDelta.y * (multiplier - 1.0) * 0.5
+                // If multiplier is not 1.0, we handle the scroll entirely to avoid conflicts
+                event.accepted = true
+                
+                // angleDelta.y is typically 120 per notch.
+                let scrollAmount = event.angleDelta.y * multiplier * 0.4
+                
                 root.contentItem.contentY = Math.max(root.contentItem.originY, 
-                                                     Math.min(root.contentItem.contentY - extra, 
+                                                     Math.min(root.contentItem.contentY - scrollAmount, 
                                                               root.contentItem.originY + root.contentItem.contentHeight - root.contentItem.height))
+            } else {
+                event.accepted = false
             }
         }
     }

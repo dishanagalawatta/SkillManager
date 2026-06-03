@@ -8,8 +8,8 @@ MenuItem {
 
     property string iconText: ""
     property string shortcut: ""
-    property bool showIcon: AppController.config_controller.showMenuIcons
-    property bool isCompact: AppController.config_controller.compactMenu
+    property bool showIcon: AppController.config_controller ? AppController.config_controller.showMenuIcons : true
+    property bool isCompact: AppController.config_controller ? AppController.config_controller.compactMenu : false
 
     implicitWidth: 200
     implicitHeight: isCompact ? 32 : 40

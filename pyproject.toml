@@ -71,6 +71,9 @@ skill-manager = "skill_manager.__main__:main"
 where = ["src"]
 include = ["skill_manager*"]
 
+[tool.setuptools.package-data]
+skill_manager = ["assets/tuf/*"]
+
 
 [tool.coverage.run]
 source = ["skill_manager"]
