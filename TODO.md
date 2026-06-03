@@ -1,6 +1,3 @@
-Prepare License documents
+remove seperate row for filters. 
 
-Readme play on the same window for video
-
-Update readme for better one
-----
+top bar need to be more compact

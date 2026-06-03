@@ -2,11 +2,15 @@
 Discovery service for finding and processing skills from sources and projects.
 """
 
+import hashlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from diskcache import Cache
+
+from skill_manager.core.config import DATA_DIR
 from skill_manager.core.parsing import (
     build_skill_search_text,
     categorize_skill,
@@ -17,6 +21,12 @@ from skill_manager.core.persistence import load_cache, save_cache
 from skill_manager.core.quick_copy import discover_package_skills, discover_project_skills
 
 logger = logging.getLogger(__name__)
+
+
+def get_discovery_cache() -> Cache:
+    """Returns a diskcache instance for discovery results."""
+    cache_dir = DATA_DIR / "cache" / "discovery"
+    return Cache(str(cache_dir))
 
 
 class DiscoveryService:
@@ -39,52 +49,54 @@ class DiscoveryService:
     ) -> dict[str, Any]:
         """Performs full discovery of skills from all sources and projects."""
 
-        # 1. Try cache first
+        # 1. Try JSON index cache first for instant UI population
         if use_cache:
             try:
                 cached_data = load_cache()
                 if cached_data and cache_callback:
                     cache_callback(cached_data)
             except Exception as e:
-                logger.warning("[DISCOVERY] Error loading cache: %s", e)
+                logger.warning("[DISCOVERY] Error loading index cache: %s", e)
 
-        # 2a. Discover from master packages
-        package_skills_raw = discover_package_skills(
-            sources=self.sources,
-            parse_skill_md=parse_skill_md,
-            categorize_skill=categorize_skill,
-            build_search_text=build_skill_search_text,
-        )
+        # 2. Discovery using diskcache for granular file-level caching
+        with get_discovery_cache() as disk_cache:
+            # 2a. Discover from master packages
+            package_skills_raw = discover_package_skills(
+                sources=self.sources,
+                parse_skill_md=self._wrap_parse_skill_md(disk_cache),
+                categorize_skill=categorize_skill,
+                build_search_text=build_skill_search_text,
+            )
 
-        all_skills = []
-        for skill in package_skills_raw:
-            all_skills.append(self.transform_skill(skill, is_package=True))
+            all_skills = []
+            for skill in package_skills_raw:
+                all_skills.append(self.transform_skill(skill, is_package=True))
 
-        # 2b. Discover from project skill folders
-        projects_state = discover_project_skills(
-            projects=self.projects,
-            parse_skill_md=parse_skill_md,
-            categorize_skill=categorize_skill,
-            build_search_text=build_skill_search_text,
-            project_aliases=self.project_aliases,
-        )
+            # 2b. Discover from project skill folders
+            projects_state = discover_project_skills(
+                projects=self.projects,
+                parse_skill_md=self._wrap_parse_skill_md(disk_cache),
+                categorize_skill=categorize_skill,
+                build_search_text=build_skill_search_text,
+                project_aliases=self.project_aliases,
+            )
 
-        for p in projects_state:
-            for skill in p.get("skills", []):
-                all_skills.append(
-                    self.transform_skill(
-                        skill, is_package=False, project_label=p.get("project_label")
+            for p in projects_state:
+                for skill in p.get("skills", []):
+                    all_skills.append(
+                        self.transform_skill(
+                            skill, is_package=False, project_label=p.get("project_label")
+                        )
                     )
-                )
 
-            # Also discover commands in commands/ subdir
-            project_path = Path(p["project_path"])
-            commands_dir = project_path / "commands"
-            if commands_dir.is_dir():
-                for cmd_file in commands_dir.glob("*.md"):
-                    cmd_data = self._process_command_file(cmd_file, p)
-                    if cmd_data:
-                        all_skills.append(cmd_data)
+                # Also discover commands in commands/ subdir
+                project_path = Path(p["project_path"])
+                commands_dir = project_path / "commands"
+                if commands_dir.is_dir():
+                    for cmd_file in commands_dir.glob("*.md"):
+                        cmd_data = self._process_command_file(cmd_file, p, disk_cache)
+                        if cmd_data:
+                            all_skills.append(cmd_data)
 
         # 3. Pre-compute metadata
         cats = sorted({s["category"] for s in all_skills if s["category"]})
@@ -98,10 +110,38 @@ class DiscoveryService:
             "status": f"Found {len(all_skills)} skills in master library ({len(projects_state)} projects)",
         }
 
-        # 4. Update cache
+        # 4. Update index cache
         save_cache(result)
 
         return result
+
+    def _wrap_parse_skill_md(self, cache: Cache) -> Callable[[str], dict[str, Any]]:
+        """Wraps parse_skill_md with disk caching based on file mtime/size hash."""
+
+        def cached_parse(path_str: str) -> dict[str, Any]:
+            path = Path(path_str)
+            if not path.is_file():
+                return {}
+
+            try:
+                stat = path.stat()
+                cache_key = f"skill:{path_str}:{stat.st_mtime}:{stat.st_size}"
+                # Use a fast hash for the key if it's too long
+                if len(cache_key) > 200:
+                    cache_key = hashlib.md5(cache_key.encode()).hexdigest()
+
+                result = cache.get(cache_key)
+                if result is not None:
+                    return result
+
+                result = parse_skill_md(path_str)
+                cache.set(cache_key, result)
+                return result
+            except Exception as e:
+                logger.warning("[DISCOVERY] Cache error for %s: %s", path_str, e)
+                return parse_skill_md(path_str)
+
+        return cached_parse
 
     def transform_skill(
         self, skill: dict[str, Any], is_package: bool, project_label: str = None
@@ -122,8 +162,6 @@ class DiscoveryService:
             or ("Master Library" if is_package else "Unknown Project"),
             "project_root": skill.get("project_root", ""),
             "project_path": skill.get("project_path", ""),
-
-
             "is_starred": metadata.get("starred", False)
             or metadata.get("essential", False)
             or local_path in self.starred_paths,
@@ -152,12 +190,27 @@ class DiscoveryService:
 
         return data
 
-
     def _process_command_file(
-        self, cmd_file: Path, project: dict[str, Any]
+        self, cmd_file: Path, project: dict[str, Any], cache: Cache = None
     ) -> dict[str, Any] | None:
         """Parses a command markdown file and returns its normalized representation."""
-        cmd_data_raw = parse_command_md(str(cmd_file))
+        cmd_path_str = str(cmd_file)
+
+        cmd_data_raw = None
+        if cache:
+            try:
+                stat = cmd_file.stat()
+                cache_key = f"cmd:{cmd_path_str}:{stat.st_mtime}:{stat.st_size}"
+                cmd_data_raw = cache.get(cache_key)
+                if cmd_data_raw is None:
+                    cmd_data_raw = parse_command_md(cmd_path_str)
+                    cache.set(cache_key, cmd_data_raw)
+            except Exception as e:
+                logger.warning("[DISCOVERY] Command cache error for %s: %s", cmd_path_str, e)
+
+        if cmd_data_raw is None:
+            cmd_data_raw = parse_command_md(cmd_path_str)
+
         if not cmd_data_raw:
             return None
 
@@ -240,4 +293,3 @@ class DiscoveryService:
 
         # Now transform it using public transform_skill
         return self.transform_skill(skill_data, is_package=False, project_label=skill_data["project_label"])
-

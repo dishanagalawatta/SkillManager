@@ -4,11 +4,12 @@ Handles saving and loading of archive, starred, and skill cache.
 """
 
 import contextlib
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
+
+import orjson
 
 from skill_manager.core.config import (
     PACKAGE_SKILL_INVENTORY_FILE,
@@ -26,13 +27,18 @@ logger = logging.getLogger(__name__)
 CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
 
 
-def _atomic_write_json(file_path: str, data: Any, indent: int = 4) -> bool:
-    """Writes JSON to a temporary file then renames it for atomicity."""
+def _atomic_write_json(file_path: str, data: Any, indent: bool = True) -> bool:
+    """Writes JSON to a temporary file then renames it for atomicity using orjson."""
     file_path = str(file_path)
     temp_path = f"{file_path}.tmp"
     try:
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=indent, default=str)
+        option = orjson.OPT_INDENT_2 if indent else 0
+        # orjson handles more types (UUID, datetime) and is faster.
+        # We use OPT_SERIALIZE_DATACLASS for future compatibility if needed.
+        # OPT_APPEND_NEWLINE is good for file output.
+        content = orjson.dumps(data, option=option | orjson.OPT_SERIALIZE_DATACLASS | orjson.OPT_APPEND_NEWLINE)
+        with open(temp_path, "wb") as f:
+            f.write(content)
         os.replace(temp_path, file_path)
         return True
     except Exception as e:
@@ -52,8 +58,8 @@ def load_archive() -> list[str]:
     if not os.path.exists(SKILL_LIBRARY_ARCHIVE_FILE):
         return []
     try:
-        with open(SKILL_LIBRARY_ARCHIVE_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(SKILL_LIBRARY_ARCHIVE_FILE, "rb") as f:
+            data = orjson.loads(f.read())
             if isinstance(data, dict):
                 return data.get("archived_skills", [])
             return data or []
@@ -72,8 +78,8 @@ def load_starred() -> list[str]:
     if not os.path.exists(SKILL_LIBRARY_STARRED_FILE):
         return []
     try:
-        with open(SKILL_LIBRARY_STARRED_FILE, encoding="utf-8") as f:
-            return json.load(f) or []
+        with open(SKILL_LIBRARY_STARRED_FILE, "rb") as f:
+            return orjson.loads(f.read()) or []
     except Exception as e:
         logger.warning("Error loading starred: %s", e)
         return []
@@ -87,8 +93,8 @@ def load_project_skill_ownership() -> dict[str, dict[str, str]]:
     if not os.path.exists(PROJECT_SKILL_OWNERSHIP_FILE):
         return {}
     try:
-        with open(PROJECT_SKILL_OWNERSHIP_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(PROJECT_SKILL_OWNERSHIP_FILE, "rb") as f:
+            data = orjson.loads(f.read())
         return data if isinstance(data, dict) else {}
     except Exception as e:
         logger.warning("Error loading project skill ownership: %s", e)
@@ -96,7 +102,7 @@ def load_project_skill_ownership() -> dict[str, dict[str, str]]:
 
 
 def save_project_skill_ownership(data: dict[str, dict[str, str]]) -> bool:
-    return _atomic_write_json(PROJECT_SKILL_OWNERSHIP_FILE, data, indent=2)
+    return _atomic_write_json(PROJECT_SKILL_OWNERSHIP_FILE, data)
 
 
 def load_package_skill_inventory() -> dict[str, Any]:
@@ -109,8 +115,8 @@ def load_package_skill_inventory() -> dict[str, Any]:
     if not os.path.exists(PACKAGE_SKILL_INVENTORY_FILE):
         return {}
     try:
-        with open(PACKAGE_SKILL_INVENTORY_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(PACKAGE_SKILL_INVENTORY_FILE, "rb") as f:
+            data = orjson.loads(f.read())
         return data if isinstance(data, dict) else {}
     except Exception as e:
         logger.warning("Error loading package skill inventory: %s", e)
@@ -118,7 +124,7 @@ def load_package_skill_inventory() -> dict[str, Any]:
 
 
 def save_package_skill_inventory(data: dict[str, Any]) -> bool:
-    return _atomic_write_json(PACKAGE_SKILL_INVENTORY_FILE, data, indent=2)
+    return _atomic_write_json(PACKAGE_SKILL_INVENTORY_FILE, data)
 
 
 def save_cache(data: dict[str, Any]) -> bool:
@@ -134,7 +140,7 @@ def save_cache(data: dict[str, Any]) -> bool:
                 {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
                 for skill in slim_data["skills"]
             ]
-        return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data, indent=2)
+        return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data)
     except Exception as e:
         logger.warning("Error saving cache: %s", e)
         return False
@@ -146,10 +152,10 @@ def load_cache() -> dict[str, Any] | None:
     if not cache_path.exists():
         return None
     try:
-        with open(cache_path, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(cache_path, "rb") as f:
+            data = orjson.loads(f.read())
         return CacheState.model_validate(data).model_dump()
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
+    except (orjson.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning("[CACHE] Corrupted cache (%s).", e)
         with contextlib.suppress(BaseException):
             cache_path.unlink()
@@ -166,15 +172,15 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
             return 0
 
         path_set = set(paths_to_remove)
-        with open(cache_path, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(cache_path, "rb") as f:
+            data = orjson.loads(f.read())
 
         original_count = len(data.get("skills", []))
         data["skills"] = [s for s in data.get("skills", []) if s.get("local_path") not in path_set]
         removed = original_count - len(data["skills"])
 
         if removed > 0:
-            _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data, indent=2)
+            _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
 
         return removed
     except Exception as exc:
@@ -193,8 +199,8 @@ def patch_cache_add(
         if not cache_path.exists():
             return 0
 
-        with open(cache_path, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(cache_path, "rb") as f:
+            data = orjson.loads(f.read())
 
         if not isinstance(data, dict):
             return 0
@@ -255,7 +261,7 @@ def patch_cache_add(
             f"Found {num_skills} skills in master library ({num_projects} projects)"
         )
 
-        _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data, indent=2)
+        _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
 
         return updated_count
     except Exception as exc:
@@ -273,8 +279,8 @@ def load_temp_registry() -> list[str]:
     if not os.path.exists(TEMP_COPIES_FILE):
         return []
     try:
-        with open(TEMP_COPIES_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(TEMP_COPIES_FILE, "rb") as f:
+            data = orjson.loads(f.read())
             return data.get("temp_paths", [])
     except Exception as e:
         logger.warning("Error loading temp registry: %s", e)

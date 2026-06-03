@@ -175,16 +175,17 @@ Item {
                     // Dynamic width: Fill remaining space on the line, or take full width if too small
                     readonly property real minSearchWidth: 200
                     readonly property real fixedWidth: fixedControls.width + headerControls.spacing
-                    
+
                     width: {
                         let available = headerControls.width - fixedWidth;
                         return available >= minSearchWidth ? available : headerControls.width;
                     }
 
-                    onTextChanged: {
+                    onDebouncedTextChanged: (text) => {
                         AppController.quickCopyModel.filterText = text
                     }
                 }
+
             }
         }
 
@@ -513,7 +514,7 @@ Item {
             }
 
             // Skill List
-            ListView {
+            SmoothListView {
                 id: qcv_skillList
                 objectName: "quickCopyList"
                 SplitView.fillWidth: true
@@ -599,7 +600,6 @@ Item {
                 }
 
                 ScrollBar.vertical: ScrollBar {
-                    active: true
                 }
             }
 

@@ -102,7 +102,7 @@ Item {
             currentIndex: tabBar.currentIndex
 
             // Settings Content
-            ScrollView {
+            SmoothScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
@@ -175,6 +175,218 @@ Item {
                                 GlassSwitch {
                                     checked: AppController.ui_controller.compactListRows
                                     onCheckedChanged: AppController.ui_controller.setCompactListRows(checked)
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                spacing: 12
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.fillWidth: true
+                                    Text {
+                                        text: "Scroll Speed"
+                                        font.family: Theme.fontFamily
+                                        color: Theme.label
+                                    }
+                                    Text {
+                                        text: "Multiplier: " + AppController.config_mgr.scrollSpeedMultiplier.toFixed(1) + "x"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.secondaryLabel
+                                    }
+                                }
+                                Slider {
+                                    Layout.preferredWidth: 150
+                                    from: 0.5
+                                    to: 5.0
+                                    stepSize: 0.1
+                                    value: AppController.config_mgr.scrollSpeedMultiplier
+                                    onMoved: AppController.config_mgr.scrollSpeedMultiplier = value
+                                }
+                            }
+                        }
+                    }
+
+                    // Application Updates Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: updatesSettingsLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: updatesSettingsLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Application Updates"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Auto Check for Updates"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller.autoCheckUpdates
+                                    onCheckedChanged: AppController.config_controller.autoCheckUpdates = checked
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Auto Download Updates"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller.autoDownloadUpdates
+                                    onCheckedChanged: AppController.config_controller.autoDownloadUpdates = checked
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            Text {
+                                text: "Skill Packages"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Skill Package Auto Updates"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller.skillPackageAutoUpdate
+                                    onCheckedChanged: AppController.config_controller.skillPackageAutoUpdate = checked
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Auto Update Mode"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassDropdown {
+                                    model: ["prompt", "silent"]
+                                    currentIndex: model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)
+                                    onActivated: {
+                                        AppController.config_controller.skillPackageAutoUpdateMode = model[index]
+                                    }
+                                    Layout.preferredWidth: 100
+                                }
+                            }
+
+                            RowLayout {
+                                spacing: 12
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.fillWidth: true
+                                    Text {
+                                        text: "Check Interval"
+                                        font.family: Theme.fontFamily
+                                        color: Theme.label
+                                    }
+                                    Text {
+                                        text: "Every " + AppController.config_controller.updateCheckIntervalHours + " hours"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.secondaryLabel
+                                    }
+                                }
+                                Slider {
+                                    Layout.preferredWidth: 150
+                                    from: 1
+                                    to: 168
+                                    stepSize: 1
+                                    value: AppController.config_controller.updateCheckIntervalHours
+                                    onMoved: AppController.config_controller.updateCheckIntervalHours = value
+                                }
+                            }
+                        }
+                    }
+
+                    // Context Menu Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: contextMenuLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: contextMenuLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Context Menu"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Show Icons"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller.showMenuIcons
+                                    onCheckedChanged: AppController.config_controller.showMenuIcons = checked
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Compact Menu"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller.compactMenu
+                                    onCheckedChanged: AppController.config_controller.compactMenu = checked
                                 }
                             }
                         }

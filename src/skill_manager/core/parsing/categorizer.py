@@ -4,6 +4,19 @@ from typing import Any
 from .constants import CATEGORIES, MAIN_CATEGORIES_MAPPING
 
 _CATEGORY_PATTERNS = None
+_COMBINED_REGEX = None
+_KW_TO_CAT = {}
+
+_MAIN_CATEGORY_REVERSE_MAP = {
+    sub.lower(): main
+    for main, sub_cats in MAIN_CATEGORIES_MAPPING.items()
+    for sub in sub_cats
+}
+
+def get_main_category(sub_category: str) -> str:
+    if not sub_category:
+        return "⚙️ System & Workflow"
+    return _MAIN_CATEGORY_REVERSE_MAP.get(sub_category.lower(), "⚙️ System & Workflow")
 
 def _get_category_patterns():
     global _CATEGORY_PATTERNS
@@ -31,18 +44,6 @@ def _get_category_patterns():
         if patterns:
             _CATEGORY_PATTERNS[cat] = patterns
     return _CATEGORY_PATTERNS
-
-_MAIN_CATEGORY_REVERSE_MAP = {
-    sub.lower(): main
-    for main, sub_cats in MAIN_CATEGORIES_MAPPING.items()
-    for sub in sub_cats
-}
-
-
-def get_main_category(sub_category: str) -> str:
-    if not sub_category:
-        return "⚙️ System & Workflow"
-    return _MAIN_CATEGORY_REVERSE_MAP.get(sub_category.lower(), "⚙️ System & Workflow")
 
 def categorize_skill(name: str, description: str, metadata: dict | None = None) -> dict[str, str]:
     """Determines the best category for a skill using a weighted, hierarchical algorithm."""

@@ -109,9 +109,9 @@ def run_pyinstaller(spec_path: str) -> int:
     if not os.path.exists(spec_path):
         raise FileNotFoundError(f"Spec file not found at: {spec_path}")
 
-    try:
-        import PyInstaller
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("PyInstaller") is None:
         print("Error: PyInstaller is not installed in the current Python environment.")
         print("Please run this script inside the uv virtual environment (e.g., `uv run python scripts/build_app.py`).")
         sys.exit(1)

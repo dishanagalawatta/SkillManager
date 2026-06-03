@@ -1,38 +1,56 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import httpx
 import pytest
 
 from skill_manager.controllers.app_update_controller import AppUpdateController
 
 
 @pytest.mark.asyncio
-async def test_fetch_latest_release_uses_httpx_response():
-    controller = AppUpdateController(MagicMock())
-    controller._on_release_fetched = MagicMock()
+async def test_check_tuf_updates_success():
+    mock_app = MagicMock()
+    controller = AppUpdateController(mock_app)
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"tag_name": "v9.9.9", "html_url": "https://example.test/release"}
-    mock_response.raise_for_status.return_value = None
+    # Mock the client and its check_for_updates method
+    mock_client = MagicMock()
+    mock_client.check_for_updates.return_value = "2.0.0"
+    controller._client = mock_client
 
-    with patch("httpx.AsyncClient.get", return_value=mock_response):
-        await controller._fetch_latest_release()
+    # Mock the signals
+    controller.updateAvailableChanged = MagicMock()
+    controller.latestVersionChanged = MagicMock()
 
-    controller._on_release_fetched.assert_called_once_with(
-        {"version": "9.9.9", "url": "https://example.test/release"}
-    )
+    await controller._check_tuf_updates()
 
+    assert controller.updateAvailable is True
+    assert controller.latestVersion == "2.0.0"
+    controller.updateAvailableChanged.emit.assert_called()
+    controller.latestVersionChanged.emit.assert_called()
 
 @pytest.mark.asyncio
-async def test_fetch_latest_release_handles_retry_exhaustion():
-    controller = AppUpdateController(MagicMock())
-    controller._on_release_fetched = MagicMock()
+async def test_check_tuf_updates_no_update():
+    mock_app = MagicMock()
+    controller = AppUpdateController(mock_app)
 
-    with patch(
-        "httpx.AsyncClient.get",
-        side_effect=httpx.HTTPError("timeout"),
-    ) as mock_get:
-        await controller._fetch_latest_release()
+    mock_client = MagicMock()
+    mock_client.check_for_updates.return_value = None
+    controller._client = mock_client
 
-    assert mock_get.call_count == 3
-    controller._on_release_fetched.assert_not_called()
+    controller.updateAvailableChanged = MagicMock()
+
+    await controller._check_tuf_updates()
+
+    assert controller.updateAvailable is False
+    controller.updateAvailableChanged.emit.assert_called()
+
+@pytest.mark.asyncio
+async def test_check_tuf_updates_failure():
+    mock_app = MagicMock()
+    controller = AppUpdateController(mock_app)
+
+    mock_client = MagicMock()
+    mock_client.check_for_updates.side_effect = Exception("Network error")
+    controller._client = mock_client
+
+    # Should not raise exception but log it (guarded by try-except)
+    await controller._check_tuf_updates()
+    assert controller.updateAvailable is False

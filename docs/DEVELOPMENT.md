@@ -108,6 +108,29 @@ To build locally for testing:
 3. **Windows Installer**:
    Compile `packaging/windows/installer.iss` using Inno Setup to generate `SkillManager_Setup.exe`.
 
+### Auto-Update Releases (Tufup)
+We use `tufup` (The Update Framework) for secure background updates. This provides protection against malicious updates through cryptographic signing of metadata.
+
+1. **Initialize Repository** (First time only):
+   ```bash
+   uv run python scripts/publish_tuf_release.py --version 1.0.0 --bundle dist/SkillManager --init
+   ```
+   **CRITICAL SECURITY:** This generates private keys in `tuf_keys/`. 
+   - **DO NOT** commit these keys to Git (they are ignored by `.gitignore`).
+   - **BACKUP** this folder to a secure location. If lost, you cannot update your users.
+
+2. **Publish a New Version**:
+   ```bash
+   uv run python scripts/publish_tuf_release.py --version 1.0.1 --bundle dist/SkillManager
+   ```
+   This script archives the bundle, generates patches, and signs the new metadata.
+
+3. **Deploy to GitHub Pages**:
+   - Updates are served via the `gh-pages` branch.
+   - Push the contents of `tuf_repo/metadata` to `gh-pages:/metadata/`.
+   - Push the contents of `tuf_repo/targets` to `gh-pages:/targets/`.
+   - The client fetches from `https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/`.
+
 ---
 
 ## 🚢 Release & CI/CD Strategy

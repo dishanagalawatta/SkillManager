@@ -30,6 +30,15 @@ class OpsController(BaseController):
 
     def _updateModelsSource(self, path: str, key: str, value: bool) -> None:
         """Updates a property for all skills matching the local_path across both models."""
+        from skill_manager.core.models.qt_model import SkillModel
+
+        # Map internal property keys to Qt Model Roles for surgical UI updates
+        role_map = {
+            "is_starred": SkillModel.IsStarredRole,
+            "is_archived": SkillModel.IsArchivedRole,
+        }
+        target_role = role_map.get(key)
+
         for model in (self.app._library_model, self.app._quick_copy_model):
             all_skills = getattr(model, "_all_skills", None)
             if isinstance(all_skills, list):
@@ -39,6 +48,15 @@ class OpsController(BaseController):
                             skill[key] = value
                         else:
                             setattr(skill, key, value)
+
+            # Srgical UI Update: Find if this skill is visible and notify QML
+            if target_role is not None:
+                filtered = getattr(model, "_filtered_skills", [])
+                for i, skill in enumerate(filtered):
+                    if skill.local_path == path:
+                        idx = model.index(i, 0)
+                        model.dataChanged.emit(idx, idx, [target_role])
+                        break
 
     @Slot()
     def toggleArchive(self):
@@ -125,6 +143,11 @@ class OpsController(BaseController):
         if not items:
             return
 
+        # ── Step 0: Optimistic UI Removal
+        paths_to_delete = [i.get("local_path") for i in items if i.get("local_path")]
+        self.app._library_model.removeSkillsByPath(paths_to_delete)
+        self.app._quick_copy_model.removeSkillsByPath(paths_to_delete)
+
         def _background_delete():
             deleted = 0
             failed = 0
@@ -162,10 +185,8 @@ class OpsController(BaseController):
             status = f"Deletion complete: {', '.join(parts) or 'nothing happened'}"
             QTimer.singleShot(0, self.app, lambda: self.app._set_status(status))
 
-            # Refresh models to reflect the removal
-            if deleted > 0:
-                QTimer.singleShot(0, self.app, self.app.refreshSkills)
-
+            # Note: No longer need full refreshSkills here as we were optimistic.
+            # Only need it if we wanted to rollback failures, but for now we just log them.
 
         self.app.task_runner.run(_background_delete)
 

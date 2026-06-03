@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from git import Repo, cmd
+
 from .config import normalize_skill_package_config
 from .process import _emit, run_process
 from .relocator import relocate_packages_from_output
@@ -29,41 +31,43 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
         raise ValueError("Configure either package_path or clone_path for git sources.")
 
     path = Path(os.path.expanduser(clone_path))
-    auth_url = repository_url
+    token = source.get("github_token")
+
+    # Use a custom credential helper to provide the token if available
+    config_args = ["-c", "protocol.ext.allow=never"]
+    if token:
+        config_args.extend(["-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f"])
 
     if (path / ".git").is_dir():
         _emit(output_callback, f"Pulling {repository_url} in {path}...")
-        run_process(
-            ["git", "-c", "protocol.ext.allow=never"]
-            + (
-                [
-                    "-c",
-                    f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f",
-                ]
-                if source.get("github_token")
-                else []
-            )
-            + ["-C", str(path), "pull", "--ff-only"],
-            output_callback,
-        )
+        try:
+            repo = Repo(path)
+            # We use git.cmd.Git for more control over the pull command with config arguments
+            g = repo.git
+            # Execute pull with config args
+            output = g.execute(["git"] + config_args + ["pull", "--ff-only"])
+            if output:
+                _emit(output_callback, output)
+            _emit(output_callback, f"Successfully pulled '{repository_url}'.")
+        except Exception as e:
+            _emit(output_callback, f"Git pull failed: {e}")
+            raise
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         _emit(output_callback, f"Cloning {repository_url} into {path}...")
-        run_process(
-            ["git", "-c", "protocol.ext.allow=never"]
-            + (
-                [
-                    "-c",
-                    f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(source.get('github_token'))}; }}; f",
-                ]
-                if source.get("github_token")
-                else []
-            )
-            + ["clone", "--", auth_url, str(path)],
-            output_callback,
-        )
+        try:
+            # Repo.clone_from doesn't easily support arbitrary git -c arguments
+            # so we use git.cmd.Git directly
+            g = cmd.Git()
+            output = g.execute(["git"] + config_args + ["clone", "--", repository_url, str(path)])
+            if output:
+                _emit(output_callback, output)
+            _emit(output_callback, f"Successfully cloned '{repository_url}'.")
+        except Exception as e:
+            _emit(output_callback, f"Git clone failed: {e}")
+            raise
 
     if clone_path != package_path:
         _emit(output_callback, f"Installed to {path}")
@@ -79,7 +83,6 @@ def _run_npm_update(
 
     command = ["npx", "--yes", "--", package_name]
     if source.get("package_args"):
-        # Local import or copy _split_args
         from .config import _split_args
         command.extend(_split_args(source["package_args"]))
     run_process(command, output_callback, cwd=cwd)

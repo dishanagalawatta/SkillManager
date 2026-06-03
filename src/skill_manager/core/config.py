@@ -1,10 +1,10 @@
-import json
 import logging
 import os
 import shutil
 from pathlib import Path
 from typing import Any
 
+import orjson
 from platformdirs import user_data_dir
 
 from skill_manager.core.schemas import AppConfig
@@ -153,8 +153,8 @@ class ConfigManager:
 
         if not self.config_path.exists() and root_config.is_file():
             try:
-                with open(root_config) as f:
-                    self.data = json.load(f)
+                with open(root_config, "rb") as f:
+                    self.data = orjson.loads(f.read())
                 self.save()  # Migrate to new location
                 # Continue loading to handle potential secondary migrations (e.g. targets -> projects)
             except Exception as e:
@@ -162,8 +162,8 @@ class ConfigManager:
 
         if self.config_path.exists():
             try:
-                with open(self.config_path) as f:
-                    self.data = json.load(f)
+                with open(self.config_path, "rb") as f:
+                    self.data = orjson.loads(f.read())
 
                 old_data = dict(self.data)
                 self.data = AppConfig.from_legacy(self.data).model_dump(by_alias=True)
@@ -196,8 +196,9 @@ class ConfigManager:
     def save(self) -> None:
         """Saves current configuration."""
         try:
-            with open(self.config_path, "w") as f:
-                json.dump(self.data, f, indent=4)
+            content = orjson.dumps(self.data, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE)
+            with open(self.config_path, "wb") as f:
+                f.write(content)
         except Exception as e:
             logger.warning("Error saving config: %s", e)
 

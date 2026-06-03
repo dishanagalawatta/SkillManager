@@ -3,15 +3,16 @@ Purpose: Manages background discovery of skills and cache synchronization.
 Usage: Accessed via AppController.discovery
 """
 
+import asyncio
 import logging
 import os
 import traceback
 
+import PySide6.QtAsyncio as QtAsyncio
 from PySide6.QtCore import Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.discovery import DiscoveryService
-from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ class DiscoveryController(BaseController):
 
     @Slot()
     def loadInitialData(self):
-        """Initial scan of skills on application startup in a background thread."""
+        """Initial scan of skills on application startup using QtAsyncio."""
+        QtAsyncio.run(self._do_discovery())
+
+    async def _do_discovery(self):
+        """Internal async discovery implementation."""
         self.app._is_loading = True
         self.app.isLoadingChanged.emit()
         self.app._set_status("Scanning skills...")
@@ -41,50 +46,43 @@ class DiscoveryController(BaseController):
             project_aliases=self.app._project_aliases,
         )
 
-        def run_discovery():
-            try:
-                def cache_callback(cached_data):
-                    nonlocal used_cache_preview
-                    used_cache_preview = True
-                    logger.info(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
-                    schedule_on_ui_thread(
-                        self.app,
-                        lambda: self._finalize_loading(
-                            cached_data.get("skills", []),
-                            cached_data.get("projects", []),
-                            cached_data.get("categories", []),
-                            cached_data.get("project_labels", []),
-                            f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
-                            is_final=False,
-                        ),
-                    )
-
-                result = service.discover_all(cache_callback=cache_callback)
-
-                # Signal completion back to main thread
-                # In tests, we skip the artificial delay to avoid hanging event loops
-                final_delay_ms = 0
-                if used_cache_preview and not self.app.isTesting:
-                    final_delay_ms = 200
-
-                schedule_on_ui_thread(
-                    self.app,
-                    lambda: self._finalize_loading(
-                        result["skills"],
-                        result["projects"],
-                        result["categories"],
-                        result["project_labels"],
-                        result["status"],
-                        is_final=True,
-                    ),
-                    delay_ms=final_delay_ms,
+        try:
+            def cache_callback(cached_data):
+                nonlocal used_cache_preview
+                used_cache_preview = True
+                logger.info(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
+                # Update UI immediately from the cached data
+                self._finalize_loading(
+                    cached_data.get("skills", []),
+                    cached_data.get("projects", []),
+                    cached_data.get("categories", []),
+                    cached_data.get("project_labels", []),
+                    f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
+                    is_final=False,
                 )
-            except Exception as e:
-                error_msg = f"Error scanning skills: {e}"
-                traceback.print_exc()
-                schedule_on_ui_thread(self.app, lambda: self._handle_loading_error(error_msg))
 
-        self.app.task_runner.run(run_discovery)
+            # run_in_executor allows running CPU-bound discovery without blocking the event loop
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, lambda: service.discover_all(cache_callback=cache_callback)
+            )
+
+            # In tests, we skip the artificial delay
+            if used_cache_preview and not self.app.isTesting:
+                await asyncio.sleep(0.2)
+
+            self._finalize_loading(
+                result["skills"],
+                result["projects"],
+                result["categories"],
+                result["project_labels"],
+                result["status"],
+                is_final=True,
+            )
+        except Exception as e:
+            error_msg = f"Error scanning skills: {e}"
+            traceback.print_exc()
+            self._handle_loading_error(error_msg)
 
     def _finalize_loading(self, all_skills, _projects_state, cats, proj_labels, status, is_final=True):
         """Updates model and UI state on the main thread after discovery completes."""

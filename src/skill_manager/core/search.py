@@ -65,8 +65,28 @@ class SearchEngine:
 
     def __init__(self, skills: list[dict[str, Any]]):
         self.indexer = SkillIndexer()
-        self.skills = skills
-        self._indexed_data = [(skill, self.indexer.build_index_data(skill)) for skill in skills]
+        self._indexed_data = []
+        self._skills_map = {}  # local_path -> (skill, indexed_data)
+        self.update_index(skills)
+
+    def update_index(self, skills: list[dict[str, Any]]):
+        """Adds or updates skills in the index."""
+        for skill in skills:
+            # Use local_path as primary ID, fallback to name for tests
+            path = skill.get("local_path") or skill.get("name")
+            if not path:
+                continue
+            index_data = self.indexer.build_index_data(skill)
+            self._skills_map[path] = (skill, index_data)
+
+        # Rebuild the list version for faster iteration in query()
+        self._indexed_data = list(self._skills_map.values())
+
+    def remove_from_index(self, paths: list[str]):
+        """Removes skills from the index by path."""
+        for path in paths:
+            self._skills_map.pop(path, None)
+        self._indexed_data = list(self._skills_map.values())
 
     def query(
         self, query_text: str, threshold: float = 30.0, valid_paths: set = None

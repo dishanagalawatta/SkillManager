@@ -150,7 +150,7 @@ Dialog {
         }
         
         // Scrollable Form Content
-        ScrollView {
+        SmoothScrollView {
             id: formScroll
             Layout.fillWidth: true
             Layout.fillHeight: true

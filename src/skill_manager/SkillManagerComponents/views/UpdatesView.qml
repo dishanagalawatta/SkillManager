@@ -190,7 +190,7 @@ Item {
                             }
                         }
 
-                        ListView {
+                        SmoothListView {
                             id: uv_packagesList
                             objectName: "uv_packagesList"
                             Layout.fillWidth: true
@@ -363,7 +363,7 @@ Item {
                             }
                         }
 
-                        ListView {
+                        SmoothListView {
                             id: uv_projectsList
                             objectName: "uv_projectsList"
                             Layout.fillWidth: true

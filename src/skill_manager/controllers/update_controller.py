@@ -4,12 +4,17 @@ Usage: Accessed via AppController.updates
 """
 
 
+import logging
+from pathlib import Path
+
 from PySide6.QtCore import QTimer, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.update_service import UpdateService
 from skill_manager.utils.qt_threading import schedule_on_ui_thread
+
+logger = logging.getLogger(__name__)
 
 
 class UpdateController(BaseController):
@@ -115,6 +120,13 @@ class UpdateController(BaseController):
                 self.app.isLoadingChanged.emit()
                 self.app.updatePackagesChanged.emit()
                 self.app._set_status(f"Scan complete: {len(results)} skills processed")
+
+                # Handle Silent Auto-Update
+                if (self.config.get("skill_package_auto_update", True) and
+                    self.config.get("skill_package_auto_update_mode") == "silent" and
+                    self.app._stats_outdated > 0):
+                    logger.info("Silent auto-update triggered for outdated skill packages.")
+                    self.updateNow()
 
             QTimer.singleShot(0, self.app, finalize)
 
@@ -383,11 +395,13 @@ class UpdateController(BaseController):
 
         def run_sync():
             try:
+                from skill_manager.core.discovery import DiscoveryService
                 from skill_manager.core.parsing import (
                     build_skill_search_text,
                     categorize_skill,
                     parse_skill_md,
                 )
+                from skill_manager.core.persistence import patch_cache_add
                 from skill_manager.core.quick_copy import discover_package_skills
 
                 source_skills = discover_package_skills(
@@ -399,6 +413,34 @@ class UpdateController(BaseController):
 
                 from skill_manager.core.copier import copy_skill_folders_to_projects
                 result = copy_skill_folders_to_projects(source_skills, [path], update_only=True)
+
+                discovered_skills = []
+                if result["details"]:
+                    service = DiscoveryService(
+                        sources=list(self.app._sources),
+                        projects=self.app._projects,
+                        archive_paths=self.app._archive_paths,
+                        starred_paths=self.app._starred_paths,
+                        project_aliases=self.app._project_aliases,
+                    )
+                    for detail in result["details"]:
+                        if detail["status"] in ("copied", "merged") and detail.get("message"):
+                            skill_path = Path(detail["message"])
+                            proj_path = Path(detail["project"])
+                            try:
+                                skill_data = service.discover_single_skill(skill_path, proj_path)
+                                if skill_data:
+                                    discovered_skills.append(skill_data)
+                            except Exception as exc:
+                                import logging
+                                logging.getLogger(__name__).error(f"[SYNC SCAN] Failed scanning {skill_path}: {exc}")
+
+                if discovered_skills:
+                    patch_cache_add(discovered_skills)
+                    def update_ui():
+                        self.app._library_model.addOrUpdateSkills(discovered_skills)
+                        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+                    QTimer.singleShot(0, self.app, update_ui)
 
                 msg = f"Update complete for {self.app.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
