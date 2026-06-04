@@ -32,3 +32,8 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+
+## 2026-05-31 - [Credential Helper Log Leakage Prevention - Multiline]
+**Vulnerability:** The application executes `git` processes with an inline credential helper string (e.g. `credential.helper=!f() { echo username=token; echo password=$TOKEN; }; f`). The `sanitize_token` function stripped passwords but used `.*` which did not handle newlines. Passwords containing newlines (multiline passwords) would only be partially redacted, leaking the subsequent lines of the password.
+**Learning:** `.*` in regex does not match newlines by default in Python. Using lookaheads for exact closing bounds can lead to under-redaction and "fail open" scenarios if the bounding strings differ slightly or newlines/spaces break the logic. Redacting secrets must always "fail safe" (over-redacting).
+**Prevention:** Always use `re.DOTALL` when using `.*` to redact the remainder of a log line or command string if it contains a secret, ensuring full redaction even if the secret contains newlines.
