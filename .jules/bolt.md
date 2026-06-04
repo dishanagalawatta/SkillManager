@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-23 - Optimize search tokenization and scoring
+**Learning:** In the core search engine logic (`SearchEngine._calculate_score`), dynamically concatenating multiple lists (`name_tokens`, `tags`, `description_tokens`) into a single `all_doc_tokens` list during O(N) queries on every keystroke adds measurable Python runtime overhead. Additionally, evaluating `rapid_fuzz` across exact duplicate tokens in the query and document wastes CPU cycles.
+**Action:** Pre-compute aggregated token lists (`all_doc_tokens`) during the indexing phase (`SkillIndexer.build_index_data`). Do not store them as Python sets in the dictionary to avoid JSON serialization issues during persistence. Convert the lists to `set()` at runtime and perform an O(1) `isdisjoint()` exact match check to instantly bypass fuzzy string matching for hits. De-duplicate remaining items with sets before falling back to `fuzz.ratio` to skip redundant work.
