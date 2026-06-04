@@ -60,6 +60,11 @@ def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
     )
     assert sanitize_token(None) is None
 
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password='my secret' ; }; f") == "credential.helper=!f() { echo username=token; echo password='***' ; }; f"
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password=secret; }; f") == "credential.helper=!f() { echo username=token; echo password=***; }; f"
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password='my secret' }") == "credential.helper=!f() { echo username=token; echo password='***' }"
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password=secret }") == "credential.helper=!f() { echo username=token; echo password=*** }"
+
 
 def test_detect_package_config_npm():
     data = {"package_name": "npx --yes my-pkg --foo"}

@@ -32,3 +32,7 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+## 2024-05-24 - [Precise Log Redaction for Command Structures]
+ **Vulnerability:** Log redaction regular expressions were overly aggressive and dropped the trailing portion of the credential setup strings leading to silent data-loss bugs in operational logging.
+ **Learning:** Using `.*` in inline string replacements causes unintended massive data loss by dropping all remaining text, like closing parentheses and semicolons, in command structures.
+ **Prevention:** When using regular expressions to redact secrets embedded within shell commands or structured strings (like `echo password='secret'`), separate patterns for quoted and unquoted values (e.g., `(password=)(['"])(.*?)\2` for quoted, and `(password=)(?!['"])([^;\r\n]+)` for unquoted) to safely handle spaces inside quotes without dropping trailing command context like semicolons or newlines.
