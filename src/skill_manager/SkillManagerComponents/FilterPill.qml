@@ -61,6 +61,6 @@ Button {
     Accessible.name: control.text
 
     HoverHandler {
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
     }
 }

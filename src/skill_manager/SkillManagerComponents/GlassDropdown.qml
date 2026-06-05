@@ -116,6 +116,6 @@ ComboBox {
     Accessible.name: control.displayText
 
     HoverHandler {
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
     }
 }
