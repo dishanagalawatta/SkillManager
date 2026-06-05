@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 /**
@@ -18,6 +19,8 @@ Button {
 
     property string iconInactive: ""
     property string iconActive: ""
+    property string iconSourceInactive: ""
+    property string iconSourceActive: ""
     property string textInactive: text
     property string textActive: text
     property string tooltipText: checked ? textActive : textInactive
@@ -37,17 +40,42 @@ Button {
             anchors.centerIn: parent
             spacing: 8
 
-            Text {
-                text: control.checked ? control.iconActive : control.iconInactive
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                color: control.checked ? Theme.accent : Theme.secondaryLabel
-                visible: text !== ""
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            Item {
+                visible: (control.checked ? (control.iconActive !== "" || control.iconSourceActive !== "") : (control.iconInactive !== "" || control.iconSourceInactive !== ""))
+                width: 16
+                height: 16
                 Layout.alignment: Qt.AlignVCenter
 
-                Behavior on color { ColorAnimation { duration: 200 } }
+                Text {
+                    anchors.centerIn: parent
+                    text: control.checked ? control.iconActive : control.iconInactive
+                    visible: control.checked ? (control.iconSourceActive === "" && control.iconActive !== "") : (control.iconSourceInactive === "" && control.iconInactive !== "")
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 16
+                    color: control.checked ? Theme.accent : Theme.secondaryLabel
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+
+                    Behavior on color { ColorAnimation { duration: 200 } }
+                }
+
+                Image {
+                    id: iconImg
+                    anchors.fill: parent
+                    visible: control.checked ? control.iconSourceActive !== "" : control.iconSourceInactive !== ""
+                    source: control.checked ? control.iconSourceActive : control.iconSourceInactive
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                ColorOverlay {
+                    anchors.fill: iconImg
+                    source: iconImg
+                    color: control.checked ? Theme.accent : Theme.secondaryLabel
+                    visible: iconImg.visible
+                }
             }
 
             Text {

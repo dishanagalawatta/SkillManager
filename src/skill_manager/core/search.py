@@ -132,7 +132,11 @@ class SearchEngine:
         # by ensuring at least one query token matches a document token reasonably well.
         query_tokens = self.indexer.tokenize(query)
         if query_tokens:
-            all_doc_tokens = index_data.get("name_tokens", []) + index_data.get("tags", []) + index_data.get("description_tokens", [])
+            all_doc_tokens = (
+                index_data.get("name_tokens", [])
+                + index_data.get("tags", [])
+                + index_data.get("description_tokens", [])
+            )
             # Also include category as a token if present
             if index_data.get("category"):
                 all_doc_tokens.append(index_data["category"])

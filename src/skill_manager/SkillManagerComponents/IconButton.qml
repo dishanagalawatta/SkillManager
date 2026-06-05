@@ -1,11 +1,13 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 
 Button {
     id: control
 
     property string iconText: text
+    property string iconSource: ""
     property string role: "secondary" // secondary, primary, destructive, ghost
     property string tooltipText: ""
     property string accessibleName: tooltipText !== "" ? tooltipText : iconText
@@ -25,6 +27,7 @@ Button {
 
         Text {
             anchors.centerIn: parent
+            visible: control.iconSource === "" && control.iconText !== ""
             text: control.iconText
             font.family: Theme.fontFamily
             font.pixelSize: control.iconSize
@@ -37,6 +40,31 @@ Button {
             }
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+        }
+
+        Image {
+            id: iconImg
+            anchors.centerIn: parent
+            width: control.iconSize
+            height: control.iconSize
+            visible: control.iconSource !== ""
+            source: control.iconSource
+            sourceSize.width: control.iconSize
+            sourceSize.height: control.iconSize
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+
+        ColorOverlay {
+            anchors.fill: iconImg
+            source: iconImg
+            color: {
+                if (!control.enabled) return Theme.secondaryLabel
+                if (control.role === "primary") return "white"
+                if (control.role === "destructive") return Theme.danger
+                return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
+            }
+            visible: control.iconSource !== ""
         }
     }
 

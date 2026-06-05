@@ -1,11 +1,13 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 
 Button {
     id: control
 
     property string iconText: ""
+    property string iconSource: ""
     property string labelText: text
     property string role: "secondary" // primary, secondary, destructive
     property string tooltipText: ""
@@ -26,22 +28,52 @@ Button {
         RowLayout {
             id: contentRow
             anchors.centerIn: parent
-            spacing: control.iconText !== "" && control.labelText !== "" ? 7 : 0
+            spacing: (control.iconText !== "" || control.iconSource !== "") && control.labelText !== "" ? 7 : 0
 
-            Text {
-                text: control.iconText
-                visible: control.iconText !== ""
-                font.family: Theme.fontFamily
-                font.pixelSize: 14
-                color: {
-                    if (!control.enabled) return Theme.secondaryLabel
-                    if (control.role === "primary") return "white"
-                    if (control.role === "destructive") return Theme.danger
-                    return control.hovered || control.down ? Theme.label : Theme.accent
-                }
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            Item {
+                visible: control.iconText !== "" || control.iconSource !== ""
+                width: 14
+                height: 14
                 Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: control.iconText
+                    visible: control.iconSource === "" && control.iconText !== ""
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                    color: {
+                        if (!control.enabled) return Theme.secondaryLabel
+                        if (control.role === "primary") return "white"
+                        if (control.role === "destructive") return Theme.danger
+                        return control.hovered || control.down ? Theme.label : Theme.accent
+                    }
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Image {
+                    id: iconImg
+                    anchors.fill: parent
+                    visible: control.iconSource !== ""
+                    source: control.iconSource
+                    sourceSize.width: 14
+                    sourceSize.height: 14
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                ColorOverlay {
+                    anchors.fill: iconImg
+                    source: iconImg
+                    color: {
+                        if (!control.enabled) return Theme.secondaryLabel
+                        if (control.role === "primary") return "white"
+                        if (control.role === "destructive") return Theme.danger
+                        return control.hovered || control.down ? Theme.label : Theme.accent
+                    }
+                    visible: control.iconSource !== ""
+                }
             }
 
             Text {

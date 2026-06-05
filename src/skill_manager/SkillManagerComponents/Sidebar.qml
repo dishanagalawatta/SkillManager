@@ -75,7 +75,7 @@ Rectangle {
 
         // Main Navigation
         SidebarButton {
-            iconText: "⚡"
+            iconSource: AppController.ui_controller.getAssetUri("ui/lightning-icon.svg")
             labelText: "Quick Copy"
             collapsed: root.isCollapsed
             active: root.currentView === "Quick Copy"
@@ -87,7 +87,7 @@ Rectangle {
         }
 
         SidebarButton {
-            iconText: "📚"
+            iconSource: AppController.ui_controller.getAssetUri("ui/library-icon.svg")
             labelText: "Library"
             collapsed: root.isCollapsed
             active: root.currentView === "Library"
@@ -98,7 +98,7 @@ Rectangle {
         }
 
         SidebarButton {
-            iconText: "🔄"
+            iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
             labelText: "Updates"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"
@@ -106,7 +106,7 @@ Rectangle {
         }
 
         SidebarButton {
-            iconText: "⚙️"
+            iconSource: AppController.ui_controller.getAssetUri("ui/settings-icon.svg")
             labelText: "Settings"
             collapsed: root.isCollapsed
             active: root.currentView === "Settings"

@@ -40,6 +40,8 @@ os.environ.setdefault(
 
 # Monkeypatch os.unlink to workaround Python 3.14 + Pytest issue with Windows junctions
 _original_os_unlink = os.unlink
+
+
 def _safe_os_unlink(path, *args, **kwargs):
     try:
         _original_os_unlink(path, *args, **kwargs)
@@ -49,18 +51,23 @@ def _safe_os_unlink(path, *args, **kwargs):
                 os.rmdir(path)
             return
         raise e
+
+
 os.unlink = _safe_os_unlink
+
 
 @pytest.fixture(scope="session")
 def qapp_cls():
     """Tells pytest-qt to use QApplication instead of QGuiApplication."""
     return QApplication
 
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_qml_style(qapp):
     """Ensures QQuickStyle is set on the qapp instance."""
     QQuickStyle.setStyle("Basic")
     yield
+
 
 @pytest.fixture
 def temp_dir():
@@ -82,6 +89,7 @@ def session_temp_dir():
     yield path
     shutil.rmtree(path, ignore_errors=True)
 
+
 @pytest.fixture(scope="session")
 def session_mock_config(session_temp_dir):
     """Provides a session-scoped mock config."""
@@ -92,6 +100,7 @@ def session_mock_config(session_temp_dir):
     yield config
     os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
 
+
 @pytest.fixture
 def mock_config(temp_dir):
     """Provides a function-scoped mock config."""
@@ -101,7 +110,6 @@ def mock_config(temp_dir):
     config = ConfigManager()
     yield config
     os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
-
 
 
 @pytest.fixture

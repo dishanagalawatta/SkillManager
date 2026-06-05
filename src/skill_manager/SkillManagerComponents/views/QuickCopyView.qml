@@ -241,6 +241,28 @@ Item {
                     Layout.rightMargin: 4
                 }
 
+                GlassCheckBox {
+                    id: qcv_selectCheck
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    
+                    checkState: {
+                        let count = AppController.quickCopyModel.visibleSelectedCount;
+                        let total = AppController.quickCopyModel.visibleSelectableCount;
+                        if (count === 0) return Qt.Unchecked;
+                        if (count >= total && total > 0) return Qt.Checked;
+                        return Qt.PartiallyChecked;
+                    }
+
+                    onToggled: {
+                        if (checkState === Qt.Checked) {
+                            AppController.quickCopyModel.clearSelection();
+                        } else {
+                            AppController.quickCopyModel.selectAll();
+                        }
+                    }
+                }
+
                 // LEFT: Selection Count & Info
                 RowLayout {
                     id: qcv_infoGroup
@@ -287,18 +309,9 @@ Item {
                             id: barAddCommandBtn
                             buttonHeight: 32
                             labelText: "Add Command"
-                            iconText: "+"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                             role: "secondary"
                             onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.quickCopyModel.projectFilter, AppController.ui_controller.clientFormat)
-                        }
-
-                        ActionButton {
-                            id: barSelectAllBtn
-                            buttonHeight: 32
-                            labelText: "Select All"
-                            role: "secondary"
-                            visible: AppController.quickCopyModel.selectedCount < AppController.quickCopyModel.rowCount()
-                            onClicked: (mouse) => AppController.quickCopyModel.selectAll()
                         }
 
                         // Selection-specific actions
@@ -306,22 +319,6 @@ Item {
                             spacing: 8
                             visible: AppController.quickCopyModel.selectedCount > 0
                             
-                            ActionButton {
-                                id: barClearBtn
-                                buttonHeight: 32
-                                labelText: "Clear Selection"
-                                role: "secondary"
-                                onClicked: (mouse) => AppController.quickCopyModel.clearSelection()
-                            }
-
-                            Rectangle {
-                                width: 1
-                                height: 16
-                                color: Theme.separator
-                                Layout.leftMargin: 4
-                                Layout.rightMargin: 4
-                            }
-
                             ActionButton {
                                 id: barAddToColBtn
                                 buttonHeight: 32
@@ -338,7 +335,7 @@ Item {
                                 buttonHeight: 32
                                 objectName: "quickCopyDeleteSelectedBtn"
                                 labelText: "Delete Selected"
-                                iconText: "🗑️"
+                                iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                                 role: "destructive"
                                 onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
                             }
@@ -390,7 +387,7 @@ Item {
                             id: qcv_saveColBtn
                             buttonSize: 32
                             iconSize: 12
-                            iconText: "Save"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/check-icon.svg")
                             role: "primary"
                             tooltipText: "Save collection"
                             flat: true
@@ -399,41 +396,19 @@ Item {
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
                             }
-                            contentItem: Text {
-                                text: "✔"
-                                font.pixelSize: 20
-                                color: Theme.success
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                radius: Theme.radiusField
-                                color: qcv_saveColBtn.hovered ? Theme.alpha(Theme.success, 0.125) : "transparent"
-                            }
                         }
 
                         IconButton {
                             id: qcv_cancelColBtn
                             buttonSize: 32
                             iconSize: 10
-                            iconText: "Cancel"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
                             role: "destructive"
                             tooltipText: "Cancel collection editing"
                             flat: true
                             onClicked: (mouse) => {
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
-                            }
-                            contentItem: Text {
-                                text: "✖"
-                                font.pixelSize: 20
-                                color: Theme.danger
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                radius: Theme.radiusField
-                                color: qcv_cancelColBtn.hovered ? Theme.alpha(Theme.danger, 0.125) : "transparent"
                             }
                         }
                     }

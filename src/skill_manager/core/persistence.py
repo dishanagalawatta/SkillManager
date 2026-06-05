@@ -36,7 +36,9 @@ def _atomic_write_json(file_path: str, data: Any, indent: bool = True) -> bool:
         # orjson handles more types (UUID, datetime) and is faster.
         # We use OPT_SERIALIZE_DATACLASS for future compatibility if needed.
         # OPT_APPEND_NEWLINE is good for file output.
-        content = orjson.dumps(data, option=option | orjson.OPT_SERIALIZE_DATACLASS | orjson.OPT_APPEND_NEWLINE)
+        content = orjson.dumps(
+            data, option=option | orjson.OPT_SERIALIZE_DATACLASS | orjson.OPT_APPEND_NEWLINE
+        )
         with open(temp_path, "wb") as f:
             f.write(content)
         os.replace(temp_path, file_path)
@@ -243,23 +245,15 @@ def patch_cache_add(
             data["projects"] = list(projects_map.values())
 
         # Re-compute categories and project_labels
-        data["categories"] = sorted(
-            {s["category"] for s in data["skills"] if s.get("category")}
-        )
+        data["categories"] = sorted({s["category"] for s in data["skills"] if s.get("category")})
         data["project_labels"] = sorted(
-            {
-                p["project_label"]
-                for p in data.get("projects", [])
-                if p.get("project_label")
-            }
+            {p["project_label"] for p in data.get("projects", []) if p.get("project_label")}
         )
 
         # Update status
         num_skills = len(data["skills"])
         num_projects = len(data.get("projects", []))
-        data["status"] = (
-            f"Found {num_skills} skills in master library ({num_projects} projects)"
-        )
+        data["status"] = f"Found {num_skills} skills in master library ({num_projects} projects)"
 
         _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
 

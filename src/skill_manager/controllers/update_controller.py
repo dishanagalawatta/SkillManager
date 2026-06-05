@@ -3,7 +3,6 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 
-
 import logging
 from pathlib import Path
 
@@ -122,9 +121,11 @@ class UpdateController(BaseController):
                 self.app._set_status(f"Scan complete: {len(results)} skills processed")
 
                 # Handle Silent Auto-Update
-                if (self.config.get("skill_package_auto_update", True) and
-                    self.config.get("skill_package_auto_update_mode") == "silent" and
-                    self.app._stats_outdated > 0):
+                if (
+                    self.config.get("skill_package_auto_update", True)
+                    and self.config.get("skill_package_auto_update_mode") == "silent"
+                    and self.app._stats_outdated > 0
+                ):
                     logger.info("Silent auto-update triggered for outdated skill packages.")
                     self.updateNow()
 
@@ -316,7 +317,9 @@ class UpdateController(BaseController):
                     if not pkg_path and self.app._sources:
                         potential_path = self.app._sources[0]
                         if Path(potential_path).resolve() == Path.cwd().resolve():
-                            source["package_path"] = str(Path(potential_path) / ".agents" / "skills")
+                            source["package_path"] = str(
+                                Path(potential_path) / ".agents" / "skills"
+                            )
                         else:
                             source["package_path"] = potential_path
                     else:
@@ -326,8 +329,7 @@ class UpdateController(BaseController):
                     if conflicts:
                         conflict_path = conflicts[0]
                         raise RuntimeError(
-                            "Package storage path overlaps a project skills path: "
-                            f"{conflict_path}"
+                            f"Package storage path overlaps a project skills path: {conflict_path}"
                         )
 
                     def log_callback(msg):
@@ -363,13 +365,20 @@ class UpdateController(BaseController):
                     save_package_skill_inventory(inventory)
                     source.update(updated_source)
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    capture_event("skill_package_updated", {"source_type": source.get("source_type", "unknown"), "success": True})
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": True},
+                    )
                 except Exception as e:
-                    capture_event("skill_package_updated", {"source_type": source.get("source_type", "unknown"), "success": False})
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": False},
+                    )
                     capture_exception(e)
                     err_msg = f"Update failed for {source.get('name')}: {e}"
                     QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
                 finally:
+
                     def finalize_ui():
                         source["is_updating"] = False
                         source["just_finished"] = True
@@ -378,6 +387,7 @@ class UpdateController(BaseController):
                         self.app._set_status(f"Update finished for {source.get('name')}")
                         self.app.loadInitialData()
                         self.config.set("skills", self.app._update_packages)
+
                     QTimer.singleShot(0, self.app, finalize_ui)
 
             self.app.task_runner.run(run)
@@ -412,6 +422,7 @@ class UpdateController(BaseController):
                 )
 
                 from skill_manager.core.copier import copy_skill_folders_to_projects
+
                 result = copy_skill_folders_to_projects(source_skills, [path], update_only=True)
 
                 discovered_skills = []
@@ -433,13 +444,18 @@ class UpdateController(BaseController):
                                     discovered_skills.append(skill_data)
                             except Exception as exc:
                                 import logging
-                                logging.getLogger(__name__).error(f"[SYNC SCAN] Failed scanning {skill_path}: {exc}")
+
+                                logging.getLogger(__name__).error(
+                                    f"[SYNC SCAN] Failed scanning {skill_path}: {exc}"
+                                )
 
                 if discovered_skills:
                     patch_cache_add(discovered_skills)
+
                     def update_ui():
                         self.app._library_model.addOrUpdateSkills(discovered_skills)
                         self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+
                     QTimer.singleShot(0, self.app, update_ui)
 
                 msg = f"Update complete for {self.app.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"

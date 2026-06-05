@@ -21,7 +21,9 @@ def update_projects(project_paths, source_paths, progress_callback=None):
         if p.is_dir():
             projects.append(p)
         else:
-            logger.warning(f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping.")
+            logger.warning(
+                f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping."
+            )
 
     sources = []
     for sp in source_paths:
@@ -29,7 +31,9 @@ def update_projects(project_paths, source_paths, progress_callback=None):
         if p.is_dir():
             sources.append(p)
         else:
-            logger.warning(f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping.")
+            logger.warning(
+                f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping."
+            )
 
     if not projects:
         logger.error("Error: No valid project directories provided.")

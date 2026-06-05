@@ -27,9 +27,9 @@ def resolve_package_storage(
     packages: list[dict[str, Any]],
     inventory: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Assigns each package an isolated final storage path when paths are shared."""
+    """Assigns each package an isolated final storage path."""
     inventory = inventory or {}
-    groups: dict[str, list[dict[str, Any]]] = {}
+    final_keys: set[str] = set()
     result = []
 
     for package in packages:
@@ -42,45 +42,54 @@ def resolve_package_storage(
         )
         configured = str(configured).strip()
         item["configured_package_path"] = configured
-        if configured:
-            groups.setdefault(normalize_storage_key(configured), []).append(item)
-        result.append(item)
 
-    final_keys: set[str] = set()
-    for group_items in groups.values():
-        grouped = len(group_items) > 1 or any(
-            str(item.get("storage_mode") or "") == "grouped" for item in group_items
+        if not configured:
+            result.append(item)
+            continue
+
+        configured_path = Path(os.path.expanduser(configured)).resolve()
+        package_id = item.get("package_id")
+        prior = inventory.get(package_id, {}) if package_id else {}
+        old_resolved = item.get("resolved_package_path") or item.get("package_path")
+
+        child_name = safe_package_folder_name(item)
+
+        # Always group unless configured path explicitly matches the package slug or name
+        if (
+            configured_path.name.lower() == child_name.lower()
+            or configured_path.name.lower() == str(item.get("name") or "").lower()
+        ):
+            resolved = configured_path
+        else:
+            resolved = configured_path / child_name
+
+        # Prevent collisions
+        counter = 2
+        original_resolved = resolved
+        while normalize_storage_key(resolved) in final_keys:
+            resolved = original_resolved.parent / f"{original_resolved.name}-{counter}"
+            counter += 1
+
+        if resolved == configured_path:
+            item["storage_mode"] = "direct"
+        else:
+            item["storage_mode"] = "grouped"
+
+        item["resolved_package_path"] = str(resolved)
+        item["package_path"] = str(resolved)
+        item["local_path"] = str(resolved)
+        item["_previous_resolved_package_path"] = str(
+            prior.get("resolved_package_path") or old_resolved or ""
         )
-        for item in group_items:
-            configured = Path(os.path.expanduser(item["configured_package_path"])).resolve()
-            package_id = item.get("package_id")
-            prior = inventory.get(package_id, {}) if package_id else {}
-            old_resolved = item.get("resolved_package_path") or item.get("package_path")
-
-            if grouped:
-                child_name = safe_package_folder_name(item)
-                resolved = configured / child_name
-                counter = 2
-                while normalize_storage_key(resolved) in final_keys:
-                    resolved = configured / f"{child_name}-{counter}"
-                    counter += 1
-                item["storage_mode"] = "grouped"
-            else:
-                resolved = configured
-                item["storage_mode"] = "direct"
-
-            item["resolved_package_path"] = str(resolved)
-            item["package_path"] = str(resolved)
-            item["local_path"] = str(resolved)
-            item["_previous_resolved_package_path"] = str(
-                prior.get("resolved_package_path") or old_resolved or ""
-            )
-            final_keys.add(normalize_storage_key(resolved))
+        final_keys.add(normalize_storage_key(resolved))
+        result.append(item)
 
     return result
 
 
-def package_project_path_conflicts(packages: list[dict[str, Any]], projects: list[str]) -> list[str]:
+def package_project_path_conflicts(
+    packages: list[dict[str, Any]], projects: list[str]
+) -> list[str]:
     from skill_manager.core.copier import normalize_project_skills_path
 
     project_keys = set()
@@ -102,7 +111,9 @@ def package_project_path_conflicts(packages: list[dict[str, Any]], projects: lis
 
 def scan_package_inventory(package: dict[str, Any]) -> dict[str, Any]:
     package_path = Path(
-        os.path.expanduser(str(package.get("resolved_package_path") or package.get("package_path") or ""))
+        os.path.expanduser(
+            str(package.get("resolved_package_path") or package.get("package_path") or "")
+        )
     )
     skills: dict[str, dict[str, Any]] = {}
     scan_ok = True
@@ -170,7 +181,11 @@ def inventory_removals_verified(previous: dict[str, Any] | None, current: dict[s
 def promote_package_storage(package: dict[str, Any], previous_inventory: dict[str, Any] | None):
     old_path = Path(os.path.expanduser(str(package.get("_previous_resolved_package_path") or "")))
     new_path = Path(os.path.expanduser(str(package.get("resolved_package_path") or "")))
-    if not old_path or not new_path or normalize_storage_key(old_path) == normalize_storage_key(new_path):
+    if (
+        not old_path
+        or not new_path
+        or normalize_storage_key(old_path) == normalize_storage_key(new_path)
+    ):
         return {"moved": 0, "skipped": 0}
     if not old_path.is_dir():
         return {"moved": 0, "skipped": 0}
@@ -179,11 +194,7 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
 
     skill_names = set((previous_inventory or {}).get("skills", {}))
     if not skill_names:
-        skill_names = {
-            child.name
-            for child in old_path.iterdir()
-            if child.is_dir() and (child / "SKILL.md").is_file()
-        }
+        return {"moved": 0, "skipped": 0}
 
     moved = 0
     new_path.mkdir(parents=True, exist_ok=True)

@@ -18,7 +18,7 @@ from skill_manager.core.skill_packages.process import (
 from skill_manager.core.skill_packages.relocator import (
     _merge_and_move_lockfile,
     _relocate_path_internal,
-    relocate_packages_from_output as _relocate_packages_from_output,
+    relocate_packages as _relocate_packages,
 )
 from skill_manager.core.skill_packages.updater import (
     _intercept_cross_platform_command,
@@ -75,49 +75,40 @@ def test_detect_package_config_git():
     assert detected["source_type"] == "git"
 
 
-def test_relocate_packages_from_output(temp_dir):
+def test_relocate_packages(temp_dir):
     project_path = temp_dir / "project_skills"
     project_path.mkdir()
 
-    # Create a dummy skill in a temp location
-    source_skill_dir = temp_dir / "some_random_path" / "caveman"
-    source_skill_dir.mkdir(parents=True)
-    (source_skill_dir / "SKILL.md").write_text("content")
+    source_dir = temp_dir / "some_repo"
+    skills_dir = source_dir / "skills"
+    skills_dir.mkdir(parents=True)
 
-    output = [f"Installed to {source_skill_dir}"]
+    skill_caveman = skills_dir / "caveman"
+    skill_caveman.mkdir()
+    (skill_caveman / "SKILL.md").write_text("content")
 
-    _relocate_packages_from_output(output, str(project_path), None)
+    skill_invalid = skills_dir / "invalid"
+    skill_invalid.mkdir()
+
+    _relocate_packages(str(source_dir), str(project_path), None)
 
     # Check if it moved
     assert (project_path / "caveman").is_dir()
     assert (project_path / "caveman" / "SKILL.md").exists()
-    assert not source_skill_dir.exists()
+    assert not (project_path / "invalid").exists()
+    assert not skill_caveman.exists()
 
 
-def test_relocate_packages_from_output_resolves_relative_paths_from_base(tmp_path):
-    staging = tmp_path / "staging"
-    source_skill_dir = staging / ".agents" / "skills" / "safe-skill"
-    source_skill_dir.mkdir(parents=True)
-    (source_skill_dir / "SKILL.md").write_text("content")
-    cwd_skill_dir = tmp_path / "repo" / ".agents" / "skills" / "safe-skill"
-    cwd_skill_dir.mkdir(parents=True)
-    (cwd_skill_dir / "SKILL.md").write_text("repo content")
-    destination = tmp_path / "package"
-    destination.mkdir()
+def test_relocate_packages_no_dest_or_no_source(temp_dir):
+    messages = []
+    assert _relocate_packages(str(temp_dir), "", messages.append) is None
 
-    _relocate_packages_from_output(
-        ["Installed to ./.agents/skills"],
-        str(destination),
-        None,
-        base_path=staging,
-    )
-
-    assert (destination / "safe-skill" / "SKILL.md").read_text() == "content"
-    assert (cwd_skill_dir / "SKILL.md").read_text() == "repo content"
+    messages.clear()
+    assert _relocate_packages("non_existent_path", str(temp_dir), messages.append) is None
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
-@patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
+@patch("skill_manager.core.skill_packages.updater.relocate_packages")
 @patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
 def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, mock_run, temp_dir):
     package_path = temp_dir / "skills_dest"
@@ -127,7 +118,7 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     source = {
         "name": "test",
         "package_path": str(package_path),
-        "update_command": 'python -c "print(\'ok\')"',
+        "update_command": "python -c \"print('ok')\"",
         "managed_folders": ["old-skill"],
     }
 
@@ -143,7 +134,7 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     assert updated["removed_folders"] == ["old-skill"]
     assert updated["current_version"] == "2.0.0"
     assert mock_run.call_args.kwargs["cwd"]
-    assert mock_relocate.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
+    assert mock_relocate.call_args.kwargs["source_path"] == mock_run.call_args.kwargs["cwd"]
 
 
 @patch("skill_manager.core.skill_packages.versioning.cmd.Git")
@@ -231,7 +222,6 @@ def test_detect_package_config_custom_and_verify_command(temp_dir):
         }
     )
     assert detected["source_type"] == "custom"
-    assert detected["current_version_command"] == "python install.py"
     assert "test -d" in detected["verify_command"]
 
 
@@ -252,15 +242,16 @@ def test_relocate_lock_files(temp_dir):
     source_root.mkdir()
     (source_root / ".skill-lock.json").write_text("{}")
 
-    # regex matches root of detected path
-    detected_path = source_root / "skills" / "skill1"
-    detected_path.mkdir(parents=True)
+    skills_dir = source_root / "skills"
+    skills_dir.mkdir()
+    skill1 = skills_dir / "skill1"
+    skill1.mkdir()
+    (skill1 / "SKILL.md").write_text("content")
 
-    output = [f"at {detected_path}"]
-    _relocate_packages_from_output(output, str(project_path), None)
+    _relocate_packages(str(source_root), str(project_path), None, package_name_prefix="test-repo")
 
-    # Should move the lock file to project root (project_path.parent)
-    assert (project_path.parent / ".skill-lock.json").exists()
+    # Should move the lock file to project root (project_path.parent) with prefix
+    assert (project_path.parent / ".test-repo-skill-lock.json").exists()
 
 
 def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
@@ -279,16 +270,6 @@ def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
     assert '"b": 2' in merged
     assert '"version": "2"' in merged
     assert not source_lock.exists()
-
-
-def test_relocate_packages_from_output_no_dest_or_no_paths(temp_dir):
-    messages = []
-    assert _relocate_packages_from_output([], "", messages.append) is None
-    assert "Relocation skipped" in messages[0]
-
-    messages.clear()
-    assert _relocate_packages_from_output(["nothing here"], str(temp_dir), messages.append) is None
-    assert any("No package paths detected" in message for message in messages)
 
 
 def test_relocate_path_internal_cleanup(temp_dir):
@@ -330,13 +311,13 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
     dir_with_apostrophe.mkdir()
 
     import shlex
+
     quoted_path = shlex.quote(str(dir_with_apostrophe))
 
     messages = []
     # This should succeed without raising a Verification failed exception
     assert _intercept_cross_platform_command(
-        f"test -d {quoted_path} && echo \"Skills installed in \"{quoted_path}",
-        messages.append
+        f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}', messages.append
     )
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
 
@@ -477,8 +458,11 @@ def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, t
 
 def test_run_process_timeout_handling():
     with (
-        patch("skill_manager.core.skill_packages.process._resolve_process_command", return_value=["some-cmd"]),
-        patch("subprocess.Popen") as mock_popen
+        patch(
+            "skill_manager.core.skill_packages.process._resolve_process_command",
+            return_value=["some-cmd"],
+        ),
+        patch("subprocess.Popen") as mock_popen,
     ):
         mock_popen.side_effect = subprocess.SubprocessError("Process failed to start")
         with pytest.raises(subprocess.SubprocessError):

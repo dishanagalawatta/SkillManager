@@ -51,6 +51,7 @@ class SkillModel(QAbstractListModel):
     clientFilterChanged = Signal()
     filterByClientChanged = Signal()
     userSelectionChanged = Signal()
+    totalSelectableCountChanged = Signal()
 
     def __init__(self, parent=None, config=None):
         super().__init__(parent)
@@ -297,6 +298,22 @@ class SkillModel(QAbstractListModel):
     def selectedCount(self):
         return sum(1 for s in self._all_filtered_skills if s.local_path in self._selected_ids)
 
+    @Property(int, notify=selectedCountChanged)
+    def visibleSelectableCount(self):
+        """Returns the number of skills currently visible in the view (not collapsed)."""
+        return sum(1 for s in self._filtered_skills if s.local_path)
+
+    @Property(int, notify=selectedCountChanged)
+    def visibleSelectedCount(self):
+        """Returns the number of selected skills that are currently visible."""
+        return sum(
+            1 for s in self._filtered_skills if s.local_path and s.local_path in self._selected_ids
+        )
+
+    @Property(int, notify=totalSelectableCountChanged)
+    def totalSelectableCount(self):
+        return len(self._all_filtered_skills)
+
     # Slots & Methods
     @Slot(int)
     def toggleSelection(self, row):
@@ -323,9 +340,7 @@ class SkillModel(QAbstractListModel):
 
     @Slot()
     def selectAll(self):
-        for skill in self._filtered_skills:
-            if self._is_main_collapsed(skill) or self._is_sub_collapsed(skill):
-                continue
+        for skill in self._all_filtered_skills:
             if skill.local_path:
                 self._selected_ids.add(skill.local_path)
         self._emit_selection_data_changed()
@@ -370,6 +385,7 @@ class SkillModel(QAbstractListModel):
             )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Error applying filter: {e}")
         finally:
             if reset:
@@ -377,6 +393,7 @@ class SkillModel(QAbstractListModel):
             else:
                 self.layoutChanged.emit()
             self.selectedCountChanged.emit()
+            self.totalSelectableCountChanged.emit()
 
     def _execute_filter_logic(self) -> list[Skill]:
         """Internal synchronous logic for filtering and searching."""

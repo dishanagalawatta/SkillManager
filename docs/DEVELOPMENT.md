@@ -59,8 +59,8 @@ uv run ruff format src
 
 ### 2. Testing
 ```bash
-# Run all tests
-uv run pytest
+# Run all tests in parallel with clean progress (Recommended)
+python run_tests.py
 
 # Run with coverage
 uv run pytest --cov=skill_manager --cov-report=term-missing
@@ -170,7 +170,8 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 | Command | Description |
 |---|---|
 | `uv run skill-manager` | Launch the application |
-| `uv run ruff check src tests`| Run linter |
-| `uv run pytest` | Run unit tests |
+| `python run_tests.py` | Run unified linting and parallel tests |
+| `uv run ruff check src tests`| Run linter only |
+| `uv run pytest` | Run unit tests (manual config) |
 | `uv run python scripts/build_app.py` | Build executable locally |
 | `uv run semantic-release version` | Dry-run version bump |

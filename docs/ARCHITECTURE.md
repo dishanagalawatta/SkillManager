@@ -52,7 +52,7 @@ SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously d
 -   **Solid Matte Foundation**: The main window utilizes a solid, deeply-tinted material (`#0E1210` in Dark Mode) providing a robust feel without desktop wallpaper bleed-through.
 -   **Glass-Pill Components**: Functional areas (sidebars, list items, headers) are encapsulated in "frosted glass" pills (`#1A201E`).
 -   **Synchronized Rounding**: 12px corner radii across all primary containers, matching native Windows 11 DWM preferences.
--   **Native Shell Integration**: Uses `pywinstyles` (where available) to apply native Mica/Acrylic effects and immersive dark mode to the window chrome.
+-   **Native Shell Integration**: Uses `pywinstyles` (where available) to apply native Mica/Acrylic effects and immersive dark mode to the window chrome. On Windows, it also explicitly sets the `AppUserModelID` via `ctypes` to ensure the taskbar correctly groups the application and displays the custom icon instead of a generic Python executable icon.
 
 ### QML Component Structure
 -   **`Main.qml`**: The root application window and layout orchestrator.

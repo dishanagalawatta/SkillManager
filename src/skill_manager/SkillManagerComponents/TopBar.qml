@@ -35,7 +35,7 @@ Rectangle {
             
             TopBarButton {
                 objectName: "navQuickCopy"
-                iconText: "⚡"
+                iconSource: AppController.ui_controller.getAssetUri("ui/lightning-icon.svg")
                 labelText: "Quick Copy"
                 active: root.currentView === "Quick Copy" || root.currentView === "QuickCopy"
                 onClicked: (mouse) => { 
@@ -46,7 +46,7 @@ Rectangle {
 
             TopBarButton {
                 objectName: "navLibrary"
-                iconText: "📚"
+                iconSource: AppController.ui_controller.getAssetUri("ui/library-icon.svg")
                 labelText: "Library"
                 active: root.currentView === "Library"
                 onClicked: (mouse) => { 
@@ -57,7 +57,7 @@ Rectangle {
 
             TopBarButton {
                 objectName: "navUpdates"
-                iconText: "🔄"
+                iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
                 labelText: "Updates"
                 active: root.currentView === "Updates"
                 onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }
@@ -65,7 +65,7 @@ Rectangle {
 
             TopBarButton {
                 objectName: "navSettings"
-                iconText: "⚙️"
+                iconSource: AppController.ui_controller.getAssetUri("ui/settings-icon.svg")
                 labelText: "Settings"
                 active: root.currentView === "Settings"
                 onClicked: (mouse) => { root.currentView = "Settings"; root.navigationChanged("Settings") }

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Item {
@@ -46,7 +47,7 @@ Item {
         Text {
             text: {
                 if (!root.mainCatName) return "";
-                if (root.mainCatName === "Special") return "⭐";
+                if (root.mainCatName === "Special") return "";
                 let parts = root.mainCatName.split(" ");
                 return parts.length > 0 ? parts[0] : "";
             }
@@ -54,6 +55,31 @@ Item {
             opacity: root.isMainCollapsed ? 0.7 : 1.0
             Layout.alignment: Qt.AlignVCenter
             Behavior on opacity { NumberAnimation { duration: 200 } }
+        }
+
+        Item {
+            visible: root.mainCatName === "Special"
+            width: 20
+            height: 20
+            Layout.alignment: Qt.AlignVCenter
+            
+            Image {
+                id: starIcon
+                anchors.centerIn: parent
+                source: AppController.ui_controller.getAssetUri("ui/star-icon.svg")
+                width: 16
+                height: 16
+                sourceSize.width: 16
+                sourceSize.height: 16
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
+            ColorOverlay {
+                anchors.fill: starIcon
+                source: starIcon
+                color: "#FFD700"
+            }
         }
 
         Text {

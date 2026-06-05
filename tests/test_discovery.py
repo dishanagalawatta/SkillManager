@@ -57,7 +57,6 @@ def test_transform_skill_archived_and_starred(service):
     assert t2["is_starred"] is True
 
 
-
 def test_process_command_file(service, temp_dir):
     cmd_file = temp_dir / "Test.Codex.md"
     cmd_file.write_text("---\nname: My Command\ncategory: Ops\n---\nBody")
@@ -79,7 +78,9 @@ def test_discover_all_integration(mock_save, mock_load, temp_dir):
     source_lib.mkdir()
     skill1_dir = source_lib / "skill1"
     skill1_dir.mkdir()
-    (skill1_dir / "SKILL.md").write_text("---\nname: Skill One\ncategory: Automation\nmetadata:\n  risk: Low\n---")
+    (skill1_dir / "SKILL.md").write_text(
+        "---\nname: Skill One\ncategory: Automation\nmetadata:\n  risk: Low\n---"
+    )
 
     # Setup project directory
     proj = temp_dir / "proj"
@@ -88,12 +89,16 @@ def test_discover_all_integration(mock_save, mock_load, temp_dir):
     proj_skills.mkdir(parents=True)
     skill_a_dir = proj_skills / "skillA"
     skill_a_dir.mkdir()
-    (skill_a_dir / "SKILL.md").write_text("---\nname: Project Skill A\ncategory: Developer Tools\n---")
+    (skill_a_dir / "SKILL.md").write_text(
+        "---\nname: Project Skill A\ncategory: Developer Tools\n---"
+    )
 
     # Setup commands directory
     commands_dir = proj_skills / "commands"
     commands_dir.mkdir()
-    (commands_dir / "my_cmd.Codex.md").write_text("---\nname: My Custom Command\ncategory: Ops\n---")
+    (commands_dir / "my_cmd.Codex.md").write_text(
+        "---\nname: My Custom Command\ncategory: Ops\n---"
+    )
 
     service = DiscoveryService(
         sources=[str(source_lib)],
@@ -221,7 +226,13 @@ def test_discovery_cache_behavior(mock_save, mock_load, temp_dir):
     )
 
     # 1. Test cache hit
-    cached_data = {"skills": [], "projects": [], "categories": [], "project_labels": [], "status": "Cached"}
+    cached_data = {
+        "skills": [],
+        "projects": [],
+        "categories": [],
+        "project_labels": [],
+        "status": "Cached",
+    }
     mock_load.return_value = cached_data
 
     callback_messages = []
@@ -244,8 +255,8 @@ def test_discovery_cache_behavior(mock_save, mock_load, temp_dir):
 def test_discovery_permission_errors(mock_walk, service):
     # Simulate permission error on one of the sources
     mock_walk.side_effect = [
-        [("/src1", ["skill1"], [])], # Success for src1
-        PermissionError("Access Denied"), # Failure for src2
+        [("/src1", ["skill1"], [])],  # Success for src1
+        PermissionError("Access Denied"),  # Failure for src2
     ]
 
     # We need to mock Path.is_file/is_dir or just let it run on real-ish paths
@@ -291,5 +302,3 @@ def test_discover_single_skill(service, temp_dir):
     assert res["category"] == "Architecture"
     assert res["project_label"] == "My Project Alias"
     assert res["is_package"] is False
-
-

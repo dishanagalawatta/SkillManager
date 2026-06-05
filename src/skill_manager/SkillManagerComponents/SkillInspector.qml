@@ -9,6 +9,26 @@ Rectangle {
     property var skill: ({})
     property bool isQuickCopy: false
     property bool isCollapsed: false
+
+    GlassMenu {
+        id: inspectorContextMenu
+        property var targetControl: null
+        
+        GlassMenuItem {
+            text: "Copy"
+            iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
+            enabled: inspectorContextMenu.targetControl && inspectorContextMenu.targetControl.selectedText !== undefined && inspectorContextMenu.targetControl.selectedText.length > 0
+            onTriggered: {
+                if (inspectorContextMenu.targetControl) inspectorContextMenu.targetControl.copy()
+            }
+        }
+        GlassMenuItem {
+            text: "Select All"
+            onTriggered: {
+                if (inspectorContextMenu.targetControl) inspectorContextMenu.targetControl.selectAll()
+            }
+        }
+    }
     
     // Calculate width based on selection and collapse state
     readonly property int targetWidth: {
@@ -86,6 +106,7 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 8
                 TextEdit {
+                    id: skillNameEdit
                     text: root.skill.name || "No Selection"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
@@ -96,6 +117,14 @@ Rectangle {
                     selectByMouse: true
                     cursorVisible: false
                     wrapMode: TextEdit.Wrap
+
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: {
+                            inspectorContextMenu.targetControl = skillNameEdit
+                            inspectorContextMenu.popup()
+                        }
+                    }
                 }
                 IconButton {
                     id: starButton
@@ -171,6 +200,7 @@ Rectangle {
                         ] : []
                         
                         TextEdit {
+                            id: metaEdit
                             text: "<b>" + modelData.label + ":</b> " + modelData.value
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.sizeCaption
@@ -181,6 +211,14 @@ Rectangle {
                             cursorVisible: false
                             wrapMode: TextEdit.Wrap
                             textFormat: TextEdit.RichText
+
+                            TapHandler {
+                                acceptedButtons: Qt.RightButton
+                                onTapped: {
+                                    inspectorContextMenu.targetControl = metaEdit
+                                    inspectorContextMenu.popup()
+                                }
+                            }
                         }
                     }
                 }
@@ -202,6 +240,7 @@ Rectangle {
                 }
                 
                 TextEdit {
+                    id: descriptionEdit
                     text: root.skill.description || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
@@ -211,6 +250,14 @@ Rectangle {
                     readOnly: true
                     selectByMouse: true
                     cursorVisible: false
+
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: {
+                            inspectorContextMenu.targetControl = descriptionEdit
+                            inspectorContextMenu.popup()
+                        }
+                    }
                 }
             }
 
@@ -280,14 +327,6 @@ Rectangle {
                         font.weight: Font.Bold
                         color: Theme.secondaryLabel
                     }
-                    Item { Layout.fillWidth: true }
-                    Text {
-                        text: root.skill.raw_content ? "Editable" : "Not Found"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                        color: root.skill.raw_content ? Theme.accent : "#ff4444"
-                        opacity: 0.7
-                    }
                 }
                 
                 Rectangle {
@@ -337,6 +376,14 @@ Rectangle {
                             
                             // Ensure text is correctly aligned
                             verticalAlignment: TextArea.AlignTop
+
+                            TapHandler {
+                                acceptedButtons: Qt.RightButton
+                                onTapped: {
+                                    inspectorContextMenu.targetControl = rawContentArea
+                                    inspectorContextMenu.popup()
+                                }
+                            }
                         }
                     }
                 }
@@ -367,6 +414,14 @@ Rectangle {
                         radius: Theme.radiusField
                         color: Theme.glassPill
                         border.color: Theme.glassBorder
+                    }
+
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: {
+                            inspectorContextMenu.targetControl = argField
+                            inspectorContextMenu.popup()
+                        }
                     }
                 }
             }

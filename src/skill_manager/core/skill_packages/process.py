@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import time
+from collections import deque
 from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
@@ -21,18 +22,26 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(echo password=).*", r"\1***", text)
     return text
 
+
 def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))
+
+    if message.startswith("[DEBUG]"):
+        logger.debug(message)
+        return
+
     # Print to terminal for debugging and visibility
-    if (
-        message.startswith("[DEBUG]")
-        or message.startswith("[ERROR]")
-        or "Relocating" in message
-        or "Success" in message
-    ):
+    if message.startswith("[ERROR]"):
+        logger.error(message)
+    elif "Relocating" in message or "Cleaning up" in message:
+        logger.debug(message)
+        return  # Prevent UI spam for thousands of relocated folders
+    elif "Success" in message:
         logger.info(message)
+
     if output_callback:
         output_callback(message)
+
 
 def _resolve_process_command(command: str | list[str], shell: bool = False) -> str | list[str]:
     if shell or not isinstance(command, list) or not command:
@@ -49,6 +58,7 @@ def _resolve_process_command(command: str | list[str], shell: bool = False) -> s
         )
     return [resolved, *command[1:]]
 
+
 def run_process(
     command: str | list[str],
     output_callback: Callable[[str], None] = None,
@@ -56,26 +66,31 @@ def run_process(
     cwd: str | os.PathLike | None = None,
 ):
     command = _resolve_process_command(command, shell)
-    process = subprocess.Popen(
-        command,
-        shell=shell,
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
+    kwargs = {
+        "shell": shell,
+        "cwd": cwd,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.STDOUT,
+        "stdin": subprocess.DEVNULL,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+        "bufsize": 1,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    process = subprocess.Popen(command, **kwargs)
     last_emit_time = 0
+    output_log = deque(maxlen=50)
 
     if process.stdout is not None:
         for line in process.stdout:
             line_clean = sanitize_token(line.strip())
             if line_clean:
-                # Always print to terminal for visibility
-                logger.info("[PROCESS] %s", line_clean)
+                # Always print to terminal for visibility at debug level
+                logger.debug("[PROCESS] %s", line_clean)
+                output_log.append(line_clean)
 
                 # Throttle progress-like lines to UI (e.g. "Updating files: 45%")
                 is_progress = bool(re.search(r"\d+%", line_clean))
@@ -88,6 +103,11 @@ def run_process(
 
     process.wait()
     if process.returncode != 0:
+        if output_log:
+            logger.error("Process failed. Last output lines:")
+            for logged_line in output_log:
+                logger.error("[PROCESS FAILED] %s", logged_line)
+
         sanitized_command = (
             [sanitize_token(str(arg)) for arg in command]
             if isinstance(command, list)

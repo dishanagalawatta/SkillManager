@@ -29,3 +29,4 @@ ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml
 DeleteConfirmDialog 1.0 dialogs/DeleteConfirmDialog.qml
 ArchiveConfirmDialog 1.0 dialogs/ArchiveConfirmDialog.qml
+GlassCheckBox 1.0 GlassCheckBox.qml
