@@ -216,10 +216,9 @@ def _skill_fingerprint(path: Path) -> str:
     for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
         try:
             rel = file_path.relative_to(path).as_posix()
-            stat = file_path.stat()
+            content = file_path.read_bytes()
         except OSError:
             continue
         digest.update(rel.encode("utf-8", errors="ignore"))
-        digest.update(str(stat.st_size).encode("ascii"))
-        digest.update(str(int(stat.st_mtime_ns)).encode("ascii"))
+        digest.update(content)
     return digest.hexdigest()

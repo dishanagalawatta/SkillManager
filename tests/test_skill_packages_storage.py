@@ -57,6 +57,23 @@ def test_resolve_package_storage_conflict(tmp_path):
     assert "pkg-2" in resolved[1]["resolved_package_path"]
 
 
+def test_resolve_package_storage_no_configured():
+    packages = [{"package_id": "1", "name": "pkg1"}]
+    resolved = resolve_package_storage(packages)
+    assert len(resolved) == 1
+    assert resolved[0]["configured_package_path"] == ""
+
+
+def test_resolve_package_storage_exact_match(tmp_path):
+    packages = [
+        {"package_id": "1", "configured_package_path": str(tmp_path / "pkg1"), "name": "pkg1"},
+    ]
+    resolved = resolve_package_storage(packages)
+    assert resolved[0]["storage_mode"] == "direct"
+    assert resolved[0]["resolved_package_path"] == str((tmp_path / "pkg1").resolve())
+
+
+
 @patch("skill_manager.core.copier.normalize_project_skills_path")
 def test_package_project_path_conflicts(mock_normalize, tmp_path):
     mock_normalize.return_value = (str(tmp_path / "project"), None)
@@ -185,3 +202,70 @@ def test_skill_fingerprint(tmp_path):
     f1.write_text("def")
     fp2 = _skill_fingerprint(skill_dir)
     assert fp1 != fp2
+
+
+def test_skill_fingerprint_oserror(tmp_path):
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
+    f1 = skill_dir / "SKILL.md"
+    f1.write_text("abc")
+
+    with patch("pathlib.Path.read_bytes", side_effect=OSError("Permission denied")):
+        fp = _skill_fingerprint(skill_dir)
+
+    import hashlib
+    assert fp == hashlib.sha1().hexdigest()
+
+
+def test_resolve_package_storage_exact_conflict(tmp_path):
+    packages = [
+        {"configured_package_path": str(tmp_path / "shared"), "name": "pkg"},
+        {"configured_package_path": str(tmp_path / "shared"), "name": "pkg"},
+    ]
+    resolved = resolve_package_storage(packages)
+    assert len(resolved) == 2
+    assert resolved[0]["resolved_package_path"] != resolved[1]["resolved_package_path"]
+    assert "-2" in resolved[1]["resolved_package_path"]
+
+
+def test_promote_package_storage_no_skills(tmp_path):
+    old_dir = tmp_path / "old"
+    old_dir.mkdir()
+    new_dir = tmp_path / "new"
+    package = {
+        "_previous_resolved_package_path": str(old_dir),
+        "resolved_package_path": str(new_dir),
+    }
+    assert promote_package_storage(package, {"skills": {}}) == {"moved": 0, "skipped": 0}
+
+
+def test_promote_package_storage_missing_source(tmp_path):
+    old_dir = tmp_path / "old"
+    old_dir.mkdir()
+    new_dir = tmp_path / "new"
+    package = {
+        "_previous_resolved_package_path": str(old_dir),
+        "resolved_package_path": str(new_dir),
+    }
+    # Skill is in inventory but not on disk
+    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {"moved": 0, "skipped": 0}
+
+
+def test_promote_package_storage_destination_exists(tmp_path):
+    old_dir = tmp_path / "old"
+    old_dir.mkdir()
+    skill_dir = old_dir / "skill1"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("content")
+
+    new_dir = tmp_path / "new"
+    new_dir.mkdir()
+    (new_dir / "skill1").mkdir() # destination already exists
+
+    package = {
+        "_previous_resolved_package_path": str(old_dir),
+        "resolved_package_path": str(new_dir),
+    }
+    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {"moved": 0, "skipped": 1}
+
+
