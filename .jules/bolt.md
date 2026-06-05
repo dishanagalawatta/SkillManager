@@ -17,3 +17,11 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-05-23 - Search query loop optimization
+**Learning:** In the skill search engine, tokenizing the query string inside the per-document scoring loop adds significant O(N) overhead. Additionally, converting pre-computed lists to sets per-document dynamically during the score calculation loop introduces conversion overhead that is slower than Python's native fast-path substring check (`if token in text:`).
+**Action:** Hoist invariant operations like query tokenization outside of document scoring loops. Avoid using dynamic set conversions in tight loops; prefer fast native string  checks for early short-circuiting before falling back to expensive operations like .
+
+## 2024-05-23 - Search query loop optimization
+**Learning:** In the skill search engine, tokenizing the query string inside the per-document scoring loop adds significant O(N) overhead. Additionally, converting pre-computed lists to sets per-document dynamically during the score calculation loop introduces conversion overhead that is slower than Python's native fast-path substring check (`if token in text:`).
+**Action:** Hoist invariant operations like query tokenization outside of document scoring loops. Avoid using dynamic set conversions in tight loops; prefer fast native string `in` checks for early short-circuiting before falling back to expensive operations like `fuzz.ratio`.
