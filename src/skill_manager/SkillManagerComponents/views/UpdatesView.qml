@@ -229,7 +229,7 @@ Item {
                                             smooth: true
                                             source: {
                                                 if (modelData.source_type === "git") return AppController.ui_controller.getAssetUri("ui/globe-icon.svg")
-                                                if (modelData.source_type === "npm") return AppController.ui_controller.getAssetUri("ui/box-icon.svg")
+                                                if (modelData.source_type === "npx") return AppController.ui_controller.getAssetUri("ui/box-icon.svg")
                                                 return AppController.ui_controller.getAssetUri("ui/folder-icon.svg")
                                             }
                                         }
@@ -251,6 +251,7 @@ Item {
                                             font.weight: Font.Medium
                                             color: Theme.label
                                             elide: Text.ElideRight
+                                            Layout.fillWidth: true
                                         }
                                         RowLayout {
                                             spacing: 4
@@ -278,6 +279,7 @@ Item {
                                     }
 
                                     RowLayout {
+                                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                         spacing: 4
                                         
                                         // Update Button / Status
@@ -287,6 +289,9 @@ Item {
                                             labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
                                             role: isLatest ? "secondary" : "primary"
                                             buttonHeight: 26
+                                            Layout.preferredWidth: 100
+                                            Layout.minimumWidth: 100
+                                            Layout.maximumWidth: 100
                                             enabled: !isLatest && !modelData.is_updating
                                             onClicked: (mouse) => AppController.update_controller.runPackageUpdate(index)
                                         }

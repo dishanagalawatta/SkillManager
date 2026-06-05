@@ -57,7 +57,7 @@ Dialog {
 
     function loadPackage(data) {
         nameInput.text = data.name || ""
-        let types = ["npm", "git", "custom"]
+        let types = ["npx", "git", "custom"]
         let idx = types.indexOf(data.source_type)
         typeCombo.currentIndex = idx !== -1 ? idx : 0
         
@@ -225,7 +225,7 @@ Dialog {
                                 ComboBox { 
                                     id: typeCombo
                                     model: ListModel {
-                                        ListElement { text: "NPM Package"; value: "npm" }
+                                        ListElement { text: "NPX Package"; value: "npx" }
                                         ListElement { text: "GitHub Repository"; value: "git" }
                                         ListElement { text: "Custom Script"; value: "custom" }
                                     }
@@ -272,11 +272,11 @@ Dialog {
                             }
                         }
                         
-                        // NPM specific
+                        // NPX specific
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 12
-                            visible: typeCombo.currentValue === "npm"
+                            visible: typeCombo.currentValue === "npx"
                             
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -350,11 +350,11 @@ Dialog {
                             }
                         }
                         
-                        // Version Tracking (Unified for Git and NPM)
+                        // Version Tracking (Unified for Git and NPX)
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 12
-                            visible: typeCombo.currentValue === "git" || typeCombo.currentValue === "npm"
+                            visible: typeCombo.currentValue === "git" || typeCombo.currentValue === "npx"
                             
                             Rectangle {
                                 Layout.fillWidth: true
@@ -497,7 +497,7 @@ Dialog {
                                         Text { text: "Detect Local Version"; font.family: Theme.fontFamily; font.pixelSize: 10; color: Theme.secondaryLabel }
                                         TextField {
                                             id: currentVerCmdInput
-                                            placeholderText: "e.g. npm list -g @org/skills --json"
+                                            placeholderText: "e.g. npx list -g @org/skills --json"
                                             Accessible.role: Accessible.EditableText
                                             Accessible.name: "Detect Local Version"
                                             Layout.fillWidth: true
@@ -514,7 +514,7 @@ Dialog {
                                         Text { text: "Detect Latest Version"; font.family: Theme.fontFamily; font.pixelSize: 10; color: Theme.secondaryLabel }
                                         TextField {
                                             id: latestVerCmdInput
-                                            placeholderText: "e.g. npm show @org/skills version"
+                                            placeholderText: "e.g. npx show @org/skills version"
                                             Accessible.role: Accessible.EditableText
                                             Accessible.name: "Detect Latest Version"
                                             Layout.fillWidth: true

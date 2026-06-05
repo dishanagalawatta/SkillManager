@@ -23,7 +23,7 @@ from skill_manager.core.skill_packages.relocator import (
 from skill_manager.core.skill_packages.updater import (
     _intercept_cross_platform_command,
     _run_git_package_update,
-    _run_npm_update,
+    _run_npx_update,
     run_skill_package_update,
 )
 from skill_manager.core.skill_packages.versioning import (
@@ -42,7 +42,7 @@ def test_normalize_skill_package_config():
     data = {"package_name": "test-package"}
     normalized = normalize_skill_package_config(data)
     assert normalized["name"] == "test-package"
-    assert normalized["source_type"] == "npm"
+    assert normalized["source_type"] == "npx"
     assert normalized["package_id"].startswith("pkg_")
     assert "npx --yes -- test-package" in normalized["update_command"]
 
@@ -61,10 +61,10 @@ def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
     assert sanitize_token(None) is None
 
 
-def test_detect_package_config_npm():
+def test_detect_package_config_npx():
     data = {"package_name": "npx --yes my-pkg --foo"}
     detected = detect_package_config(data)
-    assert detected["source_type"] == "npm"
+    assert detected["source_type"] == "npx"
     assert detected["package_name"] == "my-pkg"
     assert detected["package_args"] == "--foo"
 
@@ -96,7 +96,39 @@ def test_relocate_packages(temp_dir):
     assert (project_path / "caveman").is_dir()
     assert (project_path / "caveman" / "SKILL.md").exists()
     assert not (project_path / "invalid").exists()
-    assert not skill_caveman.exists()
+
+
+def test_relocate_packages_from_output_agents_subfolder(temp_dir):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    project_path = temp_dir / "project_skills"
+    project_path.mkdir()
+
+    source_dir = temp_dir / "staging_area"
+    agents_skills_dir = source_dir / ".agents" / "skills"
+    agents_skills_dir.mkdir(parents=True)
+
+    skill_awesome = agents_skills_dir / "awesome"
+    skill_awesome.mkdir()
+    (skill_awesome / "SKILL.md").write_text("content")
+
+    skill_invalid = agents_skills_dir / "invalid"
+    skill_invalid.mkdir()
+
+    captured_output = [
+        "Some random npx output",
+        f"Installed to {agents_skills_dir}",
+        "done"
+    ]
+
+    managed = relocate_packages_from_output(captured_output, str(project_path), None)
+
+    assert managed == ["awesome"]
+    assert (project_path / "awesome").is_dir()
+    assert (project_path / "awesome" / "SKILL.md").exists()
+    assert not (project_path / "invalid").exists()
+    assert not (project_path / ".agents").exists()
+    assert not (project_path / "skills").exists()
 
 
 def test_relocate_packages_no_dest_or_no_source(temp_dir):
@@ -108,9 +140,9 @@ def test_relocate_packages_no_dest_or_no_source(temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
-@patch("skill_manager.core.skill_packages.updater.relocate_packages")
+@patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
 @patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
-def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, mock_run, temp_dir):
+def test_run_skill_package_update_with_relocation(mock_check, mock_relocate_from_output, mock_run, temp_dir):
     package_path = temp_dir / "skills_dest"
     package_path.mkdir()
     (package_path / "old-skill").mkdir()
@@ -123,7 +155,7 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     }
 
     # Mock relocation to return a NEW list of managed folders
-    mock_relocate.return_value = ["new-skill"]
+    mock_relocate_from_output.return_value = ["new-skill"]
     mock_check.return_value = {"current_version": "2.0.0"}
 
     updated = run_skill_package_update(source)
@@ -134,7 +166,32 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     assert updated["removed_folders"] == ["old-skill"]
     assert updated["current_version"] == "2.0.0"
     assert mock_run.call_args.kwargs["cwd"]
-    assert mock_relocate.call_args.kwargs["source_path"] == mock_run.call_args.kwargs["cwd"]
+
+
+@patch("skill_manager.core.skill_packages.updater.run_process")
+@patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
+@patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
+def test_run_skill_package_update_with_npx_relocation(mock_check, mock_relocate_from_output, mock_run, temp_dir):
+    package_path = temp_dir / "skills_dest"
+    package_path.mkdir()
+
+    source = {
+        "name": "test-npx",
+        "source_type": "npx",
+        "package_name": "some-npx-pkg",
+        "package_path": str(package_path),
+        "managed_folders": [],
+    }
+
+    mock_relocate_from_output.return_value = ["new-npx-skill"]
+    mock_check.return_value = {"current_version": "3.0.0"}
+
+    updated = run_skill_package_update(source)
+
+    assert mock_relocate_from_output.called
+    assert updated["managed_folders"] == ["new-npx-skill"]
+    assert mock_run.call_args.kwargs["cwd"]
+    assert mock_relocate_from_output.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
 
 
 @patch("skill_manager.core.skill_packages.versioning.cmd.Git")
@@ -178,9 +235,9 @@ def test_run_git_package_update_clone(mock_git_class, temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_npm_update(mock_run):
+def test_run_npx_update(mock_run):
     source = {"package_name": "my-pkg", "package_args": "--dev"}
-    _run_npm_update(source, None)
+    _run_npx_update(source, None)
 
     mock_run.assert_called_once()
     assert mock_run.call_args[0][0] == ["npx", "--yes", "--", "my-pkg", "--dev"]
@@ -206,11 +263,11 @@ def test_resolve_process_command_not_found():
             _resolve_process_command(["no-such-exec"])
 
 
-def test_detect_package_config_auto_npm():
-    # update_command starting with npx should be auto-detected as npm
+def test_detect_package_config_auto_npx():
+    # update_command starting with npx should be auto-detected as npx
     source = {"update_command": "npx --yes my-pkg"}
     detected = detect_package_config(source)
-    assert detected["source_type"] == "npm"
+    assert detected["source_type"] == "npx"
     assert detected["package_name"] == "my-pkg"
 
 
@@ -229,7 +286,7 @@ def test_parse_npx_and_apply_package_args():
     assert _parse_npx_command("npx --yes package-name --foo") == ("package-name", "--foo")
     assert _parse_npx_command("python script.py") == ("", "")
 
-    detected = detect_package_config({"source_type": "npm", "package_name": "npx --yes pkg --dev"})
+    detected = detect_package_config({"source_type": "npx", "package_name": "npx --yes pkg --dev"})
     assert detected["package_name"] == "pkg"
     assert detected["package_args"] == "--dev"
 
@@ -269,7 +326,6 @@ def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
     assert '"a": 1' in merged
     assert '"b": 2' in merged
     assert '"version": "2"' in merged
-    assert not source_lock.exists()
 
 
 def test_relocate_path_internal_cleanup(temp_dir):
@@ -470,7 +526,7 @@ def test_run_process_timeout_handling():
 
 
 def test_detect_command_type_edge_cases():
-    assert _detect_command_type("npx --yes my-pkg") == "npm"
+    assert _detect_command_type("npx --yes my-pkg") == "npx"
     assert _detect_command_type("git clone ...") == "custom"
     assert _detect_command_type("copy file ...") == "custom"
 

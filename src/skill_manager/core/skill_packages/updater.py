@@ -12,7 +12,7 @@ from git import Repo, cmd
 
 from .config import normalize_skill_package_config
 from .process import _emit, run_process
-from .relocator import relocate_packages
+from .relocator import relocate_packages, relocate_packages_from_output
 from .versioning import check_skill_package_versions
 
 
@@ -23,12 +23,17 @@ def _remove_package_folder(path: Path) -> None:
 def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
     repository_url = source.get("repository_url")
     package_path = source.get("resolved_package_path") or source.get("package_path")
-    clone_path = source.get("clone_path") or package_path
+    clone_path = source.get("clone_path")
+    if not clone_path:
+        from skill_manager.core.config import DATA_DIR
+
+        from .storage import safe_package_folder_name
+        package_name = safe_package_folder_name(source)
+        clone_path = str(DATA_DIR / "package_clones" / package_name)
+        source["clone_path"] = clone_path
 
     if not repository_url:
         raise ValueError("Configure a repository_url for git sources.")
-    if not clone_path:
-        raise ValueError("Configure either package_path or clone_path for git sources.")
 
     path = Path(os.path.expanduser(clone_path))
     token = source.get("github_token")
@@ -78,14 +83,14 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
         _emit(output_callback, f"Installed to {path}")
 
 
-def _run_npm_update(
+def _run_npx_update(
     source: dict[str, Any],
     output_callback: Callable[[str], None] | None,
     cwd: str | os.PathLike | None = None,
 ):
     package_name = source.get("package_name")
     if not package_name:
-        raise ValueError("Configure an npm package name.")
+        raise ValueError("Configure an npx package name.")
 
     command = ["npx", "--yes", "--", package_name]
     if source.get("package_args"):
@@ -177,7 +182,7 @@ def run_skill_package_update(
         if output_callback:
             output_callback(msg)
 
-    uses_staging = source.get("source_type") == "npm" or bool(source.get("update_command"))
+    uses_staging = source.get("source_type") == "npx" or bool(source.get("update_command"))
     staging_context = (
         tempfile.TemporaryDirectory(prefix="skillmanager-package-", ignore_cleanup_errors=True)
         if uses_staging
@@ -185,27 +190,34 @@ def run_skill_package_update(
     )
     with staging_context as staging_dir:
         staging_path = staging_dir
-        if source.get("source_type") == "npm":
-            _run_npm_update(source, intercept_callback, cwd=staging_path)
+        if source.get("source_type") == "npx":
+            _run_npx_update(source, intercept_callback, cwd=staging_path)
         elif source.get("update_command"):
             _run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
         else:
             _run_git_package_update(source, intercept_callback)
 
         if package_path:
-            _emit(output_callback, f"[DEBUG] Relocating skills from source to: {package_path}")
-
-            source_path = staging_path
-            if not uses_staging:
+            if uses_staging:
+                _emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
+                new_managed = relocate_packages_from_output(
+                    captured_output,
+                    package_path,
+                    output_callback,
+                    base_path=staging_path,
+                    package_name_prefix=source.get("name", ""),
+                )
+            else:
+                _emit(output_callback, f"[DEBUG] Relocating skills from source to: {package_path}")
                 clone_path = source.get("clone_path") or package_path
                 source_path = Path(os.path.expanduser(clone_path))
 
-            new_managed = relocate_packages(
-                source_path=source_path,
-                target_package_path=package_path,
-                output_callback=output_callback,
-                package_name_prefix=source.get("name", ""),
-            )
+                new_managed = relocate_packages(
+                    source_path=source_path,
+                    target_package_path=package_path,
+                    output_callback=output_callback,
+                    package_name_prefix=source.get("name", ""),
+                )
 
             if new_managed is not None:
                 old_managed = source.get("managed_folders", [])

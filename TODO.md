@@ -1,2 +1,3 @@
+Scrollbar not seeing and seems like broken
 
-need to fix opening time for the app
+disable right click for skill items

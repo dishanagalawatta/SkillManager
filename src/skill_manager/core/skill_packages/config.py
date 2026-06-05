@@ -50,11 +50,11 @@ def _parse_npx_command(command: str) -> tuple[str, str]:
 
 def _detect_command_type(command: str) -> str:
     if _parse_npx_command(command)[0]:
-        return "npm"
+        return "npx"
     return "custom"
 
 
-def _apply_npm_defaults(source: dict[str, Any]):
+def _apply_npx_defaults(source: dict[str, Any]):
     package_name = str(source.get("package_name") or "").strip()
 
     if package_name:
@@ -86,7 +86,7 @@ def _apply_npm_defaults(source: dict[str, Any]):
 
     args = str(source.get("package_args") or "").strip()
     source["update_command"] = f"npx --yes -- {package_name}" + (f" {args}" if args else "")
-    source["latest_version_command"] = f"npm show -- {package_name} version"
+    source["latest_version_command"] = f"npx npm show -- {package_name} version"
 
 
 def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
@@ -101,13 +101,13 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
 
     if source_type == "auto":
         if package_name:
-            source_type = "npm"
+            source_type = "npx"
         elif update_command:
             source_type = _detect_command_type(update_command)
         source["source_type"] = source_type
 
-    if source_type == "npm":
-        _apply_npm_defaults(source)
+    if source_type == "npx":
+        _apply_npx_defaults(source)
     elif source_type == "git":
         source["update_command"] = ""
         source.setdefault("latest_version_command", "")

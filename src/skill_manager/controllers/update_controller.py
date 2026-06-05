@@ -205,12 +205,12 @@ class UpdateController(BaseController):
 
     @Slot(str)
     def addUpdatePackage(self, package_name: str):
-        """Adds a basic NPM-style source."""
+        """Adds a basic NPX-style source."""
         if not package_name:
             return
         new_source = {
             "name": package_name,
-            "source_type": "npm",
+            "source_type": "npx",
             "package_name": package_name,
             "last_updated": "Never",
             "is_updating": False,
@@ -222,7 +222,7 @@ class UpdateController(BaseController):
 
     @Slot(dict)
     def addSkillPackage(self, data: dict):
-        """Adds a fully configured skill package (git/npm/custom)."""
+        """Adds a fully configured skill package (git/npx/custom)."""
         if not data:
             return
         from skill_manager.core.skill_packages import (
