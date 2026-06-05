@@ -85,18 +85,15 @@ def test_update_skill_in_project_success(update_controller, mock_app):
             "skill_manager.controllers.update_controller.schedule_on_ui_thread"
         ) as schedule_on_ui_thread,
     ):
-        schedule_on_ui_thread.side_effect = (
-            lambda _receiver, callback, *, delay_ms=0: callback() if delay_ms == 0 else None
+        schedule_on_ui_thread.side_effect = lambda _receiver, callback, *, delay_ms=0: (
+            callback() if delay_ms == 0 else None
         )
         mock_copy.return_value = {"failed": 0}
 
         update_controller.updateSkillInProject("Skill1", "ProjectLabel")
 
         mock_copy.assert_called_once()
-        delays = [
-            call.kwargs.get("delay_ms", 0)
-            for call in schedule_on_ui_thread.call_args_list
-        ]
+        delays = [call.kwargs.get("delay_ms", 0) for call in schedule_on_ui_thread.call_args_list]
         assert delays == [0, 500]
 
 
@@ -107,8 +104,8 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
     mock_app._projects = [str(project_root)]
     mock_app._update_packages = [
         {
-            "name": "Pkg",
-            "package_id": "pkg_1",
+            "package_id": "skills",
+            "name": "skills",
             "package_path": str(package_path),
             "resolved_package_path": str(package_path),
         }
@@ -133,7 +130,7 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
 
     run_skill_package_update.assert_not_called()
     mock_app._set_status.assert_any_call(
-        f"Update failed for Pkg: Package storage path overlaps a project skills path: {package_path}"
+        f"Update failed for skills: Package storage path overlaps a project skills path: {package_path}"
     )
 
 

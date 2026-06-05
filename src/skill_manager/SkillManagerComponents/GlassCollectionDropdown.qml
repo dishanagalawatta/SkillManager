@@ -29,7 +29,7 @@ ComboBox {
                 id: editBtn
                 buttonSize: 24
                 iconSize: 10
-                iconText: "Edit"
+                iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
                 role: "ghost"
                 tooltipText: "Edit Collection"
                 visible: index > 0 // Only for custom collections

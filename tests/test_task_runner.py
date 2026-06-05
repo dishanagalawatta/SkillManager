@@ -21,6 +21,7 @@ def test_synchronous_task_runner():
     assert result == [10]
     assert ret == 20
 
+
 def test_background_task_runner():
     runner = BackgroundTaskRunner()
     result = []
@@ -38,6 +39,7 @@ def test_background_task_runner():
     assert event.wait(timeout=1.0)
     assert result == [5]
 
+
 def test_synchronous_task_runner_kwargs():
     runner = SynchronousTaskRunner()
 
@@ -45,6 +47,7 @@ def test_synchronous_task_runner_kwargs():
         return a + b
 
     assert runner.run(task, kwargs={"a": 10, "b": 20}) == 30
+
 
 def test_background_task_runner_no_args():
     runner = BackgroundTaskRunner()

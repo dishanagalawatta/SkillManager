@@ -7,6 +7,7 @@ from skill_manager.core.models import FilterEngine, FilterState, Skill
 def engine():
     return FilterEngine()
 
+
 @pytest.fixture
 def skill_data():
     return {
@@ -18,8 +19,9 @@ def skill_data():
         "is_archived": False,
         "is_bundle": False,
         "is_command": False,
-        "main_category": "⚙️ System & Workflow"
+        "main_category": "⚙️ System & Workflow",
     }
+
 
 def test_skill_from_dict(skill_data):
     skill = Skill.from_dict(skill_data)
@@ -27,12 +29,14 @@ def test_skill_from_dict(skill_data):
     assert skill.category == "Core Workflow"
     assert skill.main_category == "⚙️ System & Workflow"
 
+
 def test_filter_engine_get_main_category(engine, skill_data):
     skill = Skill.from_dict(skill_data)
     assert engine.get_main_category(skill) == "⚙️ System & Workflow"
 
     skill.is_starred = True
     assert engine.get_main_category(skill) == "Special"
+
 
 def test_filter_engine_filter_by_category(engine):
     skills = [
@@ -44,6 +48,7 @@ def test_filter_engine_filter_by_category(engine):
 
     assert len(filtered) == 1
     assert filtered[0].name == "S1"
+
 
 def test_filter_engine_filter_archived(engine):
     skills = [
@@ -59,15 +64,21 @@ def test_filter_engine_filter_archived(engine):
     state.show_archived = True
     assert len(engine.filter_skills(skills, state)) == 2
 
+
 def test_filter_engine_sort_key(engine):
-    s1 = Skill.from_dict({"name": "Apple", "main_category": "⚙️ System & Workflow", "local_path": "p1"})
-    s2 = Skill.from_dict({"name": "Zebra", "main_category": "⚙️ System & Workflow", "local_path": "p2"})
+    s1 = Skill.from_dict(
+        {"name": "Apple", "main_category": "⚙️ System & Workflow", "local_path": "p1"}
+    )
+    s2 = Skill.from_dict(
+        {"name": "Zebra", "main_category": "⚙️ System & Workflow", "local_path": "p2"}
+    )
 
     key1 = engine.sort_key(s1)
     key2 = engine.sort_key(s2)
 
     assert key1 < key2
     assert "1_⚙️ System & Workflow" in key1[0]
+
 
 def test_filter_engine_build_visible_rows_collapsed(engine):
     skills = [

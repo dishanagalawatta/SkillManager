@@ -148,13 +148,13 @@ Item {
                     
                     GlassMenuItem {
                         text: "Edit " + (model && model.isCommand ? "Command" : "Skill")
-                        iconText: "📝"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
                         onTriggered: AppController.ui_controller.selectSkill(index)
                     }
                     
                     GlassMenuItem {
                         text: "Copy Path"
-                        iconText: "📋"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
                         shortcut: AppController.config_controller.shortcutCopy
                         onTriggered: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill()
                     }
@@ -169,14 +169,14 @@ Item {
                     
                     GlassMenuItem {
                         text: model && model.isArchived ? "Unarchive" : "Archive"
-                        iconText: "📦"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/archive-icon.svg")
                         shortcut: AppController.config_controller.shortcutArchive
                         onTriggered: AppController.ops_controller.archiveSelectedSkills()
                     }
                     
                     GlassMenuItem {
                         text: "Delete"
-                        iconText: "🗑️"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                         shortcut: AppController.config_controller.shortcutDelete
                         onTriggered: {
                             if (model && model.path) {

@@ -9,8 +9,8 @@ from .process import _resolve_process_command, run_process as _run_process, sani
 from .relocator import (
     _merge_and_move_lockfile,
     _relocate_path_internal,
-    relocate_packages_from_output,
-    relocate_packages_from_output as _relocate_packages_from_output,
+    relocate_packages,
+    relocate_packages as _relocate_packages,
 )
 from .storage import (
     diff_package_inventory,
@@ -42,7 +42,7 @@ __all__ = [
     "get_git_tag",
     "run_version_command",
     "sanitize_token",
-    "relocate_packages_from_output",
+    "relocate_packages",
     "detect_git_remote",
     "resolve_package_storage",
     "scan_package_inventory",
@@ -60,7 +60,7 @@ __all__ = [
     "_run_shell_command",
     "_run_process",
     "_resolve_process_command",
-    "_relocate_packages_from_output",
+    "_relocate_packages",
     "_merge_and_move_lockfile",
     "_relocate_path_internal",
 ]

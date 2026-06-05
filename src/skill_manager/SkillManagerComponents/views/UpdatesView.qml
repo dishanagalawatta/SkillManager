@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick.Effects
 import QtQuick.Dialogs
+import Qt5Compat.GraphicalEffects
 import ".."
 import App 1.0
 import "../dialogs"
@@ -171,7 +172,7 @@ Item {
                                 spacing: 8
                                 ActionButton {
                                     labelText: "Add Package"
-                                    iconText: "+"
+                                    iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                                     role: "secondary"
                                     onClicked: (mouse) => {
                                         uv_packageEditDialog.editIndex = -1
@@ -180,7 +181,7 @@ Item {
                                 }
                                 ActionButton {
                                     labelText: "Folder"
-                                    iconText: "+"
+                                    iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                                     role: "secondary"
                                     onClicked: (mouse) => {
                                         uv_folderPicker.mode = "package"
@@ -216,10 +217,27 @@ Item {
                                         height: 28
                                         radius: 14
                                         color: Theme.alpha(Theme.accent, 0.07)
-                                        Text {
+
+                                        Image {
+                                            id: typeIcon
                                             anchors.centerIn: parent
-                                            text: modelData.source_type === "git" ? "🌐" : (modelData.source_type === "npm" ? "📦" : "📁")
-                                            font.pixelSize: 14
+                                            width: 14
+                                            height: 14
+                                            sourceSize.width: 14
+                                            sourceSize.height: 14
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            source: {
+                                                if (modelData.source_type === "git") return AppController.ui_controller.getAssetUri("ui/globe-icon.svg")
+                                                if (modelData.source_type === "npm") return AppController.ui_controller.getAssetUri("ui/box-icon.svg")
+                                                return AppController.ui_controller.getAssetUri("ui/folder-icon.svg")
+                                            }
+                                        }
+
+                                        ColorOverlay {
+                                            anchors.fill: typeIcon
+                                            source: typeIcon
+                                            color: Theme.accent
                                         }
                                     }
 
@@ -275,7 +293,7 @@ Item {
 
 
                                         IconButton {
-                                            iconText: "Edit"
+                                            iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
                                             iconSize: 10
                                             buttonSize: 28
                                             role: "ghost"
@@ -288,7 +306,7 @@ Item {
                                             }
                                         }
                                         IconButton {
-                                            iconText: "🗑️"
+                                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                                             iconSize: 10
                                             buttonSize: 28
                                             role: "destructive"
@@ -354,7 +372,7 @@ Item {
                             }
                             ActionButton {
                                 labelText: "Add Project"
-                                iconText: "+"
+                                iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                                 role: "secondary"
                                 onClicked: (mouse) => {
                                     uv_folderPicker.mode = "project"
@@ -389,10 +407,23 @@ Item {
                                         height: 28
                                         radius: 14
                                         color: Theme.alpha(Theme.accent, 0.07)
-                                        Text {
+
+                                        Image {
+                                            id: projectIcon
                                             anchors.centerIn: parent
-                                            text: "🚀"
-                                            font.pixelSize: 16
+                                            width: 16
+                                            height: 16
+                                            sourceSize.width: 16
+                                            sourceSize.height: 16
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            source: AppController.ui_controller.getAssetUri("ui/rocket-icon.svg")
+                                        }
+
+                                        ColorOverlay {
+                                            anchors.fill: projectIcon
+                                            source: projectIcon
+                                            color: Theme.accent
                                         }
                                     }
 
@@ -428,7 +459,7 @@ Item {
                                     RowLayout {
                                         spacing: 4
                                         IconButton {
-                                            iconText: "Edit"
+                                            iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
                                             iconSize: 10
                                             buttonSize: 32
                                             role: "ghost"
@@ -440,7 +471,7 @@ Item {
                                             }
                                         }
                                         IconButton {
-                                            iconText: "🗑️"
+                                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                                             iconSize: 10
                                             buttonSize: 32
                                             role: "destructive"

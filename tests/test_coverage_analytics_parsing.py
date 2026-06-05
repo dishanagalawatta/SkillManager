@@ -25,11 +25,13 @@ def test_get_or_create_device_id_handles_errors(tmp_path):
             id2 = _get_or_create_device_id()
             assert id2.startswith("device_")
 
+
 def test_analytics_calls_with_no_client():
     # _posthog is None in tests because of the safeguard
-    capture_event("test") # Should not raise
-    capture_exception(Exception("test")) # Should not raise
-    shutdown() # Should not raise
+    capture_event("test")  # Should not raise
+    capture_exception(Exception("test"))  # Should not raise
+    shutdown()  # Should not raise
+
 
 def test_get_device_id_lazy_init():
     with (
@@ -38,10 +40,12 @@ def test_get_device_id_lazy_init():
     ):
         assert get_device_id() == "mock_id"
 
+
 def test_parse_command_md_skips_common_files(tmp_path):
     f = tmp_path / "security.md"
     f.write_text("content")
     assert parse_command_md(str(f)) is None
+
 
 def test_parse_command_md_client_from_formats(tmp_path):
     # Stem 'cursor' is likely in CLIENT_FORMATS
@@ -52,6 +56,7 @@ def test_parse_command_md_client_from_formats(tmp_path):
     with patch("skill_manager.core.quick_copy.CLIENT_FORMATS", {"cursor": {}}):
         data = parse_command_md(str(f))
         assert data["client"] == "cursor"
+
 
 def test_parse_command_md_exception_handling(tmp_path):
     f = tmp_path / "bad.md"

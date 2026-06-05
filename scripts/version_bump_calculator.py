@@ -17,7 +17,7 @@ def main():
     commit_msg = sys.argv[2]
 
     # Find explicit command in commit message
-    match = re.search(r'\[(dev|patch|minor|major|preminor|premajor)\]', commit_msg)
+    match = re.search(r"\[(dev|patch|minor|major|preminor|premajor)\]", commit_msg)
     if not match:
         print("")
         sys.exit(0)
@@ -26,7 +26,7 @@ def main():
 
     # Parse current version using regex
     # e.g. 1.2.3 or 1.2.4-dev.2 or v1.2.3
-    v_match = re.match(r'^v?(\d+)\.(\d+)\.(\d+)(?:-dev\.(\d+))?$', version)
+    v_match = re.match(r"^v?(\d+)\.(\d+)\.(\d+)(?:-dev\.(\d+))?$", version)
     if not v_match:
         sys.stderr.write(f"ERROR: Invalid version format {version}\n")
         sys.exit(1)
@@ -37,7 +37,9 @@ def main():
     # Handle Edge Case B: Cross-grade logic
     # If we are working towards a minor/major release (patch == "0") and command is patch, fail.
     if is_dev and patch == "0" and cmd == "patch":
-        sys.stderr.write(f"ERROR: Cross-grade detected. Cannot graduate minor/major prerelease {version} via 'bump patch'.\n")
+        sys.stderr.write(
+            f"ERROR: Cross-grade detected. Cannot graduate minor/major prerelease {version} via 'bump patch'.\n"
+        )
         sys.exit(1)
 
     # Map commands to python-semantic-release flags
@@ -62,6 +64,7 @@ def main():
         args = ""
 
     print(args)
+
 
 if __name__ == "__main__":
     main()

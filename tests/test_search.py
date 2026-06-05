@@ -10,21 +10,22 @@ def sample_skills():
             "name": "brainstorming",
             "description": "Use before creative or constructive work. Transforms vague ideas into validated designs.",
             "category": "design",
-            "metadata": {"tags": ["planning", "design"]}
+            "metadata": {"tags": ["planning", "design"]},
         },
         {
             "name": "auto_commit",
             "description": "Automate git commits and push to remote.",
             "category": "git",
-            "metadata": {"tags": ["automation", "vcs"]}
+            "metadata": {"tags": ["automation", "vcs"]},
         },
         {
             "name": "python_test",
             "description": "Test python code using pytest.",
             "category": "testing",
-            "metadata": {"tags": ["python", "pytest"]}
-        }
+            "metadata": {"tags": ["python", "pytest"]},
+        },
     ]
+
 
 def test_search_hides_irrelevant_skills(sample_skills):
     engine = SearchEngine(sample_skills)

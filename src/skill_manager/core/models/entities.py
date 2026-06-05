@@ -7,6 +7,7 @@ from skill_manager.core.schemas import SkillRecord
 @dataclass
 class Skill:
     """Represents a single skill or command entity."""
+
     name: str = ""
     category: str = "General"
     description: str = ""
@@ -83,13 +84,14 @@ class Skill:
             source=data.get("source", "Unknown"),
             date=data.get("date", "Unknown"),
             client=data.get("client", ""),
-            main_category=data.get("main_category", "⚙️ System & Workflow")
+            main_category=data.get("main_category", "⚙️ System & Workflow"),
         )
 
 
 @dataclass
 class FilterState:
     """Represents the current filtering and view state."""
+
     filter_text: str = ""
     show_archived: bool = False
     category_filter: str = ""

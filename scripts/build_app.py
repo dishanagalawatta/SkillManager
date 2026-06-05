@@ -42,7 +42,7 @@ def clean_build_dirs(project_root: str) -> None:
     """
     dirs_to_clean = [
         os.path.join(project_root, "dist", "SkillManager"),
-        os.path.join(project_root, "build", "skill_manager")
+        os.path.join(project_root, "build", "skill_manager"),
     ]
 
     print("Cleaning previous build directories...")
@@ -62,10 +62,14 @@ def clean_build_dirs(project_root: str) -> None:
                 print(f"\nERROR: Failed to clean {dir_path}")
                 print(f"Details: {e}")
                 print("\nPOSSIBLE CAUSES:")
-                print("1. The application (SkillManager.exe) is currently running in the background.")
+                print(
+                    "1. The application (SkillManager.exe) is currently running in the background."
+                )
                 print("2. A terminal or file explorer has the directory open.")
                 print("3. An antivirus program is currently scanning the files.")
-                print("\nACTION: Please close the application and any windows using the folder, then try again.")
+                print(
+                    "\nACTION: Please close the application and any windows using the folder, then try again."
+                )
                 sys.exit(1)
     print("Cleaned successfully.")
 
@@ -113,7 +117,9 @@ def run_pyinstaller(spec_path: str) -> int:
 
     if importlib.util.find_spec("PyInstaller") is None:
         print("Error: PyInstaller is not installed in the current Python environment.")
-        print("Please run this script inside the uv virtual environment (e.g., `uv run python scripts/build_app.py`).")
+        print(
+            "Please run this script inside the uv virtual environment (e.g., `uv run python scripts/build_app.py`)."
+        )
         sys.exit(1)
 
     print(f"Running PyInstaller for spec: {spec_path}...")
@@ -146,8 +152,12 @@ def package_windows(project_root: str) -> None:
                 break
 
     if not iscc:
-        print("Error: 'iscc' (Inno Setup Compiler) not found in PATH or standard installation directories.")
-        print("Please ensure Inno Setup is installed. If it is installed in a custom location, add that folder to your system PATH.")
+        print(
+            "Error: 'iscc' (Inno Setup Compiler) not found in PATH or standard installation directories."
+        )
+        print(
+            "Please ensure Inno Setup is installed. If it is installed in a custom location, add that folder to your system PATH."
+        )
         print("Download: https://jrsoftware.org/isdl.php")
         sys.exit(1)
 

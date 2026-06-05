@@ -148,4 +148,3 @@ class CacheState(BaseModel):
             elif isinstance(item, SkillRecord):
                 validated.append(item)
         return validated
-

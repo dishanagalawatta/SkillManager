@@ -77,8 +77,8 @@ Item {
                 checked: AppController.libraryModel.showArchived
                 onClicked: (mouse) => AppController.libraryModel.showArchived = checked
                 
-                iconInactive: "📁"
-                iconActive: "📦"
+                iconSourceInactive: AppController.ui_controller.getAssetUri("ui/folder-icon.svg")
+                iconSourceActive: AppController.ui_controller.getAssetUri("ui/archive-icon.svg")
                 textActive: "Showing Archived"
             }
 
@@ -138,6 +138,29 @@ Item {
                     Layout.rightMargin: 4
                 }
 
+                GlassCheckBox {
+                    id: lv_selectCheck
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+
+                    checkState: {
+                        let count = AppController.libraryModel.visibleSelectedCount;
+                        let total = AppController.libraryModel.visibleSelectableCount;
+                        if (count === 0) return Qt.Unchecked;
+                        if (count >= total && total > 0) return Qt.Checked;
+                        return Qt.PartiallyChecked;
+                    }
+
+                    onToggled: {
+                        if (checkState === Qt.Checked) {
+                            AppController.libraryModel.clearSelection();
+                        } else {
+                            AppController.libraryModel.selectAll();
+                        }
+                    }
+                }
+
+
                 // LEFT: Selection Count
                 RowLayout {
                     spacing: 12
@@ -178,18 +201,9 @@ Item {
                         id: lv_addCommandBtn
                         buttonHeight: 32
                         labelText: "Add"
-                        iconText: "+"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                         role: "secondary"
                         onClicked: (mouse) => lv_commandDialog.openWithContext("", AppController.clientFormat)
-                    }
-
-                    ActionButton {
-                        id: lv_selectAllBtn
-                        buttonHeight: 32
-                        labelText: "Select All"
-                        role: "secondary"
-                        visible: AppController.libraryModel.selectedCount < AppController.libraryModel.rowCount()
-                        onClicked: (mouse) => AppController.libraryModel.selectAll()
                     }
 
                     // Selection-specific actions
@@ -197,22 +211,6 @@ Item {
                         spacing: 8
                         visible: AppController.libraryModel.selectedCount > 0
                         
-                        ActionButton {
-                            id: lv_clearBtn
-                            buttonHeight: 32
-                            labelText: "Clear"
-                            role: "secondary"
-                            onClicked: (mouse) => AppController.libraryModel.clearSelection()
-                        }
-
-                        Rectangle {
-                            width: 1
-                            height: 16
-                            color: Theme.separator
-                            Layout.leftMargin: 4
-                            Layout.rightMargin: 4
-                        }
-
                         GlassDropdown {
                             id: lv_projectDrop
                             Layout.preferredHeight: 32
@@ -240,7 +238,7 @@ Item {
                             id: lv_archiveBtn
                             buttonHeight: 32
                             labelText: "Archive"
-                            iconText: "📦"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/archive-icon.svg")
                             role: "secondary"
                             onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
                         }
@@ -249,7 +247,7 @@ Item {
                             id: lv_deleteBtn
                             buttonHeight: 32
                             labelText: "Delete"
-                            iconText: "🗑️"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                             role: "destructive"
                             onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
                         }

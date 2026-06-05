@@ -171,9 +171,7 @@ def discover_single_project(
         skill_data["project_path"] = str(resolved_project)
         skill_data["project_root"] = str(_project_root_for_project(resolved_project))
         skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
-        skill_data["project_label"] = project_label(
-            resolved_project, project_aliases, str(project)
-        )
+        skill_data["project_label"] = project_label(resolved_project, project_aliases, str(project))
         skill_data.setdefault("metadata", {})
         cat_info = categorize_skill(
             skill_data.get("name", ""),
@@ -259,7 +257,6 @@ def discover_project_skills(
                 logger.warning("[DISCOVERY] Error scanning project: %s", e)
 
     return projects_list
-
 
 
 def _normalize_path(path):

@@ -8,15 +8,15 @@ _COMBINED_REGEX = None
 _KW_TO_CAT = {}
 
 _MAIN_CATEGORY_REVERSE_MAP = {
-    sub.lower(): main
-    for main, sub_cats in MAIN_CATEGORIES_MAPPING.items()
-    for sub in sub_cats
+    sub.lower(): main for main, sub_cats in MAIN_CATEGORIES_MAPPING.items() for sub in sub_cats
 }
+
 
 def get_main_category(sub_category: str) -> str:
     if not sub_category:
         return "⚙️ System & Workflow"
     return _MAIN_CATEGORY_REVERSE_MAP.get(sub_category.lower(), "⚙️ System & Workflow")
+
 
 def _get_category_patterns():
     global _CATEGORY_PATTERNS
@@ -45,6 +45,7 @@ def _get_category_patterns():
             _CATEGORY_PATTERNS[cat] = patterns
     return _CATEGORY_PATTERNS
 
+
 def categorize_skill(name: str, description: str, metadata: dict | None = None) -> dict[str, str]:
     """Determines the best category for a skill using a weighted, hierarchical algorithm."""
     metadata = metadata or {}
@@ -61,8 +62,8 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
     desc_text = description.lower()
     norm_desc_text = " ".join(desc_text.replace("-", " ").replace("_", " ").split())
 
-    is_name_same = (name_text == norm_name_text)
-    is_desc_same = (desc_text == norm_desc_text)
+    is_name_same = name_text == norm_name_text
+    is_desc_same = desc_text == norm_desc_text
 
     patterns = _get_category_patterns()
     sub_category_scores = {}
@@ -94,22 +95,25 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
     if main_category_scores:
         main_cat_order = {k: i for i, k in enumerate(MAIN_CATEGORIES_MAPPING.keys())}
         best_main_cat = sorted(
-            main_category_scores.items(),
-            key=lambda x: (-x[1], main_cat_order.get(x[0], 999))
+            main_category_scores.items(), key=lambda x: (-x[1], main_cat_order.get(x[0], 999))
         )[0][0]
 
     # 4. Find winning Sub Category within the best Main Category
     best_sub_cat = "Uncategorized"
-    valid_subs = {sub: score for sub, score in sub_category_scores.items() if get_main_category(sub) == best_main_cat and score > 0}
+    valid_subs = {
+        sub: score
+        for sub, score in sub_category_scores.items()
+        if get_main_category(sub) == best_main_cat and score > 0
+    }
 
     if valid_subs:
         sub_cat_order = {k: i for i, k in enumerate(CATEGORIES.keys())}
         best_sub_cat = sorted(
-            valid_subs.items(),
-            key=lambda x: (-x[1], sub_cat_order.get(x[0], 999))
+            valid_subs.items(), key=lambda x: (-x[1], sub_cat_order.get(x[0], 999))
         )[0][0]
 
     return {"main_category": best_main_cat, "sub_category": best_sub_cat}
+
 
 def build_skill_search_text(skill_data: dict[str, Any]) -> str:
     parts = [

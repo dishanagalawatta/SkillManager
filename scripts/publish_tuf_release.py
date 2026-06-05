@@ -21,14 +21,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 REPO_DIR = Path("tuf_repo")
-KEYS_DIR = Path("tuf_keys") # IMPORTANT: Keep these safe and DO NOT commit them!
+KEYS_DIR = Path("tuf_keys")  # IMPORTANT: Keep these safe and DO NOT commit them!
 
 
 def main():
     parser = argparse.ArgumentParser(description="Publish a SkillManager update via tufup.")
     parser.add_argument("--version", required=True, help="New version string (e.g. 1.0.1)")
-    parser.add_argument("--bundle", required=True, help="Path to the app bundle directory (e.g. dist/SkillManager)")
-    parser.add_argument("--init", action="store_true", help="Initialize the repository and keys if they don't exist.")
+    parser.add_argument(
+        "--bundle", required=True, help="Path to the app bundle directory (e.g. dist/SkillManager)"
+    )
+    parser.add_argument(
+        "--init",
+        action="store_true",
+        help="Initialize the repository and keys if they don't exist.",
+    )
 
     args = parser.parse_args()
     version = args.version
@@ -80,7 +86,9 @@ def main():
     logger.info("-" * 40)
     logger.info(f"Done! Release {version} is ready in {REPO_DIR}")
     logger.info("To deploy to GitHub Pages:")
-    logger.info(f"1. Push the contents of {REPO_DIR}/metadata and {REPO_DIR}/targets to the 'gh-pages' branch.")
+    logger.info(
+        f"1. Push the contents of {REPO_DIR}/metadata and {REPO_DIR}/targets to the 'gh-pages' branch."
+    )
     logger.info("-" * 40)
 
 

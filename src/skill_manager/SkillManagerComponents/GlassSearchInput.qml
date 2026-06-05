@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 TextField {
@@ -20,13 +21,23 @@ TextField {
 
         Behavior on border.color { ColorAnimation { duration: 200 } }
 
-        Text {
+        Image {
+            id: searchIcon
             anchors.left: parent.left
             anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            text: "🔍"
-            font.pixelSize: 13
-            font.family: Theme.fontFamily
+            source: AppController.ui_controller.getAssetUri("ui/search-icon.svg")
+            width: 14
+            height: 14
+            sourceSize.width: 14
+            sourceSize.height: 14
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+
+        ColorOverlay {
+            anchors.fill: searchIcon
+            source: searchIcon
             color: Theme.secondaryLabel
         }
     }
@@ -38,7 +49,7 @@ TextField {
         anchors.verticalCenter: parent.verticalCenter
         buttonSize: 24
         iconSize: 14
-        iconText: "x"
+        iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
         role: "ghost"
         tooltipText: "Clear search"
         visible: rootSearchField.text !== ""

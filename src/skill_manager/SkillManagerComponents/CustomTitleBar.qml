@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Rectangle {
@@ -66,7 +67,7 @@ Rectangle {
 
         // Custom Button: Theme Toggle
         TitleBarButton {
-            text: Theme.darkMode ? "☀️" : "🌙"
+            iconSource: Theme.darkMode ? AppController.ui_controller.getAssetUri("ui/sun-icon.svg") : AppController.ui_controller.getAssetUri("ui/moon-icon.svg")
             tooltipText: "Toggle Theme"
             onClicked: Theme.darkMode = !Theme.darkMode
             hoverColor: Theme.glassHover
@@ -74,7 +75,7 @@ Rectangle {
 
         // Standard: Minimize
         TitleBarButton {
-            text: "—"
+            iconSource: AppController.ui_controller.getAssetUri("ui/minimize-icon.svg")
             tooltipText: "Minimize Window"
             onClicked: window.showMinimized()
             hoverColor: Theme.glassHover
@@ -82,7 +83,7 @@ Rectangle {
 
         // Standard: Maximize/Restore
         TitleBarButton {
-            text: window.visibility === Window.Maximized ? "❐" : "⬜"
+            iconSource: window.visibility === Window.Maximized ? AppController.ui_controller.getAssetUri("ui/restore-icon.svg") : AppController.ui_controller.getAssetUri("ui/maximize-icon.svg")
             tooltipText: window.visibility === Window.Maximized ? "Restore Window" : "Maximize Window"
             onClicked: {
                 if (window.visibility === Window.Maximized)
@@ -95,7 +96,7 @@ Rectangle {
 
         // Standard: Close
         TitleBarButton {
-            text: "✕"
+            iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
             tooltipText: "Close Window"
             onClicked: window.close()
             hoverColor: Theme.danger
@@ -110,18 +111,44 @@ Rectangle {
         property color textColor: Theme.label
         property real btnSize: 28
         property string tooltipText: ""
+        property string iconSource: ""
         
         Layout.preferredWidth: btnSize + 8 // Padding for spacing
         Layout.preferredHeight: btnSize
         Layout.alignment: Qt.AlignVCenter
         
-        contentItem: Text {
-            text: btn.text
-            font.pixelSize: 11
-            color: btn.textColor
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            anchors.centerIn: parent
+        contentItem: Item {
+            anchors.fill: parent
+
+            Text {
+                visible: btn.iconSource === ""
+                text: btn.text
+                font.pixelSize: 11
+                color: btn.textColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                anchors.centerIn: parent
+            }
+
+            Image {
+                id: iconImg
+                visible: btn.iconSource !== ""
+                source: btn.iconSource
+                width: 12
+                height: 12
+                sourceSize.width: 12
+                sourceSize.height: 12
+                fillMode: Image.PreserveAspectFit
+                anchors.centerIn: parent
+                smooth: true
+            }
+
+            ColorOverlay {
+                anchors.fill: iconImg
+                source: iconImg
+                color: btn.textColor
+                visible: btn.iconSource !== ""
+            }
         }
 
         background: Rectangle {
@@ -145,3 +172,4 @@ Rectangle {
         Accessible.description: btn.tooltipText
     }
 }
+

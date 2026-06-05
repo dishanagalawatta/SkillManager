@@ -480,9 +480,24 @@ def test_collapsible_starred_categories(qapp):
     # 2. Starred skill in "Planning" category
     # 3. Regular skill in "Community" category
     skills = [
-        {"name": "Star Comm", "category": "Community", "is_starred": True, "local_path": "/star_comm"},
-        {"name": "Star Plan", "category": "Planning", "is_starred": True, "local_path": "/star_plan"},
-        {"name": "Reg Comm", "category": "Community", "is_starred": False, "local_path": "/reg_comm"},
+        {
+            "name": "Star Comm",
+            "category": "Community",
+            "is_starred": True,
+            "local_path": "/star_comm",
+        },
+        {
+            "name": "Star Plan",
+            "category": "Planning",
+            "is_starred": True,
+            "local_path": "/star_plan",
+        },
+        {
+            "name": "Reg Comm",
+            "category": "Community",
+            "is_starred": False,
+            "local_path": "/reg_comm",
+        },
     ]
     model = SkillModel()
     model.setSkills(skills)
@@ -512,7 +527,9 @@ def test_collapsible_starred_categories(qapp):
     # Test SectionRole returns Special|<category> for starred skills
     assert model.data(idx_star_comm, SkillModel.SectionRole) == "Special|Community"
     assert model.data(idx_star_plan, SkillModel.SectionRole) == "Special|Planning"
-    assert model.data(idx_reg_comm, SkillModel.SectionRole) == "⚙️ System & Workflow|Community" # Default main category is "⚙️ System & Workflow"
+    assert (
+        model.data(idx_reg_comm, SkillModel.SectionRole) == "⚙️ System & Workflow|Community"
+    )  # Default main category is "⚙️ System & Workflow"
 
     # 2. Test targeted collapsing behavior using section names
     # Collapse only "Special|Community"
@@ -673,9 +690,3 @@ def test_skill_model_set_data(qapp, skill_list):
     # Verify that setData still returns False for now (unimplemented)
     res = model.setData(model.index(0), False, SkillModel.IsSelectedRole)
     assert res is False
-
-
-
-
-
-

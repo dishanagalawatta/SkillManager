@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Button {
@@ -8,6 +9,7 @@ Button {
 
     property bool active: false
     property string iconText: ""
+    property string iconSource: ""
     property string labelText: ""
 
     padding: 0
@@ -22,16 +24,41 @@ Button {
             anchors.centerIn: parent
             spacing: 8
 
-            Text {
-                text: control.iconText
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                font.weight: control.active ? Font.Bold : Font.Normal
-                color: control.active ? Theme.label : Theme.secondaryLabel
-                visible: control.iconText !== ""
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            Item {
+                visible: control.iconText !== "" || control.iconSource !== ""
+                width: 16
+                height: 16
                 Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: control.iconText
+                    visible: control.iconSource === "" && control.iconText !== ""
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: control.active ? Font.Bold : Font.Normal
+                    color: control.active ? Theme.label : Theme.secondaryLabel
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Image {
+                    id: iconImg
+                    anchors.fill: parent
+                    visible: control.iconSource !== ""
+                    source: control.iconSource
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                ColorOverlay {
+                    anchors.fill: iconImg
+                    source: iconImg
+                    color: control.active ? Theme.label : Theme.secondaryLabel
+                    visible: control.iconSource !== ""
+                }
             }
 
             Text {

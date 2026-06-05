@@ -51,7 +51,7 @@ dev = [
     "pillow",
 ]
 
-[project.scripts]
+[project.gui-scripts]
 skill-manager = "skill_manager.__main__:main"
 
 
@@ -72,7 +72,7 @@ where = ["src"]
 include = ["skill_manager*"]
 
 [tool.setuptools.package-data]
-skill_manager = ["assets/tuf/*"]
+skill_manager = ["assets/tuf/*", "assets/brand/*", "assets/ui/*", "assets/clients/*"]
 
 
 [tool.coverage.run]
@@ -141,6 +141,8 @@ dev = [
     "pyinstaller>=6.0.0",
     "pillow>=10.0.0",
     "python-semantic-release>=9.0.0",
+    "pytest-xdist",
+    "pytest-sugar",
 ]
 
 

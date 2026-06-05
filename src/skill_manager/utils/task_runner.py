@@ -20,8 +20,15 @@ class TaskRunner:
         """Executes the target with provided arguments."""
         raise NotImplementedError
 
-    def submit(self, target: Callable, callback: Callable[[Any], None] = None, args: tuple = (), kwargs: dict = None) -> None:
+    def submit(
+        self,
+        target: Callable,
+        callback: Callable[[Any], None] = None,
+        args: tuple = (),
+        kwargs: dict = None,
+    ) -> None:
         """Executes the target and optionally receives its result."""
+
         def wrapped():
             result = target(*(args or ()), **(kwargs or {}))
             if callback:

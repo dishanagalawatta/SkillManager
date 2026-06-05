@@ -23,14 +23,18 @@ def mock_app():
     app.ui._default_project_filter = "all"
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     return DiscoveryController(mock_app)
 
+
 def test_load_initial_data_success(controller, mock_app):
     mock_app.task_runner = MagicMock()
     controller.loadInitialData()
-    mock_app.task_runner.submit.assert_called_once_with(controller._run_discovery_sync, controller._on_discovery_done)
+    mock_app.task_runner.submit.assert_called_once_with(
+        controller._run_discovery_sync, controller._on_discovery_done
+    )
 
 
 def test_finalize_loading(controller, mock_app):
@@ -45,6 +49,7 @@ def test_finalize_loading(controller, mock_app):
     mock_app._quick_copy_model.setSkills.assert_called_with(skills)
     assert mock_app._is_loading is False
     mock_app.isLoadingChanged.emit.assert_called()
+
 
 def test_handle_loading_error(controller, mock_app):
     controller._handle_loading_error("Error occurred")

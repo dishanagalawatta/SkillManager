@@ -1,12 +1,14 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 MenuItem {
     id: control
 
     property string iconText: ""
+    property string iconSource: ""
     property string shortcut: ""
     property bool showIcon: AppController.config_controller ? AppController.config_controller.showMenuIcons : true
     property bool isCompact: AppController.config_controller ? AppController.config_controller.compactMenu : false
@@ -20,11 +22,36 @@ MenuItem {
         anchors.leftMargin: 12
         anchors.rightMargin: 12
 
-        Text {
-            visible: control.showIcon && control.iconText !== ""
-            text: control.iconText
-            font.pixelSize: 16
+        Item {
+            visible: control.showIcon && (control.iconText !== "" || control.iconSource !== "")
+            width: 16
+            height: 16
             Layout.alignment: Qt.AlignVCenter
+
+            Text {
+                anchors.centerIn: parent
+                visible: control.iconSource === "" && control.iconText !== ""
+                text: control.iconText
+                font.pixelSize: 16
+            }
+
+            Image {
+                id: iconImg
+                anchors.fill: parent
+                visible: control.iconSource !== ""
+                source: control.iconSource
+                sourceSize.width: 16
+                sourceSize.height: 16
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
+            ColorOverlay {
+                anchors.fill: iconImg
+                source: iconImg
+                color: control.highlighted ? Theme.label : Theme.secondaryLabel
+                visible: control.iconSource !== ""
+            }
         }
 
         Text {

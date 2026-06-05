@@ -9,6 +9,7 @@ MAIN_CATEGORY_ORDER = {
     "🎨 Specialized & Lifestyle": "6_🎨 Specialized & Lifestyle",
 }
 
+
 class FilterEngine:
     """Pure logic engine for filtering, sorting, and processing skill lists."""
 
@@ -48,7 +49,11 @@ class FilterEngine:
     def filter_skills(self, all_skills: list[Skill], state: FilterState) -> list[Skill]:
         """Filters the raw skill list based on the provided FilterState."""
         filtered = []
-        client_filter_lower = state.client_filter.lower() if (state.client_filter and state.filter_by_client) else None
+        client_filter_lower = (
+            state.client_filter.lower()
+            if (state.client_filter and state.filter_by_client)
+            else None
+        )
 
         for skill in all_skills:
             if not state.show_archived and skill.is_archived:
@@ -58,7 +63,11 @@ class FilterEngine:
             if state.category_filter and skill.category != state.category_filter:
                 continue
 
-            if state.project_filter and state.is_package_only is not True and skill.project_label != state.project_filter:
+            if (
+                state.project_filter
+                and state.is_package_only is not True
+                and skill.project_label != state.project_filter
+            ):
                 continue
 
             if not state.show_commands and skill.is_command:
@@ -88,11 +97,13 @@ class FilterEngine:
             skill._main_category_name = main_cat
             skill._sub_category_name = sub_cat
             skill._section_name = section
-            skill._is_first_in_subcategory = (section != previous_section)
+            skill._is_first_in_subcategory = section != previous_section
             previous_section = section
         return skills
 
-    def build_visible_rows(self, skills: list[Skill], collapsed_categories: set[str]) -> list[Skill]:
+    def build_visible_rows(
+        self, skills: list[Skill], collapsed_categories: set[str]
+    ) -> list[Skill]:
         """Computes the subset of skills that should be visible based on expansion/collapse state."""
         visible = []
         seen_main = set()

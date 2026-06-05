@@ -18,8 +18,12 @@ logger = logging.getLogger(__name__)
 
 # TUF Repository Configuration
 # These will be hosted on GitHub Pages
-TUF_METADATA_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
-TUF_TARGETS_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
+TUF_METADATA_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
+)
+TUF_TARGETS_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
+)
 
 
 class AppUpdateController(BaseController):
@@ -48,7 +52,8 @@ class AppUpdateController(BaseController):
         tuf_root_dest = self._tuf_dir / "root.json"
         if not tuf_root_dest.exists():
             import shutil
-            if getattr(sys, 'frozen', False):
+
+            if getattr(sys, "frozen", False):
                 bundled_root = Path(sys._MEIPASS) / "skill_manager" / "assets" / "tuf" / "root.json"
             else:
                 bundled_root = Path(__file__).parent.parent / "assets" / "tuf" / "root.json"
@@ -64,7 +69,9 @@ class AppUpdateController(BaseController):
         try:
             self._client = Client(
                 app_name="SkillManager",
-                app_install_dir=str(Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()),
+                app_install_dir=str(
+                    Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+                ),
                 current_version=skill_manager.__version__,
                 metadata_base_url=TUF_METADATA_URL,
                 target_base_url=TUF_TARGETS_URL,
@@ -103,9 +110,16 @@ class AppUpdateController(BaseController):
         if self._is_updating:
             return
 
+        # Skip update check in development mode (not frozen)
+        if not getattr(sys, "frozen", False):
+            logger.info("Running in development mode; skipping auto-update check.")
+            self._update_available = False
+            self.updateAvailableChanged.emit()
+            return
+
         # We need a BackgroundTaskRunner for threading, not asyncio.create_task
         # since PySide6 app doesn't have an asyncio loop running by default.
-        if hasattr(self.app, 'task_runner'):
+        if hasattr(self.app, "task_runner"):
             logger.debug("Submitting update check to task runner.")
             self.app.task_runner.submit(self._sync_check_updates, self._on_updates_checked)
         else:
@@ -170,14 +184,30 @@ class AppUpdateController(BaseController):
                     self._update_progress = bytes_downloaded / total_bytes
                     self.updateProgressChanged.emit(self._update_progress)
 
+            def _tufup_update():
+                import subprocess
+
+                original_popen = subprocess.Popen
+
+                # Monkey-patch Popen to always use CREATE_NO_WINDOW during update
+                class NoWindowPopen(original_popen):
+                    def __init__(self, *args, **kwargs):
+                        if sys.platform == "win32":
+                            kwargs["creationflags"] = (
+                                kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                            )
+                        super().__init__(*args, **kwargs)
+
+                subprocess.Popen = NoWindowPopen
+                try:
+                    return self._client.download_and_apply_update(
+                        progress_hook=progress_hook,
+                    )
+                finally:
+                    subprocess.Popen = original_popen
+
             # Download updates
-            success = await loop.run_in_executor(
-                None,
-                lambda: self._client.download_and_apply_update(
-                    progress_hook=progress_hook,
-                    # For Windows, we might need a custom install script if file is in use
-                )
-            )
+            success = await loop.run_in_executor(None, _tufup_update)
 
             if success:
                 logger.info("Update applied successfully. Application should be restarted.")

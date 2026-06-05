@@ -20,10 +20,12 @@ def app_controller(session_mock_config, session_temp_dir):
     from contextlib import suppress
 
     import skill_manager.app
+
     skill_manager.app.current_test_controller = controller
 
     def controller_factory(qml_engine):
         from PySide6.QtQml import QQmlEngine
+
         ctrl = skill_manager.app.current_test_controller
         if ctrl:
             QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
@@ -31,6 +33,7 @@ def app_controller(session_mock_config, session_temp_dir):
 
     with suppress(Exception):
         from PySide6.QtQml import qmlRegisterSingletonType
+
         # This registration is process-wide
         qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
 
@@ -38,6 +41,7 @@ def app_controller(session_mock_config, session_temp_dir):
 
     # Cleanup session-scoped resources
     controller.on_quit()
+
 
 @pytest.fixture
 def setup_controller_data(qapp, app_controller, temp_dir):
@@ -87,6 +91,7 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     app_controller.quickCopyModel.filterByClient = False
     qapp.processEvents()
 
+
 @pytest.fixture
 def qml_engine(qapp, app_controller, qtbot):
     """Provides a QQmlApplicationEngine with the AppController already registered."""
@@ -97,12 +102,13 @@ def qml_engine(qapp, app_controller, qtbot):
 
     # Resolve QML directory relative to the src/ directory
     import skill_manager
+
     qml_dir = qml_components_dir(package_file=skill_manager.__file__)
     engine.addImportPath(str(qml_dir.parent))
 
     qml_file = qml_dir / "Main.qml"
     if not qml_file.exists():
-         pytest.fail(f"Main.qml not found at {qml_file}")
+        pytest.fail(f"Main.qml not found at {qml_file}")
 
     engine.load(str(qml_file))
 
@@ -121,6 +127,7 @@ def qml_engine(qapp, app_controller, qtbot):
     for _ in range(5):
         qapp.processEvents()
         qtbot.wait(20)
+
 
 def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controller_data):
     """Verify navigation, search filtering, and quick copy flow in a single sequence."""
@@ -191,11 +198,13 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     # Verify clipboard
     from PySide6.QtGui import QGuiApplication
+
     clipboard = QGuiApplication.clipboard()
     # We added "Project Skill" in a folder named "proj-skill"
     # The copier might copy the name or the command reference like /skill:proj-skill
     text = clipboard.text()
     assert "proj-skill" in text or "Project Skill" in text
+
 
 def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_data):
     """Verify navigation to Updates view and interaction with scan/lists."""

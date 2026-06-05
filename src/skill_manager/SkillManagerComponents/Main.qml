@@ -22,7 +22,7 @@ Window {
     Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }
     visible: true
     title: "Skill Manager"
-    flags: Qt.Window | Qt.FramelessWindowHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
     color: "transparent" // Let Mica/Acrylic show through
 
     // --- Window Resizing Handles (Frameless Support) ---

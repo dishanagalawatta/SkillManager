@@ -33,11 +33,14 @@ class DiscoveryController(BaseController):
         self.app.isLoadingChanged.emit()
         self.app._set_status("Scanning skills...")
 
-        if hasattr(self.app, 'task_runner'):
+        if hasattr(self.app, "task_runner"):
             self.app.task_runner.submit(self._run_discovery_sync, self._on_discovery_done)
         else:
             import threading
-            threading.Thread(target=lambda: self._on_discovery_done(self._run_discovery_sync())).start()
+
+            threading.Thread(
+                target=lambda: self._on_discovery_done(self._run_discovery_sync())
+            ).start()
 
     def _run_discovery_sync(self):
         """Internal synchronous discovery implementation run in a background thread."""
@@ -56,8 +59,11 @@ class DiscoveryController(BaseController):
         )
 
         try:
+
             def cache_callback(cached_data):
-                logger.info(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
+                logger.info(
+                    f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache..."
+                )
                 # Dispatch UI update safely to the main thread via Signal
                 self._discoverySuccess.emit(
                     cached_data.get("skills", []),
@@ -65,13 +71,14 @@ class DiscoveryController(BaseController):
                     cached_data.get("categories", []),
                     cached_data.get("project_labels", []),
                     f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
-                    False
+                    False,
                 )
 
             result = service.discover_all(cache_callback=cache_callback)
 
             if not self.app.isTesting:
                 import time
+
                 time.sleep(0.2)
 
             return result
@@ -96,7 +103,9 @@ class DiscoveryController(BaseController):
         )
 
     @Slot(list, list, list, list, str, bool)
-    def _finalize_loading(self, all_skills, _projects_state, cats, proj_labels, status, is_final=True):
+    def _finalize_loading(
+        self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
+    ):
         """Updates model and UI state on the main thread after discovery completes."""
         del proj_labels
 

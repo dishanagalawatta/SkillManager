@@ -190,7 +190,9 @@ def test_cleanup_removed_project_skills_requires_verified_removal(mock_proj, ser
     ]
     ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
     with (
-        patch("skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership),
+        patch(
+            "skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership
+        ),
         patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
     ):
         service._cleanup_removed_project_skills(
@@ -285,9 +287,7 @@ def test_run_global_update_suppresses_deletion_when_inventory_scan_is_unsafe(
     mock_delete.assert_not_called()
     saved_inventory = mock_save_inventory.call_args.args[0]
     assert saved_inventory["pkg_1"]["skills"] == {"alpha": {"fingerprint": "old"}}
-    assert any(
-        "Skipped project deletion" in call.args[0] for call in status_cb.call_args_list
-    )
+    assert any("Skipped project deletion" in call.args[0] for call in status_cb.call_args_list)
 
 
 @patch("skill_manager.core.update_service.save_package_skill_inventory")
@@ -320,22 +320,22 @@ def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
         projects=[str(project_root)],
         update_packages=[
             {
-                "name": "Pkg",
-                "package_id": "pkg_1",
+                "name": "skills",
+                "package_id": "skills",
                 "package_path": str(package_path),
                 "resolved_package_path": str(package_path),
             }
         ],
     )
     mock_load_inventory.return_value = {
-        "pkg_1": {
+        "skills": {
             "resolved_package_path": str(package_path),
             "skills": {"old": {"fingerprint": "old"}},
         }
     }
     mock_update.return_value = {
-        "name": "Pkg",
-        "package_id": "pkg_1",
+        "name": "skills",
+        "package_id": "skills",
         "package_path": str(package_path),
         "resolved_package_path": str(package_path),
     }
@@ -346,7 +346,7 @@ def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
         }
     ]
     mock_load_ownership.return_value = {
-        UpdateService._ownership_project_key(str(package_path)): {"old": "pkg_1"}
+        UpdateService._ownership_project_key(str(package_path)): {"old": "skills"}
     }
     mock_discover_sources.return_value = [{"folder_name": "new", "name": "New"}]
 
@@ -384,8 +384,8 @@ def test_run_global_update_skips_package_update_for_project_root_conflict(
         projects=[str(project_root)],
         update_packages=[
             {
-                "name": "Pkg",
-                "package_id": "pkg_1",
+                "name": "skills",
+                "package_id": "skills",
                 "package_path": str(package_path),
                 "resolved_package_path": str(package_path),
             }

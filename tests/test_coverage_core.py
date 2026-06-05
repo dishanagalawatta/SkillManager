@@ -18,6 +18,7 @@ def test_update_projects_invalid_paths(caplog):
     assert "Source path 'missing_src' is not a directory" in caplog.text
     assert "No valid project directories provided." in caplog.text
 
+
 def test_update_projects_error_handling(tmp_path, caplog):
     proj = tmp_path / "proj"
     proj.mkdir()
@@ -31,6 +32,7 @@ def test_update_projects_error_handling(tmp_path, caplog):
         update_projects([str(proj)], [str(src)])
 
     assert "Error updating 'item': Copy failed" in caplog.text
+
 
 def test_get_app_data_dir_fallbacks(monkeypatch):
     monkeypatch.delenv("SKILL_MANAGER_DATA_DIR", raising=False)
@@ -53,6 +55,7 @@ def test_get_app_data_dir_fallbacks(monkeypatch):
         # It should have called home() / ".local" / "share" / APP_NAME
         assert app_dir == mock_app
 
+
 def test_resolve_data_file_copy_error(tmp_path):
     data_dir = tmp_path / "data"
     legacy_dir = tmp_path / "legacy"
@@ -64,6 +67,7 @@ def test_resolve_data_file_copy_error(tmp_path):
         # Should return legacy_path instead of target_path on failure
         res = resolve_data_file("test.json", data_dir, legacy_dir)
         assert res == legacy_dir / "test.json"
+
 
 def test_config_manager_migration(tmp_path):
     # Create a separate directory for app data
@@ -88,6 +92,7 @@ def test_config_manager_migration(tmp_path):
         # New config should exist in app_data_dir
         assert (app_data_dir / "config.json").exists()
 
+
 def test_config_manager_shortcut_merging(tmp_path):
     config_file = tmp_path / "config.json"
     # Partial shortcuts
@@ -95,8 +100,9 @@ def test_config_manager_shortcut_merging(tmp_path):
 
     cm = ConfigManager(str(config_file))
     shortcuts = cm.get("shortcuts")
-    assert shortcuts["search"] == "Ctrl+Shift+F" # Preserved
-    assert shortcuts["copy"] == DEFAULT_SHORTCUTS["copy"] # Merged from default
+    assert shortcuts["search"] == "Ctrl+Shift+F"  # Preserved
+    assert shortcuts["copy"] == DEFAULT_SHORTCUTS["copy"]  # Merged from default
+
 
 def test_config_manager_save_error(tmp_path, caplog):
     config_file = tmp_path / "config.json"

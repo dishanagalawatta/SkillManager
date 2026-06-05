@@ -5,7 +5,16 @@ from pathlib import Path
 
 def resource_path(relative_path: str, *, base_path: str | None = None) -> str:
     if base_path is None:
-        base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+        if hasattr(sys, "_MEIPASS"):
+            base_path = sys._MEIPASS
+        else:
+            # First try relative to the project root (where it lives in the repo)
+            # src/skill_manager/core/resources.py -> Project Root is 3 levels up from core
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            if (project_root / relative_path).exists():
+                base_path = str(project_root)
+            else:
+                base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 
