@@ -183,10 +183,10 @@ def check_skill_package_versions(
             if git_latest:
                 latest_version = clean_v(git_latest)
 
-    if source.get("source_type") == "npm" and (not latest_version or force_refresh):
+    if source.get("source_type") == "npx" and (not latest_version or force_refresh):
         package_name = source.get("package_name")
         if package_name:
-            detected_latest = run_version_command(f"npm view -- {package_name} version")
+            detected_latest = run_version_command(f"npx npm view -- {package_name} version")
             if detected_latest:
                 latest_version = clean_v(detected_latest)
 

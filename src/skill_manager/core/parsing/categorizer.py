@@ -47,7 +47,13 @@ def _get_category_patterns():
 
 
 def categorize_skill(name: str, description: str, metadata: dict | None = None) -> dict[str, str]:
-    """Determines the best category for a skill using a weighted, hierarchical algorithm."""
+    """Determines the best category for a skill using rapidfuzz."""
+    try:
+        from rapidfuzz import fuzz, process
+    except ImportError:
+        # Fallback if rapidfuzz isn't available somehow
+        fuzz = None
+
     metadata = metadata or {}
 
     # 1. Exact metadata category match (highest priority)
@@ -57,31 +63,47 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
             if known_cat.lower() == meta_cat.lower():
                 return {"main_category": get_main_category(known_cat), "sub_category": known_cat}
 
-    name_text = name.lower()
-    norm_name_text = " ".join(name_text.replace("-", " ").replace("_", " ").split())
-    desc_text = description.lower()
-    norm_desc_text = " ".join(desc_text.replace("-", " ").replace("_", " ").split())
+    name_text = name.lower().replace("-", " ").replace("_", " ")
+    desc_text = description.lower().replace("-", " ").replace("_", " ")
 
-    is_name_same = name_text == norm_name_text
-    is_desc_same = desc_text == norm_desc_text
-
-    patterns = _get_category_patterns()
     sub_category_scores = {}
 
-    for category, cat_patterns in patterns.items():
-        score = 0
-        for p in cat_patterns:
-            name_matches = sum(len(m) for m in p.findall(name_text))
-            if not is_name_same:
-                name_matches += sum(len(m) for m in p.findall(norm_name_text))
-            score += name_matches * 10
+    if fuzz is not None:
+        for category, keywords in CATEGORIES.items():
+            if not keywords:
+                continue
 
-            desc_matches = sum(len(m) for m in p.findall(desc_text))
-            if not is_desc_same:
-                desc_matches += sum(len(m) for m in p.findall(norm_desc_text))
-            score += desc_matches
+            # Check name match
+            name_match = process.extractOne(name_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85)
+            name_score = name_match[1] if name_match else 0
+            cat_name_score = fuzz.token_set_ratio(category.lower(), name_text)
+            if cat_name_score >= 85:
+                name_score = max(name_score, cat_name_score + 5)
 
-        sub_category_scores[category] = score
+            # Check desc match
+            desc_match = process.extractOne(desc_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85)
+            desc_score = desc_match[1] if desc_match else 0
+            cat_desc_score = fuzz.token_set_ratio(category.lower(), desc_text)
+            if cat_desc_score >= 85:
+                desc_score = max(desc_score, cat_desc_score)
+
+            # Weight name 10x
+            score = (name_score * 10) + desc_score
+            sub_category_scores[category] = score
+    else:
+        # Basic fallback using string containment
+        for category, keywords in CATEGORIES.items():
+            score = 0
+            for kw in keywords:
+                if kw.lower() in name_text:
+                    score += 10
+                if kw.lower() in desc_text:
+                    score += 1
+            if category.lower() in name_text:
+                score += 10
+            if category.lower() in desc_text:
+                score += 1
+            sub_category_scores[category] = score
 
     # 2. Aggregate scores by Main Category
     main_category_scores = {}

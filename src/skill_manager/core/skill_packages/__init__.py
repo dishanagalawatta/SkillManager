@@ -23,7 +23,7 @@ from .storage import (
 from .updater import (
     _intercept_cross_platform_command,
     _run_git_package_update,
-    _run_npm_update,
+    _run_npx_update,
     _run_shell_command,
     run_skill_package_update,
 )
@@ -56,7 +56,7 @@ __all__ = [
     "_split_args",
     "_intercept_cross_platform_command",
     "_run_git_package_update",
-    "_run_npm_update",
+    "_run_npx_update",
     "_run_shell_command",
     "_run_process",
     "_resolve_process_command",

@@ -191,9 +191,9 @@ def test_check_skill_package_versions_git_source(mock_get_tag, tmp_path):
 
 
 @patch("skill_manager.core.skill_packages.versioning.run_version_command")
-def test_check_skill_package_versions_npm(mock_run):
+def test_check_skill_package_versions_npx(mock_run):
     mock_run.return_value = "5.0.0"
-    source = {"source_type": "npm", "package_name": "mypkg"}
+    source = {"source_type": "npx", "package_name": "mypkg"}
     result = check_skill_package_versions(source)
     assert result["latest_version"] == "5.0.0"
 
