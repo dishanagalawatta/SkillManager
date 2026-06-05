@@ -60,6 +60,22 @@ def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
     )
     assert sanitize_token(None) is None
 
+def test_sanitize_token_masks_github_api_tokens():
+    # Test classic personal access token (36 chars after prefix)
+    classic_token = "ghp_" + "a" * 36
+    assert sanitize_token(f"Token is {classic_token} here") == "Token is *** here"
+
+    # Test fine-grained personal access token (82 chars after prefix)
+    fine_grained_token = "github_pat_" + "b" * 82
+    assert sanitize_token(f"My PAT: {fine_grained_token}") == "My PAT: ***"
+
+    # Test other standard GitHub token types (e.g., OAuth, installation tokens)
+    assert sanitize_token("gho_" + "c" * 36) == "***"
+    assert sanitize_token("ghs_" + "d" * 36) == "***"
+
+    # Test that longer tokens or tokens with trailing characters do not partially leak
+    assert sanitize_token("ghp_" + "e" * 40) == "***"
+
 
 def test_detect_package_config_npx():
     data = {"package_name": "npx --yes my-pkg --foo"}
