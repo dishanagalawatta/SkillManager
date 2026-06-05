@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2024-05-26 - Missing Hover Cursors on Interactive Components
+**Learning:** In Qt Quick Controls, standard `ComboBox` components and custom interactive elements like `FilterPill` do not automatically change the cursor on hover. This leads to a degraded mouse experience as users lack visual feedback that the element is clickable.
+**Action:** Explicitly add a `HoverHandler { cursorShape: Qt.PointingHandCursor }` inside interactive components to visually indicate clickability.
