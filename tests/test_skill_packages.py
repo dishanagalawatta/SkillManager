@@ -73,6 +73,13 @@ def test_sanitize_token_masks_github_api_tokens():
     fine_grained_token = "github_pat_" + "b" * 82
     assert sanitize_token(f"My PAT: {fine_grained_token}") == "My PAT: ***"
 
+    # Test other standard GitHub token types (e.g., OAuth, installation tokens)
+    assert sanitize_token("gho_" + "c" * 36) == "***"
+    assert sanitize_token("ghs_" + "d" * 36) == "***"
+
+    # Test that longer tokens or tokens with trailing characters do not partially leak
+    assert sanitize_token("ghp_" + "e" * 40) == "***"
+
 
 def test_detect_package_config_npm():
     data = {"package_name": "npx --yes my-pkg --foo"}
