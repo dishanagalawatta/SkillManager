@@ -17,3 +17,6 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+## 2024-05-23 - Optimize SearchEngine query loops
+**Learning:** In heavily executed operations like fuzzy text matching during search query evaluation, re-evaluating loop invariants adds significant overhead. For instance, dynamically concatenating token arrays or running tokenizers inside per-document scoring loops wastes execution time when these values can be pre-computed once.
+**Action:** When working on search or matching algorithms, proactively identify variables and arrays that do not change inside the document scoring loop (e.g. the tokenized search query itself). Hoist them out of the loop and pre-compute complex list structures (like aggregated document tokens) during the indexing phase to convert repeating runtime work into singular setup operations.
