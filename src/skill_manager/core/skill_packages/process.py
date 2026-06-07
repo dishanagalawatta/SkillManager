@@ -14,12 +14,23 @@ def sanitize_token(text: str) -> str:
     """Removes sensitive authentication tokens from URLs and credential helpers."""
     if not isinstance(text, str):
         return text
+
+    # Fast-path explicit token matching for GitHub tokens
+    if "ghp_" in text:
+        text = re.sub(r"ghp_[a-zA-Z0-9]{36}", "***", text)
+    if "github_pat_" in text:
+        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82}", "***", text)
+
     # Matches http://token@ or https://token@ and masks the token part
     if "@" in text and ("http://" in text or "https://" in text):
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
+
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        text = re.sub(r"(echo password=).*", r"\1***", text)
+        # Separate patterns for quoted and unquoted values to avoid dropping trailing context
+        text = re.sub(r"(echo password=)(['\"])(.*?)\2", r"\1\2***\2", text)
+        text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
+
     return text
 
 

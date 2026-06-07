@@ -16,6 +16,23 @@ def test_sanitize_token():
     assert sanitize_token("echo password=secret") == "echo password=***"
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
+    assert (
+        sanitize_token("https://ghp_123456789012345678901234567890123456@github.com")
+        == "https://***@github.com"
+    )
+    assert sanitize_token("echo password='mysecretpassword'; f") == "echo password='***'; f"
+    assert sanitize_token('echo password="mysecretpassword"; f') == 'echo password="***"; f'
+    assert sanitize_token("echo password=mysecretpassword; f") == "echo password=***; f"
+    assert (
+        sanitize_token("mytoken ghp_123456789012345678901234567890123456 token")
+        == "mytoken *** token"
+    )
+    assert (
+        sanitize_token(
+            "mytoken github_pat_11AAAAAAA0123456789012345678901234567890123456789012345678901234567890123456789012 token"
+        )
+        == "mytoken *** token"
+    )
 
 
 def test_emit():
