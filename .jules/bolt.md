@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2026-06-07 - Pre-compute properties and optimize early exit in search engine
+**Learning:** In the skill search engine (`src/skill_manager/core/search.py`), list concatenations in the hot loop evaluating document queries, such as `index_data.get("tags") + index_data.get("description_tokens")`, and creating format strings on the fly for partial string ratio tests cause huge overhead during searches. Furthermore, waiting to evaluate `fuzz.ratio` for completely disjoint string lengths when thresholding takes unnecessary CPU cycles.
+**Action:** Move token concatenation (e.g. `all_doc_tokens`) and format string generation (e.g. `tag_text`) to the `build_index_data` index-time function so they are only calculated once per document instead of once per query per document. Additionally, inline early-exit conditions and exact string match bypasses in the top level of the search iteration to save function call overhead.
