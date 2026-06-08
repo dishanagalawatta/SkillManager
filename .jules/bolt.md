@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-06-08 - Hoist query tokenization outside of loops and pre-compute token arrays
+**Learning:** In the `SearchEngine` querying loop, dynamically evaluating `.tokenize()` on the `query_text` within the iteration for each matching document creates entirely unnecessary overhead. Furthermore, assembling lists dynamically during the scoring calculation (`all_doc_tokens = name_tokens + tags + description_tokens`) on the fly severely impacts search runtime.
+**Action:** When implementing scoring loops, hoist loop invariants out—like `self.indexer.tokenize(query)`. Also, pre-compute token arrays and cache them in the inverted index `build_index_data` function to turn O(N) array concatenations into O(1) lookups during queries.
