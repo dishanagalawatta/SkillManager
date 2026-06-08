@@ -32,3 +32,8 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+
+## 2026-06-08 - [Regex Unintended Side Effects in Condition Blocks]
+**Vulnerability:** When using fast-path conditional substring checks (e.g. `if "echo password=" in text:`) to gate a regular expression replacement, the regular expression inside the block was written too broadly (e.g. `r"(password=)..."` instead of `r"(echo password=)..."`). This meant that if the fast-path condition was satisfied by one part of the string, the loose regex would incorrectly mask unrelated instances of "password=" elsewhere in the same string.
+**Learning:** Optimizing regex performance by wrapping it in `if 'pattern' in text:` requires the inner regex to exactly mirror or restrict itself to the same explicit pattern as the `if` check. Failing to do so causes collateral damage to unrelated text.
+**Prevention:** Always ensure the regular expression patterns directly match or are explicitly anchored to the exact literal substring used in the gating condition.

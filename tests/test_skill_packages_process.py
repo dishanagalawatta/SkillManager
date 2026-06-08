@@ -14,6 +14,17 @@ from skill_manager.core.skill_packages.process import (
 def test_sanitize_token():
     assert sanitize_token("https://token@github.com") == "https://***@github.com"
     assert sanitize_token("echo password=secret") == "echo password=***"
+    assert (
+        sanitize_token("echo password='my secret'; other args") == "echo password='***'; other args"
+    )
+    assert sanitize_token("echo password=secret; other args") == "echo password=***; other args"
+    assert sanitize_token("ghp_123456789012345678901234567890123456 extra") == "*** extra"
+    assert (
+        sanitize_token(
+            "github_pat_11AABBCCDD012345678901234567890123456789012345678901234567890123456789012345678901 extra"
+        )
+        == "*** extra"
+    )
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
 
