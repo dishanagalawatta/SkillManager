@@ -91,6 +91,10 @@ class AppUpdateController(BaseController):
     def latestVersion(self):
         return self._latest_version
 
+    @Property(str, constant=True)
+    def currentVersion(self):
+        return skill_manager.__version__
+
     @Property(str, notify=downloadUrlChanged)
     def downloadUrl(self):
         return self._download_url
@@ -104,24 +108,34 @@ class AppUpdateController(BaseController):
         return self._update_progress
 
     @Slot()
-    def checkForUpdates(self):
+    @Slot(bool)
+    def checkForUpdates(self, manual=False):
         """Checks for updates asynchronously using tufup."""
-        logger.debug(f"checkForUpdates called. is_updating={self._is_updating}")
+        logger.debug(f"checkForUpdates called (manual={manual}). is_updating={self._is_updating}")
         if self._is_updating:
             return
 
         # Skip update check in development mode (not frozen)
         if not getattr(sys, "frozen", False):
             logger.info("Running in development mode; skipping auto-update check.")
+            if manual:
+                self.app._set_status("Update check skipped in development mode.")
             self._update_available = False
             self.updateAvailableChanged.emit()
             return
+
+        if manual:
+            self.app._set_status("Checking for app updates...")
 
         # We need a BackgroundTaskRunner for threading, not asyncio.create_task
         # since PySide6 app doesn't have an asyncio loop running by default.
         if hasattr(self.app, "task_runner"):
             logger.debug("Submitting update check to task runner.")
-            self.app.task_runner.submit(self._sync_check_updates, self._on_updates_checked)
+            # Wrap callback to handle manual feedback
+            def on_checked(new_version):
+                self._on_updates_checked(new_version, manual)
+
+            self.app.task_runner.submit(self._sync_check_updates, on_checked)
         else:
             logger.warning("No task_runner found on app to check for updates.")
 
@@ -131,7 +145,7 @@ class AppUpdateController(BaseController):
             return None
         return self._client.check_for_updates()
 
-    def _on_updates_checked(self, new_version):
+    def _on_updates_checked(self, new_version, manual=False):
         logger.debug(f"_on_updates_checked received version: {new_version}")
         if new_version:
             logger.info(f"Update available: {new_version}")
@@ -139,10 +153,14 @@ class AppUpdateController(BaseController):
             self._update_available = True
             self.updateAvailableChanged.emit()
             self.latestVersionChanged.emit()
+            if manual:
+                self.app._set_status(f"Update available: v{new_version}")
         else:
             logger.info("No updates available.")
             self._update_available = False
             self.updateAvailableChanged.emit()
+            if manual:
+                self.app._set_status("SkillManager is up to date.")
 
     async def _check_tuf_updates(self):
         if not self._client:

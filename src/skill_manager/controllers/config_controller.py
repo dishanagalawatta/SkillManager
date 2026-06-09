@@ -27,6 +27,8 @@ class ConfigController(BaseController):
     updateCheckIntervalHoursChanged = Signal()
     skillPackageAutoUpdateChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
+    autoMinimizeOnScreenshotChanged = Signal()
+    temporaryScreenshotsChanged = Signal()
 
     @Property(float, notify=scrollSpeedMultiplierChanged)
     def scrollSpeedMultiplier(self):
@@ -107,6 +109,30 @@ class ConfigController(BaseController):
         if self.skillPackageAutoUpdateMode != value:
             self.config.set("skill_package_auto_update_mode", str(value))
             self.skillPackageAutoUpdateModeChanged.emit()
+
+    @Property(bool, notify=autoMinimizeOnScreenshotChanged)
+    def autoMinimizeOnScreenshot(self):
+        return self.config.get("auto_minimize_on_screenshot", False)
+
+    @autoMinimizeOnScreenshot.setter
+    def autoMinimizeOnScreenshot(self, value):
+        if self.autoMinimizeOnScreenshot != value:
+            self.config.set("auto_minimize_on_screenshot", bool(value))
+            self.autoMinimizeOnScreenshotChanged.emit()
+
+    @Property(bool, notify=temporaryScreenshotsChanged)
+    def temporaryScreenshots(self):
+        return self.config.get("temporary_screenshots", False)
+
+    @temporaryScreenshots.setter
+    def temporaryScreenshots(self, value):
+        if self.temporaryScreenshots != value:
+            self.config.set("temporary_screenshots", bool(value))
+            self.temporaryScreenshotsChanged.emit()
+
+    @Property(dict, notify=updateProjectsChanged)
+    def project_aliases(self):
+        return self.app._project_aliases
 
     @Property(str, notify=shortcutsChanged)
     def shortcutSearch(self):
@@ -271,6 +297,14 @@ class ConfigController(BaseController):
         from skill_manager.core.persistence import load_cache
 
         return load_cache()
+
+    @Slot(str, result=str)
+    def getProjectPath(self, label: str) -> str:
+        """Returns the project path for a given label."""
+        for p in self.app._projects:
+            if self.getProjectLabel(p) == label:
+                return p
+        return ""
 
     @Slot(str, result=str)
     def getProjectLabel(self, path: str) -> str:

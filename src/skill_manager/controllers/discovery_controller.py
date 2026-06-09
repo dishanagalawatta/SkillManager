@@ -121,9 +121,9 @@ class DiscoveryController(BaseController):
         self.app._library_model.clientFilter = self.app._client_format
         self.app._quick_copy_model.clientFilter = self.app._client_format
 
-        if self.app.ui._default_project_filter == "all":
-            self.app._library_model.projectFilter = ""
-            self.app._quick_copy_model.projectFilter = ""
+        # Apply the shared current project filter to QuickCopy model
+        if self.app._current_project_label:
+            self.app._quick_copy_model.projectFilter = self.app._current_project_label
 
         self.app._set_status(status)
 

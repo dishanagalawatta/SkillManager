@@ -155,9 +155,6 @@ def test_controller_setters(controller):
     controller.rememberFilters = True
     assert controller.rememberFilters is True
 
-    controller.defaultProjectFilter = "all"
-    assert controller.defaultProjectFilter == "all"
-
     controller.reducedMotion = True
     assert controller.reducedMotion is True
 
@@ -271,9 +268,8 @@ def test_controller_copy_selected_skills_to_clipboard(controller):
     controller.copySelectedSkillsToClipboard()
 
     copied = controller._clipboard.setText.call_args.args[0]
-    assert "/skill:S1" in copied
-    assert "/missing" in copied
-    assert controller.statusMessage == "Copied 2 skills to clipboard"
+    assert "/S1" in copied
+    assert controller.statusMessage == "Copied 1 skills to clipboard"
 
     controller.skillModel.clearSelection()
     controller.copySelectedSkillsToClipboard()
@@ -311,7 +307,7 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
         )
         controller.createCustomCommand("Deploy", "Codex", "body", "proj", "Ops")
 
-    assert controller.statusMessage == "Created command: Deploy.Codex.md"
+    assert controller.statusMessage == "Created 1 command(s)"
     controller.refreshSkills.assert_called_once()
 
 
@@ -400,11 +396,11 @@ def test_controller_daily_speed_actions(controller):
     controller._clipboard = MagicMock()
 
     controller.copyCurrentSelectionOrFocusedSkill()
-    assert "/skill:S1" in controller._clipboard.setText.call_args.args[0]
+    assert "/S1" in controller._clipboard.setText.call_args.args[0]
 
     controller.selectSkill(1)
     controller.copyCurrentSelectionOrFocusedSkill()
-    assert "/skill:S2" in controller._clipboard.setText.call_args.args[0]
+    assert "/S2" in controller._clipboard.setText.call_args.args[0]
 
     controller.selectAllVisibleSkills()
     assert controller.skillModel.selectedCount == 2
@@ -426,13 +422,11 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.startupView == "QuickCopy"
     controller.setRememberFilters(False)
     assert controller.rememberFilters is False
-    controller.setDefaultProjectFilter("all")
-    assert controller.defaultProjectFilter == "all"
     controller.setReducedMotion(True)
     assert controller.reducedMotion is True
     controller.setCompactListRows(True)
     assert controller.compactListRows is True
-    assert controller.ui.triggerSave.call_count >= 4
+    assert controller.ui.triggerSave.call_count >= 3
 
     controller.libraryModel.filterText = "abc"
     controller.quickCopyModel.categoryFilter = "Testing"
@@ -445,7 +439,6 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.currentView == "Library"
     assert controller.startupView == "Library"
     assert controller.rememberFilters is True
-    assert controller.defaultProjectFilter == "last"
     assert controller.compactListRows is False
 
 
@@ -633,3 +626,22 @@ def test_controller_on_quit_flushes_pending_save(controller):
 
 def test_client_formats_order(controller):
     assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+
+
+def test_client_format_change_syncs_model_filters(qapp, controller):
+    controller._quick_copy_model.filterByClient = True
+    controller._library_model.filterByClient = True
+
+    controller._client_format = "Codex"
+    controller.clientFormatChanged.emit()
+    qapp.processEvents()
+
+    assert controller.quickCopyModel.clientFilter == "Codex"
+    assert controller.libraryModel.clientFilter == "Codex"
+
+    controller._client_format = "Antigravity"
+    controller.clientFormatChanged.emit()
+    qapp.processEvents()
+
+    assert controller.quickCopyModel.clientFilter == "Antigravity"
+    assert controller.libraryModel.clientFilter == "Antigravity"

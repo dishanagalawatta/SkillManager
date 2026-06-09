@@ -6,10 +6,10 @@ Welcome to SkillManager, your professional tool for organizing, editing, and syn
 
 The application is divided into four main views, accessible via the left sidebar:
 
-1.  **Library**: Your central repository for all agent skills. Features multi-select deployment and deep inspection.
-2.  **Quick Copy**: A project-focused view for rapid reference copying during active development.
-3.  **Updates**: A centralized hub for synchronizing your library with Git sources and project projects.
-4.  **Settings**: Comprehensive configuration for paths, branding, and deployment formats.
+1. **Library**: Your central repository for all agent skills. Features multi-select deployment and deep inspection.
+2. **Quick Copy**: A project-focused view for rapid reference copying during active development.
+3. **Updates**: A centralized hub for synchronizing your library with Git sources and project projects.
+4. **Settings**: Comprehensive configuration for paths, branding, deployment formats, shortcuts, and appearance.
 
 ---
 
@@ -17,11 +17,15 @@ The application is divided into four main views, accessible via the left sidebar
 
 The Library is where you manage your source skills.
 
--   **Searching & Filtering**: Use the search bar at the top to instantly filter skills by name, content, or category. You can also use the category dropdown to view specific types of skills (e.g., `Architecture`, `Testing`).
--   **Skill Inspector**: Clicking on any skill opens the Inspector pane on the right. Here you can read the full documentation of the skill, view its raw Markdown, and manage its metadata.
--   **Creating Commands**: From the Inspector, you can create quick custom `.md` commands based on the skill for specific projects.
--   **Copying to Projects**: You can select one or multiple skills (using checkboxes) and hit the "Copy to Projects" button to deploy them into specific project folders.
--   **Automatic Categorization**: SkillManager intelligently categorizes your skills based on their content. By analyzing keywords in the title and description, the app assigns a visual identity (emoji) to each skill. For a full list of supported categories and their trigger keywords, see the **[Categorization Guide](CATEGORIES.md)**.
+- **Searching & Filtering**: Use the search bar at the top to instantly filter skills by name, content, or category. You can also use the category dropdown to view specific types of skills.
+- **Multi-Select**: Use checkboxes or selection shortcuts to select multiple skills for batch operations.
+- **Skill Inspector**: Clicking on any skill opens the Inspector pane on the right. Here you can read the full documentation, view raw Markdown, and manage metadata.
+- **Creating Commands**: From the Inspector, create custom `.md` commands based on the skill for specific projects.
+- **Copying to Projects**: Select one or multiple skills and use the "Copy to Projects" button to deploy them into specific project folders.
+- **Archive/Unarchive**: Archive skills you don't need while keeping them available for restoration.
+- **Star/Favorite**: Star important skills to pin them to the top of the list.
+- **Automatic Categorization**: Skills are intelligently categorized based on content analysis. For a full list of supported categories and their trigger keywords, see the **[Categorization Guide](CATEGORIES.md)**.
+- **Custom Collections**: Group skills into named collections for quick filtering and batch operations.
 
 ---
 
@@ -29,27 +33,69 @@ The Library is where you manage your source skills.
 
 The Quick Copy view is designed for daily workflow efficiency when working within a specific project.
 
--   **Project Context**: Use the top dropdown to select the project you are currently working on. The view will update to show only the skills that are installed in that specific project.
--   **One-Click Copy**: Click the "Copy Reference" button next to any skill. This copies a formatted reference (e.g., `@.agents/skills/my-skill/SKILL.md`) directly to your clipboard, ready to be pasted into your AI chat or prompt.
--   **Custom Collections**: You can create custom groups of skills (e.g., "Frontend Setup") to quickly select and copy multiple references at once.
+- **Project Context**: Use the top dropdown to select the project you are currently working on. The view updates to show only skills installed in that project.
+- **One-Click Copy**: Click the "Copy Reference" button next to any skill. This copies a formatted reference (e.g., `@.agents/skills/my-skill/SKILL.md`) directly to your clipboard.
+- **Client Format**: Choose your preferred AI agent format (Antigravity, Gemini CLI, Codex, Plain Text). This changes the syntax used for copying references.
+- **Custom Collections**: Create custom groups of skills for quick batch reference copying.
+- **Manual Input**: Add raw text references or notes alongside your skill references.
+- **Starred Items**: Starred skills and commands are shown as first-class items in the Quick Copy workflow.
 
 ---
 
 ## 3. Updates View
 
-When you modify a skill in your central library, you need to push those changes to the projects using it.
+When you modify a skill in your central library, you need to push those changes to projects using it.
 
-- **Git Updates**: Manage your skill sources (Git repos). Check for new versions and update your local library with one click.
-- **Surgical Sync**: The system compares skill versions across your projects and identifies precisely which skills are outdated.
-- **Syncing**: Update individual skills in specific projects, or use "Sync All" to bring all project projects up to date with your library.
+- **Git Updates**: Manage your skill sources (Git repos). Check for new versions and update your local library.
+- **Surgical Sync**: The system compares skill versions across projects and identifies precisely which skills are outdated.
+- **Syncing**: Update individual skills in specific projects, or use sync to bring all projects up to date.
+- **Skill Package Management**: Add, edit, and remove update sources (Git repos or local paths).
+- **Source Updating**: Run batch updates on all or selected skill packages.
 
 ---
 
 ## 4. Settings View
 
-Configure how SkillManager integrates with your file system.
+Configure how SkillManager integrates with your system.
 
 - **Skill Sources**: Manage the directories and Git repositories that feed your library.
 - **Project Projects**: Configure project root directories. SkillManager manages the `.agents/skills/` folder in these locations.
-- **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex). This updates the application's logo and the syntax used for copying references.
-- **Appearance**: Toggle Dark/Light mode and Mica/Acrylic effects (Windows only).
+- **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex, Plain Text). This updates the application's logo and reference syntax.
+- **Appearance**: Toggle Dark/Light mode, enable Mica/Acrylic effects (Windows only), reduced motion, compact list rows.
+- **Shortcuts**: Customize keyboard shortcuts for all major operations (search, copy, archive, delete, refresh, navigation, theme toggle).
+- **Updates**: Control auto-update checking, auto-download, and update check interval.
+- **Skill Packages**: Toggle automatic skill package updates and choose update mode.
+
+---
+
+## 5. Screenshot & Redaction
+
+SkillManager includes a powerful screenshots and redaction feature.
+
+- **Capture**: Take screenshots of any area of your screen while the app is open.
+- **Redaction**: Use the Image Inspector to perform color-based PII redaction by isolating and removing specific pixel colors.
+- **Saving**: Save annotated or redacted screenshots for inclusion in AI prompts.
+- **Cancel**: Press `Escape` to cancel a screenshot capture at any time.
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut (Default) | Action |
+|---|---|
+| `Ctrl+F` | Search current view |
+| `Ctrl+R` | Refresh current view |
+| `Ctrl+C` | Copy selected skill reference |
+| `Ctrl+A` | Select all visible skills |
+| `Delete` | Delete selected skills |
+| `Enter` | Open selected skill |
+| `Ctrl+W` | Close detail view |
+| *Customizable* | All shortcuts can be remapped in Settings |
+
+---
+
+## Tips & Tricks
+
+- **Drag & Drop**: Drag source and project directories directly into the Updates view to add them.
+- **Project Aliases**: Give friendly names to project paths for easier identification in dropdowns.
+- **Temporary Copies**: Use "Copy to Project (Temporary)" for one-off testing without permanent deployment.

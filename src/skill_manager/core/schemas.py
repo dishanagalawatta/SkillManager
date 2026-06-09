@@ -47,6 +47,7 @@ class SkillRecord(BaseModel):
     is_bundle: bool = False
     is_command: bool = False
     is_package: bool = False
+    is_screenshot: bool = False
     raw_content: str = ""
     body_content: str = ""
     risk: str = "Unknown"
@@ -98,6 +99,8 @@ class AppConfig(BaseSettings):
     update_check_interval_hours: int = 24
     skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
+    auto_minimize_on_screenshot: bool = False
+    temporary_screenshots: bool = False
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod

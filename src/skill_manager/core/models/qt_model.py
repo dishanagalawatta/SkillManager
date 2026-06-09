@@ -37,6 +37,7 @@ class SkillModel(QAbstractListModel):
     IsSubCollapsedRole = Qt.UserRole + 23
     SubCategoryNameRole = Qt.UserRole + 24
     IsPackageRole = Qt.UserRole + 25
+    IsScreenshotRole = Qt.UserRole + 26
 
     filterChanged = Signal()
     showArchivedChanged = Signal()
@@ -135,6 +136,8 @@ class SkillModel(QAbstractListModel):
             return skill._sub_category_name or self._engine.get_sub_category(skill)
         if role == self.IsPackageRole:
             return skill.is_package
+        if role == self.IsScreenshotRole:
+            return skill.is_screenshot
 
         return None
 
@@ -165,6 +168,7 @@ class SkillModel(QAbstractListModel):
             self.IsSubCollapsedRole: b"isSubCollapsed",
             self.SubCategoryNameRole: b"subCategoryName",
             self.IsPackageRole: b"isPackage",
+            self.IsScreenshotRole: b"isScreenshot",
         }
 
     # Properties
@@ -349,6 +353,12 @@ class SkillModel(QAbstractListModel):
     @Slot(result=list)
     def getSelectedPaths(self):
         return list(self._selected_ids)
+
+    @Slot(result=list)
+    def getFilteredSelectedPaths(self):
+        """Return selected paths limited to currently filtered (project-scoped) skills."""
+        filtered_paths = {s.local_path for s in self._all_filtered_skills if s.local_path}
+        return [p for p in self._selected_ids if p in filtered_paths]
 
     @Slot(list)
     def selectByPaths(self, paths):

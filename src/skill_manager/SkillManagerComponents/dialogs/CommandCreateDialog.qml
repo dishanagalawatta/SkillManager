@@ -37,19 +37,26 @@ Dialog {
         }
     }
 
-    function openWithContext(project, client) {
-        // Reset fields
+    property bool editMode: false
+    property string editLocalPath: ""
+
+    function openWithContext(client) {
+        editMode = false
+        editLocalPath = ""
         cmdNameInput.text = ""
         cmdCategoryInput.text = ""
         cmdBodyInput.text = ""
-        
-        // Set defaults from context
-        let projIdx = AppController.projects.indexOf(project)
-        projectDrop.currentIndex = Math.max(0, projIdx)
-        
-        let clientIdx = AppController.clientFormats.indexOf(client)
-        clientDrop.currentIndex = Math.max(0, clientIdx)
-        
+        clientSelect.selectedValues = client ? [client] : []
+        open()
+    }
+
+    function openForEdit(skill) {
+        editMode = true
+        editLocalPath = skill.local_path || ""
+        cmdNameInput.text = skill.name || ""
+        cmdCategoryInput.text = skill.category || ""
+        cmdBodyInput.text = skill.body_content || ""
+        clientSelect.selectedValues = skill.client ? [skill.client] : []
         open()
     }
 
@@ -74,7 +81,7 @@ Dialog {
                 }
                 
                 Text {
-                    text: "Create Custom Command"
+                    text: editMode ? "Edit Custom Command" : "Create Custom Command"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -191,6 +198,15 @@ Dialog {
                         id: projectDrop
                         Layout.fillWidth: true
                         model: AppController.projectLabels
+                        currentIndex: {
+                            let idx = model.indexOf(AppController.currentProject);
+                            return Math.max(0, idx);
+                        }
+                        onActivated: (index) => {
+                            if (index >= 0 && index < AppController.projectLabels.length) {
+                                AppController.setCurrentProject(AppController.projectLabels[index])
+                            }
+                        }
                     }
                 }
                 
@@ -198,8 +214,8 @@ Dialog {
                     Layout.fillWidth: true
                     spacing: 4
                     Text { text: "Client Format"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    GlassDropdown {
-                        id: clientDrop
+                    GlassMultiSelect {
+                        id: clientSelect
                         Layout.fillWidth: true
                         model: AppController.clientFormats
                     }
@@ -281,19 +297,31 @@ Dialog {
                 
                 ActionButton {
                     id: createBtn
-                    text: "Create Command"
+                    text: editMode ? "Update Command" : "Create Command"
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 40
                     enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== ""
                     
                     onClicked: {
-                        AppController.createCustomCommand(
-                            cmdNameInput.text, 
-                            clientDrop.currentText, 
-                            cmdBodyInput.text, 
-                            projectDrop.currentText, 
-                            cmdCategoryInput.text
-                        )
+                        var clients = clientSelect.selectedValues.join(",")
+                        if (editMode) {
+                            AppController.updateCustomCommandFull(
+                                editLocalPath,
+                                cmdNameInput.text,
+                                clients,
+                                cmdBodyInput.text,
+                                projectDrop.currentText,
+                                cmdCategoryInput.text
+                            )
+                        } else {
+                            AppController.createCustomCommand(
+                                cmdNameInput.text,
+                                clients,
+                                cmdBodyInput.text,
+                                projectDrop.currentText,
+                                cmdCategoryInput.text
+                            )
+                        }
                         root.accept()
                     }
                     

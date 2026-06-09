@@ -151,15 +151,13 @@ Dialog {
         
         // Scrollable Form Content
         SmoothScrollView {
-            id: formScroll
+            id: contentScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AlwaysOn
-                width: 8
-                active: true
+            ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+
+            ColumnLayout {
             }
 
             Pane {

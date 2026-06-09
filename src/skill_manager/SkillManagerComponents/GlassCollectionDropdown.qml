@@ -103,10 +103,6 @@ ComboBox {
             clip: true
             model: control.delegateModel
             currentIndex: control.highlightedIndex
-            
-            ScrollBar.vertical: ScrollBar {
-                active: true
-            }
         }
 
         background: Rectangle {

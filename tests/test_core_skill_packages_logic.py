@@ -31,5 +31,3 @@ def test_detect_package_config_git_auto():
     data["source_type"] = "git"
     detected = detect_package_config(data)
     assert detected["source_type"] == "git"
-
-

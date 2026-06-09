@@ -82,25 +82,6 @@ ComboBox {
             model: control.delegateModel
             currentIndex: control.highlightedIndex
             // Removed implicitHeight: contentHeight to avoid height mismatch with constrained Popup
-            
-            ScrollBar.vertical: ScrollBar {
-                id: scrollBar
-                active: control.popup.visible
-                policy: ScrollBar.AsNeeded
-                
-                contentItem: Rectangle {
-                    implicitWidth: 4
-                    radius: Theme.radiusSmall
-                    color: Theme.secondaryLabel
-                    opacity: scrollBar.active || scrollBar.hovered ? 0.8 : 0.3
-                    Behavior on opacity { NumberAnimation { duration: 200 } }
-                }
-                
-                background: Rectangle {
-                    implicitWidth: 4
-                    color: "transparent"
-                }
-            }
         }
 
         background: Rectangle {

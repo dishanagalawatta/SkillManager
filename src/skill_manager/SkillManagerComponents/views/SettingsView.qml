@@ -84,6 +84,28 @@ Item {
                         radius: Theme.radiusPill - 4
                     }
                 }
+                TabButton {
+                    id: aboutTab
+                    text: "About"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    checked: tabBar.currentIndex === 2
+                    onClicked: tabBar.currentIndex = 2
+                    
+                    contentItem: Text {
+                        text: parent.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeBody
+                        font.weight: parent.checked ? Font.Bold : Font.Normal
+                        color: parent.checked ? Theme.accent : Theme.secondaryLabel
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: aboutTab.checked ? Theme.glassHover : "transparent"
+                        radius: Theme.radiusPill - 4
+                    }
+                }
             }
         }
 
@@ -94,6 +116,7 @@ Item {
             height: 0
             TabButton { text: "General" }
             TabButton { text: "Shortcuts" }
+            TabButton { text: "About" }
         }
 
         StackLayout {
@@ -175,6 +198,32 @@ Item {
                                 GlassSwitch {
                                     checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
                                     onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Auto-minimize on Screenshot"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnScreenshot : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnScreenshot = checked
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Temporary Screenshots"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller ? AppController.config_controller.temporaryScreenshots : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.temporaryScreenshots = checked
                                 }
                             }
 
@@ -451,22 +500,6 @@ Item {
                             }
 
                             RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "Project Filter"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassDropdown {
-                                    Layout.preferredWidth: 170
-                                    model: ["Last Project", "All Projects"]
-                                    currentIndex: AppController.ui_controller && AppController.ui_controller.defaultProjectFilter === "all" ? 1 : 0
-                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setDefaultProjectFilter(index === 1 ? "all" : "last") }
-                                }
-                            }
-
-                            RowLayout {
                                 Text {
                                     text: "Remember Filters"
                                     font.family: Theme.fontFamily
@@ -506,6 +539,144 @@ Item {
             }
             
             ShortcutsSettings {}
+
+            // About Tab
+            SmoothScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    spacing: 20
+
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: aboutLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: aboutLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 16
+                            
+                            RowLayout {
+                                spacing: 16
+                                Rectangle {
+                                    width: 80
+                                    height: 80
+                                    radius: 16
+                                    color: Theme.glassPill
+                                    border.color: Theme.glassBorder
+                                    border.width: 1
+                                    
+                                    Image {
+                                        anchors.centerIn: parent
+                                        width: 48
+                                        height: 48
+                                        source: AppController.ui_controller.getAssetUri("brand/logo.svg")
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: 4
+                                    Text {
+                                        text: "SkillManager"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 24
+                                        font.weight: Font.Bold
+                                        color: Theme.label
+                                    }
+                                    Text {
+                                        text: "Version " + AppController.app_update_controller.currentVersion
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.sizeBody
+                                        color: Theme.secondaryLabel
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            Text {
+                                text: "The ultimate tool for managing and discovering AI coding skills. Automate your workflow, share patterns, and boost your productivity."
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeBody
+                                color: Theme.label
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
+
+                            RowLayout {
+                                spacing: 12
+                                ActionButton {
+                                    id: checkUpdatesBtn
+                                    property bool isChecking: false
+                                    labelText: isChecking ? "Checking..." : "Check for Updates"
+                                    role: "primary"
+                                    enabled: !isChecking && !AppController.app_update_controller.isUpdating
+                                    onClicked: (mouse) => {
+                                        isChecking = true
+                                        AppController.app_update_controller.checkForUpdates(true)
+                                        // Reset state after a delay or based on a signal
+                                        // Since we don't have a 'finished' signal specifically for this, 
+                                        // we'll use a timer or just rely on the status message.
+                                        // Actually, let's connect to the property changes.
+                                    }
+                                    
+                                    Connections {
+                                        target: AppController.app_update_controller
+                                        function onUpdateAvailableChanged() {
+                                            checkUpdatesBtn.isChecking = false
+                                        }
+                                    }
+                                }
+                                ActionButton {
+                                    labelText: "Release Notes"
+                                    role: "secondary"
+                                    onClicked: (mouse) => Qt.openUrlExternally("https://github.com/dishanagalawatta/SkillManager/releases")
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            ColumnLayout {
+                                spacing: 4
+                                Text {
+                                    text: "Credits"
+                                    font.family: Theme.fontFamily
+                                    font.weight: Font.Bold
+                                    color: Theme.label
+                                }
+                                Text {
+                                    text: "Developed by Dishan Agalawatta"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.sizeCaption
+                                    color: Theme.secondaryLabel
+                                }
+                                Text {
+                                    text: "Powered by PySide6 and tufup"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.sizeCaption
+                                    color: Theme.secondaryLabel
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from skill_manager.core.quick_copy import project_label
+from skill_manager.core.quick_copy import _project_root_for_project, project_label
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,88 @@ def build_command_content(
     )
 
 
+def update_custom_command_file_full(
+    *,
+    local_path: str,
+    name: str,
+    client: str,
+    body: str,
+    category: str,
+    project_label_name: str,
+    project_paths: list[str],
+) -> CommandCreateResult:
+    """Full update: change name, client, body, category, and optionally project."""
+    path = Path(local_path)
+    if not path.is_file():
+        return CommandCreateResult(False, f"Error: Command file not found at {local_path}")
+
+    project_path = find_project_path_by_label(project_label_name, project_paths)
+    if not project_path:
+        return CommandCreateResult(
+            False, f"Error: Could not find project directory for {project_label_name}"
+        )
+
+    project_root = _project_root_for_project(project_path)
+    commands_dir = project_root / ".agents" / "commands"
+    filename = build_command_filename(name, client)
+    new_path = commands_dir / filename
+
+    if new_path.exists() and new_path != path:
+        return CommandCreateResult(False, f"Error: Command {filename} already exists")
+
+    new_content = build_command_content(name, client, body, category)
+
+    try:
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        new_path.write_text(new_content, encoding="utf-8")
+        if new_path != path:
+            path.unlink()
+    except Exception as exc:
+        return CommandCreateResult(False, f"Error updating command: {exc}", new_path)
+
+    return CommandCreateResult(True, f"Updated command: {filename}", new_path)
+
+
+def update_custom_command_file(
+    *,
+    local_path: str,
+    name: str,
+    body: str,
+) -> CommandCreateResult:
+    """Updates an existing command file's name and body content."""
+    path = Path(local_path)
+    if not path.is_file():
+        return CommandCreateResult(False, f"Error: Command file not found at {local_path}")
+
+    try:
+        content = path.read_text(encoding="utf-8-sig")
+        from skill_manager.core.parsing.base import split_frontmatter
+
+        metadata, _ = split_frontmatter(content)
+    except Exception as exc:
+        return CommandCreateResult(False, f"Error reading command file: {exc}")
+
+    client = metadata.get("client", "") if metadata else ""
+    category = metadata.get("category", "") if metadata else ""
+
+    new_filename = build_command_filename(name, client)
+    new_path = path.parent / new_filename
+
+    if new_path.exists() and new_path != path:
+        return CommandCreateResult(False, f"Error: Command {new_filename} already exists")
+
+    new_content = build_command_content(name, client, body, category)
+
+    try:
+        new_path.write_text(new_content, encoding="utf-8")
+        if new_path != path:
+            path.unlink()
+    except Exception as exc:
+        return CommandCreateResult(False, f"Error updating command: {exc}", path)
+
+    return CommandCreateResult(True, f"Updated command: {new_path.name}", new_path)
+
+
 def create_custom_command_file(
     *,
     name: str,
@@ -69,7 +151,8 @@ def create_custom_command_file(
         )
 
     filename = build_command_filename(name, client)
-    commands_dir = project_path / "commands"
+    project_root = _project_root_for_project(project_path)
+    commands_dir = project_root / ".agents" / "commands"
     file_path = commands_dir / filename
     if file_path.exists():
         return CommandCreateResult(False, f"Error: Command {filename} already exists", file_path)

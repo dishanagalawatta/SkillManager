@@ -115,11 +115,7 @@ def test_relocate_packages_from_output_agents_subfolder(temp_dir):
     skill_invalid = agents_skills_dir / "invalid"
     skill_invalid.mkdir()
 
-    captured_output = [
-        "Some random npx output",
-        f"Installed to {agents_skills_dir}",
-        "done"
-    ]
+    captured_output = ["Some random npx output", f"Installed to {agents_skills_dir}", "done"]
 
     managed = relocate_packages_from_output(captured_output, str(project_path), None)
 
@@ -142,7 +138,9 @@ def test_relocate_packages_no_dest_or_no_source(temp_dir):
 @patch("skill_manager.core.skill_packages.updater.run_process")
 @patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
 @patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
-def test_run_skill_package_update_with_relocation(mock_check, mock_relocate_from_output, mock_run, temp_dir):
+def test_run_skill_package_update_with_relocation(
+    mock_check, mock_relocate_from_output, mock_run, temp_dir
+):
     package_path = temp_dir / "skills_dest"
     package_path.mkdir()
     (package_path / "old-skill").mkdir()
@@ -171,7 +169,9 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate_from
 @patch("skill_manager.core.skill_packages.updater.run_process")
 @patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
 @patch("skill_manager.core.skill_packages.updater.check_skill_package_versions")
-def test_run_skill_package_update_with_npx_relocation(mock_check, mock_relocate_from_output, mock_run, temp_dir):
+def test_run_skill_package_update_with_npx_relocation(
+    mock_check, mock_relocate_from_output, mock_run, temp_dir
+):
     package_path = temp_dir / "skills_dest"
     package_path.mkdir()
 
@@ -191,7 +191,9 @@ def test_run_skill_package_update_with_npx_relocation(mock_check, mock_relocate_
     assert mock_relocate_from_output.called
     assert updated["managed_folders"] == ["new-npx-skill"]
     assert mock_run.call_args.kwargs["cwd"]
-    assert mock_relocate_from_output.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
+    assert (
+        mock_relocate_from_output.call_args.kwargs["base_path"] == mock_run.call_args.kwargs["cwd"]
+    )
 
 
 @patch("skill_manager.core.skill_packages.versioning.cmd.Git")

@@ -131,7 +131,6 @@ Item {
                     onClicked: (mouse) => {
                         if (mouse.button === Qt.RightButton) {
                             root.rightClicked()
-                            contextMenu.popup()
                         } else {
                             root.clicked()
                         }
@@ -141,58 +140,6 @@ Item {
                     Accessible.role: Accessible.Button
                     Accessible.name: (model && model.name ? model.name : "Item")
                     Accessible.description: "Skill item"
-                }
-
-                GlassMenu {
-                    id: contextMenu
-                    
-                    GlassMenuItem {
-                        text: "Edit " + (model && model.isCommand ? "Command" : "Skill")
-                        iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
-                        onTriggered: AppController.ui_controller.selectSkill(index)
-                    }
-                    
-                    GlassMenuItem {
-                        text: "Copy Path"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
-                        shortcut: AppController.config_controller.shortcutCopy
-                        onTriggered: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill()
-                    }
-                    
-                    MenuSeparator {
-                        contentItem: Rectangle {
-                            implicitWidth: 180
-                            implicitHeight: 1
-                            color: Theme.separator
-                        }
-                    }
-                    
-                    GlassMenuItem {
-                        text: model && model.isArchived ? "Unarchive" : "Archive"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/archive-icon.svg")
-                        shortcut: AppController.config_controller.shortcutArchive
-                        onTriggered: AppController.ops_controller.archiveSelectedSkills()
-                    }
-                    
-                    GlassMenuItem {
-                        text: "Delete"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
-                        shortcut: AppController.config_controller.shortcutDelete
-                        onTriggered: {
-                            if (model && model.path) {
-                                root.deleteRequested(model.name, model.path)
-                            }
-                        }
-                        
-                        // Override background to show danger color on hover
-                        background: Rectangle {
-                            implicitWidth: 200
-                            implicitHeight: (AppController.config_controller && AppController.config_controller.compactMenu) ? 32 : 40
-                            color: parent.highlighted ? Theme.dangerHover : "transparent"
-                            radius: Theme.radiusSmall
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                    }
                 }
 
                 RowLayout {
@@ -248,6 +195,7 @@ Item {
                                 if (model.isStarred && root.showStarredIcon) return "★"
                                 if (model.isCollection) return "📦"
                                 if (model.isCommand) return "⚡"
+                                if (model.isScreenshot) return "🖼️"
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily
@@ -324,4 +272,5 @@ Item {
     signal doubleClicked()
     signal rightClicked()
     signal deleteRequested(string name, string path)
+    signal inspectImageRequested()
 }

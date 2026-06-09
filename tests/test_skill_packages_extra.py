@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from skill_manager.core.skill_packages.relocator import (
+    _is_safe_relative_to,
     _merge_and_move_lockfile,
     _relocate_path_internal,
     relocate_packages,
@@ -122,6 +123,149 @@ def test_relocate_packages_manifest_move(tmp_path):
     relocate_packages(str(source), str(dest_base), None, "pkg")
 
     assert (tmp_path / ".pkg-antigravity-install-manifest.json").exists()
+
+
+def test_is_safe_relative_to(tmp_path):
+    inner = tmp_path / "inner" / "sub"
+    inner.mkdir(parents=True)
+    assert _is_safe_relative_to(inner, tmp_path)
+
+    outer = tmp_path.parent / "unrelated"
+    outer.mkdir(exist_ok=True)
+    assert not _is_safe_relative_to(outer, tmp_path)
+
+
+def test_merge_and_move_lockfile_source_missing(tmp_path):
+    src = tmp_path / "missing.json"
+    dest = tmp_path / "dest.json"
+    _merge_and_move_lockfile(src, dest, None)
+    assert not dest.exists()
+
+
+def test_merge_and_move_lockfile_handles_exception(tmp_path):
+    src = tmp_path / "src.json"
+    src.write_text('{"skills": {"a": 1}}')
+    with patch("builtins.open", side_effect=OSError("Locked")):
+        _merge_and_move_lockfile(src, tmp_path / "dest.json", None)
+
+
+def test_relocate_packages_from_output_no_target(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    assert relocate_packages_from_output(["line"], "", None) is None
+
+
+def test_relocate_packages_from_output_no_detected_paths(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    result = relocate_packages_from_output(["just some noise"], str(dest), None)
+    assert result is None
+
+
+def test_relocate_packages_from_output_skip_same_as_dest(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    skill1 = dest / "skill1"
+    skill1.mkdir()
+    (skill1 / "SKILL.md").write_text("content")
+
+    result = relocate_packages_from_output(
+        [f"Installed to {dest}"], str(dest), None
+    )
+    assert result == []
+
+
+def test_relocate_packages_from_output_security_rejection(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    malicious = tmp_path.parent / "malicious"
+    malicious.mkdir(exist_ok=True)
+
+    result = relocate_packages_from_output(
+        [f"Installed to {malicious}"], str(dest), None, base_path=str(tmp_path)
+    )
+    assert result is None
+
+
+def test_relocate_packages_from_output_fallback_regex(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    skills_inline = f"C:/nonesuch/{tmp_path.name}/skills"
+    result = relocate_packages_from_output(
+        [f"Installed to {skills_inline}"], str(dest), None
+    )
+    assert result is None
+
+
+def test_relocate_packages_from_output_standalone_skill(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    source = tmp_path / "source"
+    source.mkdir()
+    standalone = source / "standalone-skill"
+    standalone.mkdir()
+    (standalone / "SKILL.md").write_text("content")
+
+    result = relocate_packages_from_output(
+        [f"Installed to {standalone}"], str(dest), None
+    )
+    assert result == ["standalone-skill"]
+    assert (dest / "standalone-skill").is_dir()
+
+
+def test_relocate_packages_from_output_exception_path(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    result = relocate_packages_from_output(
+        ["some output"], str(tmp_path), None, base_path=str(tmp_path)
+    )
+    assert result is None
+
+
+def test_relocate_packages_data_dir_fallback(tmp_path):
+    with patch(
+        "skill_manager.core.skill_packages.relocator.Path.cwd",
+        return_value=tmp_path,
+    ):
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        skill1 = skills_dir / "skill1"
+        skill1.mkdir()
+        (skill1 / "SKILL.md").write_text("content")
+
+        result = relocate_packages(str(tmp_path), str(tmp_path), None)
+        assert result == ["skill1"]
+
+
+def test_relocate_packages_from_output_container_move(tmp_path):
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    src_dir = tmp_path / "src_pkg"
+    src_dir.mkdir()
+    skills_dir = src_dir / "skills"
+    skills_dir.mkdir()
+    skill1 = skills_dir / "skill1"
+    skill1.mkdir()
+    (skill1 / "SKILL.md").write_text("content")
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    result = relocate_packages_from_output(
+        [f"Installed to {skills_dir}"], str(dest), None
+    )
+    assert result == ["skill1"]
+    assert (dest / "skill1").is_dir()
 
 
 @patch("skill_manager.core.skill_packages.updater._run_shell_command")

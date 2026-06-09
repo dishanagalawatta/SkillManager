@@ -8,27 +8,28 @@
 
 ---
 
-## 📺 Overview & Demo
+## Overview & Demo
 
 <video src="https://github.com/user-attachments/assets/29541600-3647-474d-8a3e-98160cdd37ff" controls="controls" muted="muted" style="max-height:640px;"></video>
 *Watch the 3-minute overview of SkillManager directly inline.*
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 SkillManager is designed for developers who need to manage growing libraries of AI skills across dozens of project repositories.
 
-- **🚀 Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard.
-- **🔄 Surgical Sync**: Intelligent synchronization that updates outdated skills across multiple repositories without full rescans.
-- **🛡️ Secure Auto-Update**: Background application updates powered by TUF (The Update Framework) for robust and secure delivery.
-- **📚 Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
-- **🎨 Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
-- **📦 Zero-Config Entry**: Professional installers for Windows, macOS, and Linux.
+- **Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard.
+- **Surgical Sync**: Intelligent synchronization that updates outdated skills across multiple repositories without full rescans.
+- **Secure Auto-Update**: Background application updates powered by TUF (The Update Framework) for robust and secure delivery.
+- **Screenshot & Redaction**: Capture screenshots with PII redaction capabilities for AI context.
+- **Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
+- **Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
+- **Zero-Config Entry**: Professional installers for Windows, macOS, and Linux.
 
 ---
 
-## 📸 Visual Showcase
+## Visual Showcase
 
 ### The Central Library
 
@@ -47,13 +48,13 @@ Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design 
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### For End Users
 
 You don't need Python or any developer tools to use SkillManager.
 
-1. Visit the **[Releases](https://github.com/yourusername/SkillManager/releases)** page.
+1. Visit the **[Releases](https://github.com/dishanagalawatta/SkillManager/releases)** page.
 2. Download the installer for your OS:
    - **Windows**: `SkillManager_Setup.exe`
    - **macOS**: `SkillManager_Portable_macos.zip`
@@ -66,17 +67,17 @@ If you want to contribute or build from source, see our **[Development Guide](do
 
 ---
 
-## 📖 Documentation
+## Documentation
 
 - **[User Guide](docs/USER_GUIDE.md)**: Detailed instructions on using every feature.
 - **[Architecture](docs/ARCHITECTURE.md)**: How the app is built (Hub & Spoke).
 - **[Design Philosophy](DESIGN.md)**: The "Solid Matte & Liquid Glass" guide.
 - **[Categories](docs/CATEGORIES.md)**: How skills are auto-classified.
-- **[Versioning &amp; Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`).
+- **[Versioning & Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`).
 
 ---
 
-## 📄 License
+## License
 
 [**MIT License**](LICENSE)
 

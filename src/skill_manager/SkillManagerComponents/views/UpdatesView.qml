@@ -102,32 +102,72 @@ Item {
         // App Update Banner
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 44
+            Layout.preferredHeight: AppController.app_update_controller.isUpdating ? 64 : 44
             Layout.leftMargin: 16
             Layout.rightMargin: 16
             color: Theme.accent
             radius: 8
             visible: AppController.app_update_controller.updateAvailable
 
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 8
                 anchors.leftMargin: 16
                 anchors.rightMargin: 8
+                spacing: 4
                 
-                Text {
-                    text: "A new version of SkillManager (v" + AppController.app_update_controller.latestVersion + ") is available!"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    font.weight: Font.Bold
-                    color: "white"
+                RowLayout {
                     Layout.fillWidth: true
+                    
+                    Text {
+                        text: AppController.app_update_controller.isUpdating ? 
+                                "Updating SkillManager to v" + AppController.app_update_controller.latestVersion + "..." :
+                                "A new version of SkillManager (v" + AppController.app_update_controller.latestVersion + ") is available!"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeBody
+                        font.weight: Font.Bold
+                        color: "white"
+                        Layout.fillWidth: true
+                    }
+                    
+                    ActionButton {
+                        labelText: AppController.app_update_controller.isUpdating ? "Updating..." : "Update Now"
+                        role: "primary"
+                        enabled: !AppController.app_update_controller.isUpdating
+                        onClicked: (mouse) => AppController.app_update_controller.downloadAndApplyUpdate()
+                        background: Rectangle {
+                            color: "white"
+                            radius: Theme.radiusButton
+                        }
+                        contentItem: Text {
+                            text: parent.labelText
+                            color: Theme.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                            font.weight: Font.Bold
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
                 }
-                
-                ActionButton {
-                    labelText: "Download Update"
-                    role: "primary"
-                    onClicked: (mouse) => Qt.openUrlExternally(AppController.app_update_controller.downloadUrl)
+
+                ProgressBar {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 4
+                    visible: AppController.app_update_controller.isUpdating
+                    value: AppController.app_update_controller.updateProgress
+                    background: Rectangle {
+                        color: Qt.rgba(1, 1, 1, 0.2)
+                        radius: 2
+                    }
+                    contentItem: Item {
+                        Rectangle {
+                            width: parent.visualPosition * parent.width
+                            height: parent.height
+                            color: "white"
+                            radius: 2
+                        }
+                    }
                 }
             }
         }

@@ -128,3 +128,62 @@ def test_config_controller_custom_collections(config_controller, mock_app):
     config_controller.applyCollectionSelection("MyColl")
     mock_app.skillModel.clearSelection.assert_called_once()
     mock_app.skillModel.selectByPaths.assert_called_with(["/path/1"])
+
+
+def test_config_controller_properties_setters(config_controller, mock_app):
+    config_controller.scrollSpeedMultiplier = 2.0
+    mock_app._config.set.assert_any_call("scroll_speed_multiplier", 2.0)
+
+    config_controller.showMenuIcons = False
+    mock_app._config.set.assert_any_call("show_menu_icons", False)
+
+    config_controller.compactMenu = True
+    mock_app._config.set.assert_any_call("compact_menu", True)
+
+    config_controller.autoCheckUpdates = False
+    mock_app._config.set.assert_any_call("auto_check_updates", False)
+
+    config_controller.autoDownloadUpdates = True
+    mock_app._config.set.assert_any_call("auto_download_updates", True)
+
+    config_controller.updateCheckIntervalHours = 48
+    mock_app._config.set.assert_any_call("update_check_interval_hours", 48)
+
+    config_controller.skillPackageAutoUpdate = False
+    mock_app._config.set.assert_any_call("skill_package_auto_update", False)
+
+    config_controller.skillPackageAutoUpdateMode = "auto"
+    mock_app._config.set.assert_any_call("skill_package_auto_update_mode", "auto")
+
+    config_controller.autoMinimizeOnScreenshot = True
+    mock_app._config.set.assert_any_call("auto_minimize_on_screenshot", True)
+
+    config_controller.temporaryScreenshots = True
+    mock_app._config.set.assert_any_call("temporary_screenshots", True)
+
+
+def test_config_controller_is_recording_shortcut(config_controller, mock_app):
+    mock_app._is_recording_shortcut = False
+    config_controller.isRecordingShortcut = True
+    assert mock_app._is_recording_shortcut is True
+
+
+def test_config_controller_remove_source_by_index(config_controller, mock_app):
+    mock_app._sources = ["/path/a", "/path/b"]
+    config_controller.removeSourceByIndex(0)
+    assert "/path/a" not in mock_app._sources
+
+    config_controller.removeSourceByIndex(99)
+    assert len(mock_app._sources) == 1
+
+
+def test_config_controller_add_source_exception(config_controller, mock_app):
+    with patch("os.path.abspath", side_effect=OSError("Access denied")):
+        config_controller.addSource("/bad/path")
+        mock_app._set_status.assert_called_with("Failed to add source: Access denied")
+
+
+def test_config_controller_get_collection_paths_empty(config_controller, mock_app):
+    mock_app._custom_collections = {"Coll1": ["/p1"]}
+    assert config_controller.getCollectionPaths("Coll1") == ["/p1"]
+    assert config_controller.getCollectionPaths("Missing") == []

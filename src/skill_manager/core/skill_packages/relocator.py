@@ -252,20 +252,39 @@ def relocate_packages_from_output(
                 for child in src_path.iterdir():
                     if child.is_dir() and not child.name.startswith("."):
                         # Validate that it is a proper skill folder
-                        if not (child / "SKILL.md").is_file() and not (child / "config.json").is_file():
+                        if (
+                            not (child / "SKILL.md").is_file()
+                            and not (child / "config.json").is_file()
+                        ):
                             # If it's the skills subfolder inside .agents/agents
-                            if child.name.lower() == "skills" and src_path.name.lower() in ("agents", ".agents"):
+                            if child.name.lower() == "skills" and src_path.name.lower() in (
+                                "agents",
+                                ".agents",
+                            ):
                                 # Iterate over the actual skills
                                 for inner_child in child.iterdir():
-                                    if inner_child.is_dir() and not inner_child.name.startswith("."):
-                                        if not (inner_child / "SKILL.md").is_file() and not (inner_child / "config.json").is_file():
-                                            _emit(output_callback, f"[WARNING] Skipping '{inner_child.name}': No SKILL.md found.")
+                                    if inner_child.is_dir() and not inner_child.name.startswith(
+                                        "."
+                                    ):
+                                        if (
+                                            not (inner_child / "SKILL.md").is_file()
+                                            and not (inner_child / "config.json").is_file()
+                                        ):
+                                            _emit(
+                                                output_callback,
+                                                f"[WARNING] Skipping '{inner_child.name}': No SKILL.md found.",
+                                            )
                                             continue
                                         managed_folder_names.add(inner_child.name)
-                                        if _relocate_path_internal(inner_child, dest_base, output_callback):
+                                        if _relocate_path_internal(
+                                            inner_child, dest_base, output_callback
+                                        ):
                                             relocated_count += 1
                             else:
-                                _emit(output_callback, f"[WARNING] Skipping '{child.name}': No SKILL.md found.")
+                                _emit(
+                                    output_callback,
+                                    f"[WARNING] Skipping '{child.name}': No SKILL.md found.",
+                                )
                             continue
                         managed_folder_names.add(child.name)
                         if _relocate_path_internal(child, dest_base, output_callback):
@@ -288,6 +307,7 @@ def relocate_packages_from_output(
 
     if target_root.resolve() == Path.cwd().resolve():
         from skill_manager.core.config import DATA_DIR
+
         target_root = DATA_DIR
 
     prefix = f"{package_name_prefix}-" if package_name_prefix else ""

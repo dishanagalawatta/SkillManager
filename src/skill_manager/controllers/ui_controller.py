@@ -25,9 +25,9 @@ class UIController(BaseController):
     darkModeChanged = Signal()
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
-    defaultProjectFilterChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
+    inspectorWidthChanged = Signal()
 
     def __init__(self, app):
         super().__init__(app)
@@ -41,9 +41,9 @@ class UIController(BaseController):
         self._current_view = ui_state.get("current_view", "Library")
         self._startup_view = ui_state.get("startup_view", self._current_view)
         self._remember_filters = ui_state.get("remember_filters", True)
-        self._default_project_filter = ui_state.get("default_project_filter", "last")
         self._reduced_motion = ui_state.get("reduced_motion", False)
         self._compact_list_rows = ui_state.get("compact_list_rows", False)
+        self._inspector_width = ui_state.get("inspector_width", 0)
 
         # Normalize view names
         self._startup_view = self._normalizeViewName(self._startup_view)
@@ -147,20 +147,6 @@ class UIController(BaseController):
             self.triggerSave()
             self.rememberFiltersChanged.emit()
 
-    @Property(str, notify=defaultProjectFilterChanged)
-    def defaultProjectFilter(self):
-        return self._default_project_filter
-
-    @defaultProjectFilter.setter
-    def defaultProjectFilter(self, value):
-        normalized = value if value in {"last", "all"} else "last"
-        if self._default_project_filter != normalized:
-            self._default_project_filter = normalized
-            if normalized == "all":
-                self.setViewFilterForView("QuickCopy", "project", "")
-            self.triggerSave()
-            self.defaultProjectFilterChanged.emit()
-
     @Property(bool, notify=reducedMotionChanged)
     def reducedMotion(self):
         return self._reduced_motion
@@ -182,6 +168,22 @@ class UIController(BaseController):
             self._compact_list_rows = value
             self.triggerSave()
             self.compactListRowsChanged.emit()
+
+    @Property(int, notify=inspectorWidthChanged)
+    def inspectorWidth(self):
+        return self._inspector_width
+
+    @inspectorWidth.setter
+    def inspectorWidth(self, value):
+        value = int(value)
+        if self._inspector_width != value and value >= 0:
+            self._inspector_width = value
+            self.triggerSave()
+            self.inspectorWidthChanged.emit()
+
+    @Slot(int)
+    def setInspectorWidth(self, value):
+        self.inspectorWidth = value
 
     @Property(str, notify=currentViewChanged)
     def logoSource(self):
@@ -206,10 +208,6 @@ class UIController(BaseController):
     @Slot(bool)
     def setRememberFilters(self, b):
         self.rememberFilters = b
-
-    @Slot(str)
-    def setDefaultProjectFilter(self, f):
-        self.defaultProjectFilter = f
 
     @Slot(bool)
     def setReducedMotion(self, b):
@@ -238,9 +236,9 @@ class UIController(BaseController):
                 "current_view": self._current_view,
                 "startup_view": self._startup_view,
                 "remember_filters": self._remember_filters,
-                "default_project_filter": self._default_project_filter,
                 "reduced_motion": self._reduced_motion,
                 "compact_list_rows": self._compact_list_rows,
+                "inspector_width": self._inspector_width,
             }
         )
         self.config.set("ui_state", ui_state)
@@ -255,9 +253,9 @@ class UIController(BaseController):
         self._current_view = "Library"
         self._startup_view = "Library"
         self._remember_filters = True
-        self._default_project_filter = "last"
         self._reduced_motion = False
         self._compact_list_rows = False
+        self._inspector_width = 0
         self._clearAllViewFilters()
         self.saveUiState()
         # Emit all relevant signals
@@ -268,9 +266,9 @@ class UIController(BaseController):
         self.windowYChanged.emit()
         self.startupViewChanged.emit()
         self.rememberFiltersChanged.emit()
-        self.defaultProjectFilterChanged.emit()
         self.reducedMotionChanged.emit()
         self.compactListRowsChanged.emit()
+        self.inspectorWidthChanged.emit()
 
     @staticmethod
     def _normalizeViewName(value: str) -> str:

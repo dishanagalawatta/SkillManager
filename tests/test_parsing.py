@@ -178,17 +178,12 @@ def test_parse_command_md_no_headers(temp_dir):
     assert data["description"] == "Just some text here without any markdown headers."
 
 
-def test_parse_skill_md_with_commands(temp_dir):
+def test_parse_skill_md_no_per_skill_commands(temp_dir):
+    """Commands are now project-level (.agents/commands/), not per-skill."""
     skill_dir = temp_dir / "skill_with_cmds"
     skill_dir.mkdir()
     skill_file = skill_dir / "SKILL.md"
     skill_file.write_text("# Skill")
 
-    cmds_dir = skill_dir / "commands"
-    cmds_dir.mkdir()
-    (cmds_dir / "cmd1.md").write_text("# Cmd 1")
-    (cmds_dir / "README.md").write_text("# Readme")  # Should be ignored
-
     data = parse_skill_md(str(skill_file))
-    assert len(data["commands"]) == 1
-    assert "cmd1.md" in data["commands"][0]
+    assert data["commands"] == []

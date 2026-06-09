@@ -10,10 +10,18 @@ Rectangle {
     property bool isQuickCopy: false
     property bool isCollapsed: false
 
+    readonly property int targetWidth: {
+        if (!root.skill || root.skill.local_path === undefined) return 0;
+        if (isCollapsed) return 32;
+
+        let dynamicWidth = parent ? parent.width * 0.5 : (isQuickCopy ? 350 : 400);
+        return Math.min(800, Math.max(isQuickCopy ? 350 : 400, dynamicWidth));
+    }
+
     GlassMenu {
         id: inspectorContextMenu
         property var targetControl: null
-        
+
         GlassMenuItem {
             text: "Copy"
             iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
@@ -28,15 +36,6 @@ Rectangle {
                 if (inspectorContextMenu.targetControl) inspectorContextMenu.targetControl.selectAll()
             }
         }
-    }
-    
-    // Calculate width based on selection and collapse state
-    readonly property int targetWidth: {
-        if (!root.skill || root.skill.local_path === undefined) return 0;
-        if (isCollapsed) return 32;
-        
-        let dynamicWidth = parent ? parent.width * 0.5 : (isQuickCopy ? 350 : 400);
-        return Math.min(800, Math.max(isQuickCopy ? 350 : 400, dynamicWidth));
     }
 
     function cleanBodyContent(content) {
@@ -182,7 +181,7 @@ Rectangle {
                 radius: Theme.radiusCard
                 color: Theme.glassPill
                 border.color: Theme.glassBorder
-                visible: root.skill.local_path !== undefined
+                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
 
                 ColumnLayout {
                     id: metaColumn
@@ -264,7 +263,7 @@ Rectangle {
             // Documentation / Commands (Moved up for better visibility)
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: (root.skill && root.skill.commands) ? root.skill.commands.length > 0 : false
+                visible: (root.skill && root.skill.commands && !root.skill.is_screenshot) ? root.skill.commands.length > 0 : false
                 spacing: 4
                 
                 Text {
@@ -313,9 +312,53 @@ Rectangle {
                 }
             }
 
+            // Screenshot Preview
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: root.skill.is_screenshot === true
+                spacing: 8
+                
+                Text {
+                    text: "Screenshot Preview"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
+                    color: Theme.secondaryLabel
+                }
+                
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(600, width * (screenshotPreview.implicitHeight / Math.max(1, screenshotPreview.implicitWidth)))
+                    color: Qt.rgba(0,0,0,0.2)
+                    radius: Theme.radiusSmall
+                    clip: true
+
+                    Image {
+                        id: screenshotPreview
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        fillMode: Image.PreserveAspectFit
+                        source: {
+                            if (!root.skill.is_screenshot || !root.skill.local_path) return "";
+                            let p = root.skill.local_path.replace(/\\/g, "/");
+                            if (p.startsWith("/")) return "file://" + p;
+                            return "file:///" + p;
+                        }
+                        asynchronous: true
+                    }
+                    
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: (mouse) => AppController.ui_controller.openPath(root.skill.local_path)
+                    }
+                }
+            }
+
             // Implementation / Raw Content Section
             ColumnLayout {
                 Layout.fillWidth: true
+                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
                 spacing: 8
                 
                 RowLayout {
@@ -344,19 +387,6 @@ Rectangle {
                         anchors.margins: 2
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                        
-                        ScrollBar.vertical: ScrollBar {
-                            id: vScroll
-                            width: 6
-                            contentItem: Rectangle {
-                                implicitWidth: 6
-                                radius: 3
-                                color: Theme.secondaryLabel
-                                opacity: vScroll.active ? (vScroll.hovered ? 0.8 : 0.4) : 0
-                                
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
-                            }
-                        }
 
                         TextArea {
                             id: rawContentArea

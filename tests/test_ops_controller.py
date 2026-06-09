@@ -100,6 +100,20 @@ def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock
         mock_patch.assert_called_with(["/p1"])
 
 
+def test_ops_controller_delete_screenshots(ops_controller, tmp_path):
+    screenshot = tmp_path / "Screenshot_test.png"
+    screenshot.write_text("fake-image-data")
+
+    items = [{"local_path": str(screenshot), "is_screenshot": True}]
+    with (
+        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch,
+        patch("skill_manager.controllers.ops_controller.QTimer.singleShot"),
+    ):
+        ops_controller.deleteSkills(items)
+        assert not screenshot.exists()
+        mock_patch.assert_called_with([str(screenshot)])
+
+
 def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
     temp_dir = tmp_path / "temp_skill"
     temp_dir.mkdir()
@@ -117,6 +131,57 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
 
         assert not temp_dir.exists()
         assert not temp_file.exists()
+        mock_save.assert_called_with([])
+
+
+def test_ops_controller_cleanup_temp_screenshots(ops_controller, tmp_path):
+    screenshot = tmp_path / "Screenshot_test.png"
+    screenshot.write_text("fake-image-data")
+    cache_entry_path = str(screenshot)
+
+    with (
+        patch(
+            "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+            return_value=[cache_entry_path],
+        ),
+        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_cache_remove,
+        patch(
+            "skill_manager.controllers.ops_controller.save_temp_screenshots_registry"
+        ) as mock_save,
+    ):
+        ops_controller.cleanup_temp_screenshots()
+
+        assert not screenshot.exists()
+        mock_cache_remove.assert_called_with([cache_entry_path])
+        mock_save.assert_called_with([])
+
+
+def test_ops_controller_cleanup_temp_screenshots_empty(ops_controller):
+    with patch(
+        "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+        return_value=[],
+    ):
+        ops_controller.cleanup_temp_screenshots()
+
+
+def test_ops_controller_cleanup_temp_screenshots_crash_recovery(ops_controller, tmp_path):
+    screenshot = tmp_path / "Screenshot_test.png"
+    cache_entry_path = str(screenshot)
+    assert not screenshot.exists()
+
+    with (
+        patch(
+            "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+            return_value=[cache_entry_path],
+        ),
+        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_cache_remove,
+        patch(
+            "skill_manager.controllers.ops_controller.save_temp_screenshots_registry"
+        ) as mock_save,
+    ):
+        ops_controller.cleanup_temp_screenshots()
+
+        mock_cache_remove.assert_called_with([cache_entry_path])
         mock_save.assert_called_with([])
 
 
@@ -394,5 +459,20 @@ def test_ops_controller_create_custom_command(mock_create, ops_controller, mock_
     mock_create.return_value = MagicMock(ok=True, message="Success")
     ops_controller.createCustomCommand("cmd", "G", "body", "proj", "cat")
     mock_create.assert_called_once()
-    mock_app._set_status.assert_called_with("Success")
+    mock_app._set_status.assert_called_with("Created 1 command(s)")
     mock_app.refreshSkills.assert_called_once()
+
+
+def test_ops_controller_toggle_starred_none(ops_controller, mock_app):
+    mock_app._selected_skill = None
+    ops_controller.toggleStarred()
+    mock_app.selectedSkillChanged.emit.assert_not_called()
+
+
+def test_ops_controller_delete_skills_empty(ops_controller, mock_app):
+    ops_controller.deleteSkills([])
+
+
+def test_ops_controller_copy_text_to_clipboard(ops_controller, mock_app):
+    ops_controller.copyTextToClipboard("test text")
+    mock_app._clipboard.setText.assert_called_with("test text")

@@ -76,8 +76,8 @@ def test_discover_project_skills_success(temp_dir):
 
 def test_project_label_non_standard_base():
     path = Path("/work/proj/custom/skills")
-    # Marker not found, root = path.parent (/work/proj/custom), base = skills
-    assert project_label(path) == "custom (skills)"
+    # Marker not found, root = path itself, base = "."
+    assert project_label(path) == "skills (.)"
 
 
 def test_resolve_resilient_path_does_not_support_singular_agent(temp_dir):
@@ -100,16 +100,21 @@ def test_project_label_normalization(temp_dir):
         assert project_label(path, {"C:/Work/Proj": "Normalized Alias"}) == "Normalized Alias"
 
 
-def test_format_project_skill_reference_error_handling():
-    # Test relative_to failure in command formatting
+def test_format_project_skill_reference_returns_body_for_commands():
     skill = {
         "is_command": True,
-        "project_root": "/other/root",
-        "local_path": "/work/proj/commands/cmd.md",
+        "body_content": "echo hello world",
+        "project_root": "/root",
+        "local_path": "/root/.agents/commands/cmd.md",
     }
-    # /work/proj/commands/cmd.md is not relative to /other/root
     ref = format_project_skill_reference(skill, "Plain Text")
-    assert ref == "cmd.md"
+    assert ref == "echo hello world"
+
+    ref_codex = format_project_skill_reference(skill, "Codex")
+    assert ref_codex == "echo hello world"
+
+    ref_gemini = format_project_skill_reference(skill, "Gemini CLI")
+    assert ref_gemini == "echo hello world"
 
 
 def test_skill_base_relative_error():
@@ -161,16 +166,11 @@ def test_project_label_complex(temp_dir):
         assert project_label("C:\\Path", {"C:/Path": "Normalized"}) == "Normalized"
 
 
-def test_format_project_skill_reference_command_fallback():
-    # command without project_root but has commands in path
-    skill = {"is_command": True, "local_path": "/work/myproj/commands/deploy.md"}
+def test_format_project_skill_reference_command_fallback_empty_body():
+    # Commands without body_content fall back to raw_content
+    skill = {"is_command": True, "raw_content": "fallback text", "local_path": "/p/c.md"}
     ref = format_project_skill_reference(skill, "Gemini CLI")
-    assert ref == "@commands/deploy.md"
-
-    # command without project_root AND no commands in path
-    skill2 = {"is_command": True, "local_path": "/work/myproj/other/deploy.md"}
-    ref2 = format_project_skill_reference(skill2, "Gemini CLI")
-    assert ref2 == "@deploy.md"
+    assert ref == "fallback text"
 
 
 def test_looks_like_explicit_reference():
@@ -226,21 +226,7 @@ def test_project_label_cleaning():
 def test_format_project_skill_reference_antigravity():
     skill = {"name": "TestSkill", "local_path": "/path/to/test-skill"}
     ref = format_project_skill_reference(skill, "Antigravity")
-    assert ref == "/skill:TestSkill"
-
-
-def test_format_project_skill_reference_command():
-    skill = {
-        "name": "MyCommand",
-        "is_command": True,
-        "project_root": "/root",
-        "local_path": "/root/commands/cmd.md",
-    }
-    ref = format_project_skill_reference(skill, "Antigravity")
-    assert ref == "/skill:MyCommand"
-
-    ref_gemini = format_project_skill_reference(skill, "Gemini CLI")
-    assert ref_gemini == "@commands/cmd.md"
+    assert ref == "/TestSkill"
 
 
 def test_project_label_standard():

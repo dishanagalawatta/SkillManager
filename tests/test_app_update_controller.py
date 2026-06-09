@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -88,8 +88,38 @@ async def test_check_for_updates_slots():
         mock_sys.frozen = True
         controller.checkForUpdates()
     mock_app.task_runner.submit.assert_called_once_with(
-        controller._sync_check_updates, controller._on_updates_checked
+        controller._sync_check_updates, ANY
     )
+
+
+@pytest.mark.asyncio
+async def test_manual_check_for_updates_feedback():
+    mock_app = MagicMock()
+    mock_app.task_runner = MagicMock()
+    controller = AppUpdateController(mock_app)
+
+    # 1. Dev mode manual feedback
+    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+        mock_sys.frozen = False
+        controller.checkForUpdates(manual=True)
+        mock_app._set_status.assert_called_with("Update check skipped in development mode.")
+
+    # 2. Production mode manual feedback (start)
+    mock_app._set_status.reset_mock()
+    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+        mock_sys.frozen = True
+        controller.checkForUpdates(manual=True)
+        mock_app._set_status.assert_any_call("Checking for app updates...")
+
+    # 3. Success feedback
+    mock_app._set_status.reset_mock()
+    controller._on_updates_checked("2.0.0", manual=True)
+    mock_app._set_status.assert_called_with("Update available: v2.0.0")
+
+    # 4. Up to date feedback
+    mock_app._set_status.reset_mock()
+    controller._on_updates_checked(None, manual=True)
+    mock_app._set_status.assert_called_with("SkillManager is up to date.")
 
 
 @pytest.mark.asyncio
