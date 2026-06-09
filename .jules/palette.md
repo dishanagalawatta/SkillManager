@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2026-06-09 - Main Window Resize Grip Accessibility
+**Learning:** In QML frameless windows, `MouseArea` elements used as resize handles must include `Accessible.role: Accessible.Grip` along with appropriate `Accessible.name` and `Accessible.description` properties for screen reader accessibility.
+**Action:** Always scan for invisible interactive areas like resize borders and ensure they have accessibility labels so visually impaired users can identify window edges.
