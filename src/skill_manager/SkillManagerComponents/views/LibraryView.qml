@@ -8,6 +8,9 @@ import ".."
 Item {
     id: lv_root
 
+    property bool showImageInspector: false
+    property bool showCommandInspector: false
+
     function focusSearch() {
         lv_searchInput.forceActiveFocus()
         lv_searchInput.selectAll()
@@ -203,7 +206,7 @@ Item {
                         labelText: "Add"
                         iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                         role: "secondary"
-                        onClicked: (mouse) => lv_commandDialog.openWithContext("", AppController.clientFormat)
+                        onClicked: (mouse) => lv_commandDialog.openWithContext(AppController.clientFormat)
                     }
 
                     // Selection-specific actions
@@ -217,6 +220,15 @@ Item {
                             Layout.preferredWidth: 160
                             model: AppController.projectLabels
                             enabled: AppController.projects.length > 0
+                            currentIndex: {
+                                let idx = model.indexOf(AppController.currentProject);
+                                return Math.max(0, idx);
+                            }
+                            onActivated: (index) => {
+                                if (index >= 0 && index < AppController.projectLabels.length) {
+                                    AppController.setCurrentProject(AppController.projectLabels[index])
+                                }
+                            }
                         }
                         
                         ActionButton {
@@ -227,8 +239,8 @@ Item {
                             enabled: AppController.projects.length > 0
                             tooltipText: enabled ? "Copies selected skills to the project temporarily. They will be deleted when you close this app." : "Add a project in Updates before copying skills."
                             onClicked: (mouse) => {
-                                if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
-                                    let path = AppController.projects[lv_projectDrop.currentIndex]
+                                let path = AppController.config_controller.getProjectPath(AppController.currentProject)
+                                if (path) {
                                     AppController.ops_controller.copySelectedSkillsToProjectTemporarily(path)
                                 }
                             }
@@ -269,8 +281,8 @@ Item {
                             enabled: AppController.projects.length > 0
                             tooltipText: enabled ? "" : "Add a project in Updates before copying skills."
                             onClicked: (mouse) => {
-                                if (lv_projectDrop.currentIndex >= 0 && lv_projectDrop.currentIndex < AppController.projects.length) {
-                                    let path = AppController.projects[lv_projectDrop.currentIndex]
+                                let path = AppController.config_controller.getProjectPath(AppController.currentProject)
+                                if (path) {
                                     AppController.ops_controller.copySelectedSkillsToProject(path)
                                 }
                             }
@@ -395,21 +407,92 @@ Item {
                     onDeleteRequested: (name, path) => {
                         lv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
                     }
-                }
-
-                ScrollBar.vertical: ScrollBar {
+                    onInspectImageRequested: {
+                        lv_root.showImageInspector = true
+                    }
                 }
             }
 
-            // Inspector Pane
+            // Inspector Pane (commands)
+            CommandInspector {
+                id: lv_commandInspector
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
+                skill: AppController.selectedSkill
+                editDialog: lv_commandDialog
+                visible: targetWidth > 0 && lv_root.showCommandInspector
+
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
+                onClosed: {
+                    lv_root.showCommandInspector = false
+                    AppController.ui_controller.selectSkill(-1)
+                }
+            }
+
+            // Inspector Pane (skills)
             SkillInspector {
                 id: lv_inspector
                 SplitView.fillHeight: true
-                SplitView.preferredWidth: targetWidth
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
                 skill: AppController.selectedSkill
-                visible: targetWidth > 0
+                visible: targetWidth > 0 && !lv_root.showImageInspector && !lv_root.showCommandInspector
 
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
                 onClosed: AppController.ui_controller.selectSkill(-1)
+            }
+
+            // Image Inspector (for screenshots)
+            ImageInspector {
+                id: lv_imageInspector
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
+                skill: AppController.selectedSkill
+                visible: targetWidth > 0 && lv_root.showImageInspector
+
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
+                onClosed: {
+                    lv_root.showImageInspector = false
+                    AppController.ui_controller.selectSkill(-1)
+                }
+            }
+        }
+    }
+
+    // Toggle between SkillInspector, CommandInspector, and ImageInspector based on skill type
+    Connections {
+        target: AppController
+        function onSelectedSkillChanged() {
+            var skill = AppController.selectedSkill
+            if (skill && skill.is_command) {
+                lv_root.showCommandInspector = true
+                lv_root.showImageInspector = false
+            } else if (skill && skill.is_screenshot) {
+                lv_root.showCommandInspector = false
+                lv_root.showImageInspector = true
+            } else {
+                lv_root.showCommandInspector = false
+                lv_root.showImageInspector = false
             }
         }
     }

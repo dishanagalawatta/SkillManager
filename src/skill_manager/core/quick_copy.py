@@ -183,6 +183,32 @@ def discover_single_project(
         skill_data["search_text"] = build_search_text(skill_data)
         skills.append(skill_data)
 
+    # ── Scan for Screenshots
+    project_root_path = _project_root_for_project(resolved_project)
+    screenshot_dir = project_root_path / ".agents" / "screenshots"
+    if screenshot_dir.is_dir():
+        for img in sorted(
+            screenshot_dir.iterdir(), key=lambda item: item.name.lower(), reverse=True
+        ):
+            if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                # Map to virtual skill
+                skill_data = {
+                    "name": img.name,
+                    "folder_name": ".agents/screenshots",
+                    "local_path": str(img),
+                    "skill_md_path": str(img),
+                    "project_key": project_key,
+                    "project_path": str(resolved_project),
+                    "project_root": str(project_root_path),
+                    "project_label": project_label(resolved_project, project_aliases, str(project)),
+                    "main_category": "Special",
+                    "category": "Screenshots",
+                    "search_text": f"screenshot capture {img.name}",
+                    "is_screenshot": True,
+                    "metadata": {"category": "Capture"},
+                }
+                skills.append(skill_data)
+
     if skills:
         project_root = _project_root_for_project(resolved_project)
         return {
@@ -333,40 +359,32 @@ def format_project_skill_reference(skill, client_format):
     local_path = Path(skill.get("local_path", ""))
 
     if is_command:
-        # For commands, we want the path relative to the project root
-        project_root = skill.get("project_root")
-        if not project_root:
-            # Fallback: try to find commands/ in the path
-            try:
-                command_idx = local_path.parts.index("commands")
-                relative_path = "/".join(local_path.parts[command_idx:])
-            except ValueError:
-                relative_path = local_path.name
-        else:
-            try:
-                relative_path = local_path.relative_to(project_root).as_posix()
-            except ValueError:
-                relative_path = local_path.name
-
-        if client_format == "Codex":
-            name = skill.get("name") or local_path.name
-            return f"[${name}]({relative_path})"
-        if client_format == "Antigravity":
-            name = skill.get("name") or local_path.name
-            return f"/skill:{name}"
-        if client_format == "Gemini CLI":
-            return f"@{relative_path}"
-        return relative_path
+        return skill.get("body_content", "") or skill.get("raw_content", "")
 
     if client_format == "Codex":
         name = skill.get("name") or local_path.name
         path = skill.get("skill_md_path") or ""
         return f"[${name}]({path})"
 
+    if skill.get("is_screenshot"):
+        # For screenshots, the reference is just the relative path to the image
+        project_root = skill.get("project_root")
+        if project_root:
+            try:
+                relative_path = local_path.relative_to(project_root).as_posix()
+            except ValueError:
+                relative_path = local_path.name
+        else:
+            relative_path = local_path.name
+
+        if client_format == "Gemini CLI":
+            return f"@{relative_path}"
+        return relative_path
+
     relative_path = project_skill_relative_path(skill)
     if client_format == "Antigravity":
         name = skill.get("name") or local_path.name
-        return f"/skill:{name}"
+        return f"/{name}"
     if client_format == "Gemini CLI":
         return f"@{relative_path}"
     return relative_path
@@ -484,9 +502,18 @@ def _project_root_for_project(project_path):
     for marker in (".agents", ".codex", ".gemini"):
         if marker in parts:
             marker_index = parts.index(marker)
-            if marker_index > 0:
+            if marker_index >= 0:
                 return Path(*parts[:marker_index])
-    return project_path.parent
+
+    # If no marker in path parts, check if the directory itself contains a marker
+    try:
+        for marker in (".agents", ".codex", ".gemini"):
+            if (project_path / marker).exists():
+                return project_path
+    except OSError:
+        pass
+
+    return project_path
 
 
 def _skill_base_relative(project_path):

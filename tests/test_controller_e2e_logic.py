@@ -113,7 +113,7 @@ def test_controller_quick_copy_workflow(app_controller):
     app_controller.quickCopyModel.toggleSelection(test_skill_idx)
     assert app_controller.quickCopyModel.selectedCount == 1
 
-    # Set client format to Antigravity (returns /skill:Name)
+    # Set client format to Antigravity (returns /Name)
     app_controller.ui.setClientFormat("Antigravity")
 
     # Execute copy
@@ -122,7 +122,7 @@ def test_controller_quick_copy_workflow(app_controller):
     # Verify clipboard
     clipboard = QGuiApplication.clipboard()
     text = clipboard.text()
-    assert text == "/skill:Project Skill"
+    assert text == "/Project Skill"
 
 
 def test_controller_skill_deletion_workflow(app_controller, temp_dir):

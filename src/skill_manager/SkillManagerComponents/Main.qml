@@ -81,6 +81,36 @@ Window {
     property string currentView: AppController.ui_controller.currentView
     onCurrentViewChanged: AppController.ui_controller.currentView = currentView
 
+    // Window state for auto-minimize on screenshot
+    property bool wasMaximized: false
+    property real savedX: 0
+    property real savedY: 0
+    property real savedWidth: 0
+    property real savedHeight: 0
+    property bool pendingScreenshot: false
+
+    function saveWindowState() {
+        wasMaximized = (window.visibility === Window.Maximized)
+        savedX = window.x
+        savedY = window.y
+        savedWidth = window.width
+        savedHeight = window.height
+    }
+
+    function restoreWindowState() {
+        if (wasMaximized) {
+            window.showMaximized()
+        } else {
+            window.x = savedX
+            window.y = savedY
+            window.width = savedWidth
+            window.height = savedHeight
+            window.showNormal()
+        }
+        window.raise()
+        window.requestActivate()
+    }
+
     function navigateTo(view) {
         window.currentView = view
         let source = "views/" + view.replace(" ", "") + "View.qml"
@@ -96,7 +126,7 @@ Window {
     }
 
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
     
@@ -112,6 +142,45 @@ Window {
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequences: ["Ctrl+Shift+S", "Meta+Shift+S"]; onActivated: AppController.screenshot_controller.takeScreenshot() }
+
+    ScreenshotOverlay {
+        id: screenshotOverlay
+    }
+
+    Timer {
+        id: screenshotDelayTimer
+        interval: 300
+        onTriggered: {
+            AppController.screenshot_controller.captureScreen()
+        }
+    }
+
+    Connections {
+        target: AppController.screenshot_controller
+        function onMinimizeRequested() {
+            window.saveWindowState()
+            window.pendingScreenshot = true
+            window.showMinimized()
+            screenshotDelayTimer.start()
+        }
+    }
+
+    Connections {
+        target: AppController.screenshot_controller
+        function onCaptureFinished() {
+            if (window.pendingScreenshot) {
+                window.pendingScreenshot = false
+                window.restoreWindowState()
+            }
+        }
+        function onCaptureCancelled() {
+            if (window.pendingScreenshot) {
+                window.pendingScreenshot = false
+                window.restoreWindowState()
+            }
+        }
+    }
 
     Rectangle {
         anchors.fill: parent

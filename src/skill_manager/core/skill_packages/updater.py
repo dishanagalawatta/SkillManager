@@ -28,6 +28,7 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
         from skill_manager.core.config import DATA_DIR
 
         from .storage import safe_package_folder_name
+
         package_name = safe_package_folder_name(source)
         clone_path = str(DATA_DIR / "package_clones" / package_name)
         source["clone_path"] = clone_path

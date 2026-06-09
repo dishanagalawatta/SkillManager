@@ -30,6 +30,30 @@ def test_skill_from_dict(skill_data):
     assert skill.main_category == "⚙️ System & Workflow"
 
 
+def test_skill_getitem_missing_key():
+    skill = Skill()
+    with pytest.raises(KeyError):
+        _ = skill["nonexistent"]
+
+
+def test_skill_setitem_missing_key():
+    skill = Skill()
+    with pytest.raises(KeyError):
+        skill["nonexistent"] = "value"
+
+
+def test_skill_contains():
+    skill = Skill(name="test")
+    assert "name" in skill
+    assert "nonexistent" not in skill
+
+
+def test_skill_get_default():
+    skill = Skill(name="test")
+    assert skill.get("name") == "test"
+    assert skill.get("nonexistent", "fallback") == "fallback"
+
+
 def test_filter_engine_get_main_category(engine, skill_data):
     skill = Skill.from_dict(skill_data)
     assert engine.get_main_category(skill) == "⚙️ System & Workflow"

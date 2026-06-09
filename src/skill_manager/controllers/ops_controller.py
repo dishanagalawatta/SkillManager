@@ -12,11 +12,13 @@ from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.persistence import (
     load_temp_registry,
+    load_temp_screenshots_registry,
     patch_cache_add,
     patch_cache_remove,
     save_archive,
     save_starred,
     save_temp_registry,
+    save_temp_screenshots_registry,
 )
 from skill_manager.core.quick_copy import (
     delete_project_skill_folders,
@@ -168,22 +170,25 @@ class OpsController(BaseController):
             deleted = 0
             failed = 0
             paths_to_remove = []
-            skill_items = [i for i in items if not i.get("is_command")]
+            skill_items = [
+                i for i in items if not i.get("is_command") and not i.get("is_screenshot")
+            ]
             command_items = [i for i in items if i.get("is_command")]
+            screenshot_items = [i for i in items if i.get("is_screenshot")]
 
             # ── Step 1: Delete Skill Folders (FS)
             if skill_items:
                 result = delete_project_skill_folders(skill_items)
                 deleted += result["deleted"]
                 failed += result["failed"]
-                # Extract paths from details
                 paths_to_remove.extend(
                     [d["path"] for d in result["details"] if d["status"] == "deleted"]
                 )
 
-            # ── Step 2: Delete Commands (Direct FS unlink)
-            for cmd in command_items:
-                path_str = cmd.get("local_path", "") if isinstance(cmd, dict) else cmd.local_path
+            # ── Step 2: Delete Files (Commands + Screenshots) via unlink
+            file_items = command_items + screenshot_items
+            for item in file_items:
+                path_str = item.get("local_path", "") if isinstance(item, dict) else item.local_path
                 p = Path(path_str)
                 try:
                     if p.is_file():
@@ -287,6 +292,32 @@ class OpsController(BaseController):
         save_temp_registry([])
         if deleted_count > 0:
             logger.info(f"[TEMP_CLEANUP] Cleaned up {deleted_count} temporary paths.")
+
+    def cleanup_temp_screenshots(self):
+        """Deletes all temporary screenshots recorded in the registry."""
+        temp_paths = load_temp_screenshots_registry()
+        if not temp_paths:
+            return
+
+        deleted_count = 0
+        for path_str in temp_paths:
+            p = Path(path_str)
+            try:
+                if p.is_file():
+                    p.unlink()
+                    deleted_count += 1
+            except Exception as e:
+                logger.error(f"[TEMP_SCREENSHOT_CLEANUP] Failed to delete {path_str}: {e}")
+                capture_exception(e)
+
+        if temp_paths:
+            patch_cache_remove(temp_paths)
+
+        save_temp_screenshots_registry([])
+        if deleted_count > 0:
+            logger.info(
+                f"[TEMP_SCREENSHOT_CLEANUP] Cleaned up {deleted_count} temporary screenshots."
+            )
 
     @Slot(str)
     def copySelectedSkillsToProject(self, project_path: str, is_temporary: bool = False):
@@ -425,10 +456,10 @@ class OpsController(BaseController):
 
     @Slot()
     def copySelectedSkillsToClipboard(self):
-        """Copies all selected skill references to clipboard."""
+        """Copies selected skill references for the current project to clipboard."""
         from skill_manager.core.quick_copy import format_project_skill_reference
 
-        paths = self.app.skillModel.getSelectedPaths()
+        paths = self.app.skillModel.getFilteredSelectedPaths()
         if not paths:
             self.app._set_status("No skills selected")
             return
@@ -436,7 +467,7 @@ class OpsController(BaseController):
         references = []
         for path in paths:
             skill = next(
-                (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+                (s for s in self.app.skillModel._all_filtered_skills if s.local_path == path), None
             )
             if skill:
                 references.append(format_project_skill_reference(skill, self.app._client_format))
@@ -466,18 +497,103 @@ class OpsController(BaseController):
 
     @Slot(str, str, str, str, str)
     def createCustomCommand(
-        self, name: str, client: str, body: str, project_label: str, category: str
+        self, name: str, clients_str: str, body: str, project_label: str, category: str
     ):
-        """Creates a new Custom Command .md file in the project's commands/ directory."""
+        """Creates Custom Command .md files for each selected client."""
         from skill_manager.core.commands import create_custom_command_file
 
-        result = create_custom_command_file(
+        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
+        if not clients:
+            self.app._set_status("Error: No client selected")
+            return
+
+        results = [
+            create_custom_command_file(
+                name=name,
+                client=client,
+                body=body,
+                project_label_name=project_label,
+                category=category,
+                project_paths=self.app._projects,
+            )
+            for client in clients
+        ]
+
+        ok_results = [r for r in results if r.ok]
+        fail_results = [r for r in results if not r.ok]
+
+        if fail_results:
+            errors = "; ".join(r.message for r in fail_results)
+            self.app._set_status(
+                f"Created {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
+            )
+        else:
+            self.app._set_status(f"Created {len(results)} command(s)")
+
+        if ok_results:
+            self.app.refreshSkills()
+
+    @Slot(str, str, str, str, str, str)
+    def updateCustomCommandFull(
+        self, local_path: str, name: str, clients_str: str, body: str, project_label: str, category: str
+    ):
+        """Full update: change name, client, body, category, project for a command."""
+        from skill_manager.core.commands import (
+            create_custom_command_file,
+            update_custom_command_file_full,
+        )
+
+        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
+        if not clients:
+            self.app._set_status("Error: No client selected")
+            return
+
+        results = []
+        result = update_custom_command_file_full(
+            local_path=local_path,
             name=name,
-            client=client,
+            client=clients[0],
             body=body,
-            project_label_name=project_label,
             category=category,
+            project_label_name=project_label,
             project_paths=self.app._projects,
+        )
+        results.append(result)
+
+        for extra_client in clients[1:]:
+            result = create_custom_command_file(
+                name=name,
+                client=extra_client,
+                body=body,
+                project_label_name=project_label,
+                category=category,
+                project_paths=self.app._projects,
+            )
+            results.append(result)
+
+        ok_results = [r for r in results if r.ok]
+        fail_results = [r for r in results if not r.ok]
+
+        if fail_results:
+            errors = "; ".join(r.message for r in fail_results)
+            self.app._set_status(
+                f"Updated {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
+            )
+        else:
+            self.app._set_status(f"Updated {len(results)} command(s)")
+
+        if ok_results:
+            self.app.refreshSkills()
+
+    @Slot(str, str, str)
+    def updateCustomCommand(self, local_path: str, name: str, body: str):
+        """Updates an existing command file's name and body content."""
+        from skill_manager.core.commands import update_custom_command_file
+
+        result = update_custom_command_file(
+            local_path=local_path,
+            name=name,
+            body=body,
         )
         self.app._set_status(result.message)
         if result.ok:

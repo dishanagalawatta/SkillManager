@@ -13,6 +13,8 @@ Item {
     property bool isEditingCollection: false
     property string editingCollectionName: ""
     property bool _isInternalSelectionChange: false
+    property bool showImageInspector: false
+    property bool showCommandInspector: false
 
     function focusSearch() {
         searchInput.forceActiveFocus()
@@ -119,14 +121,15 @@ Item {
                         GlassDropdown {
                             id: qcv_projectDrop
                             Layout.preferredWidth: 150
-                            model: ["All Projects"].concat(AppController.projectLabels)
+                            model: AppController.projectLabels
                             currentIndex: {
-                                let idx = model.indexOf(AppController.quickCopyModel.projectFilter);
-                                return idx === -1 ? 0 : idx;
+                                let idx = model.indexOf(AppController.currentProject);
+                                return Math.max(0, idx);
                             }
                             onActivated: (index) => {
-                                let proj = index === 0 ? "" : currentText
-                                AppController.ui_controller.setViewFilterForView("QuickCopy", "project", proj)
+                                if (index >= 0 && index < AppController.projectLabels.length) {
+                                    AppController.setCurrentProject(AppController.projectLabels[index])
+                                }
                             }
                         }
                     }
@@ -311,7 +314,7 @@ Item {
                             labelText: "Add Command"
                             iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                             role: "secondary"
-                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.quickCopyModel.projectFilter, AppController.ui_controller.clientFormat)
+                            onClicked: (mouse) => qcv_commandDialog.openWithContext(AppController.ui_controller.clientFormat)
                         }
 
                         // Selection-specific actions
@@ -532,22 +535,93 @@ Item {
                     onDeleteRequested: (name, path) => {
                         qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
                     }
-                }
-
-                ScrollBar.vertical: ScrollBar {
+                    onInspectImageRequested: {
+                        qcv_root.showImageInspector = true
+                    }
                 }
             }
 
-            // Overlay Inspector
+            // Command Inspector
+            CommandInspector {
+                id: qcv_commandInspector
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
+                skill: AppController.selectedSkill
+                editDialog: qcv_commandDialog
+                visible: targetWidth > 0 && qcv_root.showCommandInspector
+
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
+                onClosed: {
+                    qcv_root.showCommandInspector = false
+                    AppController.ui_controller.selectSkill(-1)
+                }
+            }
+
+            // Overlay Inspector (skills)
             SkillInspector {
                 id: qcv_inspector
                 SplitView.fillHeight: true
-                SplitView.preferredWidth: targetWidth
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
                 skill: AppController.selectedSkill
                 isQuickCopy: true
-                visible: targetWidth > 0
-                
+                visible: targetWidth > 0 && !qcv_root.showImageInspector && !qcv_root.showCommandInspector
+
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
                 onClosed: AppController.ui_controller.selectSkill(-1)
+            }
+
+            // Image Inspector (for screenshots)
+            ImageInspector {
+                id: qcv_imageInspector
+                SplitView.fillHeight: true
+                SplitView.preferredWidth: {
+                    var p = AppController.ui_controller.inspectorWidth
+                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
+                }
+                skill: AppController.selectedSkill
+                visible: targetWidth > 0 && qcv_root.showImageInspector
+
+                onWidthChanged: {
+                    if (visible && width > 0) {
+                        AppController.ui_controller.setInspectorWidth(width)
+                    }
+                }
+                onClosed: {
+                    qcv_root.showImageInspector = false
+                    AppController.ui_controller.selectSkill(-1)
+                }
+            }
+        }
+    }
+
+    // Toggle between SkillInspector, CommandInspector, and ImageInspector based on skill type
+    Connections {
+        target: AppController
+        function onSelectedSkillChanged() {
+            var skill = AppController.selectedSkill
+            if (skill && skill.is_command) {
+                qcv_root.showCommandInspector = true
+                qcv_root.showImageInspector = false
+            } else if (skill && skill.is_screenshot) {
+                qcv_root.showCommandInspector = false
+                qcv_root.showImageInspector = true
+            } else {
+                qcv_root.showCommandInspector = false
+                qcv_root.showImageInspector = false
             }
         }
     }

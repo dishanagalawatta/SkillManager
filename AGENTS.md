@@ -21,5 +21,5 @@ Co-Authored-By: Gemini CLI <noreply@google.com>
 - **GUI**: Built with PySide6/QML. UI files are in `src/skill_manager/SkillManagerComponents/`.
 - **Tests**: Use `pytest`. Parallel execution is supported via `pytest-xdist`.
 - **Logic**: Follow patterns in `src/skill_manager/core/`.
-- **Categorization**: Keep logic in `parsing.py` synced with `docs/CATEGORIES.md`.
-- **Releases**: strictly Opt-in. Use `[patch]`, `[minor]`, `[major]`, or `[dev]` in commits.
+- **Categorization**: Keep logic in `src/skill_manager/core/parsing/` synced with `docs/CATEGORIES.md`.
+- **Releases**: Strictly Opt-in. Use `[patch]`, `[minor]`, `[major]`, or `[dev]` in commits.

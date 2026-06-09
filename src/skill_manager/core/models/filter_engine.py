@@ -15,12 +15,14 @@ class FilterEngine:
 
     @staticmethod
     def get_main_category(skill: Skill) -> str:
-        if skill.is_starred or skill.is_bundle or skill.is_command:
+        if skill.is_screenshot or skill.is_starred or skill.is_bundle or skill.is_command:
             return "Special"
         return skill.main_category or "⚙️ System & Workflow"
 
     @staticmethod
     def get_sub_category(skill: Skill) -> str:
+        if skill.is_screenshot:
+            return "Screenshots"
         if skill.is_command:
             return skill.category or "Custom Commands"
         if skill.is_starred:
@@ -35,8 +37,8 @@ class FilterEngine:
 
     @staticmethod
     def sort_key(skill: Skill) -> tuple[str, str]:
-        if skill.is_command or skill.is_starred:
-            return (f"0_Special|{skill.category or 'General'}", skill.name.lower())
+        if skill.is_screenshot or skill.is_command or skill.is_starred:
+            return (f"0_Special|{FilterEngine.get_sub_category(skill)}", skill.name.lower())
         if skill.is_bundle:
             return ("0_Special|Collections", skill.name.lower())
 

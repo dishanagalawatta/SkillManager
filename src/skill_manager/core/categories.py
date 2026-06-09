@@ -62,6 +62,8 @@ CATEGORY_EMOJI_MAP = {
     "Design": "🎨",
     "Communications": "📧",
     "Social Media": "💬",
+    "Screenshot": "🖼️",
+    "Screenshots": "🖼️",
     "Localization": "🌍",
     "Psychology": "🧩",
     "Health": "🩺",

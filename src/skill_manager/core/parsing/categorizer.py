@@ -74,14 +74,18 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
                 continue
 
             # Check name match
-            name_match = process.extractOne(name_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85)
+            name_match = process.extractOne(
+                name_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
+            )
             name_score = name_match[1] if name_match else 0
             cat_name_score = fuzz.token_set_ratio(category.lower(), name_text)
             if cat_name_score >= 85:
                 name_score = max(name_score, cat_name_score + 5)
 
             # Check desc match
-            desc_match = process.extractOne(desc_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85)
+            desc_match = process.extractOne(
+                desc_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
+            )
             desc_score = desc_match[1] if desc_match else 0
             cat_desc_score = fuzz.token_set_ratio(category.lower(), desc_text)
             if cat_desc_score >= 85:

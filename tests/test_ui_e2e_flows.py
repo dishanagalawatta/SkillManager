@@ -201,7 +201,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     clipboard = QGuiApplication.clipboard()
     # We added "Project Skill" in a folder named "proj-skill"
-    # The copier might copy the name or the command reference like /skill:proj-skill
+    # The copier might copy the name or the command reference like /proj-skill
     text = clipboard.text()
     assert "proj-skill" in text or "Project Skill" in text
 

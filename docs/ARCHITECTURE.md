@@ -5,10 +5,10 @@ SkillManager is a cross-platform desktop application designed to manage, organiz
 ## System Overview
 
 The application is structured into four primary layers:
-1.  **Core Domain (`src/skill_manager/core/`)**: Pure Python business logic, handling file parsing, data modeling, synchronization algorithms, and background services.
-2.  **Sub-Controllers (`src/skill_manager/controllers/`)**: Specialized controllers that encapsulate specific logical domains (UI, Config, Ops, Updates).
-3.  **App Hub (`src/skill_manager/app.py`)**: The central `AppController` that coordinates sub-controllers and provides a stable Signal/Slot bridge to the frontend.
-4.  **Declarative UI (`src/skill_manager/SkillManagerComponents/`)**: The QML-based frontend components.
+1. **Core Domain (`src/skill_manager/core/`)**: Pure Python business logic, handling file parsing, data modeling, synchronization algorithms, and background services.
+2. **Sub-Controllers (`src/skill_manager/controllers/`)**: Specialized controllers that encapsulate specific logical domains (UI, Config, Ops, Updates, Screenshot, Discovery, AppUpdates).
+3. **App Hub (`src/skill_manager/app.py`)**: The central `AppController` that coordinates sub-controllers and provides a stable Signal/Slot bridge to the frontend.
+4. **Declarative UI (`src/skill_manager/SkillManagerComponents/`)**: The QML-based frontend components.
 
 ---
 
@@ -17,30 +17,59 @@ The application is structured into four primary layers:
 To prevent the `AppController` from becoming a "God Object," responsibilities are distributed into sub-controllers:
 
 - **`UIController`**: Manages application-wide UI state (Current View, Dark Mode), window geometry (X, Y, Width, Height), and asset URI resolution for QML.
-- **`ConfigController`**: Manages the `ConfigManager` instance, handling the addition/removal of skill sources and project targets.
-- **`OpsController`**: Handles high-frequency skill operations such as copying to projects, deleting skills (with optimistic UI updates), and managing starred/archive states.
-- **`UpdateController`**: Orchestrates background synchronization processes, Git source updates, and provides real-time progress reporting to the UI.
+- **`ConfigController`**: Manages the `ConfigManager` instance, handling the addition/removal of skill sources, project targets, client formats, custom collections, shortcuts, and update settings.
+- **`OpsController`**: Handles high-frequency skill operations such as copying to projects, deleting skills (with optimistic UI updates), managing starred/archive states, and custom commands.
+- **`UpdateController`**: Orchestrates background synchronization processes, Git source updates, skill package scanning, and provides real-time progress reporting to the UI.
+- **`DiscoveryController`**: Handles filesystem scanning for skills, project discovery, and initial data loading.
+- **`ScreenshotController`**: Manages screenshot capture workflow with region selection, PII redaction, and saving.
+- **`ImageInspectorController`**: Handles color isolation and pixel inspection within captured screenshots.
+- **`AppUpdateController`**: Manages application self-update checks, download, and installation via TUF.
 
-### 2. Data Models (`core/models.py`)
+### 2. Data Models (`core/models/`)
 
-- **`SkillModel`**: A `QAbstractListModel` subclass that exposes skills to QML. It implements highly optimized filtering and selection logic, supporting thousands of skills without UI lag.
+- **`entities.py`**: Defines core data classes (`SkillData`, `SkillCollection`, etc.) used throughout the application.
+- **`filter_engine.py`**: Implements filtering and search logic for skills (category, text, client format, starred, archived).
+- **`qt_model.py`**: `SkillModel` - A `QAbstractListModel` subclass that exposes skills to QML. It implements highly optimized filtering and selection logic, supporting thousands of skills without UI lag.
 
 ### 3. Core Services (`core/`)
 
-- **`DiscoveryService`**: Scans the filesystem to populate the models.
-- **`Parsing`**: Extracts YAML frontmatter and Markdown content.
-- **`UpdateService`**: Handles the low-level logic for comparing versions and performing surgical file updates.
-- **`ConfigManager`**: Low-level persistence for `config.json`.
+- **`discovery.py`**: `DiscoveryService` - Scans the filesystem to populate the models.
+- **`parsing/`**: Modular parsing engine:
+  - `base.py` - Common parsing utilities (markdown extraction, normalization).
+  - `categorizer.py` - Auto-classification engine using weighted keyword frequency.
+  - `command.py` - Custom command markdown parsing.
+  - `constants.py` - Category definitions and keyword mappings.
+  - `skill.py` - Skill markdown frontmatter extraction.
+- **`update_service.py`**: Handles low-level logic for comparing versions and performing surgical file updates.
+- **`updater.py`**: Git-based skill source updater.
+- **`config.py`**: `ConfigManager` - Low-level persistence for `config.json`.
+- **`analytics.py`**: PostHog analytics event capture and shutdown.
+- **`categories.py`**: Emoji resolution and category display utilities.
+- **`copier.py`**: File copy operations for deploying skills to projects.
+- **`commands.py`**: Custom command integration.
+- **`file_watch.py`**: `SkillFolderWatcher` - Watchdog-based filesystem monitoring for live refresh.
+- **`image_provider.py`**: `ScreenshotImageProvider` - QML image provider for screenshot previews.
+- **`persistence.py`**: Archive and starred state persistence.
+- **`quick_copy.py`**: Quick Copy workflow state management.
+- **`resources.py`**: Resource path resolution for development and PyInstaller builds.
+- **`schemas.py`**: Pydantic schemas for config and metadata validation.
+- **`search.py`**: Search index for fast skill lookup.
+- **`skill_packages/`**: Subsystem for managing downloadable skill packages:
+  - `config.py`, `process.py`, `relocator.py`, `storage.py`, `updater.py`, `versioning.py`.
 
-### 4. Categorization Engine (`core/parsing.py`)
+### 4. Utilities (`utils/`)
+
+- **`qt_threading.py`**: Qt-compatible thread management utilities.
+- **`task_runner.py`**: `BackgroundTaskRunner` - Concurrent background task execution.
+- **`win32.py`**: Windows-specific shell and UI utilities.
+
+### 5. Categorization Engine (`core/parsing/categorizer.py`)
 
 The application implements an intelligent auto-classification system for skills without explicit frontmatter categories:
 - **Weighted Frequency**: Matches keywords against skill content, with the `name` field weighted 2x more than the `description`.
-- **Normalization**: Markdown markers are stripped before matching to ensure consistent lookup.
-- **Visual Resolution**:
-    1. **Primary**: `AppController` resolves a pre-defined emoji mapping in `AppController.getCategoryEmoji` as the definitive visual identifier.
-    2. **Definitive Guide**: Full mapping logic and keywords are documented in `docs/CATEGORIES.md`.
-    3. **Generic**: Fallback to a folder icon (`📁`) for unknown categories.
+- **Two-Stage Resolution**: Maps keywords to a Sub Category, which resolves its parent Main Category automatically.
+- **Visual Resolution**: Emoji mapping via `get_category_emoji()` in `core/categories.py`.
+- **Definitive Guide**: Full mapping logic and keywords are documented in `docs/CATEGORIES.md`.
 
 ---
 
@@ -49,17 +78,22 @@ The application implements an intelligent auto-classification system for skills 
 SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously defined in `DESIGN.md`).
 
 ### Design Principles
--   **Solid Matte Foundation**: The main window utilizes a solid, deeply-tinted material (`#0E1210` in Dark Mode) providing a robust feel without desktop wallpaper bleed-through.
--   **Glass-Pill Components**: Functional areas (sidebars, list items, headers) are encapsulated in "frosted glass" pills (`#1A201E`).
--   **Synchronized Rounding**: 12px corner radii across all primary containers, matching native Windows 11 DWM preferences.
--   **Native Shell Integration**: Uses `pywinstyles` (where available) to apply native Mica/Acrylic effects and immersive dark mode to the window chrome. On Windows, it also explicitly sets the `AppUserModelID` via `ctypes` to ensure the taskbar correctly groups the application and displays the custom icon instead of a generic Python executable icon.
+- **Solid Matte Foundation**: The main window utilizes a solid, deeply-tinted material (`#0E1210` in Dark Mode).
+- **Glass-Pill Components**: Functional areas (sidebars, list items, headers) are encapsulated in "frosted glass" pills (`#1A201E`).
+- **Synchronized Rounding**: 12px corner radii across all primary containers, matching native Windows 11 DWM preferences.
+- **Native Shell Integration**: Uses `pywinstyles` to apply native Mica/Acrylic effects and immersive dark mode. Sets `AppUserModelID` via `ctypes` for proper taskbar grouping.
 
 ### QML Component Structure
--   **`Main.qml`**: The root application window and layout orchestrator.
--   **`Sidebar.qml`**: Navigation between Library, Quick Copy, Updates, and Settings.
--   **`views/`**: Contains the main application screens (`LibraryView.qml`, `QuickCopyView.qml`, `UpdatesView.qml`, etc.).
--   **`SkillItem.qml` & `SkillInspector.qml`**: The visual representation of a skill row and its detailed preview pane.
--   **`Theme.qml`**: A singleton defining colors, fonts, and layout metrics for the application.
+- **`Main.qml`**: The root application window and layout orchestrator.
+- **`Sidebar.qml`**: Navigation between Library, Quick Copy, Updates, and Settings.
+- **`TopBar.qml` & `CustomTitleBar.qml`**: Window chrome and toolbar.
+- **`views/`**: Main application screens (`LibraryView.qml`, `QuickCopyView.qml`, `SettingsView.qml`, `UpdatesView.qml`, `ShortcutsSettings.qml`).
+- **`SkillItem.qml` & `SkillInspector.qml`**: Skill row representation and preview pane.
+- **`Theme.qml`**: Singleton defining colors, fonts, and layout metrics.
+- **`GlassMenu.qml` & `GlassMenuItem.qml`**: Ultra-glass context menus.
+- **`ScreenshotOverlay.qml` & `ImageInspector.qml`**: Screenshot capture and redaction.
+- **`FrostOverlay.qml`**: Glass blur effect for popups.
+- **`dialogs/`**: Modal dialogs (`ArchiveConfirmDialog`, `DeleteConfirmDialog`, `PackageEditDialog`, `CommandCreateDialog`, `ProjectRenameDialog`, `FolderPickerNative`).
 
 ---
 
@@ -68,25 +102,29 @@ SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously d
 SkillManager is distributed as native standalone executables for Windows, macOS, and Linux. The packaging pipeline is fully automated via GitHub Actions.
 
 ### 1. Freezing & Compilation (`scripts/build_app.py` / `packaging/skill_manager.spec`)
--   Compilation is orchestrated by `scripts/build_app.py` which:
-    - Automatically prepares a Windows high-fidelity multi-size icon `logo.ico` from the brand design `logo.png` (holding resolutions: 16x16, 32x32, 48x48, 64x64, 128x128, and 256x256).
-    - Checks the Spec file syntax and invokes PyInstaller securely with `--noconfirm` to overwrite legacy directories.
--   The spec file `packaging/skill_manager.spec` has been refactored to resolve paths dynamically relative to PyInstaller's native `SPECPATH` variable, avoiding any CWD-dependence.
--   Path resolution in the running application uses a custom `resource_path` utility in `app.py` to seamlessly handle both local development paths and PyInstaller's `_internal` temporary extraction folders.
+- Compilation is orchestrated by `scripts/build_app.py` which:
+  - Automatically prepares a Windows high-fidelity multi-size icon `logo.ico` from `logo.png` (16x16 through 256x256).
+  - Checks the Spec file syntax and invokes PyInstaller securely with `--noconfirm`.
+- The spec file `packaging/skill_manager.spec` resolves paths dynamically relative to `SPECPATH`, avoiding CWD-dependence.
+- Path resolution at runtime uses `resource_path` in `core/resources.py` to handle both development and PyInstaller's `_internal` extraction folders.
 
 ### 2. Native OS Wrappers
--   **Windows**: The PyInstaller output is wrapped into `SkillManager_Setup.exe` using Inno Setup (`packaging/windows/installer.iss`). The installer setup uses the newly-generated high-resolution `logo.ico` file to apply pristine shell/window assets across the user system.
--   **macOS**: The generated `.app` bundle is converted into a standard `.dmg` image using `create-dmg`.
--   **Linux**: The output directory is packaged as a `.tar.gz` (with potential future expansion to AppImage).
+- **Windows**: PyInstaller output wrapped into `SkillManager_Setup.exe` via Inno Setup (`packaging/windows/installer.iss`). Portable ZIP also generated.
+- **macOS**: `.app` bundle converted to `.dmg` via `create-dmg`.
+- **Linux**: Output directory packaged as `.tar.gz`.
 
 ### 3. CI/CD Pipeline (`.github/workflows/release.yml`)
-The project uses a unified release pipeline that handles both pre-releases and official stable versions:
-1.  **Dual-Branch Strategy**: 
-    - **`develop` branch**: Triggers **Development** pre-releases (e.g., `v1.0.0-dev.1`).
-    - **`main` branch**: Triggers **Stable** official releases (e.g., `v1.0.0`).
-2.  **Versioning**: Uses `python-semantic-release` to analyze commit history and automatically determine the next version bump based on Conventional Commits.
-3.  **Parallel Build Matrix**: Runs parallel packaging jobs on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
-4.  **Artifact Publishing**: Automatically attaches native installers and portable ZIPs (named with platform suffixes) to the GitHub Release.
+The project uses a unified release pipeline handling both pre-releases and stable versions:
+1. **Dual-Branch Strategy**:
+   - `develop` branch: Development pre-releases (e.g., `v1.0.0-dev.1`).
+   - `main` branch: Stable releases (e.g., `v1.0.0`).
+2. **Trigger-Based Versioning**: `scripts/version_bump_calculator.py` parses commit messages for `[dev]`, `[patch]`, `[minor]`, `[major]`, `[preminor]`, `[premajor]` triggers and maps to `python-semantic-release` flags.
+3. **Parallel Build Matrix**: `windows-latest`, `macos-latest`, `ubuntu-latest`.
+4. **Artifact Publishing**: Native installers and portable ZIPs attached to GitHub Release.
+
+### 4. TUF Secure Updates
+- `scripts/publish_tuf_release.py` manages the TUF repository for secure background updates.
+- Metadata and targets served via `gh-pages` branch.
 
 ---
 
@@ -94,27 +132,23 @@ The project uses a unified release pipeline that handles both pre-releases and o
 
 ### Dependency Boundary Guidelines
 
-The dependency migration keeps third-party libraries behind narrow internal boundaries so QML roles, JSON file names, and the CLI entrypoint remain stable:
+Dependencies are kept behind narrow internal boundaries:
 
-- `platformdirs` is used only for platform-aware application data directory resolution, with `SKILL_MANAGER_DATA_DIR` still taking precedence.
-- `pydantic` and `pydantic-settings` define tolerant internal schemas for config, cache, skill, metadata, and package records; controllers and models still receive plain dictionaries where that is the existing contract.
-- `python-frontmatter` and `markdown-it-py` are the approved parsing stack for skill and command Markdown; fallback behavior remains tolerant of malformed frontmatter.
-- `pathspec` is the approved ignore-pattern engine for `.gitignore`-style discovery filtering.
-- `httpx` and `tenacity` are the approved stack for update-check HTTP calls and retry behavior.
-- `watchdog` is currently wrapped by `core/file_watch.py` as an inactive integration boundary. It must not change runtime discovery behavior until a dedicated live-watch feature pass wires it behind an explicit opt-in.
-- `PySide6.QtAsyncio` is the preferred async boundary for future Qt-owned coroutine work; existing background-thread workflows remain valid until migrated intentionally.
+- `platformdirs` for platform-aware data directory resolution.
+- `pydantic`/`pydantic-settings` for tolerant internal schemas.
+- `python-frontmatter` and `markdown-it-py` for parsing skill/command Markdown.
+- `pathspec` for `.gitignore`-style discovery filtering.
+- `httpx` and `tenacity` for update-check HTTP calls with retry.
+- `watchdog` for filesystem change monitoring.
+- `sentry-sdk` for error reporting.
+- `posthog` for product analytics.
+- `apscheduler` for background task scheduling.
+- `PySide6.QtAsyncio` for future Qt-owned coroutine work.
+- `diskcache` for local caching.
+- `orjson` for fast JSON serialization.
 
 ### 1. Signal Handler Best Practices (QML)
-To avoid deprecation warnings in Qt 6.x and ensure scope safety, all QML signal handlers should use formal parameter arrow functions:
-
-**Bad (Deprecated):**
-```qml
-onClicked: {
-    console.log(mouse.x); // 'mouse' is injected
-}
-```
-
-**Good (Standard):**
+All QML signal handlers use formal parameter arrow functions:
 ```qml
 onClicked: (mouse) => {
     console.log(mouse.x);
@@ -122,7 +156,14 @@ onClicked: (mouse) => {
 ```
 
 ### 2. Hub and Spoke Delegation
-The `AppController` should remain as thin as possible. New logic should be added to specialized controllers in `src/skill_manager/controllers/` and exposed via the `AppController` properties.
+The `AppController` remains thin. New logic goes in specialized controllers and exposed via properties.
 
 ### 3. Optimistic UI Updates
-When performing filesystem operations (like deletion), the application should immediately remove the item from the `SkillModel` to provide instant feedback, then handle the actual deletion in a background thread.
+Filesystem operations (deletion, archive) immediately update `SkillModel` for instant feedback, then execute in a background thread.
+
+### 4. Subprocess Patching (`__main__.py`)
+On Windows, `subprocess.Popen` is patched with `CREATE_NO_WINDOW` to prevent console windows from appearing during background operations.
+
+### 5. Lifecycle Management
+- `on_quit()` ensures clean shutdown: watcher stop, scheduler shutdown, state save, Sentry flush, PostHog shutdown with timeout.
+- `os._exit()` is called at the end of `main()` to force-clean background threads.

@@ -8,7 +8,7 @@ Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-devel
 
 - **Name:** Skill Manager
 - **Category:** Desktop productivity / developer utility
-- **Current stack:** Python 3.12+, PySide6 (Qt 6.8+), QML, `uv`, `ruff`
+- **Current stack:** Python 3.12+, PySide6 (Qt 6.8+), QML, `uv`, `ruff`, `sentry-sdk`, `posthog`, `apscheduler`
 - **Primary platforms:** Windows (Native Mica/Acrylic), macOS, Linux
 - **Design project:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while utilizing modern hardware acceleration via Qt 6.
 - **Primary users:** Developers and power users managing local skill folders across multiple project repositories.
@@ -78,15 +78,14 @@ Window
     Progress, result summary, transient messages
 ```
 
-The current top-level `CTkTabview` can remain in the first implementation phase, but the long-term Liquid Glass project is a sidebar-driven layout:
+The app uses a sidebar-driven layout (implemented in QML `Sidebar.qml`), which replaced the previous tab-based navigation:
 
-| Current Tab | Liquid Glass Destination |
+| Sidebar Item | Purpose |
 |---|---|
-| Folder update workflow | Sidebar item: Updates, project folder section |
-| Skill update workflow | Sidebar item: Updates, skill source section |
-| Project reference copying | Sidebar item: Quick Copy |
-| Local skill browsing | Sidebar item: Library |
-| Open skill tabs | Detail view or document-style tabs inside Library |
+| Quick Copy | Project reference copying |
+| Library | Local skill browsing |
+| Updates | Folder and skill update workflows |
+| Settings | Application configuration |
 
 ### Layering Model
 
@@ -363,7 +362,7 @@ Popover rules:
 
 ### Lists, Trees, And Selection
 
-`ttk.Treeview` remains appropriate for Library and Quick Copy because it supports hierarchical category browsing.
+QML `ListView` and `SmoothListView` handle hierarchical category browsing, replacing the previous `ttk.Treeview` approach.
 
 Required states:
 
@@ -379,7 +378,7 @@ Required states:
 Selection rules:
 
 - Multi-selection must be visually obvious.
-- Internal selected-item state, visible row markers, `Treeview.selection()`, and count/status labels must stay synchronized.
+- Internal selected-item state, visible row markers, and count/status labels must stay synchronized.
 - Category rows should look different from skill rows through weight, disclosure state, and subtle background, not through loud color.
 - Use accent-colored selection with readable label text; do not rely on color alone.
 
@@ -454,16 +453,20 @@ Icon direction:
 Current UI entry points:
 
 - `src/skill_manager/app.py` initializes the PySide6 `QGuiApplication` and QML engine.
-- `src/skill_manager/qml/` contains the declarative UI components (Pills, Sidebar, Views).
-- `src/skill_manager/qml/Theme.qml` (Singleton) owns the Liquid Glass tokens and opaque fallbacks.
+- `src/skill_manager/SkillManagerComponents/` contains the declarative UI components (GlassPill, Sidebar, Views).
+- `src/skill_manager/SkillManagerComponents/Theme.qml` (Singleton) owns the Liquid Glass tokens and opaque fallbacks.
 
-Recommended phased implementation:
+Implementation status:
 
-1. Setup `Theme.qml` with Liquid Glass tokens (alpha-enabled) and semantic status colors.
-2. Build `GlassPill.qml` and `Sidebar.qml` as the foundational design system.
-3. Migrate `Quick Copy` and `Library` views to QML, binding to the existing Python core via `QObject` signals and slots.
-4. Integrate native Windows 11 Mica effects using the `Qt.Window` material flags or helper libraries.
-5. Add reduced-transparency and increased-contrast logic to the `Theme` singleton.
+1. `Theme.qml` is implemented with Liquid Glass tokens (alpha-enabled) and semantic status colors.
+2. `GlassPill.qml`, `Sidebar.qml`, `GlassDropdown.qml`, and other Glass components form the foundational design system.
+3. `QuickCopyView.qml`, `LibraryView.qml`, `UpdatesView.qml`, and `SettingsView.qml` are fully migrated to QML, binding to Python core via `QObject` signals and slots.
+4. Native Windows 11 Mica effects are integrated via `pywinstyles` and `DwmSetWindowAttribute` APIs.
+5. Reduced-transparency and increased-contrast modes are handled via the `Theme` singleton properties.
+6. `ScreenshotOverlay.qml` and `ImageInspector.qml` provide screenshot capture and redaction capabilities.
+7. `FrostOverlay.qml` provides glass blur effects for popups and menus.
+8. `GlassMenu.qml` and `GlassMenuItem.qml` implement ultra-glass context menus.
+9. `TopBar.qml` and `CustomTitleBar.qml` handle window chrome and toolbar layout.
 
 Implementation constraints:
 
@@ -506,32 +509,11 @@ This guide uses the local HIG skill files as follows:
 
 | Skill file | Applied to |
 |---|---|
-| `.agent/skills/brainstorming/SKILL.md` | Keep the design direction broad enough to support future UI phases while preserving current workflows |
-| `.agent/skills/concise-planning/SKILL.md` | Keep implementation phases compact and ordered |
-| `.agent/skills/conductor-implement/SKILL.md` | Treat the guide as implementation-ready direction for future UI work |
-| `.agent/skills/hig-foundations/SKILL.md` | Content-over-chrome, semantic colors, typography, accessibility, materials |
-| `.agent/skills/hig-platforms/SKILL.md` | macOS-style desktop utility conventions, pointer/keyboard density, platform adaptation |
-| `.agent/skills/hig-components-layout/SKILL.md` | Sidebar/split-view direction, hierarchy, source-list structure |
-| `.agent/skills/hig-components-controls/SKILL.md` | Selection state, pop-up menus, toggles, text fields |
-| `.agent/skills/hig-components-content/SKILL.md` | Lists, trees, empty states, scalable content |
-| `.agent/skills/hig-components-dialogs/SKILL.md` | Modal/dialog restraint, popovers, sheets, specific button labels |
-| `.agent/skills/hig-components-menus/SKILL.md` | Toolbar, menu, and context-menu command placement |
-| `.agent/skills/hig-components-search/SKILL.md` | Search placement, scopes, instant results, empty states |
-| `.agent/skills/hig-components-system/SKILL.md` | System-feeling controls, platform conventions, status surfaces |
-| `.agent/skills/hig-inputs/SKILL.md` | Keyboard, pointer, drag/drop, focus behavior |
-| `.agent/skills/hig-patterns/SKILL.md` | Progressive disclosure, feedback, undo-over-confirmation direction |
-| `.agent/skills/hig-project-context/SKILL.md` | Product/platform/context framing for future HIG decisions |
+| `.agents/skills/brainstorming/SKILL.md` | Keep the design direction broad enough to support future UI phases while preserving current workflows |
+| `.agents/skills/concise-planning/SKILL.md` | Keep implementation phases compact and ordered |
+| `.agents/skills/conductor-implement/SKILL.md` | Treat the guide as implementation-ready direction for future UI work |
 
 ## External Design References
 
 - Apple Human Interface Guidelines: Materials, especially Liquid Glass vs. standard materials.
-- Apple Developer Documentation: Adopting Liquid Glass.
-- Apple Developer Documentation: Liquid Glass technology overview.
-face Guidelines: Materials, especially Liquid Glass vs. standard materials.
-- Apple Developer Documentation: Adopting Liquid Glass.
-- Apple Developer Documentation: Liquid Glass technology overview.
-ernal Design References
-
-- Apple Human Interface Guidelines: Materials, especially Liquid Glass vs. standard materials.
-- Apple Developer Documentation: Adopting Liquid Glass.
-- Apple Developer Documentation: Liquid Glass technology overview.
+- Apple Developer Documentation: Adopting Liquid Glass and technology overview.

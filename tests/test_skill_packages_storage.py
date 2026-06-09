@@ -73,7 +73,6 @@ def test_resolve_package_storage_exact_match(tmp_path):
     assert resolved[0]["resolved_package_path"] == str((tmp_path / "pkg1").resolve())
 
 
-
 @patch("skill_manager.core.copier.normalize_project_skills_path")
 def test_package_project_path_conflicts(mock_normalize, tmp_path):
     mock_normalize.return_value = (str(tmp_path / "project"), None)
@@ -214,6 +213,7 @@ def test_skill_fingerprint_oserror(tmp_path):
         fp = _skill_fingerprint(skill_dir)
 
     import hashlib
+
     assert fp == hashlib.sha1().hexdigest()
 
 
@@ -248,7 +248,10 @@ def test_promote_package_storage_missing_source(tmp_path):
         "resolved_package_path": str(new_dir),
     }
     # Skill is in inventory but not on disk
-    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {"moved": 0, "skipped": 0}
+    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {
+        "moved": 0,
+        "skipped": 0,
+    }
 
 
 def test_promote_package_storage_destination_exists(tmp_path):
@@ -260,12 +263,13 @@ def test_promote_package_storage_destination_exists(tmp_path):
 
     new_dir = tmp_path / "new"
     new_dir.mkdir()
-    (new_dir / "skill1").mkdir() # destination already exists
+    (new_dir / "skill1").mkdir()  # destination already exists
 
     package = {
         "_previous_resolved_package_path": str(old_dir),
         "resolved_package_path": str(new_dir),
     }
-    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {"moved": 0, "skipped": 1}
-
-
+    assert promote_package_storage(package, {"skills": {"skill1": {}}}) == {
+        "moved": 0,
+        "skipped": 1,
+    }

@@ -36,7 +36,9 @@ except ImportError:
 from skill_manager.controllers.app_update_controller import AppUpdateController
 from skill_manager.controllers.config_controller import ConfigController
 from skill_manager.controllers.discovery_controller import DiscoveryController
+from skill_manager.controllers.image_inspector_controller import ImageInspectorController
 from skill_manager.controllers.ops_controller import OpsController
+from skill_manager.controllers.screenshot_controller import ScreenshotController
 from skill_manager.controllers.ui_controller import UIController
 from skill_manager.controllers.update_controller import UpdateController
 from skill_manager.core.analytics import (
@@ -48,6 +50,7 @@ from skill_manager.core.config import (
     ConfigManager,
 )
 from skill_manager.core.file_watch import SkillFolderWatcher
+from skill_manager.core.image_provider import ScreenshotImageProvider
 from skill_manager.core.models import SkillModel
 from skill_manager.core.persistence import (
     load_archive,
@@ -73,6 +76,7 @@ class AppController(QObject):
     sourcesChanged = Signal()
     projectsChanged = Signal()
     discoveredProjectsChanged = Signal()
+    currentProjectChanged = Signal()
     clientFormatChanged = Signal()
     categoriesChanged = Signal()
     clientFormatsChanged = Signal()
@@ -94,7 +98,6 @@ class AppController(QObject):
     darkModeChanged = Signal()
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
-    defaultProjectFilterChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
     autoCheckUpdatesChanged = Signal()
@@ -136,6 +139,9 @@ class AppController(QObject):
                 s["latest_version"] = ""
         self._custom_collections = self._config.get("custom_collections", {})
 
+        # Shared project state (syncs across all project selectors)
+        self._current_project_label = ""
+
         # Updates and Syncing State
         self._stats_up_to_date = 0
         self._stats_outdated = 0
@@ -147,6 +153,9 @@ class AppController(QObject):
         self.ui = UIController(self)
         self.config_mgr = ConfigController(self)
         self.ops = OpsController(self)
+        self.screenshot_provider = ScreenshotImageProvider()
+        self.screenshot = ScreenshotController(self)
+        self.image_inspector = ImageInspectorController(self)
         self.updates = UpdateController(self)
         self.discovery = DiscoveryController(self)
         self.app_updater = AppUpdateController(self)
@@ -160,13 +169,13 @@ class AppController(QObject):
         self.ui.darkModeChanged.connect(self.darkModeChanged.emit)
         self.ui.startupViewChanged.connect(self.startupViewChanged.emit)
         self.ui.rememberFiltersChanged.connect(self.rememberFiltersChanged.emit)
-        self.ui.defaultProjectFilterChanged.connect(self.defaultProjectFilterChanged.emit)
         self.ui.reducedMotionChanged.connect(self.reducedMotionChanged.emit)
         self.ui.compactListRowsChanged.connect(self.compactListRowsChanged.emit)
 
         self.config_mgr.shortcutsChanged.connect(self.shortcutsChanged.emit)
         self.config_mgr.isRecordingShortcutChanged.connect(self.isRecordingShortcutChanged.emit)
         self.config_mgr.updateProjectsChanged.connect(self.projectsChanged.emit)
+        self.projectsChanged.connect(self._on_projects_changed)
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
         self.config_mgr.autoCheckUpdatesChanged.connect(self.autoCheckUpdatesChanged.emit)
@@ -177,9 +186,11 @@ class AppController(QObject):
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
+        self.ops.cleanup_temp_screenshots()  # Crash recovery
         app_inst = QGuiApplication.instance()
         if app_inst:
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_copies)
+            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_screenshots)
 
         # 4. Initial Model Configuration
         self._library_model.showCommands = False
@@ -189,7 +200,17 @@ class AppController(QObject):
         self._quick_copy_model.showCommands = True
         self._quick_copy_model.isPackageOnly = False
         self._quick_copy_model.showStarred = True
-        self._quick_copy_model.filterByClient = False
+        self._quick_copy_model.filterByClient = True
+
+        # Reactive client filter: sync model filters when user selects a different client
+        self.clientFormatChanged.connect(self._on_client_format_changed)
+
+        # Initialize shared currentProject from persisted QuickCopy filter or first project
+        saved = self._quick_copy_model.projectFilter
+        if saved and saved in self.config_mgr.projectLabels:
+            self._current_project_label = saved
+        elif self.config_mgr.projectLabels:
+            self._current_project_label = self.config_mgr.projectLabels[0]
 
         # 5. Load Persistence and Start Discovery
         self._archive_paths = load_archive()
@@ -286,6 +307,29 @@ class AppController(QObject):
     @Property(QObject, constant=True)
     def app_update_controller(self):
         return self.app_updater
+
+    @Property(QObject, constant=True)
+    def screenshot_controller(self):
+        return self.screenshot
+
+    @Property(QObject, constant=True)
+    def image_inspector_controller(self):
+        return self.image_inspector
+
+    @Property(str, notify=currentProjectChanged)
+    def currentProject(self):
+        return self._current_project_label
+
+    @currentProject.setter
+    def currentProject(self, label):
+        self.setCurrentProject(label)
+
+    @Slot(str)
+    def setCurrentProject(self, label):
+        if self._current_project_label != label:
+            self._current_project_label = label
+            self._quick_copy_model.projectFilter = label
+            self.currentProjectChanged.emit()
 
     # --- Core Properties ---
 
@@ -429,14 +473,6 @@ class AppController(QObject):
     @rememberFilters.setter
     def rememberFilters(self, v):
         self.ui.rememberFilters = v
-
-    @Property(str, notify=defaultProjectFilterChanged)
-    def defaultProjectFilter(self):
-        return self.ui.defaultProjectFilter
-
-    @defaultProjectFilter.setter
-    def defaultProjectFilter(self, v):
-        self.ui.defaultProjectFilter = v
 
     @Property(bool, notify=reducedMotionChanged)
     def reducedMotion(self):
@@ -596,10 +632,6 @@ class AppController(QObject):
     def setRememberFilters(self, b):
         self.ui.setRememberFilters(b)
 
-    @Slot(str)
-    def setDefaultProjectFilter(self, f):
-        self.ui.setDefaultProjectFilter(f)
-
     @Slot(bool)
     def setReducedMotion(self, b):
         self.ui.setReducedMotion(b)
@@ -712,6 +744,10 @@ class AppController(QObject):
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
+    @Slot(str, str, str, str, str, str)
+    def updateCustomCommandFull(self, lp, n, cl, b, pl, cat):
+        self.ops.updateCustomCommandFull(lp, n, cl, b, pl, cat)
+
     @Slot(str, str, str, str, str)
     def createCustomCommand(self, n, cl, b, pl, cat):
         self.ops.createCustomCommand(n, cl, b, pl, cat)
@@ -788,6 +824,16 @@ class AppController(QObject):
     def refreshSkills(self):
         self._set_status("Refreshing library...")
         self.loadInitialData()
+
+    def _on_client_format_changed(self):
+        self._quick_copy_model.clientFilter = self._client_format
+        self._library_model.clientFilter = self._client_format
+
+    def _on_projects_changed(self):
+        labels = self.config_mgr.projectLabels
+        if self._current_project_label not in labels:
+            self._current_project_label = labels[0] if labels else ""
+            self.currentProjectChanged.emit()
 
     def _set_status(self, msg):
         self._status_message = msg
@@ -881,6 +927,7 @@ def main():  # pragma: no cover
         os.path.join(os.path.abspath("."), "assets", "brand", "logo.png"),
     ]
 
+    app_icon = QIcon()
     loaded_icon = False
     loaded_icon_path = ""
     for icon_path in icon_candidates:
@@ -909,6 +956,7 @@ def main():  # pragma: no cover
     qmlRegisterSingletonInstance(AppController, "App", 1, 0, "AppController", controller)
     app.aboutToQuit.connect(controller.on_quit)
     engine = QQmlApplicationEngine()
+    engine.addImageProvider("screenshot", controller.screenshot_provider)
     engine.rootContext().setContextProperty("appController", controller)
     engine.warnings.connect(lambda msg: logger.warning(f"QML Warning: {msg}"))
     qml_dir = qml_components_dir(package_file=__file__)
@@ -919,6 +967,12 @@ def main():  # pragma: no cover
         logger.error("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
     capture_event("app_opened")
+
+    # Explicitly set icon on each QML window — QGuiApplication.setWindowIcon()
+    # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
+    if not app_icon.isNull():
+        for root in engine.rootObjects():
+            root.setIcon(app_icon)
 
     def apply_native_styles():
         for root in engine.rootObjects():
@@ -933,12 +987,9 @@ def main():  # pragma: no cover
                         hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4
                     )
 
-                # Force native Windows taskbar icon if QIcon failed to propagate
-                if (
-                    sys.platform == "win32"
-                    and loaded_icon_path
-                    and loaded_icon_path.endswith(".ico")
-                ):
+                # Force native Windows taskbar icon via Win32 API.
+                # LoadImageW with LR_LOADFROMFILE supports both ICO and PNG on Windows 10+.
+                if sys.platform == "win32" and loaded_icon_path:
                     WM_SETICON = 0x0080
                     ICON_SMALL = 0
                     ICON_BIG = 1
@@ -959,7 +1010,7 @@ def main():  # pragma: no cover
             except Exception as e:
                 logger.error(f"Failed to apply native style/icon: {e}")
 
-    apply_native_styles()
+    QTimer.singleShot(0, apply_native_styles)
     ret = app.exec()
     # Force exit to prevent background threads (like concurrent.futures or watchdog) from hanging shutdown
     os._exit(ret)

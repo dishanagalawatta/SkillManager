@@ -89,9 +89,9 @@ class DiscoveryService:
                         )
                     )
 
-                # Also discover commands in commands/ subdir
-                project_path = Path(p["project_path"])
-                commands_dir = project_path / "commands"
+                # Also discover commands in .agents/commands/ subdir
+                project_root = Path(p["project_root"])
+                commands_dir = project_root / ".agents" / "commands"
                 if commands_dir.is_dir():
                     for cmd_file in commands_dir.glob("*.md"):
                         cmd_data = self._process_command_file(cmd_file, p, disk_cache)
@@ -177,6 +177,7 @@ class DiscoveryService:
             "date": str(metadata.get("date_added") or metadata.get("date", "Unknown")),
             "is_package": is_package,
             "is_source": is_package,  # Compatibility
+            "is_screenshot": skill.get("is_screenshot", False),
         }
 
         if not is_package:

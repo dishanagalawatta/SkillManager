@@ -19,6 +19,38 @@ def test_update_projects_invalid_paths(caplog):
     assert "No valid project directories provided." in caplog.text
 
 
+def test_update_projects_empty_sources(caplog):
+    update_projects([], ["missing_src"])
+    assert "No valid project directories provided." in caplog.text
+
+    fresh_proj = MagicMock(spec=Path)
+    fresh_proj.is_dir.return_value = True
+    with (
+        patch("skill_manager.core.updater.Path", return_value=fresh_proj),
+        patch("skill_manager.core.updater.Path.resolve", return_value=fresh_proj),
+    ):
+        update_projects(["/valid_proj"], [])
+        assert "No valid source directories provided." in caplog.text
+
+
+def test_update_projects_with_progress_callback(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "item").mkdir()
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "item").mkdir()
+
+    calls = []
+
+    def callback(current, total, msg):
+        calls.append((current, total, msg))
+
+    result = update_projects([str(proj)], [str(src)], progress_callback=callback)
+    assert result == (1, 0)
+    assert len(calls) >= 2
+
+
 def test_update_projects_error_handling(tmp_path, caplog):
     proj = tmp_path / "proj"
     proj.mkdir()

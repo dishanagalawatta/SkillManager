@@ -93,9 +93,9 @@ def test_discover_all_integration(mock_save, mock_load, temp_dir):
         "---\nname: Project Skill A\ncategory: Developer Tools\n---"
     )
 
-    # Setup commands directory
-    commands_dir = proj_skills / "commands"
-    commands_dir.mkdir()
+    # Setup commands directory at .agents/commands/
+    commands_dir = proj / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
     (commands_dir / "my_cmd.Codex.md").write_text(
         "---\nname: My Custom Command\ncategory: Ops\n---"
     )

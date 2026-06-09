@@ -239,12 +239,18 @@ def test_delete_buttons_use_trashcan_emoji():
 
 
 def test_scrollbar_presence_in_lists():
-    """Verify that both QuickCopyView and LibraryView have vertical scrollbars in their list views."""
+    """Verify that both QuickCopyView and LibraryView use SmoothListView which has an AppScrollBar."""
     quick_copy = (QML_DIR / "views" / "QuickCopyView.qml").read_text(encoding="utf-8")
     library = (QML_DIR / "views" / "LibraryView.qml").read_text(encoding="utf-8")
+    smooth_list = (QML_DIR / "SmoothListView.qml").read_text(encoding="utf-8")
 
-    assert "ScrollBar.vertical: ScrollBar" in quick_copy
-    assert "ScrollBar.vertical: ScrollBar" in library
+    # The views should use SmoothListView
+    assert "SmoothListView {" in quick_copy
+    assert "SmoothListView {" in library
+
+    # SmoothListView should have the AppScrollBar
+    assert "ScrollBar.vertical: AppScrollBar" in smooth_list
+    assert "interactive: true" in smooth_list
 
 
 def test_expand_collapse_arrow_icons_presence_and_dark_mode():
