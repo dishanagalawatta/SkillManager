@@ -21,6 +21,25 @@ Item {
 
     implicitWidth: 160
     implicitHeight: 36
+    activeFocusOnTab: true
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            if (popup.opened) {
+                popup.close()
+            } else {
+                popup.open()
+            }
+            event.accepted = true
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+        }
+    }
+
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: displayText
+    Accessible.description: "Multi-select dropdown"
 
     function toggleAll(checked) {
         selectedValues = checked ? model.slice() : []
@@ -44,8 +63,8 @@ Item {
         anchors.fill: parent
         radius: Theme.radiusPill
         color: mouseArea.containsMouse ? Theme.glassHover : Theme.glassPill
-        border.color: popup.opened ? Theme.accent : Theme.glassBorder
-        border.width: popup.opened ? 2 : 1
+        border.color: (popup.opened || root.activeFocus) ? Theme.accent : Theme.glassBorder
+        border.width: (popup.opened || root.activeFocus) ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
