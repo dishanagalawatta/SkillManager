@@ -547,3 +547,14 @@ def test_run_process_timeout(mock_popen):
     mock_proc.poll.return_value = None
     mock_proc.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_proc
+
+def test_sanitize_token_git_credential_helper():
+    text1 = "git -c \"credential.helper=!f() { echo username=token; echo password='secret_token_123'; }; f\" pull nonexistent\nSome other line"
+    sanitized1 = sanitize_token(text1)
+    assert "password='***'" in sanitized1
+    assert "pull nonexistent" in sanitized1
+
+    text2 = "git -c credential.helper=!f() { echo username=token; echo password=secret; }; f pull"
+    sanitized2 = sanitize_token(text2)
+    assert "password=***" in sanitized2
+    assert "}; f pull" in sanitized2
