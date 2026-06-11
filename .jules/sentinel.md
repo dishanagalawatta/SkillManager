@@ -32,3 +32,8 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+
+## 2024-05-24 - [Avoid Greedy Regex for Token Redaction]
+**Vulnerability:** The `sanitize_token` function used a greedy regex `.*` to redact the remainder of a string when encountering `echo password=`. This can cause massive data loss by inappropriately redacting subsequent unrelated log output, and could also fail on multiline secrets.
+**Learning:** Using `.*` for secret redaction in logs is dangerous because it consumes everything up to the end of the line, which can result in missing log info needed for debugging or auditing.
+**Prevention:** Use explicit, escape-aware regex patterns for quoted values (e.g., `r'(password=)"((?:\\.|[^"])*)"'`) and explicit match boundaries for unquoted values to carefully target only the secret portion. Additionally, safely redact known tokens like GitHub PATs using explicit patterns combined with fast-path substring checks.
