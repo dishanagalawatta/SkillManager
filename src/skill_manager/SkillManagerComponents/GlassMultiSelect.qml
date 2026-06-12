@@ -5,6 +5,21 @@ import App 1.0
 
 Item {
     id: root
+    activeFocusOnTab: true
+
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: root.displayText
+    Accessible.description: "Multi-select dropdown"
+
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+        }
+    }
 
     property var model: []
     property var selectedValues: []
@@ -44,8 +59,8 @@ Item {
         anchors.fill: parent
         radius: Theme.radiusPill
         color: mouseArea.containsMouse ? Theme.glassHover : Theme.glassPill
-        border.color: popup.opened ? Theme.accent : Theme.glassBorder
-        border.width: popup.opened ? 2 : 1
+        border.color: (popup.opened || root.activeFocus) ? Theme.accent : Theme.glassBorder
+        border.width: (popup.opened || root.activeFocus) ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
