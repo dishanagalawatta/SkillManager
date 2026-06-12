@@ -17,3 +17,6 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+## 2026-06-12 - Pre-compute and Hoist Search Tokens
+**Learning:** In the skill search scoring loop, tokenizing the query dynamically and concatenating document strings per document causes significant O(N) overhead during search, even with Fast/Fuzzy string matching.
+**Action:** Always pre-compute and store loop-invariant tokenized arrays and strings (like `all_doc_tokens`) during the indexing phase rather than dynamically creating them per-document in the query scoring loop. Additionally, hoist the query string tokenization to happen once outside the evaluation loop.
