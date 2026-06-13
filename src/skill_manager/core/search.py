@@ -47,14 +47,25 @@ class SkillIndexer:
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 
+        name_tokens = self.tokenize(name)
+        description_tokens = self.tokenize(description)
+        tags_lower = [t.lower() for t in tags]
+        category_lower = category.lower()
+
+        # Pre-compute all_doc_tokens for faster fuzzy matching in _calculate_score
+        all_doc_tokens = name_tokens + tags_lower + description_tokens
+        if category_lower:
+            all_doc_tokens.append(category_lower)
+
         # Weighted components
         return {
             "name": name.lower(),
-            "name_tokens": self.tokenize(name),
-            "category": category.lower(),
-            "tags": [t.lower() for t in tags],
-            "description_tokens": self.tokenize(description),
+            "name_tokens": name_tokens,
+            "category": category_lower,
+            "tags": tags_lower,
+            "description_tokens": description_tokens,
             "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
+            "all_doc_tokens": all_doc_tokens,
         }
 
 
@@ -107,10 +118,13 @@ class SearchEngine:
         query_text = query_text.lower()
         results = []
 
+        # Optimization: Pre-compute query tokens outside the document scoring loop
+        query_tokens = self.indexer.tokenize(query_text)
+
         for skill, index_data in self._indexed_data:
             if valid_paths is not None and skill.get("local_path") not in valid_paths:
                 continue
-            score = self._calculate_score(query_text, index_data)
+            score = self._calculate_score(query_text, query_tokens, index_data)
             if score >= threshold:
                 results.append((skill, score))
 
@@ -118,7 +132,9 @@ class SearchEngine:
         results.sort(key=lambda x: (-x[1], x[0].get("name", "").lower()))
         return results
 
-    def _calculate_score(self, query: str, index_data: dict[str, Any]) -> float:
+    def _calculate_score(
+        self, query: str, query_tokens: list[str], index_data: dict[str, Any]
+    ) -> float:
         """
         Calculate a weighted relevance score for a skill.
         """
@@ -130,16 +146,9 @@ class SearchEngine:
 
         # Prevent completely irrelevant skills from surfacing due to random letter overlaps
         # by ensuring at least one query token matches a document token reasonably well.
-        query_tokens = self.indexer.tokenize(query)
         if query_tokens:
-            all_doc_tokens = (
-                index_data.get("name_tokens", [])
-                + index_data.get("tags", [])
-                + index_data.get("description_tokens", [])
-            )
-            # Also include category as a token if present
-            if index_data.get("category"):
-                all_doc_tokens.append(index_data["category"])
+            # Retrieve pre-computed doc tokens
+            all_doc_tokens = index_data.get("all_doc_tokens", [])
 
             if all_doc_tokens:
                 max_token_match = 0
