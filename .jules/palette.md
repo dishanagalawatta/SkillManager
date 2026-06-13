@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2025-02-12 - Accessibility & Keyboard navigation on QML Dropdowns/ComboBoxes
+**Learning:** Custom multi-select or dropdown components in QML (like GlassMultiSelect) do not inherit basic ComboBox keyboard interaction or screen reader properties automatically when they use plain elements (e.g. Rectangle, MouseArea) as triggers. We must explicitly supply `Accessible.role`, `Accessible.name`, `Accessible.checked`, add `activeFocusOnTab: true`, and map `Keys.onPressed` for SPACE/ENTER to emulate the standard interaction properly.
+**Action:** When creating or maintaining custom dropdown or multi-select UI widgets in QML, implement the full gamut of keyboard listeners and Accessible roles instead of assuming implicit ComboBox behavior.
