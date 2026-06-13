@@ -17,3 +17,6 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+## 2025-02-23 - Optimized search query tokenization and token aggregation
+**Learning:** In the skill search scoring loop (`_calculate_score`), evaluating `indexer.tokenize(query)` per document inside the loop introduced significant overhead, O(N*Q) where N is documents and Q is query length. Furthermore, dynamically constructing a concatenated list of document tokens (`all_doc_tokens = name_tokens + tags + description_tokens`) for every matching candidate was creating temporary lists and triggering garbage collection during intense search queries.
+**Action:** Hoisted the query tokenization outside the search loop to compute it exactly once per query. Pre-computed `all_doc_tokens` during the initial indexing phase (`build_index_data`), saving it directly to the index dictionary to transform per-document token aggregation overhead into an O(1) dictionary lookup.
