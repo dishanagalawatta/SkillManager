@@ -18,7 +18,7 @@ Dialog {
     
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
-    width: 520
+    width: 750
     modal: true
     padding: 0
     
@@ -231,7 +231,7 @@ Dialog {
                 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 180
+                    Layout.preferredHeight: 350
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: cmdBodyInput.activeFocus ? Theme.accent : Theme.glassBorder

@@ -92,6 +92,7 @@ Rectangle {
         
         ColumnLayout {
             width: mainScroll.width - 24
+            height: Math.max(implicitHeight, mainScroll.height - 24)
             x: 12
             y: 12
             spacing: 16
@@ -124,6 +125,35 @@ Rectangle {
                             inspectorContextMenu.popup()
                         }
                     }
+                }
+
+                TextField {
+                    id: argField
+                    objectName: "argField"
+                    visible: root.isQuickCopy && root.skill.local_path !== undefined
+                    Layout.preferredWidth: 150
+                    Layout.alignment: Qt.AlignVCenter
+                    placeholderText: "Optional argument..."
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: "Argument"
+                    font.family: Theme.fontFamily
+                    color: Theme.label
+                    placeholderTextColor: Theme.secondaryLabel
+                    background: Rectangle {
+                        radius: Theme.radiusField
+                        color: Theme.glassPill
+                        border.color: Theme.glassBorder
+                    }
+
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: {
+                            inspectorContextMenu.targetControl = argField
+                            inspectorContextMenu.popup()
+                        }
+                    }
+                    ToolTip.text: "Argument (e.g. ultra)"
+                    ToolTip.visible: hovered
                 }
                 IconButton {
                     id: starButton
@@ -374,7 +404,9 @@ Rectangle {
                 
                 Rectangle {
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
                     Layout.preferredHeight: 400
+                    Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
                     border.color: Theme.glassBorder
@@ -419,42 +451,7 @@ Rectangle {
                 }
             }
 
-            // Quick Copy Argument
-            ColumnLayout {
-                Layout.fillWidth: true
-                visible: root.isQuickCopy && root.skill.local_path !== undefined
-                spacing: 4
-                Text {
-                    text: "Argument (e.g. ultra)"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    color: Theme.secondaryLabel
-                    opacity: 0.8
-                }
-                TextField {
-                    id: argField
-                    Layout.fillWidth: true
-                    placeholderText: "Optional argument..."
-                    Accessible.role: Accessible.EditableText
-                    Accessible.name: "Argument"
-                    font.family: Theme.fontFamily
-                    color: Theme.label
-                    placeholderTextColor: Theme.secondaryLabel
-                    background: Rectangle {
-                        radius: Theme.radiusField
-                        color: Theme.glassPill
-                        border.color: Theme.glassBorder
-                    }
 
-                    TapHandler {
-                        acceptedButtons: Qt.RightButton
-                        onTapped: {
-                            inspectorContextMenu.targetControl = argField
-                            inspectorContextMenu.popup()
-                        }
-                    }
-                }
-            }
 
             Item { Layout.preferredHeight: 12 } // Bottom padding
         }

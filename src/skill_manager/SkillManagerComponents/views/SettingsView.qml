@@ -619,24 +619,11 @@ Item {
                                 spacing: 12
                                 ActionButton {
                                     id: checkUpdatesBtn
-                                    property bool isChecking: false
-                                    labelText: isChecking ? "Checking..." : "Check for Updates"
+                                    labelText: AppController.app_update_controller.isCheckingForUpdates ? "Checking..." : "Check for Updates"
                                     role: "primary"
-                                    enabled: !isChecking && !AppController.app_update_controller.isUpdating
+                                    enabled: !AppController.app_update_controller.isCheckingForUpdates && !AppController.app_update_controller.isUpdating
                                     onClicked: (mouse) => {
-                                        isChecking = true
                                         AppController.app_update_controller.checkForUpdates(true)
-                                        // Reset state after a delay or based on a signal
-                                        // Since we don't have a 'finished' signal specifically for this, 
-                                        // we'll use a timer or just rely on the status message.
-                                        // Actually, let's connect to the property changes.
-                                    }
-                                    
-                                    Connections {
-                                        target: AppController.app_update_controller
-                                        function onUpdateAvailableChanged() {
-                                            checkUpdatesBtn.isChecking = false
-                                        }
                                     }
                                 }
                                 ActionButton {

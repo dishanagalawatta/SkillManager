@@ -517,3 +517,12 @@ This guide uses the local HIG skill files as follows:
 
 - Apple Human Interface Guidelines: Materials, especially Liquid Glass vs. standard materials.
 - Apple Developer Documentation: Adopting Liquid Glass and technology overview.
+
+## Icons and Assets
+
+- **Icon Set:** [Lucide](https://lucide.dev/)
+- **Sourcing:** Always download raw SVG files directly from the Lucide GitHub repository instead of generating custom icon code. This ensures a standard, sleek line-art design consistency.
+- **Download Script Pattern (PowerShell):**
+  ```powershell
+  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/<icon-name>.svg" -OutFile "assets/ui/tool-<icon-name>.svg"
+  ```

@@ -71,15 +71,7 @@ Rectangle {
                 onClicked: (mouse) => { root.currentView = "Settings"; root.navigationChanged("Settings") }
             }
 
-            Rectangle { width: 1; height: 24; color: Theme.glassBorder; Layout.alignment: Qt.AlignVCenter }
 
-            TopBarButton {
-                objectName: "btnScreenshot"
-                iconSource: AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/screenshot-icon-dark.svg" : "ui/screenshot-icon-light.svg")
-                labelText: "Screenshot"
-                active: false
-                onClicked: (mouse) => AppController.screenshot_controller.takeScreenshot()
-            }
             
             Item { Layout.fillWidth: true }
         }
@@ -140,6 +132,16 @@ Rectangle {
                 interval: 5000
                 onTriggered: statusPill.opacity = 0
             }
+        }
+
+        Rectangle { width: 1; height: 24; color: Theme.glassBorder; Layout.alignment: Qt.AlignVCenter }
+
+        TopBarButton {
+            objectName: "btnScreenshot"
+            iconSource: AppController.ui_controller.getAssetUri("ui/tool-camera.svg")
+            labelText: "Screenshot"
+            active: false
+            onClicked: (mouse) => AppController.screenshot_controller.takeScreenshot()
         }
     }
 }

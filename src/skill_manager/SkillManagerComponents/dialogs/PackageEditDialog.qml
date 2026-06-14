@@ -21,7 +21,7 @@ Dialog {
     
     x: Math.round((parent.width - width) / 2)
     y: Math.round(Math.max(10, (parent.height - height) / 2))
-    width: 650
+    width: 750
     height: Math.min(parent.height - 20, 850)
     modal: true
     padding: 0
