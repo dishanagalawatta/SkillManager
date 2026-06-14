@@ -122,7 +122,9 @@ class AppUpdateController(BaseController):
     @Slot(bool)
     def checkForUpdates(self, manual=False):
         """Checks for updates asynchronously using tufup."""
-        logger.debug("checkForUpdates called (manual=%s). is_updating=%s", manual, self._is_updating)
+        logger.debug(
+            "checkForUpdates called (manual=%s). is_updating=%s", manual, self._is_updating
+        )
         if self._is_updating:
             return
 
@@ -148,9 +150,14 @@ class AppUpdateController(BaseController):
         # since PySide6 app doesn't have an asyncio loop running by default.
         if hasattr(self.app, "task_runner"):
             logger.debug("Submitting update check to task runner.")
+
             # Wrap callback to handle manual feedback
-            def on_checked(new_version):
-                self._on_updates_checked(new_version, manual)
+            def on_checked(result):
+                if isinstance(result, tuple):
+                    new_version, error = result
+                else:
+                    new_version, error = result, None
+                self._on_updates_checked(new_version, manual, error)
 
             self.app.task_runner.submit(self._sync_check_updates, on_checked)
         else:
@@ -161,25 +168,40 @@ class AppUpdateController(BaseController):
     def _sync_check_updates(self):
         logger.debug("_sync_check_updates running in thread.")
         if not self._client:
-            return None
+            return None, "Update client not initialized."
+
+        pool = None
         try:
             import concurrent.futures
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(self._client.check_for_updates)
-                return future.result(timeout=15)
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            future = pool.submit(self._client.check_for_updates)
+            return future.result(timeout=15), None
         except concurrent.futures.TimeoutError:
             logger.warning("Update check timed out after 15 seconds.")
-            return None
+            return None, "Update check timed out."
         except Exception as e:
             logger.warning("Update check failed: %s", e)
-            return None
+            return None, str(e)
+        finally:
+            if pool:
+                # wait=False ensures we don't block the background thread if the task hangs
+                pool.shutdown(wait=False, cancel_futures=True)
 
-    def _on_updates_checked(self, new_version, manual=False):
-        logger.debug("_on_updates_checked received version: %s", new_version)
+    def _on_updates_checked(self, new_version, manual=False, error=None):
+        logger.debug("_on_updates_checked received version: %s, error: %s", new_version, error)
         self._is_checking_for_updates = False
         self._has_checked_for_updates = True
         self.isCheckingForUpdatesChanged.emit()
+
+        if error:
+            logger.info("Update check returned error: %s", error)
+            self._update_available = False
+            self.updateAvailableChanged.emit()
+            if manual:
+                self.app._set_status(f"Update check failed: {error}")
+            return
+
         if new_version:
             logger.info("Update available: %s", new_version)
             self._latest_version = str(new_version)
@@ -235,6 +257,7 @@ class AppUpdateController(BaseController):
     def _sync_apply_update(self):
         """Synchronous version of _apply_update for background thread execution."""
         try:
+
             def progress_hook(bytes_downloaded, total_bytes):
                 if total_bytes > 0:
                     self._update_progress = bytes_downloaded / total_bytes

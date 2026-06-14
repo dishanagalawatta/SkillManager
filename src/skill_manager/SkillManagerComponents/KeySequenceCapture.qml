@@ -18,12 +18,12 @@ Rectangle {
     activeFocusOnTab: true
 
     Accessible.role: Accessible.Button
-    Accessible.name: root.active ? "Recording shortcut, press Esc to cancel" : (root.sequence || "Click to record shortcut")
-    Accessible.description: "Press Enter or Space to start recording, Escape to cancel"
+    Accessible.name: root.active ? "Recording shortcut, click outside to cancel" : (root.sequence || "Click to record shortcut")
+    Accessible.description: "Press Enter or Space to start recording, click outside to cancel"
 
     focus: active
     onActiveChanged: {
-        AppController.isRecordingShortcut = active
+        AppController.config_controller.isRecordingShortcut = active
         if (active) root.forceActiveFocus()
     }
     
@@ -40,7 +40,7 @@ Rectangle {
 
         Text {
             Layout.fillWidth: true
-            text: active ? "Recording... (Press Esc to cancel)" : (sequence || "Click to record shortcut")
+            text: active ? "Recording... (Click outside to cancel)" : (sequence || "Click to record shortcut")
             color: active ? Theme.accent : (sequence ? Theme.label : Theme.secondaryLabel)
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sizeBody
@@ -72,12 +72,6 @@ Rectangle {
             return
         }
 
-        if (event.key === Qt.Key_Escape) {
-            active = false
-            event.accepted = true
-            return
-        }
-
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             active = false
             event.accepted = true
@@ -102,6 +96,8 @@ Rectangle {
         // Handle F-keys
         if (event.key >= Qt.Key_F1 && event.key <= Qt.Key_F12) {
             keyText = "F" + (event.key - Qt.Key_F1 + 1)
+        } else if (event.key === Qt.Key_Escape) {
+            keyText = "Escape"
         } else if (event.key === Qt.Key_Delete) {
             keyText = "Delete"
         } else if (event.key === Qt.Key_Home) {

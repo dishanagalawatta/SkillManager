@@ -162,7 +162,7 @@ Dialog {
 
             Pane {
                 id: formPane
-                width: formScroll.availableWidth
+                width: contentScroll.availableWidth
                 padding: 24
                 topPadding: 12
                 bottomPadding: 32

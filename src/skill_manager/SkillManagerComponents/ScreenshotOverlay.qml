@@ -258,18 +258,21 @@ Window {
     }
 
     Shortcut {
+        enabled: overlay.visible
         sequence: "Return"
         context: Qt.ApplicationShortcut
         onActivated: if (mode === "redacting" && overlay.visible) finalize()
     }
 
     Shortcut {
+        enabled: overlay.visible
         sequence: "Enter"
         context: Qt.ApplicationShortcut
         onActivated: if (mode === "redacting" && overlay.visible) finalize()
     }
 
     Shortcut {
+        enabled: overlay.visible
         sequence: AppController.config_controller.shortcutClearSelection
         context: Qt.ApplicationShortcut
         onActivated: {

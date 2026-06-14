@@ -578,6 +578,8 @@ Item {
                             
                             RowLayout {
                                 spacing: 16
+                                Layout.fillWidth: true
+
                                 Rectangle {
                                     width: 80
                                     height: 80
@@ -611,6 +613,67 @@ Item {
                                         color: Theme.secondaryLabel
                                     }
                                 }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                RowLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+
+                                    ActionButton {
+                                        labelText: "Release Notes"
+                                        role: "secondary"
+                                        visible: !AppController.app_update_controller.isUpdating
+                                        onClicked: (mouse) => Qt.openUrlExternally("https://github.com/dishanagalawatta/SkillManager/releases")
+                                    }
+
+                                    ActionButton {
+                                        id: updateNowBtn
+                                        visible: !AppController.app_update_controller.isCheckingForUpdates
+                                        labelText: {
+                                            if (AppController.app_update_controller.isUpdating) return "Updating..."
+                                            if (AppController.app_update_controller.updateAvailable) return "Update Now"
+                                            if (AppController.app_update_controller.hasCheckedForUpdates) return "Up to Date"
+                                            return "Check for Updates"
+                                        }
+                                        role: (AppController.app_update_controller.updateAvailable && !AppController.app_update_controller.isUpdating) ? "primary" : "secondary"
+                                        enabled: {
+                                            if (AppController.app_update_controller.isUpdating) return false
+                                            if (AppController.app_update_controller.updateAvailable) return true
+                                            if (AppController.app_update_controller.hasCheckedForUpdates) return false
+                                            return true
+                                        }
+                                        onClicked: (mouse) => {
+                                            if (AppController.app_update_controller.updateAvailable) {
+                                                AppController.app_update_controller.downloadAndApplyUpdate()
+                                            } else {
+                                                AppController.app_update_controller.checkForUpdates(true)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Update Progress Bar
+                            ProgressBar {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 4
+                                visible: AppController.app_update_controller.isUpdating
+                                value: AppController.app_update_controller.updateProgress
+                                background: Rectangle {
+                                    color: Theme.alpha(Theme.label, 0.1)
+                                    radius: 2
+                                }
+                                contentItem: Item {
+                                    Rectangle {
+                                        width: parent.visualPosition * parent.width
+                                        height: parent.height
+                                        color: Theme.accent
+                                        radius: 2
+                                    }
+                                }
                             }
 
                             Rectangle {
@@ -626,24 +689,6 @@ Item {
                                 color: Theme.label
                                 wrapMode: Text.Wrap
                                 Layout.fillWidth: true
-                            }
-
-                            RowLayout {
-                                spacing: 12
-                                ActionButton {
-                                    id: checkUpdatesBtn
-                                    labelText: AppController.app_update_controller.isCheckingForUpdates ? "Checking..." : "Check for Updates"
-                                    role: "primary"
-                                    enabled: !AppController.app_update_controller.isCheckingForUpdates && !AppController.app_update_controller.isUpdating
-                                    onClicked: (mouse) => {
-                                        AppController.app_update_controller.checkForUpdates(true)
-                                    }
-                                }
-                                ActionButton {
-                                    labelText: "Release Notes"
-                                    role: "secondary"
-                                    onClicked: (mouse) => Qt.openUrlExternally("https://github.com/dishanagalawatta/SkillManager/releases")
-                                }
                             }
 
                             Rectangle {

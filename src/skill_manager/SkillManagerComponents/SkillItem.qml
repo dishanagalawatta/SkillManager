@@ -158,13 +158,13 @@ Item {
                         }
 
                         contentItem: Item {
-                            implicitWidth: Math.min(400, previewImg.implicitWidth)
+                            implicitWidth: Math.min(300, previewImg.implicitWidth)
                             implicitHeight: Math.min(300, previewImg.implicitHeight)
                             
                             Image {
                                 id: previewImg
                                 anchors.fill: parent
-                                source: (model && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
+                                source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 sourceSize.width: 600 // High enough for detail, but limited for perf
@@ -179,11 +179,15 @@ Item {
                             if (!model) return "";
                             if (model.isCommand && model.bodyContent) {
                                 let lines = model.bodyContent.split('\n');
-                                if (lines.length > 10) {
-                                    return lines.slice(0, 10).join('\n') + '\n...';
+                                let truncated = lines.slice(0, 5).join('\n');
+                                if (lines.length > 5 || truncated.length > 180) {
+                                    return truncated.substring(0, 180).trim() + '\n...';
                                 }
-                                return model.bodyContent;
+                                return truncated;
                             } else if (!model.isScreenshot && !model.isCommand && !model.isCollection && model.description) {
+                                if (model.description.length > 180) {
+                                    return model.description.substring(0, 180).trim() + '...';
+                                }
                                 return model.description;
                             }
                             return "";
@@ -210,7 +214,9 @@ Item {
                             font.pixelSize: 12
                             color: Theme.label
                             wrapMode: Text.Wrap
-                            width: Math.min(implicitWidth, 400)
+                            width: Math.min(implicitWidth, 280)
+                            maximumLineCount: 8
+                            elide: Text.ElideRight
                         }
                     }
                 }

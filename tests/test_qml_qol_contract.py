@@ -47,8 +47,9 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
     assert "id: screenshotTooltip" in skill_item
     assert "visible: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
     assert "delay: 450" in skill_item
-    assert 'source: (model && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""' in skill_item
+    assert 'source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""' in skill_item
     assert "fillMode: Image.PreserveAspectFit" in skill_item
+    assert "implicitWidth: Math.min(300, previewImg.implicitWidth)" in skill_item
 
 
 def test_text_preview_tooltip_exists_in_skill_item():
@@ -59,7 +60,8 @@ def test_text_preview_tooltip_exists_in_skill_item():
     assert "model.isCommand && model.bodyContent" in skill_item
     assert "model.description" in skill_item
     assert "font.family: (model && model.isCommand) ? \"Consolas, Monaco, Courier New, monospace\" : Theme.fontFamily" in skill_item
-    assert "width: Math.min(implicitWidth, 400)" in skill_item
+    assert "width: Math.min(implicitWidth, 280)" in skill_item
+    assert "substring(0, 180)" in skill_item
 
 
 def test_action_bars_use_shared_action_buttons_and_keep_primary_names():
@@ -448,3 +450,30 @@ def test_no_color_string_concatenation():
                 offenders.append(f"{path.name}:{line_num} -> {line.strip()}")
 
     assert offenders == [], f"Found color string concatenation: {offenders}"
+
+
+def test_key_sequence_capture_proper_controller_path():
+    """Verify that KeySequenceCapture maps correctly to AppController.config_controller.isRecordingShortcut."""
+    ksc = (QML_DIR / "KeySequenceCapture.qml").read_text(encoding="utf-8")
+
+    assert "AppController.config_controller.isRecordingShortcut = active" in ksc
+    assert "AppController.isRecordingShortcut =" not in ksc
+
+
+def test_popup_shortcuts_are_gated_by_visibility():
+    """Verify that all shortcuts in auxiliary popup windows are disabled when the window is hidden to prevent ambiguous shortcut drops."""
+    screenshot = (QML_DIR / "ScreenshotOverlay.qml").read_text(encoding="utf-8")
+    inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
+
+    def count_shortcuts(content: str) -> int:
+        return len(re.findall(r"(^|\s)Shortcut\s*\{", content))
+
+    def count_enabled_shortcuts(content: str, visibility_var: str) -> int:
+        return len(re.findall(rf"enabled:\s*{visibility_var}\.visible", content))
+
+    assert count_shortcuts(screenshot) == count_enabled_shortcuts(screenshot, "overlay"), (
+        "Not all shortcuts in ScreenshotOverlay are gated by overlay.visible"
+    )
+    assert count_shortcuts(inspector) == count_enabled_shortcuts(inspector, "root"), (
+        "Not all shortcuts in ImageInspector are gated by root.visible"
+    )

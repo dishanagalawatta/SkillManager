@@ -79,18 +79,7 @@ Item {
                 RowLayout {
                     spacing: 8
 
-                    ActionButton {
-                        id: checkAppUpdatesBtn
-                        labelText: AppController.app_update_controller.isCheckingForUpdates ? "Checking..." : "Check Updates"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
-                        role: "secondary"
-                        tooltipText: "Check for new SkillManager application updates."
-                        enabled: !AppController.app_update_controller.isCheckingForUpdates
-                                 && !AppController.app_update_controller.isUpdating
-                        onClicked: (mouse) => {
-                            AppController.app_update_controller.checkForUpdates(true)
-                        }
-                    }
+
 
                     ActionButton {
                         objectName: "scanUpdatesBtn"
@@ -112,117 +101,6 @@ Item {
             }
         }
 
-        // App Update Banner (always visible, state-driven)
-        Rectangle {
-            id: appUpdateBanner
-            Layout.fillWidth: true
-            Layout.preferredHeight: isUpdating ? 64 : 44
-            Layout.leftMargin: 16
-            Layout.rightMargin: 16
-            radius: 8
-            
-            readonly property bool isChecking: AppController.app_update_controller.isCheckingForUpdates
-            readonly property bool isUpdating: AppController.app_update_controller.isUpdating
-            readonly property bool updateAvailable: AppController.app_update_controller.updateAvailable
-            readonly property bool hasChecked: AppController.app_update_controller.hasCheckedForUpdates
-            readonly property string latestVersion: AppController.app_update_controller.latestVersion
-            readonly property string currentVersion: AppController.app_update_controller.currentVersion
-
-            color: {
-                if (updateAvailable || isUpdating) return Theme.accent
-                return Theme.glassPill
-            }
-            border {
-                color: Theme.glassBorder
-                width: (!updateAvailable && !isUpdating) ? 1 : 0
-            }
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 8
-                anchors.leftMargin: 16
-                anchors.rightMargin: 8
-                spacing: 4
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        text: {
-                            if (isChecking) return "Checking for app updates..."
-                            if (isUpdating) return "Updating SkillManager to v" + latestVersion + "..."
-                            if (updateAvailable) return "A new version of SkillManager (v" + latestVersion + ") is available!"
-                            if (hasChecked) return "SkillManager is up to date (v" + currentVersion + ")"
-                            return "App updates: check for new versions"
-                        }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: (updateAvailable || isUpdating) ? "white" : Theme.label
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                    }
-
-                    ActionButton {
-                        id: updateNowBtn
-                        visible: !isChecking
-                        labelText: {
-                            if (isUpdating) return "Updating..."
-                            if (updateAvailable) return "Update Now"
-                            if (hasChecked) return "Up to Date"
-                            return "Check for Updates"
-                        }
-                        role: (updateAvailable && !isUpdating) ? "primary" : "secondary"
-                        enabled: {
-                            if (isUpdating) return false
-                            if (updateAvailable) return true
-                            if (hasChecked) return false
-                            return true
-                        }
-                        onClicked: (mouse) => {
-                            if (updateAvailable) {
-                                AppController.app_update_controller.downloadAndApplyUpdate()
-                            } else {
-                                AppController.app_update_controller.checkForUpdates(true)
-                            }
-                        }
-                        // Override style for "Update Now" button on accent background
-                        background: Rectangle {
-                            color: updateAvailable ? "white" : "transparent"
-                            radius: Theme.radiusButton
-                        }
-                        contentItem: Text {
-                            text: parent.labelText
-                            color: updateAvailable ? Theme.accent : (enabled ? Theme.accent : Theme.secondaryLabel)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            font.weight: Font.Bold
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                }
-
-                ProgressBar {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 4
-                    visible: isUpdating
-                    value: AppController.app_update_controller.updateProgress
-                    background: Rectangle {
-                        color: Qt.rgba(1, 1, 1, 0.2)
-                        radius: 2
-                    }
-                    contentItem: Item {
-                        Rectangle {
-                            width: parent.visualPosition * parent.width
-                            height: parent.height
-                            color: "white"
-                            radius: 2
-                        }
-                    }
-                }
-            }
-        }
 
         // Main Layout with SplitView
         SplitView {

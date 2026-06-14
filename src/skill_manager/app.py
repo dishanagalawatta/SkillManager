@@ -202,6 +202,7 @@ class AppController(QObject):
         self._library_model.showCommands = False
         self._library_model.isPackageOnly = True
         self._library_model.showStarred = True
+        self._library_model.filterByClient = True
 
         self._quick_copy_model.showCommands = True
         self._quick_copy_model.isPackageOnly = False
