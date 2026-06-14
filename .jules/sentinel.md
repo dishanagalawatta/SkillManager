@@ -32,3 +32,7 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+## 2024-06-14 - Fix incomplete secret redaction in multiline texts
+**Vulnerability:** The `sanitize_token` regex `re.sub(r"(echo password=).*", r"\1***", text)` failed to redact the full secret if it spanned multiple lines, because `.` does not match `\n` by default. This could leak the trailing portion of the secret.
+**Learning:** In Python, greedy wildcard matches `.*` stop at newlines unless `re.DOTALL` is used. Furthermore, simple greedy matches fail if tokens are enclosed in quotes that are later escaped.
+**Prevention:** To reliably redact secrets in structured string commands like `echo password=...`, use separate regex patterns for double-quoted, single-quoted, and unquoted strings, and avoid using non-greedy matchers `(.*?)` inside quotes as they are vulnerable to escaped characters.
