@@ -140,6 +140,79 @@ Item {
                     Accessible.role: Accessible.Button
                     Accessible.name: (model && model.name ? model.name : "Item")
                     Accessible.description: "Skill item"
+
+                    ToolTip {
+                        id: screenshotTooltip
+                        visible: mouseArea.containsMouse && model && model.isScreenshot && model.path
+                        delay: 450
+                        timeout: 8000
+                        padding: 8
+                        x: mouseArea.mouseX + 15
+                        y: mouseArea.mouseY + 15
+
+                        background: Rectangle {
+                            color: Theme.glassActive
+                            radius: Theme.radiusSmall
+                            border.color: Theme.glassOuterBorder
+                            border.width: 1
+                        }
+
+                        contentItem: Item {
+                            implicitWidth: Math.min(400, previewImg.implicitWidth)
+                            implicitHeight: Math.min(300, previewImg.implicitHeight)
+                            
+                            Image {
+                                id: previewImg
+                                anchors.fill: parent
+                                source: (model && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                sourceSize.width: 600 // High enough for detail, but limited for perf
+                                sourceSize.height: 600
+                            }
+                        }
+                    }
+
+                    ToolTip {
+                        id: textPreviewTooltip
+                        property string previewText: {
+                            if (!model) return "";
+                            if (model.isCommand && model.bodyContent) {
+                                let lines = model.bodyContent.split('\n');
+                                if (lines.length > 10) {
+                                    return lines.slice(0, 10).join('\n') + '\n...';
+                                }
+                                return model.bodyContent;
+                            } else if (!model.isScreenshot && !model.isCommand && !model.isCollection && model.description) {
+                                return model.description;
+                            }
+                            return "";
+                        }
+                        
+                        visible: mouseArea.containsMouse && previewText.length > 0
+                        delay: 450
+                        timeout: 8000
+                        padding: 8
+                        x: mouseArea.mouseX + 15
+                        y: mouseArea.mouseY + 15
+
+                        background: Rectangle {
+                            color: Theme.glassActive
+                            radius: Theme.radiusSmall
+                            border.color: Theme.glassOuterBorder
+                            border.width: 1
+                        }
+
+                        contentItem: Text {
+                            id: textItem
+                            text: textPreviewTooltip.previewText
+                            font.family: (model && model.isCommand) ? "Consolas, Monaco, Courier New, monospace" : Theme.fontFamily
+                            font.pixelSize: 12
+                            color: Theme.label
+                            wrapMode: Text.Wrap
+                            width: Math.min(implicitWidth, 400)
+                        }
+                    }
                 }
 
                 RowLayout {
