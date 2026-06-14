@@ -341,7 +341,10 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
         # Check QML models updated surgically
         mock_app._library_model.addOrUpdateSkills.assert_called_once_with([mock_skill_data])
         mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once_with([mock_skill_data])
+        
+        # Verify category update
         assert "Development" in mock_app._categories
+        mock_app.categoriesChanged.emit.assert_called()
 
 
 def test_ops_controller_copy_selected_no_project(ops_controller, mock_app):
@@ -446,6 +449,8 @@ def test_ops_controller_add_to_archive(ops_controller, mock_app):
 def test_ops_controller_clipboard_operations(ops_controller, mock_app):
     mock_app.skillModel._all_skills = [{"local_path": "/p1", "name": "S1"}]
     mock_app._client_format = "Gemini"
+    mock_app.config_controller.autoMinimizeOnQuickCopy = False
+    mock_app.ui_controller.currentView = "QuickCopy"
 
     # Test copySkillToClipboard (skill exists)
     with patch("skill_manager.core.quick_copy.format_project_skill_reference", return_value="REF"):
@@ -455,6 +460,22 @@ def test_ops_controller_clipboard_operations(ops_controller, mock_app):
     # Test copySkillToClipboard (raw text)
     ops_controller.copySkillToClipboard("raw text")
     mock_app._clipboard.setText.assert_called_with("raw text")
+
+    # Test auto-minimize signal
+    mock_app.config_controller.autoMinimizeOnQuickCopy = True
+    
+    # Connect a mock to the signal
+    signal_mock = MagicMock()
+    ops_controller.minimizeAppRequested.connect(signal_mock)
+    
+    ops_controller.copyTextToClipboard("some text")
+    assert signal_mock.called
+
+    # Test no minimize if view is different
+    signal_mock.reset_mock()
+    mock_app.ui_controller.currentView = "Library"
+    ops_controller.copyTextToClipboard("some text")
+    assert not signal_mock.called
 
 
 def test_ops_controller_copy_selection_orchestration(ops_controller, mock_app):
@@ -514,6 +535,9 @@ def test_ops_controller_create_custom_command(
     mock_patch_cache.assert_called_once()
     mock_app._library_model.addOrUpdateSkills.assert_called_once()
     mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once()
+
+    # Verify category update
+    assert "Commands" in mock_app._categories
     mock_app.categoriesChanged.emit.assert_called()
     mock_app._set_status.assert_called_with("Created 1 command(s)")
 
@@ -616,6 +640,7 @@ def test_update_custom_command_full_multi_client(
     mock_discover.return_value = {
         "local_path": "/project/.agents/commands/Cmd.Codex.md",
         "name": "Cmd",
+        "category": "Commands"
     }
     mock_app._categories = []
 

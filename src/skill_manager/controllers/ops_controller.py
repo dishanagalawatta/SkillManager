@@ -690,3 +690,15 @@ class OpsController(BaseController):
         """Internal helper to merge newly discovered skills into both models."""
         self.app._library_model.addOrUpdateSkills(discovered_skills)
         self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+
+        # Update categories if new ones appeared
+        new_cats = False
+        for s in discovered_skills:
+            cat = s.get("category")
+            if cat and cat not in self.app._categories:
+                self.app._categories.append(cat)
+                new_cats = True
+
+        if new_cats:
+            self.app._categories.sort()
+            self.app.categoriesChanged.emit()
