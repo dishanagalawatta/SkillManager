@@ -1,23 +1,20 @@
 # Agent Instructions
 
 ## Package Manager
+
 Use **uv**: `uv sync`, `uv run skill-manager`, `python run_tests.py`
 
-## Commit Attribution
-AI commits MUST include:
-```
-Co-Authored-By: Gemini CLI <noreply@google.com>
-```
-
 ## File-Scoped Commands
-| Task | Command |
-|------|---------|
-| Lint | `uv run ruff check path/to/file.py --fix` |
-| Format | `uv run ruff format path/to/file.py` |
-| Test | `uv run pytest path/to/file.py` |
-| Full Suite | `python run_tests.py` |
+
+| Task       | Command                                     |
+| ---------- | ------------------------------------------- |
+| Lint       | `uv run ruff check path/to/file.py --fix` |
+| Format     | `uv run ruff format path/to/file.py`      |
+| Test       | `uv run pytest path/to/file.py`           |
+| Full Suite | `python run_tests.py`                     |
 
 ## Key Conventions
+
 - **GUI**: Built with PySide6/QML. UI files are in `src/skill_manager/SkillManagerComponents/`.
 - **Tests**: Use `pytest`. Parallel execution is supported via `pytest-xdist`.
 - **Logic**: Follow patterns in `src/skill_manager/core/`.
