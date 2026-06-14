@@ -100,6 +100,7 @@ class AppConfig(BaseSettings):
     skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
+    auto_minimize_on_quick_copy: bool = False
     temporary_screenshots: bool = False
 
     @field_validator("project_aliases", "shortcuts", mode="before")
