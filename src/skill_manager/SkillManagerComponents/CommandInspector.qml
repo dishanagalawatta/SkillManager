@@ -54,6 +54,7 @@ Rectangle {
 
         ColumnLayout {
             width: mainScroll.width - 24
+            height: Math.max(implicitHeight, mainScroll.height - 24)
             x: 12
             y: 12
             spacing: 16
@@ -93,6 +94,45 @@ Rectangle {
                 }
 
                 IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
+                    flat: true
+                    onClicked: (mouse) => {
+                        if (root.editDialog) {
+                            root.editDialog.openForEdit(root.skill)
+                        }
+                    }
+                    visible: root.skill && root.skill.local_path !== undefined
+                    ToolTip.text: "Edit settings"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Edit settings"
+                    Accessible.description: ToolTip.text
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                    role: "destructive"
+                    flat: true
+                    onClicked: (mouse) => {
+                        AppController.ops_controller.deleteSkills([{
+                            "local_path": root.skill.local_path,
+                            "is_command": true
+                        }])
+                        root.closed()
+                    }
+                    visible: root.skill && root.skill.local_path !== undefined
+                    ToolTip.text: "Delete command"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Delete command"
+                    Accessible.description: ToolTip.text
+                }
+
+                IconButton {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
@@ -125,7 +165,9 @@ Rectangle {
 
                 Rectangle {
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
                     Layout.preferredHeight: 400
+                    Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
                     border.color: Theme.glassBorder
@@ -163,41 +205,6 @@ Rectangle {
                             }
                         }
                     }
-                }
-            }
-
-            // Actions
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-
-                ActionButton {
-                    text: "Edit"
-                    onClicked: (mouse) => {
-                        if (root.editDialog) {
-                            root.editDialog.openForEdit(root.skill)
-                        }
-                    }
-                    ToolTip.text: "Edit settings"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
-                }
-
-                Item { Layout.fillWidth: true }
-
-                ActionButton {
-                    text: "Delete"
-                    role: "destructive"
-                    onClicked: (mouse) => {
-                        AppController.ops_controller.deleteSkills([{
-                            "local_path": root.skill.local_path,
-                            "is_command": true
-                        }])
-                        root.closed()
-                    }
-                    ToolTip.text: "Delete command"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
                 }
             }
 

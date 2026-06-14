@@ -200,9 +200,62 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
 
+                // Action buttons
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-undo.svg")
+                    tooltipText: "Undo (Ctrl+Z)"
+                    role: "ghost"
+                    buttonSize: 28
+                    iconSize: 14
+                    enabled: root.annotations.length > 0
+                    onClicked: {
+                        if (root.selectedIndex >= 0) {
+                            var updated = root.annotations.slice()
+                            updated.splice(root.selectedIndex, 1)
+                            root.annotations = updated
+                            root.selectedIndex = -1
+                        } else {
+                            var updated = root.annotations.slice()
+                            updated.pop()
+                            root.annotations = updated
+                        }
+                    }
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-x.svg")
+                    tooltipText: "Clear All"
+                    role: "ghost"
+                    buttonSize: 28
+                    iconSize: 14
+                    enabled: root.annotations.length > 0
+                    onClicked: {
+                        root.annotations = []
+                        root.selectedIndex = -1
+                    }
+                }
+
+                ActionButton {
+                    text: "Apply"
+                    role: "primary"
+                    enabled: root.annotations.length > 0
+                    buttonHeight: 28
+                    onClicked: {
+                        AppController.image_inspector_controller.saveAnnotations(root.imagePath, root.annotations)
+                        root.annotations = []
+                        root.selectedIndex = -1
+                    }
+                }
+
+                Rectangle {
+                    width: 1
+                    height: 20
+                    color: Theme.separator
+                }
+
                 // Zoom controls
                 IconButton {
-                    iconText: "-"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-minus.svg")
                     tooltipText: "Zoom Out (Ctrl+-)"
                     role: "ghost"
                     buttonSize: 28
@@ -220,7 +273,7 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconText: "+"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-plus.svg")
                     tooltipText: "Zoom In (Ctrl++)"
                     role: "ghost"
                     buttonSize: 28
@@ -229,7 +282,7 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconText: "\u2922"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-scan.svg")
                     tooltipText: "Zoom to Fit (Ctrl+0)"
                     role: "ghost"
                     buttonSize: 28
@@ -253,7 +306,7 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconText: root.isFullscreen ? "\u2716" : "\u26F6"
+                    iconSource: root.isFullscreen ? AppController.ui_controller.getAssetUri("ui/tool-minimize.svg") : AppController.ui_controller.getAssetUri("ui/tool-maximize.svg")
                     tooltipText: root.isFullscreen ? "Exit Fullscreen" : "Fullscreen"
                     role: "ghost"
                     buttonSize: 28
@@ -262,7 +315,7 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconText: "\u2197"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-external-link.svg")
                     tooltipText: "Open Externally"
                     role: "ghost"
                     buttonSize: 28
@@ -271,7 +324,7 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconText: "\u2716"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-x.svg")
                     tooltipText: "Close Inspector"
                     role: "ghost"
                     buttonSize: 28
@@ -909,17 +962,17 @@ Rectangle {
                 // Tool buttons
                 Repeater {
                     model: [
-                        { tool: "rect", icon: "\u25A1", tip: "Rectangle" },
-                        { tool: "arrow", icon: "\u2192", tip: "Arrow" },
-                        { tool: "redact", icon: "\u2588", tip: "Redact" },
-                        { tool: "freehand", icon: "\u270E", tip: "Freehand" },
-                        { tool: "text", icon: "T", tip: "Text" },
-                        { tool: "highlight", icon: "\u2593", tip: "Highlight" }
+                        { tool: "rect", iconSource: "ui/tool-rect.svg", tip: "Rectangle" },
+                        { tool: "arrow", iconSource: "ui/tool-arrow.svg", tip: "Arrow" },
+                        { tool: "redact", iconSource: "ui/tool-redact.svg", tip: "Redact" },
+                        { tool: "freehand", iconSource: "ui/tool-freehand.svg", tip: "Freehand" },
+                        { tool: "text", iconSource: "ui/tool-text.svg", tip: "Text" },
+                        { tool: "highlight", iconSource: "ui/tool-highlight.svg", tip: "Highlight" }
                     ]
 
                     IconButton {
                         required property var modelData
-                        iconText: modelData.icon
+                        iconSource: AppController.ui_controller.getAssetUri(modelData.iconSource)
                         tooltipText: modelData.tip
                         role: root.activeTool === modelData.tool ? "primary" : "ghost"
                         buttonSize: 32
@@ -943,47 +996,93 @@ Rectangle {
                 }
 
                 // Color picker
-                Repeater {
-                    model: root.presetColors
+                Item {
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
 
                     Rectangle {
-                        required property string modelData
-                        required property int index
-                        property bool isSelected: root.activeColor.toString().toUpperCase() === modelData
-
-                        width: isSelected ? 24 : 20
-                        height: isSelected ? 24 : 20
-                        radius: isSelected ? 12 : 10
-                        color: modelData
-                        border.color: isSelected ? Theme.accent : Theme.glassBorder
-                        border.width: isSelected ? 2 : 1
-                        opacity: isSelected ? 1.0 : 0.7
-
-                        Behavior on width { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                        Behavior on height { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                        Behavior on radius { NumberAnimation { duration: 120 } }
-
-                        // Checkmark overlay when selected
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: "transparent"
-                            visible: isSelected
-                            Text {
-                                anchors.centerIn: parent
-                                text: "\u2713"
-                                color: "white"
-                                font.pixelSize: 11
-                                font.bold: true
-                                style: Text.Outline
-                                styleColor: Qt.rgba(0, 0, 0, 0.4)
-                            }
-                        }
+                        anchors.centerIn: parent
+                        width: 24; height: 24
+                        radius: 12
+                        color: root.activeColor
+                        border.color: Theme.glassBorder
+                        border.width: 1
 
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.activeColor = Qt.color(modelData)
+                            hoverEnabled: true
+                            onClicked: colorPopup.open()
+                            ToolTip.visible: containsMouse
+                            ToolTip.text: "Select Color"
+                            ToolTip.delay: 500
+                        }
+                    }
+
+                    Popup {
+                        id: colorPopup
+                        y: -height - 8
+                        x: -width / 2 + 16
+                        width: 156
+                        padding: 8
+                        background: Rectangle {
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            radius: Theme.radiusCard
+                        }
+
+                        Flow {
+                            width: parent.width
+                            spacing: 8
+                            
+                            Repeater {
+                                model: root.presetColors
+                                Rectangle {
+                                    required property string modelData
+                                    property bool isSelected: root.activeColor.toString().toUpperCase() === modelData
+
+                                    width: isSelected ? 24 : 20
+                                    height: isSelected ? 24 : 20
+                                    radius: isSelected ? 12 : 10
+                                    color: modelData
+                                    border.color: isSelected ? Theme.accent : Theme.glassBorder
+                                    border.width: isSelected ? 2 : 1
+                                    opacity: isSelected ? 1.0 : 0.7
+
+                                    Behavior on width { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                                    Behavior on height { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                                    Behavior on radius { NumberAnimation { duration: 120 } }
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: parent.radius
+                                        color: "transparent"
+                                        visible: isSelected
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "\u2713"
+                                            color: "white"
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            style: Text.Outline
+                                            styleColor: Qt.rgba(0, 0, 0, 0.4)
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        hoverEnabled: true
+                                        ToolTip.visible: containsMouse
+                                        ToolTip.text: modelData
+                                        ToolTip.delay: 500
+                                        onClicked: {
+                                            root.activeColor = Qt.color(modelData)
+                                            colorPopup.close()
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -996,90 +1095,89 @@ Rectangle {
                 }
 
                 // Stroke width
-                Text {
-                    text: "Size:"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    color: Theme.secondaryLabel
-                }
-
-                Repeater {
-                    model: [2, 3, 4, 8]
+                Item {
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
 
                     Rectangle {
-                        required property int modelData
-                        property bool isSelected: root.strokeWidth === modelData
-
+                        anchors.centerIn: parent
                         width: 24; height: 24
                         radius: 4
-                        color: isSelected ? Theme.accent : "transparent"
-                        border.color: isSelected ? Theme.accent : Theme.glassBorder
-                        border.width: isSelected ? 2 : 1
+                        color: "transparent"
+                        border.color: Theme.glassBorder
+                        border.width: 1
 
                         Rectangle {
                             anchors.centerIn: parent
-                            width: modelData + 2
-                            height: modelData + 2
-                            radius: (modelData + 2) / 2
-                            color: isSelected ? "white" : Theme.label
+                            width: root.strokeWidth + 2
+                            height: root.strokeWidth + 2
+                            radius: (root.strokeWidth + 2) / 2
+                            color: Theme.label
                         }
 
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.strokeWidth = modelData
+                            hoverEnabled: true
+                            onClicked: sizePopup.open()
+                            ToolTip.visible: containsMouse
+                            ToolTip.text: "Select Size"
+                            ToolTip.delay: 500
+                        }
+                    }
+
+                    Popup {
+                        id: sizePopup
+                        y: -height - 8
+                        x: -width / 2 + 16
+                        padding: 8
+                        background: Rectangle {
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            radius: Theme.radiusCard
+                        }
+
+                        Row {
+                            spacing: 8
+                            Repeater {
+                                model: [2, 3, 4, 8]
+                                Rectangle {
+                                    required property int modelData
+                                    property bool isSelected: root.strokeWidth === modelData
+
+                                    width: 24; height: 24
+                                    radius: 4
+                                    color: isSelected ? Theme.accent : "transparent"
+                                    border.color: isSelected ? Theme.accent : Theme.glassBorder
+                                    border.width: isSelected ? 2 : 1
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: modelData + 2
+                                        height: modelData + 2
+                                        radius: (modelData + 2) / 2
+                                        color: isSelected ? "white" : Theme.label
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        hoverEnabled: true
+                                        ToolTip.visible: containsMouse
+                                        ToolTip.text: "Size " + modelData
+                                        ToolTip.delay: 500
+                                        onClicked: {
+                                            root.strokeWidth = modelData
+                                            sizePopup.close()
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
                 Item { Layout.fillWidth: true }
-
-                // Action buttons
-                IconButton {
-                    iconText: "\u21A9"
-                    tooltipText: "Undo (Ctrl+Z)"
-                    role: "ghost"
-                    buttonSize: 32
-                    iconSize: 14
-                    enabled: root.annotations.length > 0
-                    onClicked: {
-                        if (root.selectedIndex >= 0) {
-                            var updated = root.annotations.slice()
-                            updated.splice(root.selectedIndex, 1)
-                            root.annotations = updated
-                            root.selectedIndex = -1
-                        } else {
-                            var updated = root.annotations.slice()
-                            updated.pop()
-                            root.annotations = updated
-                        }
-                    }
-                }
-
-                IconButton {
-                    iconText: "\u2716"
-                    tooltipText: "Clear All"
-                    role: "ghost"
-                    buttonSize: 32
-                    iconSize: 14
-                    enabled: root.annotations.length > 0
-                    onClicked: {
-                        root.annotations = []
-                        root.selectedIndex = -1
-                    }
-                }
-
-                ActionButton {
-                    text: "Apply & Save"
-                    role: "primary"
-                    enabled: root.annotations.length > 0
-                    buttonHeight: 32
-                    onClicked: {
-                        AppController.image_inspector_controller.saveAnnotations(root.imagePath, root.annotations)
-                        root.annotations = []
-                        root.selectedIndex = -1
-                    }
-                }
             }
         }
     }

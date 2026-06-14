@@ -68,6 +68,8 @@ class SkillModel(QAbstractListModel):
         self._state = FilterState()
         self._suppress_layout = False
         self._batch_apply_needed = False
+        self._selections_by_project: dict[str, list[str]] = {}
+        self._project_selections_save_timer = None
         self._collapse_save_timer = None
         self._cached_selected_count = 0
         self._cached_visible_selectable = 0
@@ -86,6 +88,12 @@ class SkillModel(QAbstractListModel):
             self._state.is_package_only = self._config.get(
                 "is_package_only", self._config.get("is_source_only", None)
             )
+            raw = self._config.get("project_selections", {})
+            if raw:
+                self._selections_by_project = {k: list(v) for k, v in raw.items()}
+            initial_project = self._state.project_filter
+            if initial_project and initial_project in self._selections_by_project:
+                self._selected_ids = set(self._selections_by_project[initial_project])
 
     def rowCount(self, _parent=QModelIndex()):
         return len(self._filtered_skills)
@@ -235,9 +243,17 @@ class SkillModel(QAbstractListModel):
     @projectFilter.setter
     def projectFilter(self, value):
         if self._state.project_filter != value:
+            old_project = self._state.project_filter
+            if old_project:
+                self._selections_by_project[old_project] = list(self._selected_ids)
             self._state.project_filter = value
+            if value in self._selections_by_project:
+                self._selected_ids = set(self._selections_by_project[value])
+            else:
+                self._selected_ids.clear()
             self._apply_filter()
             self._save_filters()
+            self._save_project_selections()
             self.projectFilterChanged.emit()
 
     @Property(str, notify=clientFilterChanged)
@@ -352,6 +368,7 @@ class SkillModel(QAbstractListModel):
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()
             self.selectionStateChanged.emit()
+            self._save_project_selections()
 
     @Slot()
     def clearSelection(self):
@@ -359,6 +376,7 @@ class SkillModel(QAbstractListModel):
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._save_project_selections()
 
     @Slot()
     def selectAll(self):
@@ -368,6 +386,7 @@ class SkillModel(QAbstractListModel):
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._save_project_selections()
 
     @Slot(result=list)
     def getSelectedPaths(self):
@@ -387,6 +406,7 @@ class SkillModel(QAbstractListModel):
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._save_project_selections()
 
     def removeSkillsByPath(self, paths: list):
         path_set = set(paths)
@@ -398,6 +418,7 @@ class SkillModel(QAbstractListModel):
 
         self._apply_filter()
         self.selectionStateChanged.emit()
+        self._save_project_selections()
 
     def _apply_filter(self, reset=False):
         """Applies filters and updates the model synchronously.
@@ -451,7 +472,10 @@ class SkillModel(QAbstractListModel):
             }
             results = self._search_engine.query(self._state.filter_text, valid_paths=valid_paths)
             path_to_skill = {s.local_path: s for s in self._all_skills}
-            return [path_to_skill.get(r[0].get("local_path", ""), Skill.from_dict(r[0])) for r in results]
+            return [
+                path_to_skill.get(r[0].get("local_path", ""), Skill.from_dict(r[0]))
+                for r in results
+            ]
         skills = self._engine.filter_skills(self._all_skills, self._state)
         skills.sort(key=self._engine.sort_key)
         return skills
@@ -524,6 +548,7 @@ class SkillModel(QAbstractListModel):
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()
             self.selectionStateChanged.emit()
+            self._save_project_selections()
 
     @Property(list, notify=collapsedCategoriesChanged)
     def collapsedCategories(self):
@@ -583,6 +608,7 @@ class SkillModel(QAbstractListModel):
             return
         if self._collapse_save_timer is None:
             from PySide6.QtCore import QTimer
+
             self._collapse_save_timer = QTimer()
             self._collapse_save_timer.setSingleShot(True)
             self._collapse_save_timer.timeout.connect(self._do_save_collapsed)
@@ -592,17 +618,34 @@ class SkillModel(QAbstractListModel):
     def _do_save_collapsed(self):
         self._config.set("collapsed_categories", list(self._state.collapsed_categories))
 
+    def _save_project_selections(self):
+        if not self._config:
+            return
+        if self._project_selections_save_timer is None:
+            from PySide6.QtCore import QTimer
+
+            self._project_selections_save_timer = QTimer()
+            self._project_selections_save_timer.setSingleShot(True)
+            self._project_selections_save_timer.timeout.connect(self._do_save_project_selections)
+            self._project_selections_save_timer.setInterval(500)
+        self._project_selections_save_timer.start()
+
+    def _do_save_project_selections(self):
+        self._config.set("project_selections", self._selections_by_project)
+
     def _save_filters(self):
         if not self._config:
             return
-        self._config.set_many({
-            "show_archived": self._state.show_archived,
-            "category_filter": self._state.category_filter,
-            "collection_filter": self._state.collection_filter,
-            "project_filter": self._state.project_filter,
-            "client_format": self._state.client_filter,
-            "show_commands": self._state.show_commands,
-            "show_starred": self._state.show_starred,
-            "is_package_only": self._state.is_package_only,
-            "is_source_only": self._state.is_package_only,
-        })
+        self._config.set_many(
+            {
+                "show_archived": self._state.show_archived,
+                "category_filter": self._state.category_filter,
+                "collection_filter": self._state.collection_filter,
+                "project_filter": self._state.project_filter,
+                "client_format": self._state.client_filter,
+                "show_commands": self._state.show_commands,
+                "show_starred": self._state.show_starred,
+                "is_package_only": self._state.is_package_only,
+                "is_source_only": self._state.is_package_only,
+            }
+        )

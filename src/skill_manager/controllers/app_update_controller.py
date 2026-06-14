@@ -32,6 +32,7 @@ class AppUpdateController(BaseController):
     downloadUrlChanged = Signal()
     isUpdatingChanged = Signal()
     updateProgressChanged = Signal(float)
+    isCheckingForUpdatesChanged = Signal()
 
     def __init__(self, app):
         super().__init__(app)
@@ -40,6 +41,8 @@ class AppUpdateController(BaseController):
         self._download_url = "https://github.com/dishanagalawatta/SkillManager/releases/latest"
         self._is_updating = False
         self._update_progress = 0.0
+        self._is_checking_for_updates = False
+        self._has_checked_for_updates = False
 
         # tufup Client initialization
         # Use the app data directory for TUF metadata storage
@@ -107,6 +110,14 @@ class AppUpdateController(BaseController):
     def updateProgress(self):
         return self._update_progress
 
+    @Property(bool, notify=isCheckingForUpdatesChanged)
+    def isCheckingForUpdates(self):
+        return self._is_checking_for_updates
+
+    @Property(bool, constant=True)
+    def hasCheckedForUpdates(self):
+        return self._has_checked_for_updates
+
     @Slot()
     @Slot(bool)
     def checkForUpdates(self, manual=False):
@@ -115,6 +126,9 @@ class AppUpdateController(BaseController):
         if self._is_updating:
             return
 
+        self._is_checking_for_updates = True
+        self.isCheckingForUpdatesChanged.emit()
+
         # Skip update check in development mode (not frozen)
         if not getattr(sys, "frozen", False):
             logger.info("Running in development mode; skipping auto-update check.")
@@ -122,6 +136,9 @@ class AppUpdateController(BaseController):
                 self.app._set_status("Update check skipped in development mode.")
             self._update_available = False
             self.updateAvailableChanged.emit()
+            self._is_checking_for_updates = False
+            self._has_checked_for_updates = True
+            self.isCheckingForUpdatesChanged.emit()
             return
 
         if manual:
@@ -138,15 +155,31 @@ class AppUpdateController(BaseController):
             self.app.task_runner.submit(self._sync_check_updates, on_checked)
         else:
             logger.warning("No task_runner found on app to check for updates.")
+            self._is_checking_for_updates = False
+            self.isCheckingForUpdatesChanged.emit()
 
     def _sync_check_updates(self):
         logger.debug("_sync_check_updates running in thread.")
         if not self._client:
             return None
-        return self._client.check_for_updates()
+        try:
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(self._client.check_for_updates)
+                return future.result(timeout=15)
+        except concurrent.futures.TimeoutError:
+            logger.warning("Update check timed out after 15 seconds.")
+            return None
+        except Exception as e:
+            logger.warning("Update check failed: %s", e)
+            return None
 
     def _on_updates_checked(self, new_version, manual=False):
         logger.debug("_on_updates_checked received version: %s", new_version)
+        self._is_checking_for_updates = False
+        self._has_checked_for_updates = True
+        self.isCheckingForUpdatesChanged.emit()
         if new_version:
             logger.info("Update available: %s", new_version)
             self._latest_version = str(new_version)
