@@ -216,6 +216,19 @@ Item {
 
                             RowLayout {
                                 Text {
+                                    text: "Auto-minimize on Quick Copy"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassSwitch {
+                                    checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnQuickCopy : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnQuickCopy = checked
+                                }
+                            }
+
+                            RowLayout {
+                                Text {
                                     text: "Temporary Screenshots"
                                     font.family: Theme.fontFamily
                                     color: Theme.label
