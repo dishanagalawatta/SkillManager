@@ -214,7 +214,11 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
 def _skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name)."""
     parts = []
-    for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
+    try:
+        files = sorted(p for p in path.rglob("*") if p.is_file())
+    except OSError:
+        files = []
+    for file_path in files:
         try:
             stat = file_path.stat()
             rel = file_path.relative_to(path).as_posix()
