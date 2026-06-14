@@ -54,21 +54,21 @@ ColumnLayout {
                     }
 
                     // Copy
-                    Text { text: "Copy Selection"; font.family: Theme.fontFamily; color: Theme.label }
+                    Text { text: "Copy"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
                         sequence: AppController.config_controller.shortcutCopy
                         onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("copy", seq)
                     }
 
                     // Archive
-                    Text { text: "Archive Selected"; font.family: Theme.fontFamily; color: Theme.label }
+                    Text { text: "Archive"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
                         sequence: AppController.config_controller.shortcutArchive
                         onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("archive", seq)
                     }
 
                     // Delete
-                    Text { text: "Delete Selected"; font.family: Theme.fontFamily; color: Theme.label }
+                    Text { text: "Delete"; font.family: Theme.fontFamily; color: Theme.label }
                     KeySequenceCapture {
                         sequence: AppController.config_controller.shortcutDelete
                         onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("delete", seq)

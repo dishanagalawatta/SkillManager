@@ -40,6 +40,28 @@ def test_skill_rows_are_selection_first_in_main_views():
     assert "showInlineDelete: false" in library
 
 
+def test_screenshot_hover_tooltip_exists_in_skill_item():
+    skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
+
+    assert "ToolTip {" in skill_item
+    assert "id: screenshotTooltip" in skill_item
+    assert "visible: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
+    assert "delay: 450" in skill_item
+    assert 'source: (model && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""' in skill_item
+    assert "fillMode: Image.PreserveAspectFit" in skill_item
+
+
+def test_text_preview_tooltip_exists_in_skill_item():
+    skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
+
+    assert "id: textPreviewTooltip" in skill_item
+    assert "visible: mouseArea.containsMouse && previewText.length > 0" in skill_item
+    assert "model.isCommand && model.bodyContent" in skill_item
+    assert "model.description" in skill_item
+    assert "font.family: (model && model.isCommand) ? \"Consolas, Monaco, Courier New, monospace\" : Theme.fontFamily" in skill_item
+    assert "width: Math.min(implicitWidth, 400)" in skill_item
+
+
 def test_action_bars_use_shared_action_buttons_and_keep_primary_names():
     quick_copy = (QML_DIR / "views" / "QuickCopyView.qml").read_text(encoding="utf-8")
     library = (QML_DIR / "views" / "LibraryView.qml").read_text(encoding="utf-8")
@@ -54,7 +76,7 @@ def test_action_bars_use_shared_action_buttons_and_keep_primary_names():
     assert 'objectName: "quickCopyDeleteSelectedBtn"' in quick_copy
     assert 'objectName: "quickCopyDestructiveDivider"' in quick_copy
     assert 'objectName: "libraryDestructiveDivider"' in library
-    assert 'labelText: "Copy Selected"' in quick_copy
+    assert 'labelText: "Copy"' in quick_copy
     assert 'labelText: "Copy to Project"' in library
     assert 'labelText: "Scan"' in updates
     assert 'labelText: "Update All"' in updates

@@ -341,7 +341,7 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
         # Check QML models updated surgically
         mock_app._library_model.addOrUpdateSkills.assert_called_once_with([mock_skill_data])
         mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once_with([mock_skill_data])
-        
+
         # Verify category update
         assert "Development" in mock_app._categories
         mock_app.categoriesChanged.emit.assert_called()
@@ -463,11 +463,11 @@ def test_ops_controller_clipboard_operations(ops_controller, mock_app):
 
     # Test auto-minimize signal
     mock_app.config_controller.autoMinimizeOnQuickCopy = True
-    
+
     # Connect a mock to the signal
     signal_mock = MagicMock()
     ops_controller.minimizeAppRequested.connect(signal_mock)
-    
+
     ops_controller.copyTextToClipboard("some text")
     assert signal_mock.called
 

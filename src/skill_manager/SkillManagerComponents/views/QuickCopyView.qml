@@ -309,6 +309,16 @@ Item {
                         visible: !qcv_root.isEditingCollection
 
                         ActionButton {
+                            id: barScreenshotBtn
+                            objectName: "quickCopyScreenshotBtn"
+                            buttonHeight: 32
+                            labelText: "Screenshot"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/screenshot-icon.svg")
+                            role: "secondary"
+                            onClicked: (mouse) => AppController.screenshot_controller.takeScreenshot()
+                        }
+
+                        ActionButton {
                             id: barAddCommandBtn
                             buttonHeight: 32
                             labelText: "Add Command"
@@ -337,7 +347,7 @@ Item {
                                 id: barDeleteBtn
                                 buttonHeight: 32
                                 objectName: "quickCopyDeleteSelectedBtn"
-                                labelText: "Delete Selected"
+                                labelText: "Delete"
                                 iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                                 role: "destructive"
                                 onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
@@ -356,7 +366,7 @@ Item {
                                 id: barCopyBtn
                                 buttonHeight: 32
                                 objectName: "copySelectedBtn"
-                                labelText: "Copy Selected"
+                                labelText: "Copy"
                                 role: "primary"
                                 onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
                             }

@@ -134,14 +134,6 @@ Rectangle {
             }
         }
 
-        Rectangle { width: 1; height: 24; color: Theme.glassBorder; Layout.alignment: Qt.AlignVCenter }
 
-        TopBarButton {
-            objectName: "btnScreenshot"
-            iconSource: AppController.ui_controller.getAssetUri("ui/tool-camera.svg")
-            labelText: "Screenshot"
-            active: false
-            onClicked: (mouse) => AppController.screenshot_controller.takeScreenshot()
-        }
     }
 }
