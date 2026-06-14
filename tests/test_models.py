@@ -457,11 +457,17 @@ def test_skill_model_save_methods_with_mock_config(qapp, skill_list):
     model = SkillModel(config=mock_conf)
     model.setSkills(skill_list)
 
+    # toggleCategory uses a debounced timer; fire it immediately
     model.toggleCategory("⚙️ System & Workflow|Dev")
+    if model._collapse_save_timer is not None:
+        model._collapse_save_timer.timeout.emit()
     mock_conf.set.assert_any_call("collapsed_categories", ["⚙️ System & Workflow|Dev"])
 
+    # showArchived uses _save_filters -> set_many
     model.showArchived = True
-    mock_conf.set.assert_any_call("show_archived", True)
+    mock_conf.set_many.assert_called_once()
+    call_args = mock_conf.set_many.call_args[0][0]
+    assert call_args["show_archived"] is True
 
 
 def test_skill_model_role_names(qapp):

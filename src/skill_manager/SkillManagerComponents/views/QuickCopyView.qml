@@ -258,10 +258,10 @@ Item {
                     }
 
                     onToggled: {
-                        if (checkState === Qt.Checked) {
-                            AppController.quickCopyModel.clearSelection();
-                        } else {
+                        if (checkState === Qt.Unchecked) {
                             AppController.quickCopyModel.selectAll();
+                        } else {
+                            AppController.quickCopyModel.clearSelection();
                         }
                     }
                 }

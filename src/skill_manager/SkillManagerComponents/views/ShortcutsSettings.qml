@@ -140,6 +140,12 @@ ColumnLayout {
                         sequence: AppController.config_controller.shortcutSettingsView
                         onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("settings_view", seq)
                     }
+
+                    Text { text: "Screenshot"; font.family: Theme.fontFamily; color: Theme.label }
+                    KeySequenceCapture {
+                        sequence: AppController.config_controller.shortcutScreenshot
+                        onSequenceCaptured: (seq) => AppController.config_controller.setShortcut("screenshot", seq)
+                    }
                 }
 
                 Rectangle {

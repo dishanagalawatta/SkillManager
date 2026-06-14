@@ -144,6 +144,7 @@ DEFAULT_SHORTCUTS = {
     "library_view": "Alt+2",
     "updates_view": "Alt+3",
     "settings_view": "Alt+4",
+    "screenshot": "Ctrl+Shift+S",
 }
 
 
@@ -215,4 +216,9 @@ class ConfigManager:
 
     def set(self, key: str, value: Any) -> None:
         self.data[key] = value
+        self.save()
+
+    def set_many(self, updates: dict[str, Any]) -> None:
+        """Sets multiple config keys and writes to disk once."""
+        self.data.update(updates)
         self.save()

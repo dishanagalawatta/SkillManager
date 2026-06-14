@@ -81,6 +81,7 @@ Rectangle {
                         border.color: nameField.activeFocus ? Theme.glassBorder : "transparent"
                     }
                     selectByMouse: true
+                    readOnly: true
 
                     TapHandler {
                         acceptedButtons: Qt.RightButton
@@ -148,6 +149,7 @@ Rectangle {
                             color: Theme.label
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
+                            readOnly: true
                             background: null
                             padding: 12
                             verticalAlignment: TextArea.AlignTop
@@ -168,22 +170,6 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
-
-                ActionButton {
-                    text: "Save"
-                    role: "primary"
-                    enabled: nameField.text.trim() !== "" && bodyArea.text.trim() !== ""
-                    onClicked: (mouse) => {
-                        AppController.ops_controller.updateCustomCommand(
-                            root.skill.local_path,
-                            nameField.text.trim(),
-                            bodyArea.text
-                        )
-                    }
-                    ToolTip.text: "Save changes"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
-                }
 
                 ActionButton {
                     text: "Edit"

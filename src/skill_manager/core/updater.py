@@ -22,7 +22,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
             projects.append(p)
         else:
             logger.warning(
-                f"Warning: Project path '{tp}' is not a directory or does not exist. Skipping."
+                "Warning: Project path '%s' is not a directory or does not exist. Skipping.", tp
             )
 
     sources = []
@@ -32,7 +32,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
             sources.append(p)
         else:
             logger.warning(
-                f"Warning: Source path '{sp}' is not a directory or does not exist. Skipping."
+                "Warning: Source path '%s' is not a directory or does not exist. Skipping.", sp
             )
 
     if not projects:
@@ -54,10 +54,10 @@ def update_projects(project_paths, source_paths, progress_callback=None):
     logger.info("Starting update process...")
     logger.info("Projects:")
     for t in projects:
-        logger.info(f"  - {t}")
+        logger.info("  - %s", t)
     logger.info("\nSources (in order of priority):")
     for s in sources:
-        logger.info(f"  - {s}")
+        logger.info("  - %s", s)
     logger.info("-" * 40)
 
     updated_count = 0
@@ -66,7 +66,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
 
     # Iterate through each project directory
     for project_dir, items in project_items:
-        logger.info(f"\nProcessing project directory: '{project_dir.name}'")
+        logger.info("\nProcessing project directory: '%s'", project_dir.name)
 
         for item in items:
             folder_name = item.name
@@ -84,19 +84,19 @@ def update_projects(project_paths, source_paths, progress_callback=None):
 
             if selected_source_subfolder:
                 msg = f"Updating '{folder_name}'..."
-                logger.info(f"[*] {msg} (using source: '{selected_source_dir.name}')")
+                logger.info("[*] %s (using source: '%s')", msg, selected_source_dir.name)
                 if progress_callback:
                     progress_callback(processed_count, total_folders, msg)
                 try:
                     # dirs_exist_ok=True allows merging into existing directories (Python 3.8+)
                     shutil.copytree(selected_source_subfolder, item, dirs_exist_ok=True)
-                    logger.info(f"    Successfully updated '{folder_name}'.")
+                    logger.info("    Successfully updated '%s'.", folder_name)
                     updated_count += 1
                 except Exception as e:
-                    logger.error(f"    [!] Error updating '{folder_name}': {e}")
+                    logger.error("    [!] Error updating '%s': %s", folder_name, e)
             else:
                 msg = f"Skipping '{folder_name}'"
-                logger.info(f"[-] {msg} - no matching folder found in any source directory.")
+                logger.info("[-] %s - no matching folder found in any source directory.", msg)
                 if progress_callback:
                     progress_callback(processed_count, total_folders, msg)
                 skipped_count += 1
@@ -108,8 +108,8 @@ def update_projects(project_paths, source_paths, progress_callback=None):
 
     logger.info("\n" + "=" * 40)
     logger.info("Update process complete.")
-    logger.info(f"Total projects updated: {updated_count}")
-    logger.info(f"Total projects skipped: {skipped_count}")
+    logger.info("Total projects updated: %d", updated_count)
+    logger.info("Total projects skipped: %d", skipped_count)
     return updated_count, skipped_count
 
 

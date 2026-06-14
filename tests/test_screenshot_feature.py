@@ -16,6 +16,9 @@ def mock_app():
     app.screenshot_provider = MagicMock()
     app.skillModel = MagicMock()
     app.quickCopyModel = MagicMock()
+    app._library_model = MagicMock()
+    app._quick_copy_model = MagicMock()
+    app._categories = []
     app.projects = ["/mock/project"]
     app._config = {}
     app.config_controller = MagicMock()
@@ -93,8 +96,8 @@ def test_save_screenshot_gemini_cli(controller, mock_app, tmp_path):
             assert args[0].startswith("@.agents/screenshots/Screenshot_")
 
             # Verify direct injection into models
-            mock_app.skillModel.addOrUpdateSkills.assert_called()
-            mock_app.quickCopyModel.addOrUpdateSkills.assert_called()
+            mock_app._library_model.addOrUpdateSkills.assert_called()
+            mock_app._quick_copy_model.addOrUpdateSkills.assert_called()
 
 
 def test_save_screenshot_standard(controller, mock_app, tmp_path):
@@ -120,8 +123,8 @@ def test_save_screenshot_standard(controller, mock_app, tmp_path):
         # Check clipboard
         mock_clipboard().setPixmap.assert_called()
         # Verify direct injection into models
-        mock_app.skillModel.addOrUpdateSkills.assert_called()
-        mock_app.quickCopyModel.addOrUpdateSkills.assert_called()
+        mock_app._library_model.addOrUpdateSkills.assert_called()
+        mock_app._quick_copy_model.addOrUpdateSkills.assert_called()
 
 
 def test_screenshot_discovery(tmp_path):
@@ -163,6 +166,41 @@ def test_save_screenshot_no_pixmap(controller, mock_app):
     mock_app._set_status.assert_not_called()
 
 
+def test_save_screenshot_emits_categories_changed(controller, mock_app, tmp_path):
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = "MockProject"
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "PlainText"
+    mock_app._categories = ["Dev"]
+
+    with patch("skill_manager.core.quick_copy.project_label", return_value="MockProject"):
+        full_pixmap = QPixmap(100, 100)
+        controller._current_full_pixmap = full_pixmap
+
+        controller.saveScreenshot(QRect(0, 0, 10, 10), [])
+
+    assert "Screenshots" in mock_app._categories
+    mock_app.categoriesChanged.emit.assert_called_once()
+
+
+def test_save_screenshot_skips_categories_changed_when_already_present(
+    controller, mock_app, tmp_path
+):
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = "MockProject"
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "PlainText"
+    mock_app._categories = ["Screenshots", "Dev"]
+
+    with patch("skill_manager.core.quick_copy.project_label", return_value="MockProject"):
+        full_pixmap = QPixmap(100, 100)
+        controller._current_full_pixmap = full_pixmap
+
+        controller.saveScreenshot(QRect(0, 0, 10, 10), [])
+
+    mock_app.categoriesChanged.emit.assert_not_called()
+
+
 def test_save_screenshot_no_project(controller, mock_app):
     mock_app.quickCopyModel.projectFilter = ""
     mock_app.projects = []
@@ -180,6 +218,14 @@ def test_clear_selection_default_shortcut():
     assert "clear_selection" in DEFAULT_SHORTCUTS
     assert DEFAULT_SHORTCUTS["clear_selection"] == "Esc"
     assert "screenshot_cancel" not in DEFAULT_SHORTCUTS
+
+
+def test_screenshot_default_shortcut():
+    """Screenshot shortcut is in DEFAULT_SHORTCUTS with Ctrl+Shift+S."""
+    from skill_manager.core.config import DEFAULT_SHORTCUTS
+
+    assert "screenshot" in DEFAULT_SHORTCUTS
+    assert DEFAULT_SHORTCUTS["screenshot"] == "Ctrl+Shift+S"
 
 
 def test_auto_minimize_on_screenshot_default():

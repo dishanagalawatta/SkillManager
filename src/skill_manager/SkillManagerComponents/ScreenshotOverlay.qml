@@ -7,7 +7,6 @@ Window {
     id: overlay
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     visibility: Window.Hidden
-    visible: false
     color: "transparent"
 
     onClosing: {
@@ -30,7 +29,7 @@ Window {
     Image {
         id: bg
         anchors.fill: parent
-        source: "image://screenshot/current"
+        source: "image://screenshot/current?v=" + AppController.screenshot_controller.screenshotVersion
         cache: false
     }
 
@@ -272,10 +271,12 @@ Window {
 
     Shortcut {
         sequence: AppController.config_controller.shortcutClearSelection
-        context: Qt.WindowShortcut
+        context: Qt.ApplicationShortcut
         onActivated: {
-            AppController.screenshot_controller.cancelCapture()
-            overlay.close()
+            if (overlay.visible) {
+                AppController.screenshot_controller.cancelCapture()
+                overlay.close()
+            }
         }
     }
 
@@ -286,7 +287,7 @@ Window {
             overlay.isRedacting = false
             overlay.selectionRect = Qt.rect(0,0,0,0)
             overlay.redactionRects = []
-            overlay.showFullScreen()
+            overlay.visibility = Window.FullScreen
             overlay.raise()
             overlay.requestActivate()
         }

@@ -87,6 +87,7 @@ Window {
     property real savedY: 0
     property real savedWidth: 0
     property real savedHeight: 0
+    property real savedOpacity: 1
     property bool pendingScreenshot: false
 
     function saveWindowState() {
@@ -95,9 +96,17 @@ Window {
         savedY = window.y
         savedWidth = window.width
         savedHeight = window.height
+        savedOpacity = window.opacity
+    }
+
+    function hideWindowInstantly() {
+        window.opacity = 0
+        window.x = -32000
+        window.y = -32000
     }
 
     function restoreWindowState() {
+        window.opacity = savedOpacity
         if (wasMaximized) {
             window.showMaximized()
         } else {
@@ -142,7 +151,7 @@ Window {
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequences: ["Ctrl+Shift+S", "Meta+Shift+S"]; onActivated: AppController.screenshot_controller.takeScreenshot() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutScreenshot; context: Qt.ApplicationShortcut; onActivated: AppController.screenshot_controller.takeScreenshot() }
 
     ScreenshotOverlay {
         id: screenshotOverlay
@@ -150,7 +159,7 @@ Window {
 
     Timer {
         id: screenshotDelayTimer
-        interval: 300
+        interval: 10
         onTriggered: {
             AppController.screenshot_controller.captureScreen()
         }
@@ -161,7 +170,7 @@ Window {
         function onMinimizeRequested() {
             window.saveWindowState()
             window.pendingScreenshot = true
-            window.showMinimized()
+            window.hideWindowInstantly()
             screenshotDelayTimer.start()
         }
     }

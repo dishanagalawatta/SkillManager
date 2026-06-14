@@ -155,10 +155,10 @@ Item {
                     }
 
                     onToggled: {
-                        if (checkState === Qt.Checked) {
-                            AppController.libraryModel.clearSelection();
-                        } else {
+                        if (checkState === Qt.Unchecked) {
                             AppController.libraryModel.selectAll();
+                        } else {
+                            AppController.libraryModel.clearSelection();
                         }
                     }
                 }

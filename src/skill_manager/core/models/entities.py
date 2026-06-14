@@ -89,6 +89,37 @@ class Skill:
             main_category=data.get("main_category", "⚙️ System & Workflow"),
         )
 
+    @classmethod
+    def from_dict_fast(cls, data: dict[str, Any]) -> "Skill":
+        """Fast factory that skips Pydantic validation.
+
+        Use only for data that was already validated (e.g. from discovery cache).
+        """
+        is_package = data.get("is_package", data.get("is_source", False))
+        return cls(
+            name=str(data.get("name", "")),
+            category=data.get("category", "General"),
+            description=data.get("description", ""),
+            local_path=data.get("local_path", ""),
+            project_label=data.get("project_label", ""),
+            project_path=data.get("project_path", ""),
+            project_root=data.get("project_root", ""),
+            skill_md_path=data.get("skill_md_path", ""),
+            is_starred=data.get("is_starred", False),
+            is_archived=data.get("is_archived", False),
+            is_bundle=data.get("is_bundle", False),
+            is_command=data.get("is_command", False),
+            is_package=is_package,
+            is_screenshot=data.get("is_screenshot", False),
+            raw_content=data.get("raw_content", ""),
+            body_content=data.get("body_content", ""),
+            risk=data.get("risk", "Unknown"),
+            source=data.get("source", "Unknown"),
+            date=data.get("date", "Unknown"),
+            client=data.get("client", ""),
+            main_category=data.get("main_category", "⚙️ System & Workflow"),
+        )
+
 
 @dataclass
 class FilterState:

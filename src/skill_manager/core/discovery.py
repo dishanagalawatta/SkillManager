@@ -4,6 +4,7 @@ Discovery service for finding and processing skills from sources and projects.
 
 import hashlib
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,6 @@ from skill_manager.core.parsing import (
     parse_skill_md,
 )
 from skill_manager.core.persistence import load_cache, save_cache
-from skill_manager.core.quick_copy import discover_package_skills, discover_project_skills
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,28 @@ def get_discovery_cache() -> Cache:
     return Cache(str(cache_dir))
 
 
+def _compute_dir_fingerprint(dir_path: Path) -> str:
+    """Compute a lightweight fingerprint for a directory.
+
+    Uses directory mtime + count of immediate child dirs containing SKILL.md.
+    This avoids enumerating all files — just a stat + fast glob.
+    """
+    try:
+        stat = dir_path.stat()
+        # Count immediate child dirs with SKILL.md (fast, no recursion)
+        skill_count = sum(
+            1 for child in dir_path.iterdir() if child.is_dir() and (child / "SKILL.md").is_file()
+        )
+        raw = f"{stat.st_mtime}:{stat.st_size}:{skill_count}"
+        return hashlib.md5(raw.encode()).hexdigest()
+    except OSError:
+        return ""
+
+
 class DiscoveryService:
+    # Cache key prefix for directory fingerprints
+    _DIR_FP_PREFIX = "dir_fp:"
+
     def __init__(
         self,
         sources: list[str],
@@ -47,7 +68,12 @@ class DiscoveryService:
     def discover_all(
         self, use_cache: bool = True, cache_callback: Callable[[dict[str, Any]], None] = None
     ) -> dict[str, Any]:
-        """Performs full discovery of skills from all sources and projects."""
+        """Performs full discovery of skills from all sources and projects.
+
+        Uses incremental scanning: directories whose fingerprint (mtime + skill
+        count) hasn't changed since the last scan are skipped, reusing the
+        previously-discovered skills from the disk cache.
+        """
 
         # 1. Try JSON index cache first for instant UI population
         if use_cache:
@@ -60,26 +86,18 @@ class DiscoveryService:
 
         # 2. Discovery using diskcache for granular file-level caching
         with get_discovery_cache() as disk_cache:
-            # 2a. Discover from master packages
-            package_skills_raw = discover_package_skills(
-                sources=self.sources,
-                parse_skill_md=self._wrap_parse_skill_md(disk_cache),
-                categorize_skill=categorize_skill,
-                build_search_text=build_skill_search_text,
-            )
+            parse_fn = self._wrap_parse_skill_md(disk_cache)
+            cat_fn = self._wrap_categorize_skill(disk_cache)
+
+            # 2a. Discover from master packages (incremental)
+            package_skills_raw = self._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
 
             all_skills = []
             for skill in package_skills_raw:
                 all_skills.append(self.transform_skill(skill, is_package=True))
 
-            # 2b. Discover from project skill folders
-            projects_state = discover_project_skills(
-                projects=self.projects,
-                parse_skill_md=self._wrap_parse_skill_md(disk_cache),
-                categorize_skill=categorize_skill,
-                build_search_text=build_skill_search_text,
-                project_aliases=self.project_aliases,
-            )
+            # 2b. Discover from project skill folders (incremental)
+            projects_state = self._discover_projects_incremental(disk_cache, parse_fn, cat_fn)
 
             for p in projects_state:
                 for skill in p.get("skills", []):
@@ -115,8 +133,257 @@ class DiscoveryService:
 
         return result
 
+    def _discover_packages_incremental(
+        self, disk_cache: Cache, parse_fn: Callable, cat_fn: Callable
+    ) -> list[dict[str, Any]]:
+        """Discover package skills, skipping directories with unchanged fingerprints."""
+        from skill_manager.core.quick_copy import (
+            _classification_text,
+            _is_ignored,
+            _load_ignore_spec,
+            _resolve_resilient_path,
+            _skill_base_relative,
+        )
+
+        skills: list[dict[str, Any]] = []
+        seen_sources: set[str] = set()
+        unique_sources: list[Path] = []
+
+        for source in self.sources:
+            resolved = _resolve_resilient_path(source)
+            if not resolved or not resolved.is_dir():
+                continue
+            key = os.path.normcase(str(resolved))
+            if key in seen_sources:
+                continue
+            seen_sources.add(key)
+            unique_sources.append(resolved)
+
+        if not unique_sources:
+            return []
+
+        # Check fingerprints — skip unchanged directories entirely
+        changed_sources: list[Path] = []
+        cached_skills: list[dict[str, Any]] = []
+
+        for src in unique_sources:
+            fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+            current_fp = _compute_dir_fingerprint(src)
+            stored_fp = disk_cache.get(fp_key)
+
+            if current_fp and current_fp == stored_fp:
+                # Directory unchanged — load cached skills for this source
+                cached = disk_cache.get(f"pkg_skills:{fp_key}")
+                if cached is not None:
+                    cached_skills.extend(cached)
+                    continue
+
+            # Directory changed or no cache — needs full scan
+            changed_sources.append(src)
+
+        # Scan only changed directories
+        if changed_sources:
+
+            def _scan_one(resolved_source: Path) -> list[dict[str, Any]]:
+                source_skills: list[dict[str, Any]] = []
+                ignore_spec = _load_ignore_spec(resolved_source)
+                for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):
+                    if not child.is_dir():
+                        continue
+                    if _is_ignored(child, resolved_source, ignore_spec):
+                        continue
+                    skill_md_path = child / "SKILL.md"
+                    if not skill_md_path.is_file():
+                        continue
+
+                    skill_data = parse_fn(str(skill_md_path))
+                    if not skill_data.get("name"):
+                        skill_data["name"] = child.name
+                    skill_data["folder_name"] = child.name
+                    skill_data["local_path"] = str(child)
+                    skill_data["skill_md_path"] = str(skill_md_path)
+                    skill_data["source_path"] = str(resolved_source)
+                    skill_data["project_path"] = str(resolved_source)
+                    skill_data["project_label"] = "Master Library"
+                    skill_data["project_root"] = str(resolved_source)
+                    skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
+                    skill_data["is_package"] = True
+                    skill_data["is_source"] = True
+
+                    if not skill_data.get("main_category"):
+                        skill_data.setdefault("metadata", {})
+                        cat_info = cat_fn(
+                            skill_data.get("name", ""),
+                            _classification_text(skill_data),
+                            skill_data.get("metadata", {}),
+                        )
+                        skill_data["main_category"] = cat_info.get("main_category", "")
+                        skill_data["category"] = cat_info.get("sub_category", "")
+
+                    if not skill_data.get("search_text"):
+                        skill_data["search_text"] = build_skill_search_text(skill_data)
+
+                    source_skills.append(skill_data)
+                return source_skills
+
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor() as executor:
+                futures = [executor.submit(_scan_one, src) for src in changed_sources]
+                for future in futures:
+                    try:
+                        new_skills = future.result()
+                        skills.extend(new_skills)
+                        # Cache results for this source
+                        src = changed_sources[futures.index(future)]
+                        fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+                        disk_cache.set(fp_key, _compute_dir_fingerprint(src))
+                        disk_cache.set(f"pkg_skills:{fp_key}", new_skills)
+                    except Exception as e:
+                        logger.warning("[DISCOVERY] Error scanning source: %s", e)
+
+        return cached_skills + skills
+
+    def _discover_projects_incremental(
+        self, disk_cache: Cache, parse_fn: Callable, cat_fn: Callable
+    ) -> list[dict[str, Any]]:
+        """Discover project skills, skipping directories with unchanged fingerprints."""
+        from skill_manager.core.quick_copy import (
+            _resolve_resilient_path,
+        )
+
+        seen_projects: set[str] = set()
+        unique_projects: list[str] = []
+
+        for project in self.projects:
+            resolved = _resolve_resilient_path(project)
+            if not resolved or not resolved.is_dir():
+                continue
+            key = os.path.normcase(str(resolved))
+            if key in seen_projects:
+                continue
+            seen_projects.add(key)
+            unique_projects.append(project)
+
+        if not unique_projects:
+            return []
+
+        projects_state: list[dict[str, Any]] = []
+
+        for project in unique_projects:
+            resolved = _resolve_resilient_path(project)
+            if not resolved:
+                continue
+
+            fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(resolved))}"
+            current_fp = _compute_dir_fingerprint(resolved)
+            stored_fp = disk_cache.get(fp_key)
+
+            if current_fp and current_fp == stored_fp:
+                cached = disk_cache.get(f"proj_skills:{fp_key}")
+                if cached is not None:
+                    projects_state.append(cached)
+                    continue
+
+            # Full scan for this project
+            project_data = self._scan_single_project(project, resolved, parse_fn, cat_fn)
+            if project_data:
+                projects_state.append(project_data)
+                disk_cache.set(fp_key, _compute_dir_fingerprint(resolved))
+                disk_cache.set(f"proj_skills:{fp_key}", project_data)
+
+        return projects_state
+
+    def _scan_single_project(
+        self, project: str, resolved: Path, parse_fn: Callable, cat_fn: Callable
+    ) -> dict[str, Any] | None:
+        """Scan a single project directory for skills."""
+        from skill_manager.core.quick_copy import (
+            _classification_text,
+            _is_ignored,
+            _load_ignore_spec,
+            _project_root_for_project,
+            _skill_base_relative,
+            project_label,
+        )
+
+        project_key = os.path.normcase(str(resolved))
+        skills: list[dict[str, Any]] = []
+        ignore_spec = _load_ignore_spec(resolved)
+
+        for child in sorted(resolved.iterdir(), key=lambda i: i.name.lower()):
+            if not child.is_dir():
+                continue
+            if _is_ignored(child, resolved, ignore_spec):
+                continue
+            skill_md_path = child / "SKILL.md"
+            if not skill_md_path.is_file():
+                continue
+
+            skill_data = parse_fn(str(skill_md_path))
+            if not skill_data.get("name"):
+                skill_data["name"] = child.name
+            skill_data["folder_name"] = child.name
+            skill_data["local_path"] = str(child)
+            skill_data["skill_md_path"] = str(skill_md_path)
+            skill_data["project_key"] = project_key
+            skill_data["project_path"] = str(resolved)
+            skill_data["project_root"] = str(_project_root_for_project(resolved))
+            skill_data["skill_base_relative"] = _skill_base_relative(resolved)
+            skill_data["project_label"] = project_label(resolved, self.project_aliases, project)
+            skill_data.setdefault("metadata", {})
+            cat_info = cat_fn(
+                skill_data.get("name", ""),
+                _classification_text(skill_data),
+                skill_data.get("metadata", {}),
+            )
+            skill_data["main_category"] = cat_info.get("main_category", "")
+            skill_data["category"] = cat_info.get("sub_category", "")
+            skill_data["search_text"] = build_skill_search_text(skill_data)
+            skills.append(skill_data)
+
+        # Screenshots
+        project_root_path = _project_root_for_project(resolved)
+        screenshot_dir = project_root_path / ".agents" / "screenshots"
+        if screenshot_dir.is_dir():
+            for img in sorted(screenshot_dir.iterdir(), key=lambda i: i.name.lower(), reverse=True):
+                if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                    skills.append(
+                        {
+                            "name": img.name,
+                            "folder_name": ".agents/screenshots",
+                            "local_path": str(img),
+                            "skill_md_path": str(img),
+                            "project_key": project_key,
+                            "project_path": str(resolved),
+                            "project_root": str(project_root_path),
+                            "project_label": project_label(resolved, self.project_aliases, project),
+                            "main_category": "Special",
+                            "category": "Screenshots",
+                            "search_text": f"screenshot capture {img.name}",
+                            "is_screenshot": True,
+                            "metadata": {"category": "Capture"},
+                        }
+                    )
+
+        if skills:
+            project_root = _project_root_for_project(resolved)
+            return {
+                "project_path": str(resolved),
+                "project_root": str(project_root),
+                "project_label": project_label(resolved, self.project_aliases, project),
+                "skill_base_relative": _skill_base_relative(resolved),
+                "project_key": project_key,
+                "skills": skills,
+            }
+        return None
+
     def _wrap_parse_skill_md(self, cache: Cache) -> Callable[[str], dict[str, Any]]:
-        """Wraps parse_skill_md with disk caching based on file mtime/size hash."""
+        """Wraps parse_skill_md with disk caching based on file mtime/size hash.
+
+        Also caches categorization results so that ``categorize_skill`` is
+        skipped for files whose content hasn't changed since the last scan.
+        """
 
         def cached_parse(path_str: str) -> dict[str, Any]:
             path = Path(path_str)
@@ -126,7 +393,6 @@ class DiscoveryService:
             try:
                 stat = path.stat()
                 cache_key = f"skill:{path_str}:{stat.st_mtime}:{stat.st_size}"
-                # Use a fast hash for the key if it's too long
                 if len(cache_key) > 200:
                     cache_key = hashlib.md5(cache_key.encode()).hexdigest()
 
@@ -142,6 +408,28 @@ class DiscoveryService:
                 return parse_skill_md(path_str)
 
         return cached_parse
+
+    def _wrap_categorize_skill(self, cache: Cache) -> Callable[[str, str, dict], dict[str, str]]:
+        """Wraps categorize_skill with disk caching.
+
+        Keyed by the raw classification text so unchanged skills skip the
+        rapidfuzz fuzzy-matching step entirely.
+        """
+
+        def cached_categorize(name: str, text: str, metadata: dict) -> dict[str, str]:
+            # Build a stable cache key from the inputs
+            raw = f"{name}|{text}"
+            cache_key = f"cat:{hashlib.md5(raw.encode()).hexdigest()}"
+
+            result = cache.get(cache_key)
+            if result is not None:
+                return result
+
+            result = categorize_skill(name, text, metadata)
+            cache.set(cache_key, result)
+            return result
+
+        return cached_categorize
 
     def transform_skill(
         self, skill: dict[str, Any], is_package: bool, project_label: str = None

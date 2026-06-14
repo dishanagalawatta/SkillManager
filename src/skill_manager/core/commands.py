@@ -26,6 +26,15 @@ def build_command_filename(name: str, client: str) -> str:
     return f"{safe_name}.{client}.md"
 
 
+def resolve_commands_dir(project_label_name: str, project_paths: list[str]) -> Path | None:
+    """Resolve the .agents/commands directory for a given project label."""
+    project_path = find_project_path_by_label(project_label_name, project_paths)
+    if not project_path:
+        return None
+    project_root = _project_root_for_project(project_path)
+    return project_root / ".agents" / "commands"
+
+
 def build_command_content(
     name: str,
     client: str,

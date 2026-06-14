@@ -25,6 +25,7 @@ class DiscoveryController(BaseController):
         super().__init__(app)
         self._discoverySuccess.connect(self._finalize_loading)
         self._discoveryError.connect(self._handle_loading_error)
+        self._previous_skills: dict[str, dict] = {}  # path -> skill dict
 
     @Slot()
     def loadInitialData(self):
@@ -62,7 +63,8 @@ class DiscoveryController(BaseController):
 
             def cache_callback(cached_data):
                 logger.info(
-                    f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache..."
+                    "[CACHE] Loading %d skills from cache...",
+                    len(cached_data.get("skills", [])),
                 )
                 # Dispatch UI update safely to the main thread via Signal
                 self._discoverySuccess.emit(
@@ -106,16 +108,49 @@ class DiscoveryController(BaseController):
     def _finalize_loading(
         self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
     ):
-        """Updates model and UI state on the main thread after discovery completes."""
+        """Updates model and UI state on the main thread after discovery completes.
+
+        Uses incremental model updates when possible: only changed skills are
+        re-indexed, avoiding a full SearchEngine rebuild.
+        """
         del proj_labels
 
         if self.app._categories != cats:
             self.app._categories = cats
             self.app.categoriesChanged.emit()
 
-        # Update both models with the shared skill list
-        self.app._library_model.setSkills(all_skills)
-        self.app._quick_copy_model.setSkills(all_skills)
+        # Build a lookup of new skills by path
+        new_skills_map = {s["local_path"]: s for s in all_skills if s.get("local_path")}
+
+        # Determine which skills changed since last scan
+        added_or_updated: list[dict] = []
+        for path, skill in new_skills_map.items():
+            prev = self._previous_skills.get(path)
+            if prev is None or prev != skill:
+                added_or_updated.append(skill)
+
+        removed_paths = set(self._previous_skills.keys()) - set(new_skills_map.keys())
+
+        if self._previous_skills and (added_or_updated or removed_paths):
+            # Incremental update — only touch changed skills
+            if added_or_updated:
+                self.app._library_model.addOrUpdateSkills(added_or_updated)
+                self.app._quick_copy_model.addOrUpdateSkills(added_or_updated)
+            if removed_paths:
+                self.app._library_model.removeSkillsByPath(list(removed_paths))
+                self.app._quick_copy_model.removeSkillsByPath(list(removed_paths))
+            logger.info(
+                "[DISCOVERY] Incremental update: %d added/updated, %d removed",
+                len(added_or_updated),
+                len(removed_paths),
+            )
+        else:
+            # First load or full replacement needed
+            self.app._library_model.setSkills(all_skills)
+            self.app._quick_copy_model.setSkills(all_skills)
+
+        # Snapshot current state for next diff
+        self._previous_skills = new_skills_map
 
         # Ensure client filters are set
         self.app._library_model.clientFilter = self.app._client_format

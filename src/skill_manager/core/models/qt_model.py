@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, Signal, Slot
@@ -5,6 +6,8 @@ from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, Signal
 from skill_manager.core.models.entities import FilterState, Skill
 from skill_manager.core.models.filter_engine import FilterEngine
 from skill_manager.core.search import SearchEngine
+
+logger = logging.getLogger(__name__)
 
 
 class SkillModel(QAbstractListModel):
@@ -44,14 +47,13 @@ class SkillModel(QAbstractListModel):
     categoryFilterChanged = Signal()
     collectionFilterChanged = Signal()
     projectFilterChanged = Signal()
-    selectedCountChanged = Signal()
+    selectionStateChanged = Signal()
     collapsedCategoriesChanged = Signal()
     showCommandsChanged = Signal()
     showStarredChanged = Signal()
     isPackageOnlyChanged = Signal()
     clientFilterChanged = Signal()
     filterByClientChanged = Signal()
-    userSelectionChanged = Signal()
     totalSelectableCountChanged = Signal()
 
     def __init__(self, parent=None, config=None):
@@ -64,6 +66,13 @@ class SkillModel(QAbstractListModel):
         self._selected_ids: set[str] = set()
         self._engine = FilterEngine()
         self._state = FilterState()
+        self._suppress_layout = False
+        self._batch_apply_needed = False
+        self._collapse_save_timer = None
+        self._cached_selected_count = 0
+        self._cached_visible_selectable = 0
+        self._cached_visible_selected = 0
+        self._cached_total_selectable = 0
 
         if self._config:
             self._state.collapsed_categories = set(self._config.get("collapsed_categories", []))
@@ -298,25 +307,34 @@ class SkillModel(QAbstractListModel):
             self._save_filters()
             self.isPackageOnlyChanged.emit()
 
-    @Property(int, notify=selectedCountChanged)
+    @Property(int, notify=selectionStateChanged)
     def selectedCount(self):
-        return sum(1 for s in self._all_filtered_skills if s.local_path in self._selected_ids)
+        return self._cached_selected_count
 
-    @Property(int, notify=selectedCountChanged)
+    @Property(int, notify=selectionStateChanged)
     def visibleSelectableCount(self):
         """Returns the number of skills currently visible in the view (not collapsed)."""
-        return sum(1 for s in self._filtered_skills if s.local_path)
+        return self._cached_visible_selectable
 
-    @Property(int, notify=selectedCountChanged)
+    @Property(int, notify=selectionStateChanged)
     def visibleSelectedCount(self):
         """Returns the number of selected skills that are currently visible."""
-        return sum(
-            1 for s in self._filtered_skills if s.local_path and s.local_path in self._selected_ids
-        )
+        return self._cached_visible_selected
 
     @Property(int, notify=totalSelectableCountChanged)
     def totalSelectableCount(self):
-        return len(self._all_filtered_skills)
+        return self._cached_total_selectable
+
+    def _update_selection_counts(self):
+        """Recomputes cached selection/visibility counts."""
+        self._cached_selected_count = sum(
+            1 for s in self._all_filtered_skills if s.local_path in self._selected_ids
+        )
+        self._cached_visible_selectable = sum(1 for s in self._filtered_skills if s.local_path)
+        self._cached_visible_selected = sum(
+            1 for s in self._filtered_skills if s.local_path and s.local_path in self._selected_ids
+        )
+        self._cached_total_selectable = len(self._all_filtered_skills)
 
     # Slots & Methods
     @Slot(int)
@@ -332,15 +350,15 @@ class SkillModel(QAbstractListModel):
                 self._selected_ids.add(path)
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
-            self.selectedCountChanged.emit()
-            self.userSelectionChanged.emit()
+            self._update_selection_counts()
+            self.selectionStateChanged.emit()
 
     @Slot()
     def clearSelection(self):
         self._selected_ids.clear()
         self._emit_selection_data_changed()
-        self.selectedCountChanged.emit()
-        self.userSelectionChanged.emit()
+        self._update_selection_counts()
+        self.selectionStateChanged.emit()
 
     @Slot()
     def selectAll(self):
@@ -348,7 +366,8 @@ class SkillModel(QAbstractListModel):
             if skill.local_path:
                 self._selected_ids.add(skill.local_path)
         self._emit_selection_data_changed()
-        self.selectedCountChanged.emit()
+        self._update_selection_counts()
+        self.selectionStateChanged.emit()
 
     @Slot(result=list)
     def getSelectedPaths(self):
@@ -366,8 +385,8 @@ class SkillModel(QAbstractListModel):
             if path:
                 self._selected_ids.add(path)
         self._emit_selection_data_changed()
-        self.selectedCountChanged.emit()
-        self.userSelectionChanged.emit()
+        self._update_selection_counts()
+        self.selectionStateChanged.emit()
 
     def removeSkillsByPath(self, paths: list):
         path_set = set(paths)
@@ -378,10 +397,18 @@ class SkillModel(QAbstractListModel):
             self._search_engine.remove_from_index(list(path_set))
 
         self._apply_filter()
-        self.selectedCountChanged.emit()
+        self.selectionStateChanged.emit()
 
     def _apply_filter(self, reset=False):
-        """Applies filters and updates the model synchronously."""
+        """Applies filters and updates the model synchronously.
+
+        When ``_suppress_layout`` is True, the filter+sort pipeline is
+        deferred to ``_end_batch()`` so redundant work is eliminated.
+        """
+        if self._suppress_layout:
+            self._batch_apply_needed = True
+            return
+
         if reset:
             self.beginResetModel()
         else:
@@ -394,16 +421,27 @@ class SkillModel(QAbstractListModel):
                 self._all_filtered_skills, self._state.collapsed_categories
             )
         except Exception as e:
-            import logging
-
-            logging.getLogger(__name__).error(f"Error applying filter: {e}")
+            logger.error("Error applying filter: %s", e)
         finally:
             if reset:
                 self.endResetModel()
             else:
                 self.layoutChanged.emit()
-            self.selectedCountChanged.emit()
+            self._update_selection_counts()
+            self.selectionStateChanged.emit()
             self.totalSelectableCountChanged.emit()
+
+    def _begin_batch(self):
+        """Suppress layout signals and filter work until _end_batch()."""
+        self._suppress_layout = True
+        self._batch_apply_needed = False
+
+    def _end_batch(self):
+        """Re-enable layout signals and emit a single layoutChanged."""
+        self._suppress_layout = False
+        if self._batch_apply_needed:
+            self._batch_apply_needed = False
+            self._apply_filter()
 
     def _execute_filter_logic(self) -> list[Skill]:
         """Internal synchronous logic for filtering and searching."""
@@ -412,14 +450,8 @@ class SkillModel(QAbstractListModel):
                 s.local_path for s in self._engine.filter_skills(self._all_skills, self._state)
             }
             results = self._search_engine.query(self._state.filter_text, valid_paths=valid_paths)
-            skills = []
-            for result in results:
-                s = result[0]
-                if isinstance(s, dict):
-                    skills.append(Skill.from_dict(s))
-                else:
-                    skills.append(s)
-            return skills
+            path_to_skill = {s.local_path: s for s in self._all_skills}
+            return [path_to_skill.get(r[0].get("local_path", ""), Skill.from_dict(r[0])) for r in results]
         skills = self._engine.filter_skills(self._all_skills, self._state)
         skills.sort(key=self._engine.sort_key)
         return skills
@@ -457,8 +489,8 @@ class SkillModel(QAbstractListModel):
     @Slot(list)
     def setSkills(self, skills: list[dict[str, Any]]):
         was_empty = len(self._all_skills) == 0
-        self._all_skills = [Skill.from_dict(s) for s in skills]
-        self._search_engine = SearchEngine(skills)  # Keep raw dicts for SearchEngine for now
+        self._all_skills = [Skill.from_dict_fast(s) for s in skills]
+        self._search_engine = SearchEngine(skills)
         self._apply_filter(reset=was_empty)
 
     @Slot(list)
@@ -466,7 +498,7 @@ class SkillModel(QAbstractListModel):
         was_empty = len(self._all_skills) == 0
         skills_dict = {s.local_path: s for s in self._all_skills}
         for s_dict in new_skills:
-            skill = Skill.from_dict(s_dict)
+            skill = Skill.from_dict_fast(s_dict)
             skills_dict[skill.local_path] = skill
         self._all_skills = list(skills_dict.values())
 
@@ -490,7 +522,8 @@ class SkillModel(QAbstractListModel):
                 self._selected_ids.discard(path)
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
-            self.selectedCountChanged.emit()
+            self._update_selection_counts()
+            self.selectionStateChanged.emit()
 
     @Property(list, notify=collapsedCategoriesChanged)
     def collapsedCategories(self):
@@ -538,27 +571,38 @@ class SkillModel(QAbstractListModel):
             self._all_filtered_skills, self._state.collapsed_categories
         )
         self.layoutChanged.emit()
-        self.selectedCountChanged.emit()
+        self._update_selection_counts()
+        self.selectionStateChanged.emit()
 
     @Slot(str, result=bool)
     def isCategoryCollapsed(self, name):
         return name in self._state.collapsed_categories
 
     def _save_collapsed(self):
-        if self._config:
-            self._config.set("collapsed_categories", list(self._state.collapsed_categories))
+        if not self._config:
+            return
+        if self._collapse_save_timer is None:
+            from PySide6.QtCore import QTimer
+            self._collapse_save_timer = QTimer()
+            self._collapse_save_timer.setSingleShot(True)
+            self._collapse_save_timer.timeout.connect(self._do_save_collapsed)
+            self._collapse_save_timer.setInterval(500)
+        self._collapse_save_timer.start()
+
+    def _do_save_collapsed(self):
+        self._config.set("collapsed_categories", list(self._state.collapsed_categories))
 
     def _save_filters(self):
         if not self._config:
             return
-        c = self._config
-        s = self._state
-        c.set("show_archived", s.show_archived)
-        c.set("category_filter", s.category_filter)
-        c.set("collection_filter", s.collection_filter)
-        c.set("project_filter", s.project_filter)
-        c.set("client_format", s.client_filter)
-        c.set("show_commands", s.show_commands)
-        c.set("show_starred", s.show_starred)
-        c.set("is_package_only", s.is_package_only)
-        c.set("is_source_only", s.is_package_only)
+        self._config.set_many({
+            "show_archived": self._state.show_archived,
+            "category_filter": self._state.category_filter,
+            "collection_filter": self._state.collection_filter,
+            "project_filter": self._state.project_filter,
+            "client_format": self._state.client_filter,
+            "show_commands": self._state.show_commands,
+            "show_starred": self._state.show_starred,
+            "is_package_only": self._state.is_package_only,
+            "is_source_only": self._state.is_package_only,
+        })

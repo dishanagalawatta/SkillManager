@@ -57,10 +57,15 @@ def test_config_controller_get_project_label(config_controller, mock_app):
 
 
 def test_config_controller_set_project_alias(config_controller, mock_app):
+    mock_app._library_model = MagicMock()
+    mock_app._quick_copy_model = MagicMock()
     config_controller.setProjectAlias("/path/p", "NewName")
     assert mock_app._project_aliases["/path/p"] == "NewName"
     mock_app.projectsChanged.emit.assert_called_once()
-    mock_app.refreshSkills.assert_called_once()
+    mock_app._library_model._begin_batch.assert_called_once()
+    mock_app._library_model._end_batch.assert_called_once()
+    mock_app._quick_copy_model._begin_batch.assert_called_once()
+    mock_app._quick_copy_model._end_batch.assert_called_once()
 
 
 def test_config_controller_remove_project(config_controller, mock_app):

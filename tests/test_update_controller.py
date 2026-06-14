@@ -134,6 +134,93 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
     )
 
 
+@patch("skill_manager.controllers.update_controller.QTimer.singleShot")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.copier.copy_skill_folders_to_projects")
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.quick_copy.discover_package_skills")
+def test_sync_project_emits_categories_changed(
+    mock_discover_pkg,
+    mock_patch_cache,
+    mock_copy,
+    mock_discover_single,
+    mock_timer,
+    update_controller,
+    mock_app,
+):
+    mock_app._categories = []
+    mock_discover_pkg.return_value = [{"local_path": "/src/s1"}]
+    mock_copy.return_value = {
+        "merged": 1,
+        "failed": 0,
+        "details": [{"status": "merged", "message": "/project/S1.md", "project": "/project"}],
+    }
+    mock_discover_single.return_value = {
+        "local_path": "/project/S1",
+        "name": "S1",
+        "category": "NewCategory",
+        "project_label": "ProjectLabel",
+    }
+
+    timer_callbacks = []
+
+    def mock_single_shot(ms, obj, callback):
+        timer_callbacks.append(callback)
+
+    mock_timer.side_effect = mock_single_shot
+
+    update_controller.syncProject("/project")
+
+    for cb in timer_callbacks:
+        cb()
+
+    assert "NewCategory" in mock_app._categories
+    mock_app.categoriesChanged.emit.assert_called()
+
+
+@patch("skill_manager.controllers.update_controller.QTimer.singleShot")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.copier.copy_skill_folders_to_projects")
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.quick_copy.discover_package_skills")
+def test_sync_project_skips_categories_changed_when_no_new_cats(
+    mock_discover_pkg,
+    mock_patch_cache,
+    mock_copy,
+    mock_discover_single,
+    mock_timer,
+    update_controller,
+    mock_app,
+):
+    mock_app._categories = ["Dev", "General"]
+    mock_discover_pkg.return_value = [{"local_path": "/src/s1"}]
+    mock_copy.return_value = {
+        "merged": 1,
+        "failed": 0,
+        "details": [{"status": "merged", "message": "/project/S1.md", "project": "/project"}],
+    }
+    mock_discover_single.return_value = {
+        "local_path": "/project/S1",
+        "name": "S1",
+        "category": "Dev",
+        "project_label": "ProjectLabel",
+    }
+
+    timer_callbacks = []
+
+    def mock_single_shot(ms, obj, callback):
+        timer_callbacks.append(callback)
+
+    mock_timer.side_effect = mock_single_shot
+
+    update_controller.syncProject("/project")
+
+    for cb in timer_callbacks:
+        cb()
+
+    assert mock_app._categories == ["Dev", "General"]
+
+
 def test_recalculate_stats(update_controller, mock_app):
     mock_app._update_results = [
         {"status": "up_to_date"},
@@ -147,3 +234,130 @@ def test_recalculate_stats(update_controller, mock_app):
     assert mock_app._stats_outdated == 2
     assert mock_app._stats_missing == 1
     mock_app.statsChanged.emit.assert_called_once()
+
+
+def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_path):
+    pkg_path = tmp_path / "pkg"
+    pkg_path.mkdir()
+    skill_dir = pkg_path / "new_skill"
+    skill_dir.mkdir()
+
+    mock_app._update_packages = [
+        {
+            "package_id": "test-pkg",
+            "name": "Test Package",
+            "package_path": str(pkg_path),
+            "resolved_package_path": str(pkg_path),
+            "is_updating": False,
+            "just_finished": False,
+        }
+    ]
+    mock_app._sources = []
+    mock_app._projects = []
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    mock_skill = {
+        "local_path": str(skill_dir),
+        "name": "new_skill",
+        "category": "NewCat",
+    }
+
+    timer_callbacks = []
+
+    def mock_single_shot(ms, obj, callback):
+        timer_callbacks.append(callback)
+
+    with (
+        patch.object(update_controller, "_resolvePackageStorageState"),
+        patch("skill_manager.controllers.update_controller.QTimer.singleShot", side_effect=mock_single_shot),
+        patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
+        patch("skill_manager.core.skill_packages.run_skill_package_update", return_value={"status": "ok"}),
+        patch(
+            "skill_manager.core.skill_packages.scan_package_inventory",
+            return_value={"scan_ok": True, "skills": {"new_skill": {"name": "new_skill"}}},
+        ),
+        patch(
+            "skill_manager.core.skill_packages.diff_package_inventory",
+            return_value={"added": ["new_skill"], "updated": [], "removed": []},
+        ),
+        patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=False),
+        patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
+        patch("skill_manager.core.persistence.save_package_skill_inventory"),
+        patch("skill_manager.core.persistence.patch_cache_add") as mock_patch_cache,
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill",
+            return_value=mock_skill,
+        ) as mock_discover_single,
+    ):
+        update_controller.runPackageUpdate(0)
+
+        for cb in timer_callbacks:
+            cb()
+
+        mock_discover_single.assert_called_once()
+        mock_patch_cache.assert_called_once()
+        mock_app._library_model.addOrUpdateSkills.assert_called_once_with([mock_skill])
+        mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once_with([mock_skill])
+        mock_app.loadInitialData.assert_not_called()
+        assert "NewCat" in mock_app._categories
+        mock_app.categoriesChanged.emit.assert_called()
+
+
+def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_path):
+    pkg_path = tmp_path / "pkg"
+    pkg_path.mkdir()
+    kept_dir = pkg_path / "kept_skill"
+    kept_dir.mkdir()
+
+    mock_app._update_packages = [
+        {
+            "package_id": "test-pkg",
+            "name": "Test Package",
+            "package_path": str(pkg_path),
+            "resolved_package_path": str(pkg_path),
+            "is_updating": False,
+            "just_finished": False,
+        }
+    ]
+    mock_app._sources = []
+    mock_app._projects = []
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    timer_callbacks = []
+
+    def mock_single_shot(ms, obj, callback):
+        timer_callbacks.append(callback)
+
+    with (
+        patch.object(update_controller, "_resolvePackageStorageState"),
+        patch("skill_manager.controllers.update_controller.QTimer.singleShot", side_effect=mock_single_shot),
+        patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
+        patch("skill_manager.core.skill_packages.run_skill_package_update", return_value={"status": "ok"}),
+        patch(
+            "skill_manager.core.skill_packages.scan_package_inventory",
+            return_value={"scan_ok": True, "skills": {"kept_skill": {"name": "kept_skill"}}},
+        ),
+        patch(
+            "skill_manager.core.skill_packages.diff_package_inventory",
+            return_value={"added": [], "updated": [], "removed": ["old_skill"]},
+        ),
+        patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=True),
+        patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
+        patch("skill_manager.core.persistence.save_package_skill_inventory"),
+        patch("skill_manager.core.persistence.patch_cache_add"),
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None),
+    ):
+        update_controller.runPackageUpdate(0)
+
+        for cb in timer_callbacks:
+            cb()
+
+        mock_app._library_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
+        mock_app._quick_copy_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
+        mock_app.loadInitialData.assert_not_called()

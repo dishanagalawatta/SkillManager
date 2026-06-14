@@ -9,7 +9,8 @@ from skill_manager.core.file_watch import SkillFolderEventHandler, SkillFolderWa
 def test_skill_folder_event_handler():
     """Test that the handler coalesces events and triggers the callback for markdown files or directories."""
     mock_callback = Mock()
-    handler = SkillFolderEventHandler(mock_callback)
+    # Use debounce_ms=0 to test filtering logic without debounce delay
+    handler = SkillFolderEventHandler(mock_callback, debounce_ms=0)
 
     # Trigger with a markdown file
     md_event = FileModifiedEvent("test_skill.md")

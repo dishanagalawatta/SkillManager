@@ -7,7 +7,7 @@ Item {
     id: control
     
     property int checkState: Qt.Unchecked
-    property string tooltipText: checkState === Qt.Checked ? "Clear Selection" : "Select All"
+    property string tooltipText: checkState === Qt.Unchecked ? "Select All" : "Clear Selection"
     property int buttonSize: 28
     property int iconSize: 12
 

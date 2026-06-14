@@ -43,15 +43,20 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
         for key, value in fields.items()
         if value not in (None, "")
     )
-    msg = f"{event}{(' ' + details) if details else ''}"
-    if level.upper() == "ERROR":
-        logger.error(msg)
-    elif level.upper() == "WARN":
-        logger.warning(msg)
-    elif level.upper() == "DEBUG":
-        logger.debug(msg)
+    if details:
+        msg = "%s %s"
+        args = (event, details)
     else:
-        logger.info(msg)
+        msg = "%s"
+        args = (event,)
+    if level.upper() == "ERROR":
+        logger.error(msg, *args)
+    elif level.upper() == "WARN":
+        logger.warning(msg, *args)
+    elif level.upper() == "DEBUG":
+        logger.debug(msg, *args)
+    else:
+        logger.info(msg, *args)
 
 
 class UpdateService:
@@ -486,7 +491,9 @@ class UpdateService:
                     updated_sources.append(check_skill_package_versions(source))
                 except Exception as exc:
                     logger.error(
-                        f"[ERROR] Failed to check versions for {source.get('name')}: {exc}"
+                        "[ERROR] Failed to check versions for %s: %s",
+                        source.get("name"),
+                        exc,
                     )
                     updated_sources.append(source)
 

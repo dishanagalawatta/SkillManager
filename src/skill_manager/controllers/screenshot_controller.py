@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRect, Signal, Slot
+from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
 from PySide6.QtGui import QColor, QGuiApplication, QPainter
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ class ScreenshotController(QObject):
     captureFinished = Signal(str)  # Path to saved file
     minimizeRequested = Signal()
     captureCancelled = Signal()
+    screenshotVersionChanged = Signal()
 
     @Slot()
     def cancelCapture(self):
@@ -31,10 +32,19 @@ class ScreenshotController(QObject):
         super().__init__()
         self.app = app_controller
         self._current_full_pixmap = None
+        self._screenshot_version = 0
+
+    @Property(int, notify=screenshotVersionChanged)
+    def screenshotVersion(self):
+        return self._screenshot_version
 
     @Slot()
     def takeScreenshot(self):
         """Captures the primary screen and signals QML to show the overlay."""
+        logger.info(
+            "takeScreenshot called, autoMinimize=%s",
+            self.app.config_controller.autoMinimizeOnScreenshot,
+        )
         if self.app.config_controller.autoMinimizeOnScreenshot:
             self.minimizeRequested.emit()
             logger.info("Auto-minimize enabled, requesting window minimize.")
@@ -47,6 +57,8 @@ class ScreenshotController(QObject):
 
         self._current_full_pixmap = screen.grabWindow(0)
         self.app.screenshot_provider.set_pixmap(self._current_full_pixmap)
+        self._screenshot_version += 1
+        self.screenshotVersionChanged.emit()
         self.showOverlay.emit()
         logger.info("Screenshot capture initiated, overlay requested.")
 
@@ -57,8 +69,20 @@ class ScreenshotController(QObject):
         if not screen:
             logger.error("No primary screen detected for screenshot.")
             return
+        logger.info(
+            "captureScreen: screen=%s, geometry=%s",
+            screen.name(),
+            screen.geometry(),
+        )
         self._current_full_pixmap = screen.grabWindow(0)
+        logger.info(
+            "captureScreen: grabbed %dx%d pixmap",
+            self._current_full_pixmap.width(),
+            self._current_full_pixmap.height(),
+        )
         self.app.screenshot_provider.set_pixmap(self._current_full_pixmap)
+        self._screenshot_version += 1
+        self.screenshotVersionChanged.emit()
         self.showOverlay.emit()
         logger.info("Screenshot capture initiated via captureScreen().")
 
@@ -163,8 +187,12 @@ class ScreenshotController(QObject):
                 "metadata": {"category": "Capture"},
             }
 
-            self.app.skillModel.addOrUpdateSkills([skill_data])
-            self.app.quickCopyModel.addOrUpdateSkills([skill_data])
+            self.app._library_model.addOrUpdateSkills([skill_data])
+            self.app._quick_copy_model.addOrUpdateSkills([skill_data])
+
+            if "Screenshots" not in set(self.app._categories):
+                self.app._categories = sorted(set(self.app._categories) | {"Screenshots"})
+                self.app.categoriesChanged.emit()
         else:
-            logger.error(f"Failed to save screenshot to {filepath}")
+            logger.error("Failed to save screenshot to %s", filepath)
             self.app._set_status("Failed to save screenshot.")

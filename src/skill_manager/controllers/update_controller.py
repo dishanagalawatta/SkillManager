@@ -385,7 +385,48 @@ class UpdateController(BaseController):
                         self.app._update_packages[index] = dict(source)
                         self.app.updatePackagesChanged.emit()
                         self.app._set_status(f"Update finished for {source.get('name')}")
-                        self.app.loadInitialData()
+
+                        removed = source.get("removed_folders", [])
+                        removals_verified = source.get("removals_verified", False)
+                        if removed and removals_verified:
+                            self.app._library_model.removeSkillsByPath(removed)
+                            self.app._quick_copy_model.removeSkillsByPath(removed)
+
+                        updated = source.get("updated_folders", [])
+                        if updated:
+                            from skill_manager.core.discovery import DiscoveryService
+                            from skill_manager.core.persistence import patch_cache_add
+
+                            pkg_path = (
+                                source.get("resolved_package_path")
+                                or source.get("package_path")
+                                or source.get("local_path")
+                                or ""
+                            )
+                            service = DiscoveryService(
+                                sources=[pkg_path] if pkg_path else [],
+                                projects=[],
+                                archive_paths=self.app._archive_paths,
+                                starred_paths=self.app._starred_paths,
+                                project_aliases=self.app._project_aliases,
+                            )
+                            discovered = []
+                            for folder in updated:
+                                try:
+                                    folder_path = Path(pkg_path) / folder if pkg_path else Path(folder)
+                                    if folder_path.is_dir():
+                                        skill_data = service.discover_single_skill(
+                                            folder_path, folder_path
+                                        )
+                                        if skill_data:
+                                            discovered.append(skill_data)
+                                except Exception:
+                                    pass
+
+                            if discovered:
+                                patch_cache_add(discovered)
+                                self._merge_discovered_skills(discovered)
+
                         self.config.set("skills", self.app._update_packages)
 
                     QTimer.singleShot(0, self.app, finalize_ui)
@@ -443,18 +484,15 @@ class UpdateController(BaseController):
                                 if skill_data:
                                     discovered_skills.append(skill_data)
                             except Exception as exc:
-                                import logging
-
-                                logging.getLogger(__name__).error(
-                                    f"[SYNC SCAN] Failed scanning {skill_path}: {exc}"
+                                logger.error(
+                                    "[SYNC SCAN] Failed scanning %s: %s", skill_path, exc
                                 )
 
                 if discovered_skills:
                     patch_cache_add(discovered_skills)
 
                     def update_ui():
-                        self.app._library_model.addOrUpdateSkills(discovered_skills)
-                        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+                        self._merge_discovered_skills(discovered_skills)
 
                     QTimer.singleShot(0, self.app, update_ui)
 

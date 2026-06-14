@@ -30,6 +30,10 @@ class ConfigController(BaseController):
     autoMinimizeOnScreenshotChanged = Signal()
     temporaryScreenshotsChanged = Signal()
 
+    # Cached property values (invalidated via _invalidate_project_cache)
+    _cached_update_projects: list[dict] | None = None
+    _cached_project_labels: list[str] | None = None
+
     @Property(float, notify=scrollSpeedMultiplierChanged)
     def scrollSpeedMultiplier(self):
         return self.config.get("scroll_speed_multiplier", 1.0)
@@ -190,6 +194,10 @@ class ConfigController(BaseController):
     def shortcutSettingsView(self):
         return self.get_shortcut("settings_view")
 
+    @Property(str, notify=shortcutsChanged)
+    def shortcutScreenshot(self):
+        return self.get_shortcut("screenshot")
+
     @Property(bool, notify=isRecordingShortcutChanged)
     def isRecordingShortcut(self):
         return self.app._is_recording_shortcut
@@ -250,8 +258,7 @@ class ConfigController(BaseController):
         if resolved_path not in self.app._projects:
             self.app._projects.append(resolved_path)
             self.config.set("projects", self.app._projects)
-            self.app.projectsChanged.emit()
-            self.updateProjectsChanged.emit()
+            self._emit_projects_changed()
             self.app._set_status(f"Added project: {resolved_path}")
             capture_event("project_target_added", {"target_count": len(self.app._projects)})
 
@@ -266,8 +273,7 @@ class ConfigController(BaseController):
                 del self.app._project_aliases[path]
                 self.config.set("project_aliases", self.app._project_aliases)
             self.config.set("projects", self.app._projects)
-            self.app.projectsChanged.emit()
-            self.updateProjectsChanged.emit()
+            self._emit_projects_changed()
             self.app._set_status(f"Removed project: {path}")
 
     @Slot(int)
@@ -326,6 +332,8 @@ class ConfigController(BaseController):
     @Property(list, notify=updateProjectsChanged)
     def updateProjects(self):
         """Returns a list of project info with skill counts and sync status for the UI."""
+        if self._cached_update_projects is not None:
+            return self._cached_update_projects
         results = []
         from pathlib import Path
 
@@ -360,12 +368,32 @@ class ConfigController(BaseController):
                     "is_updating": p in self.app._syncing_projects,
                 }
             )
+        self._cached_update_projects = results
         return results
 
     @Property(list, notify=updateProjectsChanged)
     def projectLabels(self):
         """Returns a list of human-readable labels for all projects."""
-        return [self.getProjectLabel(p) for p in self.app._projects]
+        if self._cached_project_labels is not None:
+            return self._cached_project_labels
+        self._cached_project_labels = [self.getProjectLabel(p) for p in self.app._projects]
+        return self._cached_project_labels
+
+    def _invalidate_project_cache(self):
+        """Invalidate cached project data so properties recompute on next access."""
+        self._cached_update_projects = None
+        self._cached_project_labels = None
+
+    def _emit_projects_changed(self):
+        """Emit both project signals and invalidate cache."""
+        self.app.projectsChanged.emit()
+        self._invalidate_project_cache()
+        self.updateProjectsChanged.emit()
+
+    def _emit_collections_changed(self):
+        """Emit both collection change signals."""
+        self.app.customCollectionsChanged.emit()
+        self.customCollectionsChanged.emit()
 
     @Slot(str, str)
     def setProjectAlias(self, path: str, alias: str):
@@ -379,9 +407,24 @@ class ConfigController(BaseController):
             self.app._project_aliases[path] = alias
 
         self.config.set("project_aliases", self.app._project_aliases)
-        self.app.projectsChanged.emit()
-        self.updateProjectsChanged.emit()
-        self.app.refreshSkills()
+        self._emit_projects_changed()
+
+        new_label = self.getProjectLabel(path)
+        for model in (self.app._library_model, self.app._quick_copy_model):
+            model._begin_batch()
+            try:
+                all_skills = getattr(model, "_all_skills", None)
+                if isinstance(all_skills, list):
+                    for skill in all_skills:
+                        sp = skill.get("project_path") if isinstance(skill, dict) else getattr(skill, "project_path", None)
+                        if sp and str(sp) == str(path):
+                            if isinstance(skill, dict):
+                                skill["project_label"] = new_label
+                            else:
+                                skill.project_label = new_label
+            finally:
+                model._end_batch()
+
         self.app._set_status(f"Renamed project to: {alias or 'Default'}")
 
     @Slot(str, str, result=str)
@@ -429,8 +472,7 @@ class ConfigController(BaseController):
             return
         self.app._custom_collections[name] = paths
         self.config.set("custom_collections", self.app._custom_collections)
-        self.app.customCollectionsChanged.emit()
-        self.customCollectionsChanged.emit()
+        self._emit_collections_changed()
         self.app._set_status(f"Collection saved: {name}")
 
     @Slot(str)
@@ -439,8 +481,7 @@ class ConfigController(BaseController):
         if name in self.app._custom_collections:
             del self.app._custom_collections[name]
             self.config.set("custom_collections", self.app._custom_collections)
-            self.app.customCollectionsChanged.emit()
-            self.customCollectionsChanged.emit()
+            self._emit_collections_changed()
             self.app._set_status(f"Collection deleted: {name}")
 
     @Slot(str)
