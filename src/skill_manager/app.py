@@ -50,6 +50,7 @@ from skill_manager.core.config import (
     ConfigManager,
 )
 from skill_manager.core.file_watch import SkillFolderWatcher
+from skill_manager.core.global_hotkey import GlobalHotkeyManager
 from skill_manager.core.image_provider import ScreenshotImageProvider
 from skill_manager.core.models import SkillModel
 from skill_manager.core.persistence import (
@@ -159,6 +160,7 @@ class AppController(QObject):
         self.updates = UpdateController(self)
         self.discovery = DiscoveryController(self)
         self.app_updater = AppUpdateController(self)
+        self.global_hotkey = GlobalHotkeyManager(self)
 
         # 4. Connect Sub-Controller signals to Proxy Signals
         self.ui.currentViewChanged.connect(self.currentViewChanged.emit)
@@ -191,6 +193,10 @@ class AppController(QObject):
         if app_inst:
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_copies)
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_screenshots)
+
+        # 6. Global Hotkey Setup (screenshot hotkey works when app is minimized)
+        self._hotkey_id_screenshot = 1
+        self._setup_global_hotkeys()
 
         # 4. Initial Model Configuration
         self._library_model.showCommands = False
@@ -844,8 +850,45 @@ class AppController(QObject):
     def getProjectLabel(self, path):
         return self.config_mgr.getProjectLabel(path)
 
+    def _setup_global_hotkeys(self):
+        """Register global hotkeys and connect signals."""
+        # Connect hotkey signal to screenshot trigger
+        # Use QueuedConnection because the signal is emitted from a background thread
+        from PySide6.QtCore import Qt
+
+        self.global_hotkey.hotkeyPressed.connect(
+            self._on_global_hotkey, Qt.ConnectionType.QueuedConnection
+        )
+
+        # Register screenshot hotkey at startup
+        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
+        if screenshot_seq:
+            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
+
+        # Re-register when shortcuts change
+        self.config_mgr.shortcutsChanged.connect(self._on_shortcuts_changed)
+
+        # Start the listener thread
+        self.global_hotkey.start()
+
+    @Slot(int)
+    def _on_global_hotkey(self, hotkey_id: int):
+        """Handle global hotkey press."""
+        if hotkey_id == self._hotkey_id_screenshot:
+            self.screenshot.takeScreenshot()
+
+    def _on_shortcuts_changed(self):
+        """Re-register global hotkeys when shortcuts are updated."""
+        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
+        if screenshot_seq:
+            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
+
     def on_quit(self):
         """Ensures all pending state is saved before exit."""
+        # Stop global hotkey listener
+        if hasattr(self, "global_hotkey"):
+            self.global_hotkey.stop()
+
         if hasattr(self, "_watcher"):
             self._watcher.stop()
         if hasattr(self, "_scheduler") and self._scheduler.running:

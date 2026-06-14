@@ -32,7 +32,7 @@ class ImageInspectorController(BaseController):
 
         pixmap = QPixmap(image_path)
         if pixmap.isNull():
-            logger.error(f"Failed to load image from: {image_path}")
+            logger.error("Failed to load image from: %s", image_path)
             self.imageLoadError.emit(f"Failed to load image: {image_path}")
             return False
 
@@ -46,11 +46,11 @@ class ImageInspectorController(BaseController):
         painter.end()
 
         if pixmap.save(image_path):
-            logger.info(f"Annotated image saved to: {image_path}")
+            logger.info("Annotated image saved to: %s", image_path)
             self.imageSaved.emit(image_path)
             return True
 
-        logger.error(f"Failed to save annotated image to: {image_path}")
+        logger.error("Failed to save annotated image to: %s", image_path)
         self.imageLoadError.emit(f"Failed to save: {image_path}")
         return False
 

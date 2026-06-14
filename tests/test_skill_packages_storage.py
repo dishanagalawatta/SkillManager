@@ -209,7 +209,7 @@ def test_skill_fingerprint_oserror(tmp_path):
     f1 = skill_dir / "SKILL.md"
     f1.write_text("abc")
 
-    with patch("pathlib.Path.read_bytes", side_effect=OSError("Permission denied")):
+    with patch("pathlib.Path.stat", side_effect=OSError("Permission denied")):
         fp = _skill_fingerprint(skill_dir)
 
     import hashlib

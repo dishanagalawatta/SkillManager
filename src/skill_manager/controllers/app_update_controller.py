@@ -61,7 +61,7 @@ class AppUpdateController(BaseController):
             if bundled_root.exists():
                 shutil.copy(bundled_root, tuf_root_dest)
             else:
-                logger.warning(f"Bundled root.json not found at {bundled_root}")
+                logger.warning("Bundled root.json not found at %s", bundled_root)
 
         # In a real app, the public key should be embedded
         # For now, we'll assume it's in the app bundle or handled by the publish script
@@ -80,7 +80,7 @@ class AppUpdateController(BaseController):
             )
             logger.debug("tufup Client initialized successfully.")
         except Exception as e:
-            logger.warning(f"Failed to initialize TUF client (updates will be unavailable): {e}")
+            logger.warning("Failed to initialize TUF client (updates will be unavailable): %s", e)
             self._client = None
 
     @Property(bool, notify=updateAvailableChanged)
@@ -111,7 +111,7 @@ class AppUpdateController(BaseController):
     @Slot(bool)
     def checkForUpdates(self, manual=False):
         """Checks for updates asynchronously using tufup."""
-        logger.debug(f"checkForUpdates called (manual={manual}). is_updating={self._is_updating}")
+        logger.debug("checkForUpdates called (manual=%s). is_updating=%s", manual, self._is_updating)
         if self._is_updating:
             return
 
@@ -146,9 +146,9 @@ class AppUpdateController(BaseController):
         return self._client.check_for_updates()
 
     def _on_updates_checked(self, new_version, manual=False):
-        logger.debug(f"_on_updates_checked received version: {new_version}")
+        logger.debug("_on_updates_checked received version: %s", new_version)
         if new_version:
-            logger.info(f"Update available: {new_version}")
+            logger.info("Update available: %s", new_version)
             self._latest_version = str(new_version)
             self._update_available = True
             self.updateAvailableChanged.emit()
@@ -171,7 +171,7 @@ class AppUpdateController(BaseController):
             new_version = await loop.run_in_executor(None, self._client.check_for_updates)
 
             if new_version:
-                logger.info(f"Update available: {new_version}")
+                logger.info("Update available: %s", new_version)
                 self._latest_version = str(new_version)
                 self._update_available = True
                 self.updateAvailableChanged.emit()

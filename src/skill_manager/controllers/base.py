@@ -19,3 +19,14 @@ class BaseController(QObject):
         super().__init__()
         self.app = app
         self.config: ConfigManager = app._config
+
+    def _merge_discovered_skills(self, discovered: list):
+        """Merge discovered skills into both models, updating categories."""
+        new_cats = sorted({s["category"] for s in discovered if s.get("category")})
+        if new_cats:
+            current_cats = set(self.app._categories)
+            current_cats.update(new_cats)
+            self.app._categories = sorted(current_cats)
+            self.app.categoriesChanged.emit()
+        self.app._library_model.addOrUpdateSkills(discovered)
+        self.app._quick_copy_model.addOrUpdateSkills(discovered)

@@ -297,9 +297,11 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
     project_path.mkdir(parents=True, exist_ok=True)
     # create_custom_command_file uses project_paths to find targets
     controller._projects = [str(project_path)]
-    controller.refreshSkills = MagicMock()
 
-    with patch("skill_manager.core.commands.create_custom_command_file") as mock_create:
+    with (
+        patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None),
+    ):
         from skill_manager.core.commands import CommandCreateResult
 
         mock_create.return_value = CommandCreateResult(
@@ -308,7 +310,6 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
         controller.createCustomCommand("Deploy", "Codex", "body", "proj", "Ops")
 
     assert controller.statusMessage == "Created 1 command(s)"
-    controller.refreshSkills.assert_called_once()
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -516,7 +517,6 @@ def test_controller_cache_save_load_and_corruption(controller, tmp_path):
 
 
 def test_controller_archive_refresh_and_delegate_actions(controller):
-    controller.loadInitialData = MagicMock()
     # Don't mock the whole ops object, we need its real state
     # but mock methods we want to track
     with (
@@ -532,7 +532,6 @@ def test_controller_archive_refresh_and_delegate_actions(controller):
     ):
         controller.addToArchive("/skill")
         assert "/skill" in controller._archive_paths
-        controller.loadInitialData.assert_called_once()
 
         controller.toggleCurrentSkillArchive()
         controller.toggleCurrentSkillStarred()

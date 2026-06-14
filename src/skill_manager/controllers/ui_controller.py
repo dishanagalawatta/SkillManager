@@ -246,19 +246,23 @@ class UIController(BaseController):
     @Slot()
     def resetUiState(self):
         """Restores UI preferences and geometry to stable defaults."""
-        self._window_width = 1300
-        self._window_height = 650
-        self._window_x = 100
-        self._window_y = 100
-        self._current_view = "Library"
-        self._startup_view = "Library"
-        self._remember_filters = True
-        self._reduced_motion = False
-        self._compact_list_rows = False
-        self._inspector_width = 0
-        self._clearAllViewFilters()
-        self.saveUiState()
-        # Emit all relevant signals
+        self.blockSignals(True)
+        try:
+            self._window_width = 1300
+            self._window_height = 650
+            self._window_x = 100
+            self._window_y = 100
+            self._current_view = "Library"
+            self._startup_view = "Library"
+            self._remember_filters = True
+            self._reduced_motion = False
+            self._compact_list_rows = False
+            self._inspector_width = 0
+            self._clearAllViewFilters()
+            self.saveUiState()
+        finally:
+            self.blockSignals(False)
+        # Re-emit after unblocking so QML bindings update
         self.currentViewChanged.emit()
         self.windowWidthChanged.emit()
         self.windowHeightChanged.emit()
@@ -402,16 +406,24 @@ class UIController(BaseController):
     def clearViewFilters(self):
         """Clears all filters from the current model."""
         model = self.app.skillModel
-        model.filterText = ""
-        model.categoryFilter = ""
-        model.collectionFilter = False
-        model.projectFilter = ""
+        model._begin_batch()
+        try:
+            model.filterText = ""
+            model.categoryFilter = ""
+            model.collectionFilter = False
+            model.projectFilter = ""
+        finally:
+            model._end_batch()
         self.app._set_status("Filters cleared")
 
     def _clearAllViewFilters(self):
         """Clears filters for all models."""
         for model in [self.app._library_model, self.app._quick_copy_model]:
-            model.filterText = ""
-            model.categoryFilter = ""
-            model.collectionFilter = False
-            model.projectFilter = ""
+            model._begin_batch()
+            try:
+                model.filterText = ""
+                model.categoryFilter = ""
+                model.collectionFilter = False
+                model.projectFilter = ""
+            finally:
+                model._end_batch()

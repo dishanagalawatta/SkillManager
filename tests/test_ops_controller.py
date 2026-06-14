@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -226,11 +227,30 @@ def test_ops_controller_update_models_source(ops_controller, mock_app):
 
     mock_app._library_model._all_skills = [skill_library]
     mock_app._quick_copy_model._all_skills = [skill_quick_copy]
+    mock_app._library_model._filtered_skills = [skill_library]
+    mock_app._quick_copy_model._filtered_skills = [skill_quick_copy]
 
     ops_controller._updateModelsSource("/path/s", "is_archived", True)
 
     assert skill_library["is_archived"] is True
     assert skill_quick_copy["is_archived"] is True
+    mock_app._library_model.dataChanged.emit.assert_called()
+    mock_app._quick_copy_model.dataChanged.emit.assert_called()
+
+
+def test_ops_controller_update_models_source_calls_apply_filter_on_starred(
+    ops_controller, mock_app
+):
+    skill = {"local_path": "/path/s", "is_starred": False}
+    mock_app._library_model._all_skills = [skill]
+    mock_app._quick_copy_model._all_skills = [skill]
+    mock_app._library_model._filtered_skills = [skill]
+    mock_app._quick_copy_model._filtered_skills = [skill]
+
+    ops_controller._updateModelsSource("/path/s", "is_starred", True)
+
+    mock_app._library_model.dataChanged.emit.assert_called()
+    mock_app._quick_copy_model.dataChanged.emit.assert_called()
 
 
 def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, mock_app):
@@ -384,6 +404,8 @@ def test_ops_controller_aliases(ops_controller):
 def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
     mock_app._archive_paths = ["/p1"]  # /p1 already archived
+    mock_app._library_model._all_skills = []
+    mock_app._quick_copy_model._all_skills = []
 
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.archiveSelectedSkills()
@@ -391,7 +413,8 @@ def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
         assert "/p2" in mock_app._archive_paths
         mock_save.assert_called_once()
         mock_app._set_status.assert_called_with("1 skills archived")
-        mock_app.refreshSkills.assert_called_once()
+        mock_app._library_model._apply_filter.assert_called_once()
+        mock_app._quick_copy_model._apply_filter.assert_called_once()
 
     # Test already archived case
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
@@ -407,9 +430,16 @@ def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
 
 def test_ops_controller_add_to_archive(ops_controller, mock_app):
     mock_app._archive_paths = []
+    skill = {"local_path": "/p3", "is_archived": False}
+    mock_app._library_model._all_skills = [skill]
+    mock_app._library_model._filtered_skills = [skill]
+    mock_app._quick_copy_model._all_skills = [{"local_path": "/p3", "is_archived": False}]
+    mock_app._quick_copy_model._filtered_skills = [{"local_path": "/p3", "is_archived": False}]
     ops_controller.addToArchive("/p3")
     assert "/p3" in mock_app._archive_paths
-    mock_app.refreshSkills.assert_called_once()
+    assert skill["is_archived"] is True
+    mock_app._library_model.dataChanged.emit.assert_called()
+    mock_app._quick_copy_model.dataChanged.emit.assert_called()
     mock_app._set_status.assert_called_with("Skill archived: /p3")
 
 
@@ -454,13 +484,38 @@ def test_ops_controller_copy_selection_orchestration(ops_controller, mock_app):
     mock_app._set_status.assert_called_with("No skill available to copy")
 
 
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
 @patch("skill_manager.core.commands.create_custom_command_file")
-def test_ops_controller_create_custom_command(mock_create, ops_controller, mock_app):
-    mock_create.return_value = MagicMock(ok=True, message="Success")
+def test_ops_controller_create_custom_command(
+    mock_create, mock_discover, mock_patch_cache, ops_controller, mock_app
+):
+    mock_result = MagicMock(
+        ok=True, message="Created command: test.md", path=Path("/project/.agents/commands/test.md")
+    )
+    mock_create.return_value = mock_result
+    mock_discover.return_value = {
+        "local_path": "/project/.agents/commands/test.md",
+        "name": "test",
+        "category": "Commands",
+    }
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
     ops_controller.createCustomCommand("cmd", "G", "body", "proj", "cat")
     mock_create.assert_called_once()
+    mock_discover.assert_called_once_with(
+        Path("/project/.agents/commands/test.md"), Path("/project/.agents/commands")
+    )
+    mock_patch_cache.assert_called_once()
+    mock_app._library_model.addOrUpdateSkills.assert_called_once()
+    mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once()
+    mock_app.categoriesChanged.emit.assert_called()
     mock_app._set_status.assert_called_with("Created 1 command(s)")
-    mock_app.refreshSkills.assert_called_once()
 
 
 def test_ops_controller_toggle_starred_none(ops_controller, mock_app):
@@ -476,3 +531,110 @@ def test_ops_controller_delete_skills_empty(ops_controller, mock_app):
 def test_ops_controller_copy_text_to_clipboard(ops_controller, mock_app):
     ops_controller.copyTextToClipboard("test text")
     mock_app._clipboard.setText.assert_called_with("test text")
+
+
+def test_set_project_alias_targeted_update(mock_app):
+    from skill_manager.controllers.config_controller import ConfigController
+
+    mock_app._project_aliases = {}
+    mock_app._categories = ["Dev"]
+    skill_library = {
+        "local_path": "/src/S1",
+        "project_path": "/project",
+        "project_label": "OldLabel",
+    }
+    skill_quick = {"local_path": "/src/S1", "project_path": "/project", "project_label": "OldLabel"}
+    mock_app._library_model._all_skills = [skill_library]
+    mock_app._quick_copy_model._all_skills = [skill_quick]
+
+    config_ctrl = ConfigController(mock_app)
+    config_ctrl.setProjectAlias("/project", "NewLabel")
+
+    assert skill_library["project_label"] == "NewLabel"
+    assert skill_quick["project_label"] == "NewLabel"
+    mock_app._set_status.assert_called_with("Renamed project to: NewLabel")
+
+
+def test_set_project_alias_no_refresh(mock_app):
+    from skill_manager.controllers.config_controller import ConfigController
+
+    mock_app._project_aliases = {}
+    mock_app._categories = ["Dev"]
+    skill = {"local_path": "/src/S1", "project_path": "/other_project", "project_label": "Old"}
+    mock_app._library_model._all_skills = [skill]
+    mock_app._quick_copy_model._all_skills = []
+
+    config_ctrl = ConfigController(mock_app)
+    config_ctrl.setProjectAlias("/project", "NewLabel")
+
+    assert skill["project_label"] == "Old"
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.commands.create_custom_command_file")
+@patch("skill_manager.core.commands.update_custom_command_file_full")
+@patch("skill_manager.core.commands.resolve_commands_dir")
+def test_update_custom_command_full_multi_client(
+    mock_resolve_dir,
+    mock_update_full,
+    mock_create,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """updateCustomCommandFull should iterate all selected clients."""
+    from pathlib import Path
+
+    mock_app._projects = ["/project"]
+    mock_app._sources = []
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+
+    commands_dir = tmp_path / "commands"
+    mock_resolve_dir.return_value = commands_dir
+
+    # First client: update existing file
+    update_result = MagicMock(
+        ok=True, message="Updated", path=Path("/project/.agents/commands/Cmd.Codex.md")
+    )
+    mock_update_full.return_value = update_result
+
+    # Second client: file exists → update
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    (commands_dir / "Cmd.Antigravity.md").write_text("old")
+
+    # Third client: file doesn't exist → create
+    create_result = MagicMock(
+        ok=True, message="Created", path=Path("/project/.agents/commands/Cmd.Gemini.md")
+    )
+    mock_create.return_value = create_result
+
+    mock_discover.return_value = {
+        "local_path": "/project/.agents/commands/Cmd.Codex.md",
+        "name": "Cmd",
+    }
+    mock_app._categories = []
+
+    ops_controller.updateCustomCommandFull(
+        "/project/.agents/commands/Cmd.Codex.md",
+        "Cmd",
+        "Codex, Antigravity, Gemini CLI",
+        "body",
+        "proj",
+        "Cat",
+    )
+
+    # update_custom_command_file_full called twice (client 0 + client 1 which exists)
+    assert mock_update_full.call_count == 2
+    # create_custom_command_file called once (client 2 which didn't exist)
+    assert mock_create.call_count == 1
+
+    # Verify second update call used the existing Antigravity path
+    second_call = mock_update_full.call_args_list[1]
+    assert "Antigravity" in str(second_call)
+
+    mock_app._set_status.assert_called()

@@ -4,6 +4,7 @@ from skill_manager.core.commands import (
     build_command_content,
     build_command_filename,
     create_custom_command_file,
+    resolve_commands_dir,
     update_custom_command_file,
     update_custom_command_file_full,
 )
@@ -380,3 +381,18 @@ def test_update_custom_command_file_full_project_not_found(tmp_path):
     )
     assert not result.ok
     assert "Could not find project directory" in result.message
+
+
+def test_resolve_commands_dir_success(tmp_path):
+    project_root = tmp_path / "my-project"
+    project_path = project_root / ".agents" / "skills"
+    project_path.mkdir(parents=True)
+
+    result = resolve_commands_dir("my-project", [str(project_path)])
+    assert result is not None
+    assert result == project_root / ".agents" / "commands"
+
+
+def test_resolve_commands_dir_not_found(tmp_path):
+    result = resolve_commands_dir("non-existent", [str(tmp_path)])
+    assert result is None

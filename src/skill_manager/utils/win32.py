@@ -53,7 +53,7 @@ def apply_native_style(window, style_name: str) -> None:
         # This handles version checks and DwmSetWindowAttribute internally.
         pywinstyles.apply_style(window, style_name)
     except Exception as e:
-        logger.error(f"Failed to apply native style {style_name}: {e}")
+        logger.error("Failed to apply native style %s: %s", style_name, e)
 
 
 def get_window_placement(hwnd: int) -> tuple | None:
