@@ -1,3 +1,4 @@
+import hashlib
 from unittest.mock import patch
 
 from skill_manager.core.skill_packages.storage import (
@@ -198,7 +199,7 @@ def test_skill_fingerprint(tmp_path):
     assert isinstance(fp1, str)
     assert len(fp1) > 0
 
-    f1.write_text("def")
+    f1.write_text("abcdef")
     fp2 = _skill_fingerprint(skill_dir)
     assert fp1 != fp2
 
@@ -209,10 +210,8 @@ def test_skill_fingerprint_oserror(tmp_path):
     f1 = skill_dir / "SKILL.md"
     f1.write_text("abc")
 
-    with patch("pathlib.Path.stat", side_effect=OSError("Permission denied")):
+    with patch("pathlib.Path.rglob", side_effect=OSError("Permission denied")):
         fp = _skill_fingerprint(skill_dir)
-
-    import hashlib
 
     assert fp == hashlib.sha1().hexdigest()
 
