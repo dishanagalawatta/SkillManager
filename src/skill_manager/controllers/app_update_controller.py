@@ -191,41 +191,42 @@ class AppUpdateController(BaseController):
             return
         self._is_updating = True
         self.isUpdatingChanged.emit()
-        asyncio.create_task(self._apply_update())
 
-    async def _apply_update(self):
+        if hasattr(self.app, "task_runner"):
+            self.app.task_runner.run(self._sync_apply_update)
+        else:
+            logger.warning("No task_runner found on app to apply update.")
+            self._is_updating = False
+            self.isUpdatingChanged.emit()
+
+    def _sync_apply_update(self):
+        """Synchronous version of _apply_update for background thread execution."""
         try:
-            loop = asyncio.get_running_loop()
-
             def progress_hook(bytes_downloaded, total_bytes):
                 if total_bytes > 0:
                     self._update_progress = bytes_downloaded / total_bytes
                     self.updateProgressChanged.emit(self._update_progress)
 
-            def _tufup_update():
-                import subprocess
+            import subprocess
 
-                original_popen = subprocess.Popen
+            original_popen = subprocess.Popen
 
-                # Monkey-patch Popen to always use CREATE_NO_WINDOW during update
-                class NoWindowPopen(original_popen):
-                    def __init__(self, *args, **kwargs):
-                        if sys.platform == "win32":
-                            kwargs["creationflags"] = (
-                                kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
-                            )
-                        super().__init__(*args, **kwargs)
+            # Monkey-patch Popen to always use CREATE_NO_WINDOW during update
+            class NoWindowPopen(original_popen):
+                def __init__(self, *args, **kwargs):
+                    if sys.platform == "win32":
+                        kwargs["creationflags"] = (
+                            kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                        )
+                    super().__init__(*args, **kwargs)
 
-                subprocess.Popen = NoWindowPopen
-                try:
-                    return self._client.download_and_apply_update(
-                        progress_hook=progress_hook,
-                    )
-                finally:
-                    subprocess.Popen = original_popen
-
-            # Download updates
-            success = await loop.run_in_executor(None, _tufup_update)
+            subprocess.Popen = NoWindowPopen
+            try:
+                success = self._client.download_and_apply_update(
+                    progress_hook=progress_hook,
+                )
+            finally:
+                subprocess.Popen = original_popen
 
             if success:
                 logger.info("Update applied successfully. Application should be restarted.")

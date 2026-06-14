@@ -131,9 +131,9 @@ async def test_check_tuf_updates_no_client():
     await controller._check_tuf_updates()
 
 
-@pytest.mark.asyncio
-async def test_download_and_apply_update_early_returns():
+def test_download_and_apply_update_early_returns():
     mock_app = MagicMock()
+    mock_app.task_runner = MagicMock()
     controller = AppUpdateController(mock_app)
 
     # Client is None
@@ -152,24 +152,22 @@ async def test_download_and_apply_update_early_returns():
     assert controller._is_updating is False
 
 
-@pytest.mark.asyncio
-async def test_download_and_apply_update_success():
+def test_download_and_apply_update_success():
     mock_app = MagicMock()
+    mock_app.task_runner = MagicMock()
     controller = AppUpdateController(mock_app)
 
     controller._client = MagicMock()
     controller._update_available = True
 
-    with patch("skill_manager.controllers.app_update_controller.asyncio.create_task") as mock_task:
-        controller.downloadAndApplyUpdate()
-        assert controller._is_updating is True
-        mock_task.assert_called_once()
-        coro = mock_task.call_args[0][0]
-        coro.close()
+    controller.downloadAndApplyUpdate()
+    assert controller._is_updating is True
+    mock_app.task_runner.run.assert_called_once_with(
+        controller._sync_apply_update
+    )
 
 
-@pytest.mark.asyncio
-async def test_apply_update_success():
+def test_apply_update_success():
     mock_app = MagicMock()
     controller = AppUpdateController(mock_app)
 
@@ -186,7 +184,7 @@ async def test_apply_update_success():
     controller.isUpdatingChanged = MagicMock()
     controller.updateProgressChanged = MagicMock()
 
-    await controller._apply_update()
+    controller._sync_apply_update()
 
     assert controller.updateProgress == 0.5
     controller.updateProgressChanged.emit.assert_called_with(0.5)
@@ -194,8 +192,7 @@ async def test_apply_update_success():
     assert controller.isUpdating is False
 
 
-@pytest.mark.asyncio
-async def test_apply_update_failure():
+def test_apply_update_failure():
     mock_app = MagicMock()
     controller = AppUpdateController(mock_app)
 
@@ -203,12 +200,11 @@ async def test_apply_update_failure():
     mock_client.download_and_apply_update.return_value = False
     controller._client = mock_client
 
-    await controller._apply_update()
+    controller._sync_apply_update()
     mock_app._set_status.assert_called_with("Update failed.")
 
 
-@pytest.mark.asyncio
-async def test_apply_update_exception():
+def test_apply_update_exception():
     mock_app = MagicMock()
     controller = AppUpdateController(mock_app)
 
@@ -216,5 +212,5 @@ async def test_apply_update_exception():
     mock_client.download_and_apply_update.side_effect = Exception("Download error")
     controller._client = mock_client
 
-    await controller._apply_update()
+    controller._sync_apply_update()
     mock_app._set_status.assert_called_with("Update error: Download error")
