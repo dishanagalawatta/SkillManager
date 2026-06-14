@@ -191,6 +191,13 @@ Window {
         }
     }
 
+    Connections {
+        target: AppController.ops_controller
+        function onMinimizeAppRequested() {
+            window.showMinimized()
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         color: "transparent"
