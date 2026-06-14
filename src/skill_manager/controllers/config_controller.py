@@ -125,6 +125,16 @@ class ConfigController(BaseController):
             self.config.set("auto_minimize_on_screenshot", bool(value))
             self.autoMinimizeOnScreenshotChanged.emit()
 
+    @Property(bool, notify=autoMinimizeOnQuickCopyChanged)
+    def autoMinimizeOnQuickCopy(self):
+        return self.config.get("auto_minimize_on_quick_copy", False)
+
+    @autoMinimizeOnQuickCopy.setter
+    def autoMinimizeOnQuickCopy(self, value):
+        if self.autoMinimizeOnQuickCopy != value:
+            self.config.set("auto_minimize_on_quick_copy", bool(value))
+            self.autoMinimizeOnQuickCopyChanged.emit()
+
     @Property(bool, notify=temporaryScreenshotsChanged)
     def temporaryScreenshots(self):
         return self.config.get("temporary_screenshots", False)
