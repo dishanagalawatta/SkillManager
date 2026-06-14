@@ -10,8 +10,6 @@
 * [ ] Custom method to bring your own client AI agent copy/paste style to users
 * [ ] Order for copy to clipboard
 * [ ] Check edit feature, for specific clients
-* [ ] Fluid Motion
-* [ ] heavy refreshSkills()
 
 ## Backlog
 
