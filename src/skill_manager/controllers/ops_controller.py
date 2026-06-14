@@ -6,7 +6,7 @@ Usage: Accessed via AppController.ops
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Slot
+from PySide6.QtCore import QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -29,6 +29,17 @@ logger = logging.getLogger(__name__)
 
 class OpsController(BaseController):
     """Controller for skill-related operations."""
+
+    minimizeAppRequested = Signal()
+
+    def _maybeMinimizeOnCopy(self):
+        """Requests app minimization if the setting is enabled and current view is QuickCopy."""
+        if (
+            self.app.config_controller.autoMinimizeOnQuickCopy
+            and self.app.ui_controller.currentView == "QuickCopy"
+        ):
+            self.minimizeAppRequested.emit()
+            logger.info("Auto-minimize on Quick Copy triggered.")
 
     def _updateModelsSource(self, path: str, key: str, value: bool) -> None:
         """Updates a property for all skills matching the local_path across both models.
@@ -483,12 +494,14 @@ class OpsController(BaseController):
         content = " ".join(references)
         self.app._clipboard.setText(content)
         self.app._set_status(f"Copied {len(references)} skills to clipboard")
+        self._maybeMinimizeOnCopy()
 
     @Slot(str)
     def copyTextToClipboard(self, content: str):
         """Copies raw text to system clipboard."""
         self.app._clipboard.setText(str(content))
         self.app._set_status("Copied to clipboard")
+        self._maybeMinimizeOnCopy()
 
     @Slot(dict, str)
     def copySkillReference(self, skill: dict, arg: str = ""):
@@ -500,6 +513,7 @@ class OpsController(BaseController):
             ref += f"({arg})"
         self.app._clipboard.setText(ref)
         self.app._set_status(f"Copied reference: {ref}")
+        self._maybeMinimizeOnCopy()
 
     @Slot(str, str, str, str, str)
     def createCustomCommand(
@@ -671,3 +685,8 @@ class OpsController(BaseController):
     def _saveStarred(self):
         """Internal helper to persist starred state."""
         save_starred(self.app._starred_paths)
+
+    def _merge_discovered_skills(self, discovered_skills):
+        """Internal helper to merge newly discovered skills into both models."""
+        self.app._library_model.addOrUpdateSkills(discovered_skills)
+        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
