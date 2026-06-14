@@ -163,6 +163,9 @@ def test_config_controller_properties_setters(config_controller, mock_app):
     config_controller.autoMinimizeOnScreenshot = True
     mock_app._config.set.assert_any_call("auto_minimize_on_screenshot", True)
 
+    config_controller.autoMinimizeOnQuickCopy = True
+    mock_app._config.set.assert_any_call("auto_minimize_on_quick_copy", True)
+
     config_controller.temporaryScreenshots = True
     mock_app._config.set.assert_any_call("temporary_screenshots", True)
 
