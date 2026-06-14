@@ -131,7 +131,7 @@ class FilterState:
     collection_filter: bool = False
     project_filter: str = ""
     client_filter: str = ""
-    filter_by_client: bool = True
+    filter_by_client: bool = False
     show_commands: bool = True
     show_starred: bool = True
     is_package_only: bool | None = None  # None = All, True = Packages, False = Projects

@@ -94,9 +94,7 @@ async def test_check_for_updates_slots():
         mock_sys.frozen = True
         controller.checkForUpdates()
     assert controller._is_checking_for_updates is True
-    mock_app.task_runner.submit.assert_called_once_with(
-        controller._sync_check_updates, ANY
-    )
+    mock_app.task_runner.submit.assert_called_once_with(controller._sync_check_updates, ANY)
 
 
 @pytest.mark.asyncio
@@ -133,6 +131,13 @@ async def test_manual_check_for_updates_feedback():
     controller._on_updates_checked(None, manual=True)
     mock_app._set_status.assert_called_with("SkillManager is up to date.")
     assert controller._is_checking_for_updates is False
+
+    # 5. Error feedback - clears checking and shows error
+    mock_app._set_status.reset_mock()
+    controller._on_updates_checked(None, manual=True, error="Network failure")
+    mock_app._set_status.assert_called_with("Update check failed: Network failure")
+    assert controller._is_checking_for_updates is False
+    assert controller._update_available is False
 
 
 @pytest.mark.asyncio
@@ -175,9 +180,7 @@ def test_download_and_apply_update_success():
 
     controller.downloadAndApplyUpdate()
     assert controller._is_updating is True
-    mock_app.task_runner.run.assert_called_once_with(
-        controller._sync_apply_update
-    )
+    mock_app.task_runner.run.assert_called_once_with(controller._sync_apply_update)
 
 
 def test_apply_update_success():
@@ -237,8 +240,9 @@ def test_sync_check_updates_handles_exception():
     mock_client.check_for_updates.side_effect = Exception("Network error")
     controller._client = mock_client
 
-    result = controller._sync_check_updates()
+    result, error = controller._sync_check_updates()
     assert result is None
+    assert "Network error" in error
 
 
 def test_sync_check_updates_handles_timeout():
@@ -249,14 +253,16 @@ def test_sync_check_updates_handles_timeout():
 
     def slow_check():
         import time
+
         time.sleep(30)
         return "2.0.0"
 
     mock_client.check_for_updates.side_effect = slow_check
     controller._client = mock_client
 
-    result = controller._sync_check_updates()
+    result, error = controller._sync_check_updates()
     assert result is None
+    assert "timed out" in error
 
 
 def test_sync_check_updates_no_client():
@@ -264,8 +270,9 @@ def test_sync_check_updates_no_client():
     controller = AppUpdateController(mock_app)
     controller._client = None
 
-    result = controller._sync_check_updates()
+    result, error = controller._sync_check_updates()
     assert result is None
+    assert "not initialized" in error
 
 
 def test_is_checking_for_updates_state_transitions():

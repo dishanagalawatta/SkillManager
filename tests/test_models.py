@@ -243,6 +243,50 @@ def test_skill_model_data_various_roles(qapp, skill_list):
     assert model.data(idx, SkillModel.IsCollapsedRole) is False
 
 
+def test_skill_model_client_filter_migration(qapp):
+    skills = [
+        {
+            "name": "Debug",
+            "local_path": "/cmd/debug.clienta.md",
+            "is_command": True,
+            "client": "ClientA",
+            "category": "Dev",
+        },
+        {
+            "name": "Debug",
+            "local_path": "/cmd/debug.clientb.md",
+            "is_command": True,
+            "client": "ClientB",
+            "category": "Dev",
+        },
+        {
+            "name": "Other",
+            "local_path": "/cmd/other.md",
+            "is_command": False,
+            "category": "Dev",
+        }
+    ]
+    model = SkillModel()
+    model.setSkills(skills)
+    model.filterByClient = True
+    model.clientFilter = "ClientA"
+
+    # Toggle selection by path to avoid row index confusion during filters
+    model.selectByPaths(["/cmd/debug.clienta.md", "/cmd/other.md"])
+
+    selected = set(model.getSelectedPaths())
+    assert "/cmd/debug.clienta.md" in selected
+    assert "/cmd/other.md" in selected
+
+    # Change client
+    model.clientFilter = "ClientB"
+
+    selected = set(model.getSelectedPaths())
+    assert "/cmd/debug.clientb.md" in selected
+    assert "/cmd/other.md" in selected
+    assert "/cmd/debug.clienta.md" not in selected
+
+
 def test_skill_model_show_commands_setter(qapp, skill_list):
     skill_list[0]["is_command"] = True
     model = SkillModel()
@@ -684,6 +728,70 @@ def test_skill_model_flags(qapp, skill_list):
     flags = model.flags(idx)
     assert flags & Qt.ItemIsSelectable
     assert flags & Qt.ItemIsEnabled
+
+
+def test_skill_model_selection_persists_across_client_change_default(qapp):
+    """With default filterByClient=False, client change must not affect selection."""
+    skills = [
+        {"name": "Client A Skill 1", "local_path": "/a1", "client": "Antigravity"},
+        {"name": "Client A Skill 2", "local_path": "/a2", "client": "Antigravity"},
+        {"name": "Client B Skill 1", "local_path": "/b1", "client": "Codex"},
+        {"name": "Client B Skill 2", "local_path": "/b2", "client": "Codex"},
+    ]
+    model = SkillModel()
+    model.setSkills(skills)
+
+    # filterByClient defaults to False — client format doesn't filter view
+    assert model.filterByClient is False
+
+    model.selectByPaths(["/a1", "/a2"])
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
+    assert model.selectedCount == 2
+
+    # Switch to client B — selection and count must stay unchanged
+    model.clientFilter = "Codex"
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
+    assert model.selectedCount == 2, "selectedCount must not drop when filterByClient is False"
+    assert model.data(model.index(0, 0), SkillModel.IsSelectedRole) is True
+    assert model.data(model.index(1, 0), SkillModel.IsSelectedRole) is True
+
+    # Switch back to client A — everything still intact
+    model.clientFilter = "Antigravity"
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
+    assert model.selectedCount == 2
+
+
+def test_skill_model_selection_survives_client_filter_when_explicitly_enabled(qapp):
+    """Even with filterByClient=True, _selected_ids must persist (only filtered count drops)."""
+    skills = [
+        {"name": "Client A Skill 1", "local_path": "/a1", "client": "Antigravity"},
+        {"name": "Client A Skill 2", "local_path": "/a2", "client": "Antigravity"},
+        {"name": "Client B Skill 1", "local_path": "/b1", "client": "Codex"},
+        {"name": "Client B Skill 2", "local_path": "/b2", "client": "Codex"},
+    ]
+    model = SkillModel()
+    model.setSkills(skills)
+    model.filterByClient = True
+
+    model.selectByPaths(["/a1", "/a2"])
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
+    assert model.selectedCount == 2
+
+    # Switch to client B — selection persists, but filtered count drops
+    model.clientFilter = "Codex"
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}, (
+        "Selection changed when it should not have"
+    )
+    assert model.data(model.index(0, 0), SkillModel.IsSelectedRole) is False
+    assert model.data(model.index(1, 0), SkillModel.IsSelectedRole) is False
+    assert model.selectedCount == 0, "selectedCount drops because client-filtered skills are hidden"
+
+    # Switch back to client A — original selection restored in view
+    model.clientFilter = "Antigravity"
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
+    assert model.selectedCount == 2
+    assert model.data(model.index(0, 0), SkillModel.IsSelectedRole) is True
+    assert model.data(model.index(1, 0), SkillModel.IsSelectedRole) is True
 
 
 def test_skill_model_set_data(qapp, skill_list):
