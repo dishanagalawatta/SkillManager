@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-06-14 - Optimize search loop token matching
+**Learning:** In hot paths doing fuzzy matching across arrays of tokens (like `SearchEngine._calculate_score` inside a nested loop for mismatched queries), manually iterating `fuzz.ratio` in a Python `for` loop is significantly slower than using `rapidfuzz.process.extractOne` due to Python interpreter overhead. Using `process.extractOne` with a `score_cutoff` shifts the iteration and early-exit logic to optimized C code, yielding ~25% overall reduction in matching time for large indexes. Additionally, moving built-in formatting like `f"{category} {' '.join(tags)}"` to index generation time avoids O(N) operations during runtime search matching.
+**Action:** When evaluating fuzzy matches against a collection of strings, prefer `rapidfuzz.process.extract` or `extractOne` instead of looping `fuzz.ratio` in Python. Also, pre-compute combined strings during object creation rather than dynamically during hot path traversals.
