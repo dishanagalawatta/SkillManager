@@ -28,6 +28,7 @@ class ConfigController(BaseController):
     skillPackageAutoUpdateChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
     autoMinimizeOnScreenshotChanged = Signal()
+    autoMinimizeOnQuickCopyChanged = Signal()
     temporaryScreenshotsChanged = Signal()
 
     # Cached property values (invalidated via _invalidate_project_cache)
