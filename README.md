@@ -73,7 +73,7 @@ If you want to contribute or build from source, see our **[Development Guide](do
 - **[Architecture](docs/ARCHITECTURE.md)**: How the app is built (Hub & Spoke).
 - **[Design Philosophy](DESIGN.md)**: The "Solid Matte & Liquid Glass" guide.
 - **[Categories](docs/CATEGORIES.md)**: How skills are auto-classified.
-- **[Versioning & Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`).
+- **[Versioning &amp; Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`)..
 
 ---
 
