@@ -10,6 +10,8 @@
 ## Bug Tracker
 
 * [ ] Investigate and fix the update process validation
+* [ ] Staring skill motion refining
+* [ ] iconless app launch
 
 ## Backlog
 

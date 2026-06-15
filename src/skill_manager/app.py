@@ -936,11 +936,9 @@ def main():  # pragma: no cover
         # Use a standard AppUserModelID format
         myappid = "Antigravity.SkillManager.App.1.0"
         if not getattr(sys, "frozen", False):
-            # Development mode: Windows aggressively caches taskbar icons for wrapper executables.
-            # Append a timestamp to the AppUserModelID to force Windows to reload the dynamic icon.
-            import time
-
-            myappid += f".dev.{int(time.time())}"
+            # Development mode: Append .dev to distinguish from release builds.
+            # Do NOT append a timestamp, as it breaks Windows taskbar icon grouping.
+            myappid += ".dev"
 
         try:
             res = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -1017,6 +1015,8 @@ def main():  # pragma: no cover
     if not app_icon.isNull():
         for root in engine.rootObjects():
             root.setIcon(app_icon)
+            if hasattr(root, "show"):
+                root.show()
 
     def apply_native_styles():
         for root in engine.rootObjects():
