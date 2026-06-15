@@ -487,7 +487,11 @@ class OpsController(BaseController):
                 (s for s in self.app.skillModel._all_filtered_skills if s.local_path == path), None
             )
             if skill:
-                references.append(format_project_skill_reference(skill, self.app._client_format))
+                references.append(
+                    format_project_skill_reference(
+                        skill, self.app._client_format, all_skills=self.app.skillModel._all_skills
+                    )
+                )
             else:
                 references.append(path)
 
@@ -508,7 +512,9 @@ class OpsController(BaseController):
         """Copies a formatted skill reference to clipboard."""
         from skill_manager.core.quick_copy import format_project_skill_reference
 
-        ref = format_project_skill_reference(skill, self.app._client_format)
+        ref = format_project_skill_reference(
+            skill, self.app._client_format, all_skills=self.app.skillModel._all_skills
+        )
         if arg:
             ref += f"({arg})"
         self.app._clipboard.setText(ref)
@@ -591,6 +597,8 @@ class OpsController(BaseController):
         - New clients get a file created.
         - Excluded clients' files are left untouched.
         """
+        from pathlib import Path
+
         from skill_manager.core.commands import (
             build_command_filename,
             create_custom_command_file,
@@ -605,9 +613,23 @@ class OpsController(BaseController):
 
         commands_dir = resolve_commands_dir(project_label, self.app._projects)
 
+        original_client = None
+        path = Path(local_path)
+        if path.is_file():
+            try:
+                from skill_manager.core.parsing.base import split_frontmatter
+
+                content = path.read_text(encoding="utf-8-sig")
+                metadata, _ = split_frontmatter(content)
+                original_client = metadata.get("client", "") if metadata else ""
+            except Exception:
+                pass
+
+        primary_client = original_client if original_client in clients else clients[0]
+
         results = []
-        for i, client in enumerate(clients):
-            if i == 0:
+        for client in clients:
+            if client == primary_client:
                 result = update_custom_command_file_full(
                     local_path=local_path,
                     name=name,

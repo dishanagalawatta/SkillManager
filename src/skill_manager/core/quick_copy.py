@@ -13,6 +13,66 @@ logger = logging.getLogger(__name__)
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text"}
 
 
+def replace_skill_references_in_command(content: str, client_format: str, all_skills: list) -> str:
+    if not content or not all_skills:
+        return content
+
+    import re
+
+    # Pre-build lookup maps for folder name and skill name
+    skill_map = {}
+    for s in all_skills:
+        # Ignore commands and screenshots for this replacement
+        if getattr(s, "is_command", False) or s.get("is_command", False):
+            continue
+        if getattr(s, "is_screenshot", False) or s.get("is_screenshot", False):
+            continue
+
+        folder = str(getattr(s, "folder_name", "") or s.get("folder_name", "")).strip().lower()
+        if folder:
+            skill_map[folder] = s
+
+        name = str(getattr(s, "name", "") or s.get("name", "")).strip().lower()
+        if name:
+            skill_map[name] = s
+
+    def replacer(match):
+        full_match = match.group(0)
+
+        name = ""
+        if full_match.startswith("[$"):
+            # Codex format
+            name = match.group(1)
+        elif full_match.startswith("/"):
+            # Antigravity format
+            name = full_match[1:]
+        elif full_match.startswith("@"):
+            # Gemini CLI format
+            parts = full_match.split("/")
+            if full_match.endswith("/SKILL.md"):
+                if len(parts) >= 2:
+                    name = parts[-2]
+            else:
+                name = parts[-1]
+            name = name.lstrip("@")
+
+        if name:
+            name_lower = name.lower()
+            if name_lower in skill_map:
+                # Don't pass all_skills down again to avoid infinite recursion
+                # if someone somehow puts a command reference inside a command.
+                return format_project_skill_reference(skill_map[name_lower], client_format)
+
+        return full_match
+
+    # Pattern matches:
+    # 1. Codex: [$name](path) -> \[\$([^\]]+)\]\([^)]+\)
+    # 2. Antigravity: /name -> \/[a-zA-Z0-9_-]+
+    # 3. Gemini CLI: @name or @path/to/name -> @[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*
+    pattern = r'\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*'
+    return re.sub(pattern, replacer, str(content))
+
+
 def _resolve_resilient_path(path_str):
     """Resolve a skill path and auto-detect .agents/skills for project roots."""
     if not path_str:
@@ -354,12 +414,17 @@ def project_label(project_path, project_aliases=None, original_project=None):
     return f"{root.name} ({base})"
 
 
-def format_project_skill_reference(skill, client_format):
+def format_project_skill_reference(skill, client_format, all_skills=None):
     is_command = skill.get("is_command", False)
     local_path = Path(skill.get("local_path", ""))
 
     if is_command:
-        return skill.get("body_content", "") or skill.get("raw_content", "")
+        content = skill.get("body_content", "") or skill.get("raw_content", "")
+        if not content:
+            return ""
+        if all_skills is not None:
+            return replace_skill_references_in_command(content, client_format, all_skills)
+        return content
 
     if client_format == "Codex":
         name = skill.get("name") or local_path.name

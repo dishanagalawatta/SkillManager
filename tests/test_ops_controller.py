@@ -618,7 +618,14 @@ def test_update_custom_command_full_multi_client(
     mock_app._starred_paths = []
     mock_app._project_aliases = {}
 
+    mock_app._project_aliases = {}
+
     commands_dir = tmp_path / "commands"
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    mock_resolve_dir.return_value = commands_dir
+
+    local_path = commands_dir / "Cmd.Codex.md"
+    local_path.write_text("---\nclient: Codex\n---\nbody", encoding="utf-8")
     mock_resolve_dir.return_value = commands_dir
 
     # First client: update existing file
@@ -628,7 +635,6 @@ def test_update_custom_command_full_multi_client(
     mock_update_full.return_value = update_result
 
     # Second client: file exists → update
-    commands_dir.mkdir(parents=True, exist_ok=True)
     (commands_dir / "Cmd.Antigravity.md").write_text("old")
 
     # Third client: file doesn't exist → create
@@ -640,14 +646,14 @@ def test_update_custom_command_full_multi_client(
     mock_discover.return_value = {
         "local_path": "/project/.agents/commands/Cmd.Codex.md",
         "name": "Cmd",
-        "category": "Commands"
+        "category": "Commands",
     }
     mock_app._categories = []
 
     ops_controller.updateCustomCommandFull(
-        "/project/.agents/commands/Cmd.Codex.md",
+        str(local_path),
         "Cmd",
-        "Codex, Antigravity, Gemini CLI",
+        "Antigravity, Codex, Gemini CLI",
         "body",
         "proj",
         "Cat",
@@ -658,8 +664,8 @@ def test_update_custom_command_full_multi_client(
     # create_custom_command_file called once (client 2 which didn't exist)
     assert mock_create.call_count == 1
 
-    # Verify second update call used the existing Antigravity path
-    second_call = mock_update_full.call_args_list[1]
-    assert "Antigravity" in str(second_call)
+    # Verify first update call used the existing Antigravity path
+    first_call = mock_update_full.call_args_list[0]
+    assert "Antigravity" in str(first_call)
 
     mock_app._set_status.assert_called()
