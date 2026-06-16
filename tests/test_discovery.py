@@ -116,6 +116,7 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
     # _resolve_resilient_path calls .resolve(), which on Windows resolves short paths
     # like RUNNER~1 to runneradmin. The cache key uses this resolved path.
     import os
+
     from skill_manager.core.quick_copy import _resolve_resilient_path
     resolved_source = _resolve_resilient_path(str(source_lib))
     fp_key = f"dir_fp:{os.path.normcase(str(resolved_source))}"
