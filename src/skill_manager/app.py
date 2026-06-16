@@ -36,6 +36,7 @@ except ImportError:
 from skill_manager.controllers.app_update_controller import AppUpdateController
 from skill_manager.controllers.config_controller import ConfigController
 from skill_manager.controllers.discovery_controller import DiscoveryController
+from skill_manager.controllers.font_database_bridge import FontDatabaseBridge
 from skill_manager.controllers.image_inspector_controller import ImageInspectorController
 from skill_manager.controllers.ops_controller import OpsController
 from skill_manager.controllers.screenshot_controller import ScreenshotController
@@ -58,9 +59,11 @@ from skill_manager.core.persistence import (
     load_starred,
 )
 from skill_manager.core.resources import (
+    invalidate_qml_disk_cache_if_stale,
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
+from skill_manager.core.schemas import UpdatePackageRecord
 from skill_manager.utils.task_runner import BackgroundTaskRunner
 
 logger = logging.getLogger(__name__)
@@ -131,14 +134,19 @@ class AppController(QObject):
         self._sources = self._config.get("sources", [])
         self._projects = self._config.get("projects", [])
         self._project_aliases = self._config.get("project_aliases", {})
-        self._update_packages = self._config.get("skills", [])
-        for s in self._update_packages:
-            s["is_updating"] = False
-            if "current_version" not in s:
-                s["current_version"] = ""
-            if "latest_version" not in s:
-                s["latest_version"] = ""
+        self._update_packages = []
+        raw_skills = self._config.get("skills", [])
+        for s in raw_skills:
+            try:
+                # Validate and normalize using Pydantic
+                record = UpdatePackageRecord.model_validate(s)
+                # Ensure is_updating is False on startup
+                record.is_updating = False
+                self._update_packages.append(record.model_dump())
+            except Exception as e:
+                logger.warning("Invalid skill package config found: %s. Error: %s", s, e)
         self._custom_collections = self._config.get("custom_collections", {})
+        self._migrate_collections()
 
         # Shared project state (syncs across all project selectors)
         self._current_project_label = ""
@@ -342,7 +350,7 @@ class AppController(QObject):
 
     @Property(QObject, notify=skillModelChanged)
     def skillModel(self):
-        if self.ui._current_view == "Library":
+        if self.ui.currentView == "Library":
             return self._library_model
         return self._quick_copy_model
 
@@ -687,9 +695,9 @@ class AppController(QObject):
     def resetShortcuts(self):
         self.config_mgr.resetShortcuts()
 
-    @Slot(str, list)
-    def saveCustomCollection(self, n, p):
-        self.config_mgr.saveCustomCollection(n, p)
+    @Slot(str, list, list, list)
+    def saveCustomCollection(self, n, p, c, proj):
+        self.config_mgr.saveCustomCollection(n, p, c, proj)
 
     @Slot(str)
     def deleteCustomCollection(self, n):
@@ -702,6 +710,22 @@ class AppController(QObject):
     @Slot(str, result=list)
     def getCollectionPaths(self, n):
         return self.config_mgr.getCollectionPaths(n)
+
+    @Slot(str, result=list)
+    def getCollectionClients(self, n):
+        return self.config_mgr.getCollectionClients(n)
+
+    @Slot(str, result=list)
+    def getCollectionProjects(self, n):
+        return self.config_mgr.getCollectionProjects(n)
+
+    @Slot(str, result=str)
+    def checkMissingSkills(self, n):
+        return self.config_mgr.checkMissingSkills(n)
+
+    @Slot(str, list)
+    def copyMissingSkills(self, n, projects):
+        self.config_mgr.copyMissingSkills(n, projects)
 
     @Slot()
     def toggleCurrentSkillArchive(self):
@@ -842,6 +866,16 @@ class AppController(QObject):
             self._current_project_label = labels[0] if labels else ""
             self.currentProjectChanged.emit()
 
+    def _migrate_collections(self):
+        """Migrate old format {name: [paths]} to new format {name: {paths, clients, projects}}."""
+        migrated = False
+        for name, value in list(self._custom_collections.items()):
+            if isinstance(value, list):
+                self._custom_collections[name] = {"paths": value, "clients": [], "projects": []}
+                migrated = True
+        if migrated:
+            self._config.set("custom_collections", self._custom_collections)
+
     def _set_status(self, msg):
         self._status_message = msg
         self.statusMessageChanged.emit()
@@ -948,6 +982,10 @@ def main():  # pragma: no cover
         except Exception as e:
             logger.error(f"Failed to set AppUserModelID: {e}")
 
+    # Safety net: drop any stale Qt QML disk cache before loading QML.
+    # Runs even when QML_DISABLE_DISK_CACHE=1 is honored (defense in depth).
+    invalidate_qml_disk_cache_if_stale(skill_manager.__version__)
+
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication(sys.argv)
 
@@ -997,10 +1035,22 @@ def main():  # pragma: no cover
     controller = AppController()
     qmlRegisterSingletonInstance(AppController, "App", 1, 0, "AppController", controller)
     app.aboutToQuit.connect(controller.on_quit)
+
+    # Register FontDatabaseBridge BEFORE the QQmlApplicationEngine is created.
+    # Registering singleton QObject types after `engine = QQmlApplicationEngine()`
+    # but before `engine.load()` interacts badly with the engine's type cache for
+    # locally-registered QML components, surfacing as
+    # "Cannot assign object of type X to list property 'data'; expected 'QObject'"
+    # during Main.qml load.
+    font_bridge = FontDatabaseBridge()
+    qmlRegisterSingletonInstance(FontDatabaseBridge, "App", 1, 0, "FontDB", font_bridge)
+
     engine = QQmlApplicationEngine()
     engine.addImageProvider("screenshot", controller.screenshot_provider)
     engine.rootContext().setContextProperty("appController", controller)
+    engine.rootContext().setContextProperty("fontDB", font_bridge)
     engine.warnings.connect(lambda msg: logger.warning(f"QML Warning: {msg}"))
+
     qml_dir = qml_components_dir(package_file=__file__)
     engine.addImportPath(str(qml_dir.parent))
     qml_file = qml_dir / "Main.qml"

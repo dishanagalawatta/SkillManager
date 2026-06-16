@@ -447,6 +447,36 @@ class SkillModel(QAbstractListModel):
         self.selectionStateChanged.emit()
         self._save_project_selections()
 
+    def updateSkillProperty(self, path: str, key: str, value: Any) -> bool:
+        """Updates a property for a skill identified by its local_path.
+        Returns True if at least one skill was updated.
+        """
+        changed = False
+        # Update in the master list
+        for skill in self._all_skills:
+            lp = skill.local_path if hasattr(skill, "local_path") else skill.get("local_path")
+            if lp == path:
+                if isinstance(skill, dict):
+                    skill[key] = value
+                else:
+                    setattr(skill, key, value)
+                changed = True
+
+        if not changed:
+            return False
+
+        # If it's in the currently filtered list, emit dataChanged
+        for i, skill in enumerate(self._filtered_skills):
+            lp = skill.local_path if hasattr(skill, "local_path") else skill.get("local_path")
+            if lp == path:
+                idx = self.index(i, 0)
+                # Find role by name if possible, or just emit all
+                self.dataChanged.emit(idx, idx)
+                break
+
+        self.selectionStateChanged.emit()
+        return True
+
     def _apply_filter(self, reset=False):
         """Applies filters and updates the model synchronously.
 

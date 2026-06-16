@@ -8,6 +8,12 @@ import ".."
 Item {
     id: sv_root
 
+    // Current settings sub-tab (General / Shortcuts / About). A plain int
+    // property is used instead of a hidden TabBar because a TabBar with
+    // height: 0 / visible: false may not allocate its TabButton children,
+    // which leaves currentIndex at -1 and hides every StackLayout child.
+    property int settingsTab: 0
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 20
@@ -45,8 +51,8 @@ Item {
                     text: "General"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    checked: tabBar.currentIndex === 0
-                    onClicked: tabBar.currentIndex = 0
+                    checked: settingsTab === 0
+                    onClicked: settingsTab = 0
                     
                     contentItem: Text {
                         text: parent.text
@@ -67,8 +73,8 @@ Item {
                     text: "Shortcuts"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    checked: tabBar.currentIndex === 1
-                    onClicked: tabBar.currentIndex = 1
+                    checked: settingsTab === 1
+                    onClicked: settingsTab = 1
                     
                     contentItem: Text {
                         text: parent.text
@@ -89,8 +95,8 @@ Item {
                     text: "About"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    checked: tabBar.currentIndex === 2
-                    onClicked: tabBar.currentIndex = 2
+                    checked: settingsTab === 2
+                    onClicked: settingsTab = 2
                     
                     contentItem: Text {
                         text: parent.text
@@ -109,27 +115,21 @@ Item {
             }
         }
 
-        // Hidden TabBar to drive the StackLayout
-        TabBar {
-            id: tabBar
-            visible: false
-            height: 0
-            TabButton { text: "General" }
-            TabButton { text: "Shortcuts" }
-            TabButton { text: "About" }
-        }
-
+        // Settings sub-tab content. currentIndex is driven by the
+        // sv_root.settingsTab property (set by the TabButton onClicked
+        // handlers above) — not a hidden TabBar, which may not allocate
+        // its TabButton children when height/visible are zero.
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: tabBar.currentIndex
+            currentIndex: settingsTab
 
             // Settings Content
             SmoothScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                contentWidth: availableWidth
+                contentWidth: width - leftPadding - rightPadding
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -558,7 +558,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                contentWidth: availableWidth
+                contentWidth: width - leftPadding - rightPadding
 
                 ColumnLayout {
                     anchors.fill: parent

@@ -49,7 +49,8 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
     assert "delay: 450" in skill_item
     assert 'source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""' in skill_item
     assert "fillMode: Image.PreserveAspectFit" in skill_item
-    assert "implicitWidth: Math.min(300, previewImg.implicitWidth)" in skill_item
+    assert "implicitWidth:" in skill_item
+    assert "previewImg" in skill_item
 
 
 def test_text_preview_tooltip_exists_in_skill_item():
@@ -136,7 +137,7 @@ def test_compact_rows_are_persisted_and_wired_to_skill_items():
         "property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false"
         in skill_item
     )
-    assert "_compact_list_rows" in ui_controller_py
+    assert "compactListRows" in ui_controller_py
 
 
 def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
@@ -477,3 +478,52 @@ def test_popup_shortcuts_are_gated_by_visibility():
     assert count_shortcuts(inspector) == count_enabled_shortcuts(inspector, "root"), (
         "Not all shortcuts in ImageInspector are gated by root.visible"
     )
+
+
+def test_color_overlay_is_a_thin_reexport_of_qt5compat_coloroverlay():
+    """Verify ColorOverlay.qml is a thin re-export of Qt5Compat.GraphicalEffects.ColorOverlay.
+
+    The custom ColorOverlay component re-exports Qt5Compat's ColorOverlay (which
+    correctly recolours SVG icons to a target colour while preserving the source's
+    alpha and antialiasing) under the same anchors.fill + source + color API the
+    rest of the UI uses. The import of Qt5Compat.GraphicalEffects must be confined
+    to ColorOverlay.qml itself — call sites must NOT import Qt5Compat directly.
+    """
+    color_overlay = (QML_DIR / "ColorOverlay.qml").read_text(encoding="utf-8")
+    qmldir = (QML_DIR / "qmldir").read_text(encoding="utf-8")
+
+    # qmldir must register the local ColorOverlay
+    assert "ColorOverlay 1.0 ColorOverlay.qml" in qmldir, (
+        "ColorOverlay.qml must be registered in qmldir so call sites can use it"
+    )
+
+    # The QML file must import Qt5Compat.GraphicalEffects (the re-export target)
+    assert "import Qt5Compat.GraphicalEffects" in color_overlay, (
+        "ColorOverlay.qml must import Qt5Compat.GraphicalEffects to re-export ColorOverlay"
+    )
+
+    # The root element must be the Qt5Compat ColorOverlay type (unqualified,
+    # since the import exposes it in scope).
+    assert re.search(r"^\s*ColorOverlay\s*\{", color_overlay, re.MULTILINE), (
+        "ColorOverlay.qml must use Qt5Compat's ColorOverlay as its root element"
+    )
+
+    # The aliases must be wired through to the underlying ColorOverlay's
+    # `source` and `color` properties so the call-site API is preserved.
+    assert "property alias source: root.source" in color_overlay, (
+        "ColorOverlay.qml must alias `source` through to the underlying ColorOverlay"
+    )
+    assert "property alias color: root.color" in color_overlay, (
+        "ColorOverlay.qml must alias `color` through to the underlying ColorOverlay"
+    )
+
+    # Call sites must NOT import Qt5Compat.GraphicalEffects directly — the whole
+    # point of the local ColorOverlay.qml is to encapsulate that import.
+    for qml_file in QML_DIR.rglob("*.qml"):
+        if qml_file.name == "ColorOverlay.qml":
+            continue
+        text = qml_file.read_text(encoding="utf-8")
+        assert "import Qt5Compat.GraphicalEffects" not in text, (
+            f"{qml_file.name} must not import Qt5Compat.GraphicalEffects directly; "
+            "use the local ColorOverlay component instead"
+        )

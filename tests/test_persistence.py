@@ -139,7 +139,7 @@ def test_save_project_skill_ownership_failure(temp_files):
 
 
 def test_patch_cache_remove(temp_files):
-    data = {"skills": [{"local_path": "/p1"}, {"local_path": "/p2"}]}
+    data = {"skills": [{"name": "S1", "local_path": "/p1"}, {"name": "S2", "local_path": "/p2"}]}
     with patch_config(temp_files):
         save_cache(data)
         removed_count = patch_cache_remove(["/p1"])
@@ -151,7 +151,7 @@ def test_patch_cache_remove(temp_files):
 
 def test_patch_cache_remove_failure(temp_files):
     with patch_config(temp_files):
-        save_cache({"skills": [{"local_path": "/p1"}]})
+        save_cache({"skills": [{"name": "S1", "local_path": "/p1"}]})
         with patch("builtins.open", side_effect=OSError("Lock Error")):
             count = patch_cache_remove(["/p1"])
             assert count == 0
@@ -175,12 +175,12 @@ def test_temp_registry_failure(temp_files):
 def test_patch_cache_add(temp_files):
     from skill_manager.core.persistence import patch_cache_add
 
-    data = {"skills": [{"local_path": "/p1", "category": "Cat1"}]}
+    data = {"skills": [{"name": "S1", "local_path": "/p1", "category": "Cat1"}]}
     with patch_config(temp_files):
         save_cache(data)
         new_skills = [
-            {"local_path": "/p1", "category": "Cat2", "raw_content": "strip-me"},
-            {"local_path": "/p2", "category": "Cat3"},
+            {"name": "S1", "local_path": "/p1", "category": "Cat2", "raw_content": "strip-me"},
+            {"name": "S2", "local_path": "/p2", "category": "Cat3"},
         ]
         projects_state = [
             {

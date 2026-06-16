@@ -1,3 +1,4 @@
+import os
 import sys
 
 
@@ -18,8 +19,18 @@ def _patch_subprocess():
         subprocess.Popen = NoWindowPopen
 
 
-# Execute patch before any other imports happen!
+def _disable_qml_disk_cache():
+    # Force-disable Qt's on-disk QML compilation cache for the current process.
+    # The cache can hold stale .qmlc files that mismatch the current QML source
+    # (e.g. after adding/removing components), producing cryptic load errors
+    # like "Cannot assign object of type X to list property 'data'".
+    # This must run before PySide6 / QtQuick modules are imported.
+    os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
+
+
+# Execute patches before any other imports happen!
 _patch_subprocess()
+_disable_qml_disk_cache()
 
 import logging  # noqa: E402
 

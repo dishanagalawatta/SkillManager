@@ -29,6 +29,24 @@ SkillManager is designed for developers who need to manage growing libraries of 
 
 ---
 
+## Quick Start (Developers)
+
+```bash
+# 1. Install dependencies
+uv sync
+
+# 2. Run the app
+uv run skill-manager
+
+# 3. Run the full test suite
+python run_tests.py
+```
+
+The full local-dev loop, debugging recipes, and PySide6/QML cache
+invalidation steps live in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+---
+
 ## Visual Showcase
 
 ### The Central Library
@@ -63,17 +81,43 @@ You don't need Python or any developer tools to use SkillManager.
 
 ### For Developers
 
-If you want to contribute or build from source, see our **[Development Guide](docs/DEVELOPMENT.md)**.
+If you want to contribute or build from source, see the
+**[Development Guide](docs/DEVELOPMENT.md)**, then the
+**[Contributing Guide](docs/CONTRIBUTING.md)** for PR conventions and
+release tagging.
 
 ---
 
 ## Documentation
 
-- **[User Guide](docs/USER_GUIDE.md)**: Detailed instructions on using every feature.
-- **[Architecture](docs/ARCHITECTURE.md)**: How the app is built (Hub & Spoke).
-- **[Design Philosophy](DESIGN.md)**: The "Solid Matte & Liquid Glass" guide.
-- **[Categories](docs/CATEGORIES.md)**: How skills are auto-classified.
-- **[Versioning &amp; Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`)..
+| Audience | Document | Purpose |
+|----------|----------|---------|
+| User | [User Guide](docs/USER_GUIDE.md) | End-user manual |
+| Engineer | [Architecture](docs/ARCHITECTURE.md) | Module map, lifecycle, data flow |
+| Engineer | [API Reference](docs/API.md) | `AppController` Q_PROPERTY / Slot / Signal surface |
+| Engineer | [Environment](docs/ENVIRONMENT.md) | Every environment variable |
+| Engineer | [Development](docs/DEVELOPMENT.md) | Local-dev loop, debugging |
+| Engineer | [Categories](docs/CATEGORIES.md) | Skill taxonomy and parser rules |
+| Engineer | [Versioning](docs/VERSIONING.md) | Release trigger rules |
+| Contributor | [Contributing](docs/CONTRIBUTING.md) | PR + commit + review rules |
+| Decision | [ADR Index](ADR_INDEX.md) | All architecture decisions |
+| Agent | [AGENTS.md](AGENTS.md) | Agent-facing instructions (concise) |
+| Designer | [Design](DESIGN.md) | "Solid Matte & Liquid Glass" system |
+| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle |
+
+---
+
+## Quality Gates
+
+| Gate | Command | Source |
+|------|---------|--------|
+| Lint | `uv run ruff check .` | ruff config in `pyproject.toml` |
+| Format | `uv run ruff format .` | ruff config in `pyproject.toml` |
+| Test | `uv run pytest` | `pyproject.toml` `[tool.pytest.ini_options]` |
+| Full Suite | `python run_tests.py` | Sequential + parallel + lint |
+| QML Diagnostic | `uv run pytest tests/test_qml_comprehensive_diagnostic.py` | `tests/test_qml_comprehensive_diagnostic.py` |
+
+CI runs all of the above. A PR is mergeable only when all five pass.
 
 ---
 

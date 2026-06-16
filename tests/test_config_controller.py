@@ -119,17 +119,17 @@ def test_config_controller_shortcuts(config_controller, mock_app):
 def test_config_controller_custom_collections(config_controller, mock_app):
     mock_app._custom_collections = {}
 
-    # Save collection
-    config_controller.saveCustomCollection("MyColl", ["/path/1", "/path/2"])
-    assert mock_app._custom_collections["MyColl"] == ["/path/1", "/path/2"]
+    # Save collection with new format
+    config_controller.saveCustomCollection("MyColl", ["/path/1", "/path/2"], ["Codex"], ["ProjectA"])
+    assert mock_app._custom_collections["MyColl"] == {"paths": ["/path/1", "/path/2"], "clients": ["Codex"], "projects": ["ProjectA"]}
     mock_app._config.set.assert_called_with("custom_collections", mock_app._custom_collections)
 
     # Delete collection
     config_controller.deleteCustomCollection("MyColl")
     assert "MyColl" not in mock_app._custom_collections
 
-    # Apply selection
-    mock_app._custom_collections = {"MyColl": ["/path/1"]}
+    # Apply selection (with new format)
+    mock_app._custom_collections = {"MyColl": {"paths": ["/path/1"], "clients": [], "projects": []}}
     config_controller.applyCollectionSelection("MyColl")
     mock_app.skillModel.clearSelection.assert_called_once()
     mock_app.skillModel.selectByPaths.assert_called_with(["/path/1"])
@@ -186,7 +186,7 @@ def test_config_controller_remove_source_by_index(config_controller, mock_app):
 
 
 def test_config_controller_add_source_exception(config_controller, mock_app):
-    with patch("os.path.abspath", side_effect=OSError("Access denied")):
+    with patch.object(config_controller.config, "set", side_effect=OSError("Access denied")):
         config_controller.addSource("/bad/path")
         mock_app._set_status.assert_called_with("Failed to add source: Access denied")
 

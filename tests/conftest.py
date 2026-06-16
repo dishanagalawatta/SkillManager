@@ -180,3 +180,61 @@ def source_factory():
         return base
 
     return _make_source
+
+
+@pytest.fixture(scope="session")
+def app_controller(session_mock_config, session_temp_dir):
+    """Provides an AppController initialized for testing (session-scoped)."""
+    import skill_manager.app
+    from skill_manager.app import AppController
+
+    # We use SynchronousTaskRunner to avoid threading issues in tests
+    controller = AppController(skip_initial_load=True, config=session_mock_config)
+    controller.task_runner = SynchronousTaskRunner()
+
+    skill_manager.app.current_test_controller = controller
+
+    def controller_factory(qml_engine):
+        from PySide6.QtQml import QQmlEngine
+        ctrl = skill_manager.app.current_test_controller
+        if ctrl:
+            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
+        return ctrl
+
+    from contextlib import suppress
+    with suppress(Exception):
+        from PySide6.QtQml import qmlRegisterSingletonType
+        # This registration is process-wide
+        qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
+
+    yield controller
+    controller.on_quit()
+
+
+@pytest.fixture
+def qml_engine(qapp, app_controller, qtbot):
+    """Provides a QQmlApplicationEngine with the AppController already registered."""
+    from PySide6.QtQml import QQmlApplicationEngine
+
+    import skill_manager
+    from skill_manager.core.resources import qml_components_dir
+
+    engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("appController", app_controller)
+
+    qml_dir = qml_components_dir(package_file=skill_manager.__file__)
+    engine.addImportPath(str(qml_dir.parent))
+
+    qml_file = qml_dir / "Main.qml"
+    engine.load(str(qml_file))
+
+    if not engine.rootObjects():
+        pytest.fail("Failed to load Main.qml")
+
+    yield engine
+
+    engine.clearComponentCache()
+    engine.deleteLater()
+    for _ in range(5):
+        qapp.processEvents()
+        qtbot.wait(20)

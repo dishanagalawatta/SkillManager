@@ -3,7 +3,6 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick.Effects
 import QtQuick.Dialogs
-import Qt5Compat.GraphicalEffects
 import ".."
 import App 1.0
 import "../dialogs"

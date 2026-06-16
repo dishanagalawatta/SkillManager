@@ -78,7 +78,7 @@ def test_ops_controller_delete_commands(mock_timer, mock_del, ops_controller, mo
     cmd_file = tmp_path / "test.md"
     cmd_file.write_text("content")
 
-    items = [{"local_path": str(cmd_file), "is_command": True}]
+    items = [{"name": "Cmd", "local_path": str(cmd_file), "is_command": True}]
     with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
         ops_controller.deleteSkills(items)
         assert not cmd_file.exists()
@@ -94,7 +94,7 @@ def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock
         "details": [{"path": "/p1", "status": "deleted"}],
     }
 
-    items = [{"local_path": "/p1", "is_command": False}]
+    items = [{"name": "S1", "local_path": "/p1", "is_command": False}]
     with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
         ops_controller.deleteSkills(items)
         mock_del.assert_called_once()
@@ -105,7 +105,7 @@ def test_ops_controller_delete_screenshots(ops_controller, tmp_path):
     screenshot = tmp_path / "Screenshot_test.png"
     screenshot.write_text("fake-image-data")
 
-    items = [{"local_path": str(screenshot), "is_screenshot": True}]
+    items = [{"name": "Screenshot", "local_path": str(screenshot), "is_screenshot": True}]
     with (
         patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch,
         patch("skill_manager.controllers.ops_controller.QTimer.singleShot"),
@@ -222,66 +222,38 @@ def test_ops_controller_copy_selected_temporary(mock_timer, mock_copy, ops_contr
 
 
 def test_ops_controller_update_models_source(ops_controller, mock_app):
-    skill_library = {"local_path": "/path/s", "is_archived": False, "is_starred": False}
-    skill_quick_copy = {"local_path": "/path/s", "is_archived": False, "is_starred": False}
+    mock_app._library_model.updateSkillProperty.return_value = True
+    mock_app._quick_copy_model.updateSkillProperty.return_value = True
 
-    mock_app._library_model._all_skills = [skill_library]
-    mock_app._quick_copy_model._all_skills = [skill_quick_copy]
-    mock_app._library_model._filtered_skills = [skill_library]
-    mock_app._quick_copy_model._filtered_skills = [skill_quick_copy]
+    ops_controller._updateModelsProperty("/path/s", "is_archived", True)
 
-    ops_controller._updateModelsSource("/path/s", "is_archived", True)
-
-    assert skill_library["is_archived"] is True
-    assert skill_quick_copy["is_archived"] is True
-    mock_app._library_model.dataChanged.emit.assert_called()
-    mock_app._quick_copy_model.dataChanged.emit.assert_called()
-
-
-def test_ops_controller_update_models_source_calls_apply_filter_on_starred(
-    ops_controller, mock_app
-):
-    skill = {"local_path": "/path/s", "is_starred": False}
-    mock_app._library_model._all_skills = [skill]
-    mock_app._quick_copy_model._all_skills = [skill]
-    mock_app._library_model._filtered_skills = [skill]
-    mock_app._quick_copy_model._filtered_skills = [skill]
-
-    ops_controller._updateModelsSource("/path/s", "is_starred", True)
-
-    mock_app._library_model.dataChanged.emit.assert_called()
-    mock_app._quick_copy_model.dataChanged.emit.assert_called()
+    mock_app._library_model.updateSkillProperty.assert_called_with("/path/s", "is_archived", True)
+    mock_app._quick_copy_model.updateSkillProperty.assert_called_with("/path/s", "is_archived", True)
 
 
 def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/s", "is_archived": False}
-    skill_library = {"local_path": "/path/s", "is_archived": False}
-    skill_quick_copy = {"local_path": "/path/s", "is_archived": False}
-
-    mock_app._library_model._all_skills = [skill_library]
-    mock_app._quick_copy_model._all_skills = [skill_quick_copy]
+    skill = {"local_path": "/path/s", "is_archived": False}
+    mock_app._selected_skill = skill
+    mock_app._library_model._all_skills = [skill]
+    mock_app._quick_copy_model._all_skills = [{"local_path": "/path/s", "is_archived": False}]
 
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
-        assert skill_library["is_archived"] is True
-        assert skill_quick_copy["is_archived"] is True
+        assert skill["is_archived"] is True
         mock_save.assert_called_once()
 
 
 def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/e", "is_starred": False}
-    skill_library = {"local_path": "/path/e", "is_starred": False}
-    skill_quick_copy = {"local_path": "/path/e", "is_starred": False}
-
-    mock_app._library_model._all_skills = [skill_library]
-    mock_app._quick_copy_model._all_skills = [skill_quick_copy]
+    skill = {"local_path": "/path/e", "is_starred": False}
+    mock_app._selected_skill = skill
+    mock_app._library_model._all_skills = [skill]
+    mock_app._quick_copy_model._all_skills = [{"local_path": "/path/e", "is_starred": False}]
 
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
-        assert skill_library["is_starred"] is True
-        assert skill_quick_copy["is_starred"] is True
+        assert skill["is_starred"] is True
         mock_save.assert_called_once()
 
 
@@ -388,7 +360,7 @@ def test_ops_controller_delete_skills_partial_failure(
         "details": [{"path": "/p1", "status": "deleted"}],
     }
 
-    items = [{"local_path": "/p1"}, {"local_path": "/p2"}]
+    items = [{"name": "S1", "local_path": "/p1"}, {"name": "S2", "local_path": "/p2"}]
     ops_controller.deleteSkills(items)
 
     mock_app._set_status.assert_called_with("Deletion complete: 1 deleted, 1 failed")
@@ -416,8 +388,8 @@ def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
         assert "/p2" in mock_app._archive_paths
         mock_save.assert_called_once()
         mock_app._set_status.assert_called_with("1 skills archived")
-        mock_app._library_model._apply_filter.assert_called_once()
-        mock_app._quick_copy_model._apply_filter.assert_called_once()
+        mock_app._library_model.updateSkillProperty.assert_called()
+        mock_app._quick_copy_model.updateSkillProperty.assert_called()
 
     # Test already archived case
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
@@ -433,16 +405,12 @@ def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
 
 def test_ops_controller_add_to_archive(ops_controller, mock_app):
     mock_app._archive_paths = []
-    skill = {"local_path": "/p3", "is_archived": False}
-    mock_app._library_model._all_skills = [skill]
-    mock_app._library_model._filtered_skills = [skill]
-    mock_app._quick_copy_model._all_skills = [{"local_path": "/p3", "is_archived": False}]
-    mock_app._quick_copy_model._filtered_skills = [{"local_path": "/p3", "is_archived": False}]
+    mock_app._library_model.updateSkillProperty.return_value = True
+    mock_app._quick_copy_model.updateSkillProperty.return_value = True
     ops_controller.addToArchive("/p3")
     assert "/p3" in mock_app._archive_paths
-    assert skill["is_archived"] is True
-    mock_app._library_model.dataChanged.emit.assert_called()
-    mock_app._quick_copy_model.dataChanged.emit.assert_called()
+    mock_app._library_model.updateSkillProperty.assert_called_with("/p3", "is_archived", True)
+    mock_app._quick_copy_model.updateSkillProperty.assert_called_with("/p3", "is_archived", True)
     mock_app._set_status.assert_called_with("Skill archived: /p3")
 
 

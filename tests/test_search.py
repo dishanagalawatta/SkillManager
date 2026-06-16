@@ -96,3 +96,52 @@ def test_search_string_tags(sample_skills):
     engine = SearchEngine([skill])
     result = engine.query("alpha")
     assert len(result) == 1
+
+
+def test_search_none_tags_in_metadata():
+    """Test that skills with None tags in metadata don't crash the indexer."""
+    skill_with_none_tags = {
+        "name": "none_tagged",
+        "description": "has None tags in metadata",
+        "category": "test",
+        "metadata": {"tags": None},
+        "local_path": "/none_tagged",
+    }
+    skill_with_empty_metadata = {
+        "name": "empty_meta",
+        "description": "has empty metadata",
+        "category": "test",
+        "metadata": {},
+        "local_path": "/empty_meta",
+    }
+    skill_with_no_metadata = {
+        "name": "no_meta",
+        "description": "has no metadata key",
+        "category": "test",
+        "local_path": "/no_meta",
+    }
+    skill_with_tags_at_top_level = {
+        "name": "top_level_tags",
+        "description": "tags at top level not in metadata",
+        "category": "test",
+        "tags": ["important", "urgent"],
+        "metadata": {},
+        "local_path": "/top_level_tags",
+    }
+
+    engine = SearchEngine(
+        [
+            skill_with_none_tags,
+            skill_with_empty_metadata,
+            skill_with_no_metadata,
+            skill_with_tags_at_top_level,
+        ]
+    )
+
+    results = engine.query("none_tagged")
+    assert len(results) == 1
+    assert results[0][0]["name"] == "none_tagged"
+
+    results = engine.query("important")
+    assert len(results) == 1
+    assert results[0][0]["name"] == "top_level_tags"

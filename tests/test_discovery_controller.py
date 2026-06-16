@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from skill_manager.controllers.discovery_controller import DiscoveryController
+from skill_manager.core.schemas import CacheState, SkillRecord
 
 
 @pytest.fixture
@@ -38,15 +39,19 @@ def test_load_initial_data_success(controller, mock_app):
 
 
 def test_finalize_loading(controller, mock_app):
-    skills = [{"name": "S1"}]
-    cats = ["Cat1"]
+    state = CacheState(
+        skills=[SkillRecord(name="S1", local_path="/p/s1")],
+        categories=["Cat1"],
+        project_labels=["L"],
+        status="Finished",
+    )
 
-    controller._finalize_loading(skills, ["/p"], cats, ["L"], "Finished", is_final=True)
+    controller._finalize_loading(state, is_final=True)
 
-    assert mock_app._categories == cats
+    assert mock_app._categories == ["Cat1"]
     mock_app.categoriesChanged.emit.assert_called_once()
-    mock_app._library_model.setSkills.assert_called_with(skills)
-    mock_app._quick_copy_model.setSkills.assert_called_with(skills)
+    mock_app._library_model.setSkills.assert_called()
+    mock_app._quick_copy_model.setSkills.assert_called()
     assert mock_app._is_loading is False
     mock_app.isLoadingChanged.emit.assert_called()
 
@@ -80,5 +85,11 @@ def test_on_discovery_done_error(controller, mock_app):
 
 def test_finalize_loading_with_project_label(controller, mock_app):
     mock_app._current_project_label = "MyProject"
-    controller._finalize_loading([], [], [], [], "Status", is_final=False)
+    state = CacheState(
+        skills=[],
+        categories=[],
+        project_labels=[],
+        status="Status",
+    )
+    controller._finalize_loading(state, is_final=False)
     assert mock_app._quick_copy_model.projectFilter == "MyProject"

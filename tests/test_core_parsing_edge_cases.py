@@ -9,7 +9,7 @@ from skill_manager.core.parsing import (
 
 def test_normalize_description_types():
     assert normalize_description(None) == ""
-    assert normalize_description(["a", "b"]) == "a b"
+    assert normalize_description(["a", "b"]) == "a\nb"
     assert normalize_description(123) == "123"
     assert normalize_description("  extra   spaces  ") == "extra spaces"
 
