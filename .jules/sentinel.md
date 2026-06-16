@@ -32,3 +32,7 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+## 2025-02-23 - [Regex ReDoS and Data Loss in Credential Sanitization]
+ **Vulnerability:** The regex used to sanitize git credentials (`re.sub(r"(echo password=).*", ...)`) was overly greedy and not quote-aware, leading to unintended truncation of valid command structures and potential ReDoS paths or bypasses via quote escaping.
+ **Learning:** Regular expressions used for sanitizing shell commands must explicitly model quoting mechanics (single, double, unquoted) to accurately target secret strings without stripping trailing delimiters or command sequences.
+ **Prevention:** Use discrete, mutually-exclusive capture patterns that account for quotation boundaries and escapes (e.g., `(?:\\.|[^"\\])*` for double quotes) instead of catch-all `.*` dot matches.

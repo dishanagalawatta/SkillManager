@@ -13,7 +13,19 @@ from skill_manager.core.skill_packages.process import (
 
 def test_sanitize_token():
     assert sanitize_token("https://token@github.com") == "https://***@github.com"
+
+    # Test unquoted password
     assert sanitize_token("echo password=secret") == "echo password=***"
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password=secret; }; f") == "credential.helper=!f() { echo username=token; echo password=***; }; f"
+
+    # Test double quoted password
+    assert sanitize_token('echo password="secret"') == 'echo password="***"'
+    assert sanitize_token('credential.helper=!f() { echo username=token; echo password="secret"; }; f') == 'credential.helper=!f() { echo username=token; echo password="***"; }; f'
+
+    # Test single quoted password
+    assert sanitize_token("echo password='secret'") == "echo password='***'"
+    assert sanitize_token("credential.helper=!f() { echo username=token; echo password='secret'; }; f") == "credential.helper=!f() { echo username=token; echo password='***'; }; f"
+
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
 
