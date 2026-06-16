@@ -57,7 +57,7 @@ def test_compute_dir_fingerprint(temp_dir):
     # 3. Modify internal file and touch subdir
     time.sleep(0.1)
     (skill_dir / "SKILL.md").write_text("updated")
-    os.utime(skill_dir, None) # Important for fingerprint to pick up change
+    os.utime(skill_dir, None)  # Important for fingerprint to pick up change
 
     fp3 = _compute_dir_fingerprint(temp_dir)
     assert fp3 != fp2
@@ -113,7 +113,11 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
     assert skills[0]["name"] == "Skill One"
 
     # Verify cache was populated
-    fp_key = f"dir_fp:{os.path.normcase(str(source_lib))}"
+    # The source is resolved in the service before building the key
+    from skill_manager.core.quick_copy import _resolve_resilient_path
+
+    resolved_source_lib = _resolve_resilient_path(str(source_lib))
+    fp_key = f"dir_fp:{os.path.normcase(str(resolved_source_lib))}"
     assert disk_cache.get(fp_key) is not None
     assert disk_cache.get(f"pkg_skills:{fp_key}") == skills
 

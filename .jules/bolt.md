@@ -21,3 +21,7 @@
 ## 2024-06-16 - Safe optimization with rapidfuzz.process.extractOne
 **Learning:** When replacing manual Python loops evaluating string similarity with `rapidfuzz.process.extractOne`, you must be careful to preserve the scoring logic when fuzzy matches fall below the threshold. If the original loop evaluated and stored scores under a certain threshold, passing a hardcoded `score_cutoff` will cause `extractOne` to return `None`, throwing away that lower score and changing functionality.
 **Action:** Always map the original threshold logic by dynamically passing the score tracking variable (e.g., `score_cutoff=max_token_match`) to short-circuit matching while safely preserving the actual maximum score even if it's low.
+
+## 2024-06-16 - Cross-platform path resolution in unit tests
+**Learning:** When comparing or hashing paths in unit tests (e.g., verifying cache keys), ensure you apply the exact same path resolution logic (like `Path.resolve()` or custom normalizations like `_resolve_resilient_path`) that the application code uses. `tempfile.mkdtemp()` on Windows returns short paths (e.g., `C:\Users\RUNNER~1\AppData\Local\Temp\...`) while `resolve()` expands them to long paths, leading to cache key mismatches (`assert None is not None`) in tests if the test relies on the un-resolved path.
+**Action:** Always pass the test's temporary directory paths through the system's designated path resolution function (e.g., `_resolve_resilient_path(str(source_lib))`) before generating expected keys or comparing paths.
