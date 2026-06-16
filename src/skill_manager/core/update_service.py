@@ -1,12 +1,21 @@
 """
-Update service for handling background skill updates and project syncing.
+Update service for handling background skill updates and project syncing,
+as well as application-level updates via tufup.
 """
 
 import logging
+import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+try:
+    from tufup.client import Client as TUFClient
+except ImportError:
+    TUFClient = None
+
+import skill_manager
 from skill_manager.core.copier import copy_skill_folders_to_projects
 from skill_manager.core.parsing import build_skill_search_text, categorize_skill, parse_skill_md
 from skill_manager.core.persistence import (
@@ -36,6 +45,13 @@ from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
 
 logger = logging.getLogger(__name__)
 
+# TUF Repository Configuration
+TUF_METADATA_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
+)
+TUF_TARGETS_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
+)
 
 def _log_update(level: str, event: str, **fields: Any) -> None:
     details = " ".join(
@@ -60,6 +76,7 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
 
 
 class UpdateService:
+    """Service for handling background skill updates and project syncing."""
     def __init__(
         self,
         sources: list[str],
@@ -546,3 +563,108 @@ class UpdateService:
                 }
             )
         return results
+
+
+class AppUpdateService:
+    """Service for checking and applying application-level updates via TUF."""
+
+    def __init__(self, tuf_dir: Path, target_dir: Path):
+        self.tuf_dir = tuf_dir
+        self.target_dir = target_dir
+        self._client: TUFClient | None = None
+        self._initialize_client()
+
+    def _initialize_client(self):
+        """Initialize the tufup client with local configuration."""
+        if TUFClient is None:
+            logger.error("tufup library not found. Updates unavailable.")
+            return
+
+        self.tuf_dir.mkdir(parents=True, exist_ok=True)
+        self.target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Ensure root.json exists
+        self._ensure_root_json()
+
+        app_install_dir = (
+            Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+        )
+
+        try:
+            self._client = TUFClient(
+                app_name="SkillManager",
+                app_install_dir=str(app_install_dir),
+                current_version=skill_manager.__version__,
+                metadata_base_url=TUF_METADATA_URL,
+                target_base_url=TUF_TARGETS_URL,
+                metadata_dir=str(self.tuf_dir),
+                target_dir=str(self.target_dir),
+            )
+            logger.debug("tufup Client initialized successfully.")
+        except Exception as e:
+            logger.warning("Failed to initialize TUF client: %s", e)
+
+    def _ensure_root_json(self):
+        """Ensures the TUF root.json metadata is present in the data directory."""
+        dest = self.tuf_dir / "root.json"
+        if dest.exists():
+            return
+
+        import shutil
+        if getattr(sys, "frozen", False):
+            bundled = Path(sys._MEIPASS) / "skill_manager" / "assets" / "tuf" / "root.json"
+        else:
+            bundled = Path(__file__).parent.parent / "assets" / "tuf" / "root.json"
+
+        if bundled.exists():
+            shutil.copy(bundled, dest)
+            logger.info("Seeded TUF root.json from bundle.")
+        else:
+            logger.warning("Bundled root.json not found at %s", bundled)
+
+    def check_for_updates(self) -> tuple[str | None, str | None]:
+        """
+        Check for available updates.
+        Returns: (new_version_str or None, error_message or None)
+        """
+        if not self._client:
+            return None, "Update client not initialized."
+
+        try:
+            new_version = self._client.check_for_updates()
+            return str(new_version) if new_version else None, None
+        except Exception as e:
+            logger.warning("Update check failed: %s", e)
+            return None, str(e)
+
+    def apply_update(self, progress_callback: Callable[[float], None] | None = None) -> bool:
+        """
+        Download and apply the pending update.
+        Returns: True if successful.
+        """
+        if not self._client:
+            return False
+
+        def progress_hook(bytes_downloaded, total_bytes):
+            if progress_callback and total_bytes > 0:
+                progress_callback(bytes_downloaded / total_bytes)
+
+        original_popen = subprocess.Popen
+
+        # Monkey-patch Popen to hide windows on Windows during the update process
+        class NoWindowPopen(original_popen):
+            def __init__(self, *args, **kwargs):
+                if sys.platform == "win32":
+                    kwargs["creationflags"] = (
+                        kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                    )
+                super().__init__(*args, **kwargs)
+
+        try:
+            subprocess.Popen = NoWindowPopen
+            return self._client.download_and_apply_update(progress_hook=progress_hook)
+        except Exception as e:
+            logger.error("Failed to apply update: %s", e)
+            return False
+        finally:
+            subprocess.Popen = original_popen

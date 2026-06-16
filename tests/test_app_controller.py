@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from skill_manager.app import AppController
+from skill_manager.core.schemas import CacheState, SkillRecord
 from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
@@ -71,10 +72,13 @@ def test_controller_status_message(controller):
 
 def test_controller_load_initial_data_logic(controller):
     # Test _finalize_loading directly to avoid threads
-    skills = [{"name": "Skill A", "category": "Dev", "is_package": True}]
-    controller.discovery._finalize_loading(
-        all_skills=skills, _projects_state=[], cats=["Dev"], proj_labels=[], status="Success"
+    state = CacheState(
+        skills=[SkillRecord(name="Skill A", local_path="/test/skill_a", category="Dev", is_package=True)],
+        categories=["Dev"],
+        project_labels=[],
+        status="Success",
     )
+    controller.discovery._finalize_loading(state)
 
     assert controller.skillModel.rowCount() == 1
     assert "Dev" in controller.categories
@@ -199,18 +203,18 @@ def test_controller_window_and_theme_setters_emit(controller):
 
     controller.windowWidth = 900
     # setter prevents values < 1050
-    assert controller.ui._window_width != 900
+    assert controller.ui.windowWidth != 900
 
     controller.windowWidth = 1500
     controller.windowHeight = 800
     controller.windowX = 22
     controller.windowY = 33
-    controller.darkMode = not controller.ui._dark_mode
+    controller.darkMode = not controller.ui.darkMode
 
-    assert controller.ui._window_width == 1500
-    assert controller.ui._window_height == 800
-    assert controller.ui._window_x == 22
-    assert controller.ui._window_y == 33
+    assert controller.ui.windowWidth == 1500
+    assert controller.ui.windowHeight == 800
+    assert controller.ui.windowX == 22
+    assert controller.ui.windowY == 33
     assert controller.ui.triggerSave.call_count >= 5
 
 
@@ -249,7 +253,7 @@ def test_controller_small_branch_slots(controller):
     assert controller.statusMessage == "Refreshing library..."
     controller.loadInitialData.assert_called_once()
 
-    controller.saveCustomCollection("", ["/p1"])
+    controller.saveCustomCollection("", ["/p1"], [], [])
     assert "" not in controller.customCollections
 
     controller.syncProject("/not-a-project")
@@ -280,7 +284,7 @@ def test_controller_custom_collections(controller):
     controller.skillModel.clearSelection = MagicMock()
     controller.skillModel.selectByPaths = MagicMock()
 
-    controller.saveCustomCollection("Core", ["/a", "/b"])
+    controller.saveCustomCollection("Core", ["/a", "/b"], ["Codex"], ["ProjectA"])
     assert "Core" in controller.customCollections
     assert controller.getCollectionPaths("Core") == ["/a", "/b"]
 
@@ -472,13 +476,13 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
 
     # Success case - we'll test _finalize_loading separately for correctness
     # as the async loop is mocked away here.
-    controller.discovery._finalize_loading(
-        all_skills=[{"name": "A", "is_package": True}],
-        _projects_state=[],
-        cats=["Dev"],
-        proj_labels=["P"],
+    state = CacheState(
+        skills=[SkillRecord(name="A", local_path="/test/a", is_package=True)],
+        categories=["Dev"],
+        project_labels=["P"],
         status="Done",
     )
+    controller.discovery._finalize_loading(state)
     assert controller.categories == ["Dev"]
     assert controller.statusMessage == "Done"
 
@@ -505,7 +509,7 @@ def test_controller_cache_save_load_and_corruption(controller, tmp_path):
 
     with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
         controller.config_mgr.save_cache(
-            {"skills": [{"name": "A", "raw_content": "large", "body_content": "body"}]}
+            {"skills": [{"name": "A", "local_path": "/test", "raw_content": "large", "body_content": "body"}]}
         )
         saved = cache_file.read_text(encoding="utf-8")
         assert "raw_content" not in saved

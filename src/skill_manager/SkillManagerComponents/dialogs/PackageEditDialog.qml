@@ -9,7 +9,6 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import Qt5Compat.GraphicalEffects
 import ".."
 import App 1.0
 
@@ -162,7 +161,7 @@ Dialog {
 
             Pane {
                 id: formPane
-                width: contentScroll.availableWidth
+                width: contentScroll.width - contentScroll.leftPadding - contentScroll.rightPadding
                 padding: 24
                 topPadding: 12
                 bottomPadding: 32

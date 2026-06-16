@@ -29,6 +29,7 @@ class Skill:
     date: str = "Unknown"
     client: str = ""
     main_category: str = "⚙️ System & Workflow"
+    tags: list[str] = field(default_factory=list)
 
     # Internal UI/Sorting flags
     _section_name: str | None = None
@@ -87,6 +88,7 @@ class Skill:
             date=data.get("date", "Unknown"),
             client=data.get("client", ""),
             main_category=data.get("main_category", "⚙️ System & Workflow"),
+            tags=data.get("tags", []),
         )
 
     @classmethod
@@ -118,6 +120,7 @@ class Skill:
             date=data.get("date", "Unknown"),
             client=data.get("client", ""),
             main_category=data.get("main_category", "⚙️ System & Workflow"),
+            tags=data.get("tags", []),
         )
 
 

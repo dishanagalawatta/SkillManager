@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,10 +9,10 @@ DEFAULT_MAIN_CATEGORY = "⚙️ System & Workflow"
 
 
 class SkillMetadata(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     name: str = ""
-    description: str | list[Any] = ""
+    description: str = ""
     category: str = ""
     type: str = ""
     risk: str = "Unknown"
@@ -21,23 +21,36 @@ class SkillMetadata(BaseModel):
     date_added: str = "Unknown"
     starred: bool = False
     essential: bool = False
-    tags: list[str] | str = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("tags", mode="before")
     @classmethod
-    def _coerce_tags(cls, value: Any) -> list[str] | str:
+    def _coerce_tags(cls, value: Any) -> list[str]:
         if value is None:
             return []
-        return value
+        if isinstance(value, str):
+            return [tag.strip() for tag in value.split(",") if tag.strip()]
+        if isinstance(value, list):
+            return [str(v) for v in value if v]
+        return []
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _coerce_description(cls, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            return "\n".join(str(v) for v in value)
+        return str(value)
 
 
 class SkillRecord(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
-    name: str = ""
+    name: str = Field(..., min_length=1)
+    local_path: str = Field(..., min_length=1)
     category: str = "General"
     description: str = ""
-    local_path: str = ""
     project_label: str = ""
     project_path: str = ""
     project_root: str = ""
@@ -56,17 +69,38 @@ class SkillRecord(BaseModel):
     client: str = ""
     main_category: str = DEFAULT_MAIN_CATEGORY
     metadata: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
 
-    @field_validator("name", "category", "description", "local_path", mode="before")
+    @field_validator("name", "category", "local_path", mode="before")
     @classmethod
     def _coerce_string_fields(cls, value: Any) -> str:
         if value is None:
             return ""
+        return str(value).strip()
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _coerce_description(cls, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            return "\n".join(str(v) for v in value)
         return str(value)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [tag.strip() for tag in value.split(",") if tag.strip()]
+        if isinstance(value, list):
+            return [str(v) for v in value if v]
+        return []
 
 
 class ShortcutConfig(BaseModel):
-    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     search: str = "Ctrl+F"
     copy_: str = Field(default="Ctrl+C", alias="copy")
@@ -84,6 +118,14 @@ class ShortcutConfig(BaseModel):
     settings_view: str = "Alt+4"
 
 
+class CollectionConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    paths: list[str] = Field(default_factory=list)
+    clients: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+
+
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="allow", env_prefix="SKILL_MANAGER_")
 
@@ -91,12 +133,12 @@ class AppConfig(BaseSettings):
     projects: list[str] = Field(default_factory=list)
     project_aliases: dict[str, str] = Field(default_factory=dict)
     shortcuts: dict[str, str] = Field(default_factory=dict)
-    scroll_speed_multiplier: float = 1.0
+    scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
     show_menu_icons: bool = True
     compact_menu: bool = False
     auto_check_updates: bool = True
     auto_download_updates: bool = False
-    update_check_interval_hours: int = 24
+    update_check_interval_hours: int = Field(default=24, ge=1, le=168)
     skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
@@ -107,6 +149,30 @@ class AppConfig(BaseSettings):
     @classmethod
     def _dict_or_empty(cls, value: Any) -> dict[str, Any]:
         return value if isinstance(value, dict) else {}
+
+    @field_validator("skill_package_auto_update_mode")
+    @classmethod
+    def _validate_update_mode(cls, value: str) -> str:
+        allowed = {"prompt", "auto", "notify"}
+        if value not in allowed:
+            return "prompt"
+        return value
+
+    @field_validator("scroll_speed_multiplier", mode="before")
+    @classmethod
+    def _coerce_float(cls, value: Any) -> float:
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 1.0
+
+    @field_validator("update_check_interval_hours", mode="before")
+    @classmethod
+    def _coerce_int(cls, value: Any) -> int:
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return 24
 
     @classmethod
     def from_legacy(cls, data: dict[str, Any]) -> AppConfig:
@@ -123,7 +189,7 @@ class AppConfig(BaseSettings):
 
 
 class PackageConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     id: str = ""
     path: str = ""
@@ -131,24 +197,177 @@ class PackageConfig(BaseModel):
     enabled: bool = True
 
 
+class UpdatePackageRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = ""
+    source_type: str = "npx"  # git, npx, local, custom
+    package_name: str = ""
+    package_id: str = ""
+    package_path: str = ""
+    resolved_package_path: str = ""
+    local_path: str = ""
+    last_updated: str = "Never"
+    is_updating: bool = False
+    just_finished: bool = False
+    current_version: str = ""
+    latest_version: str = ""
+    storage_mode: str = "individual"  # individual, grouped
+    managed_folders: list[str] = Field(default_factory=list)
+    removed_folders: list[str] = Field(default_factory=list)
+    updated_folders: list[str] = Field(default_factory=list)
+    removals_verified: bool = False
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _coerce_name(cls, value: Any) -> str:
+        return str(value or "").strip()
+
+
+class Redaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    x: int = Field(..., ge=0)
+    y: int = Field(..., ge=0)
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+
+
+class AnnotationPoint(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    x: float
+    y: float
+
+
+class BaseAnnotation(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: str
+    color: str = "#FF0000"
+    strokeWidth: int = 3
+
+
+class RectAnnotation(BaseAnnotation):
+    type: Literal["rect"] = "rect"
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class ArrowAnnotation(BaseAnnotation):
+    type: Literal["arrow"] = "arrow"
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+
+class FilledRectAnnotation(BaseAnnotation):
+    type: Literal["filledRect", "redact"] = "filledRect"
+    x: float
+    y: float
+    width: float
+    height: float
+    color: str = "#000000"
+
+
+# Backward compatibility alias
+RedactAnnotation = FilledRectAnnotation
+
+
+class FreehandAnnotation(BaseAnnotation):
+    type: Literal["freehand"] = "freehand"
+    points: list[AnnotationPoint] = Field(..., min_length=2)
+
+
+class EllipseAnnotation(BaseAnnotation):
+    type: Literal["ellipse"] = "ellipse"
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class FilledEllipseAnnotation(BaseAnnotation):
+    type: Literal["filledEllipse"] = "filledEllipse"
+    x: float
+    y: float
+    width: float
+    height: float
+    color: str = "#000000"
+
+
+class TextAnnotation(BaseAnnotation):
+    type: Literal["text"] = "text"
+    x: float
+    y: float
+    text: str = Field(..., min_length=1)
+    fontSize: int = 16
+    fontFamily: str = "Segoe UI"
+
+
+class HighlightAnnotation(BaseAnnotation):
+    type: Literal["highlight"] = "highlight"
+    x: float
+    y: float
+    width: float
+    height: float
+    color: str = "#FFFF00"
+
+
+# Union type for validation
+Annotation = (
+    RectAnnotation
+    | ArrowAnnotation
+    | FilledRectAnnotation
+    | FreehandAnnotation
+    | TextAnnotation
+    | HighlightAnnotation
+    | EllipseAnnotation
+    | FilledEllipseAnnotation
+)
+
+
+class AppUpdateState(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    is_checking: bool = False
+    is_updating: bool = False
+    update_available: bool = False
+    has_checked: bool = False
+    current_version: str = ""
+    latest_version: str = ""
+    progress: float = 0.0
+    error: str | None = None
+
+
+class ScreenshotParams(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    crop_x: int = Field(..., ge=0)
+    crop_y: int = Field(..., ge=0)
+    crop_width: int = Field(..., gt=0)
+    crop_height: int = Field(..., gt=0)
+    redactions: list[Redaction] = Field(default_factory=list)
+
+
+class UIStateRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    window_width: int = Field(default=1300, ge=1050)
+    window_height: int = Field(default=650, ge=650)
+    window_x: int = 100
+    window_y: int = 100
+    dark_mode: bool = False
+    current_view: str = "Library"
+    startup_view: str = "Library"
+    remember_filters: bool = True
+    reduced_motion: bool = False
+    compact_list_rows: bool = False
+    inspector_width: int = Field(default=0, ge=0)
+
+
 class CacheState(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     skills: list[SkillRecord] = Field(default_factory=list)
     projects: list[dict[str, Any]] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     project_labels: list[str] = Field(default_factory=list)
     status: str = ""
-
-    @field_validator("skills", mode="before")
-    @classmethod
-    def _validate_skills(cls, value: Any) -> list[Any]:
-        if not isinstance(value, list):
-            return []
-        validated = []
-        for item in value:
-            if isinstance(item, dict):
-                validated.append(SkillRecord.model_validate(item))
-            elif isinstance(item, SkillRecord):
-                validated.append(item)
-        return validated

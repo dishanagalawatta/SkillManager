@@ -9,7 +9,35 @@ ComboBox {
     signal collectionSelected(string name)
     signal editCollectionClicked(string name)
 
-    model: ["All Collections"].concat(AppController.customCollections)
+    function getFilteredCollections() {
+        let all = AppController.customCollections
+        let activeClient = AppController.clientFormat
+        let filtered = []
+        for (let i = 0; i < all.length; i++) {
+            let name = all[i]
+            let clients = AppController.config_controller.getCollectionClients(name)
+            if (clients.length === 0 || clients.indexOf(activeClient) >= 0) {
+                filtered.push(name)
+            }
+        }
+        return filtered
+    }
+
+    model: ["All Collections"].concat(getFilteredCollections())
+    
+    Connections {
+        target: AppController
+        function onClientFormatChanged() {
+            control.model = ["All Collections"].concat(control.getFilteredCollections())
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onCustomCollectionsChanged() {
+            control.model = ["All Collections"].concat(control.getFilteredCollections())
+        }
+    }
     
     delegate: ItemDelegate {
         width: control.width
@@ -48,7 +76,7 @@ ComboBox {
     indicator: Canvas {
         id: canvas
         x: control.width - width - control.rightPadding
-        y: control.topPadding + (control.availableHeight - height) / 2
+        y: control.topPadding + ((control.height - control.topPadding - control.bottomPadding) - height) / 2
         width: 12
         height: 8
         contextType: "2d"

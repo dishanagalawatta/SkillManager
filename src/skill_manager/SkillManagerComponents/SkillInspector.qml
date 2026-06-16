@@ -83,18 +83,14 @@ Rectangle {
     border.color: Theme.glassBorder
     clip: true // Ensure content doesn't bleed out when collapsed
     
-    SmoothScrollView {
-        id: mainScroll
+    Item {
+        id: mainContainer
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.margins: 16
         clip: true
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
         
         ColumnLayout {
-            width: mainScroll.width - 24
-            height: Math.max(implicitHeight, mainScroll.height - 24)
-            x: 12
-            y: 12
+            anchors.fill: parent
             spacing: 16
             visible: !root.isCollapsed && root.skill.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
@@ -204,55 +200,6 @@ Rectangle {
                 }
             }
 
-            // Metadata Section
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: metaColumn.implicitHeight + 24
-                radius: Theme.radiusCard
-                color: Theme.glassPill
-                border.color: Theme.glassBorder
-                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
-
-                ColumnLayout {
-                    id: metaColumn
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 4
-                    
-                    Repeater {
-                        model: root.skill.local_path ? [
-                            { label: "Location", value: root.skill.project_label || "Unknown" },
-                            { label: "Type", value: root.skill.category || "Unknown" },
-                            { label: "Risk", value: root.skill.risk || "Unknown" },
-                            { label: "Source", value: root.skill.source || "Unknown" },
-                            { label: "Date", value: root.skill.date || "Unknown" }
-                        ] : []
-                        
-                        TextEdit {
-                            id: metaEdit
-                            text: "<b>" + modelData.label + ":</b> " + modelData.value
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            color: Theme.secondaryLabel
-                            Layout.fillWidth: true
-                            readOnly: true
-                            selectByMouse: true
-                            cursorVisible: false
-                            wrapMode: TextEdit.Wrap
-                            textFormat: TextEdit.RichText
-
-                            TapHandler {
-                                acceptedButtons: Qt.RightButton
-                                onTapped: {
-                                    inspectorContextMenu.targetControl = metaEdit
-                                    inspectorContextMenu.popup()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // Description
             ColumnLayout {
                 Layout.fillWidth: true
@@ -285,6 +232,69 @@ Rectangle {
                         onTapped: {
                             inspectorContextMenu.targetControl = descriptionEdit
                             inspectorContextMenu.popup()
+                        }
+                    }
+                }
+            }
+
+            // Metadata Section
+            Flow {
+                id: metaFlow
+                Layout.fillWidth: true
+                spacing: 8
+                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
+
+                Repeater {
+                    model: root.skill.local_path ? [
+                        { label: "Location", value: root.skill.project_label || "Unknown" },
+                        { label: "Type", value: root.skill.category || "Unknown" },
+                        { label: "Risk", value: root.skill.risk || "Unknown" },
+                        { label: "Source", value: root.skill.source || "Unknown" },
+                        { label: "Date", value: root.skill.date || "Unknown" }
+                    ] : []
+                    
+                    Rectangle {
+                        height: 26
+                        width: rowLayout.implicitWidth + 16
+                        radius: Theme.radiusSmall
+                        color: Theme.glassPill
+                        border.color: Theme.glassBorder
+                        border.width: 1
+                        visible: modelData.value && modelData.value.toLowerCase() !== "unknown"
+                        
+                        Row {
+                            id: rowLayout
+                            anchors.centerIn: parent
+                            spacing: 4
+                            
+                            Text {
+                                text: modelData.label + ":"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeMetadata
+                                font.weight: Font.DemiBold
+                                color: Theme.secondaryLabel
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            
+                            TextEdit {
+                                id: metaValEdit
+                                text: modelData.value
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeMetadata
+                                color: Theme.label
+                                readOnly: true
+                                selectByMouse: true
+                                cursorVisible: false
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
+                                    onTapped: {
+                                        inspectorContextMenu.targetControl = metaValEdit
+                                        inspectorContextMenu.popup()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -385,27 +395,15 @@ Rectangle {
                 }
             }
 
-            // Implementation / Raw Content Section
+            // Skill Details / Raw Content Section
             ColumnLayout {
                 Layout.fillWidth: true
                 visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
                 spacing: 8
                 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "Implementation Details"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        color: Theme.secondaryLabel
-                    }
-                }
-                
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 400
                     Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
@@ -422,9 +420,9 @@ Rectangle {
 
                         TextArea {
                             id: rawContentArea
-                            width: rawContentScroll.availableWidth
+                            width: rawContentScroll.width - rawContentScroll.leftPadding - rawContentScroll.rightPadding
                             Accessible.role: Accessible.EditableText
-                            Accessible.name: "Implementation Details"
+                            Accessible.name: "Skill Details"
                             text: cleanBodyContent((root.skill && root.skill.body_content) || "")
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
@@ -451,9 +449,11 @@ Rectangle {
                 }
             }
 
-
-
-            Item { Layout.preferredHeight: 12 } // Bottom padding
+            // Flexible spacer for screenshot mode to prevent vertical stretching
+            Item {
+                Layout.fillHeight: true
+                visible: root.skill.is_screenshot === true
+            }
         }
     }
 

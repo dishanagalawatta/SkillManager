@@ -158,8 +158,15 @@ Item {
                         }
 
                         contentItem: Item {
-                            implicitWidth: Math.min(300, previewImg.implicitWidth)
-                            implicitHeight: Math.min(300, previewImg.implicitHeight)
+                            property real maxW: 400
+                            property real maxH: 400
+                            property real minW: 100
+                            property real minH: 100
+                            
+                            property real scaleFactor: previewImg.status === Image.Ready ? Math.min(1.0, maxW / Math.max(1, previewImg.implicitWidth), maxH / Math.max(1, previewImg.implicitHeight)) : 1.0
+                            
+                            implicitWidth: previewImg.status === Image.Ready ? Math.max(minW, previewImg.implicitWidth * scaleFactor) : minW
+                            implicitHeight: previewImg.status === Image.Ready ? Math.max(minH, previewImg.implicitHeight * scaleFactor) : minH
                             
                             Image {
                                 id: previewImg
@@ -167,8 +174,8 @@ Item {
                                 source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
-                                sourceSize.width: 600 // High enough for detail, but limited for perf
-                                sourceSize.height: 600
+                                // Setting only width preserves the original aspect ratio for the pixmap
+                                sourceSize.width: 600 
                             }
                         }
                     }

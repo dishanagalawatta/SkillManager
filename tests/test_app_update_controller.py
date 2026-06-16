@@ -1,336 +1,167 @@
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from skill_manager.controllers.app_update_controller import AppUpdateController
 
 
-@pytest.fixture(autouse=True)
-def mock_tufup_client():
-    with patch("skill_manager.controllers.app_update_controller.Client") as mock:
-        yield mock
+@pytest.fixture
+def mock_app():
+    app = MagicMock()
+    app.task_runner = MagicMock()
+    app._set_status = MagicMock()
+    return app
 
 
-@pytest.mark.asyncio
-async def test_check_tuf_updates_success():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    # Mock the client and its check_for_updates method
-    mock_client = MagicMock()
-    mock_client.check_for_updates.return_value = "2.0.0"
-    controller._client = mock_client
-
-    # Mock the signals
-    controller.updateAvailableChanged = MagicMock()
-    controller.latestVersionChanged = MagicMock()
-
-    await controller._check_tuf_updates()
-
-    assert controller.updateAvailable is True
-    assert controller.latestVersion == "2.0.0"
-    controller.updateAvailableChanged.emit.assert_called()
-    controller.latestVersionChanged.emit.assert_called()
+@pytest.fixture
+def controller(mock_app):
+    return AppUpdateController(mock_app)
 
 
-@pytest.mark.asyncio
-async def test_check_tuf_updates_no_update():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
+class TestAppUpdateControllerProperties:
+    def test_initial_state(self, controller):
+        assert controller.isUpdating is False
+        assert controller.updateProgress == 0.0
+        assert controller.isCheckingForUpdates is False
+        assert controller.hasCheckedForUpdates is False
 
-    mock_client = MagicMock()
-    mock_client.check_for_updates.return_value = None
-    controller._client = mock_client
+    def test_download_url(self, controller):
+        assert (
+            controller.downloadUrl
+            == "https://github.com/dishanagalawatta/SkillManager/releases/latest"
+        )
 
-    controller.updateAvailableChanged = MagicMock()
-
-    await controller._check_tuf_updates()
-
-    assert controller.updateAvailable is False
-    controller.updateAvailableChanged.emit.assert_called()
-
-
-@pytest.mark.asyncio
-async def test_check_tuf_updates_failure():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-    mock_client.check_for_updates.side_effect = Exception("Network error")
-    controller._client = mock_client
-
-    # Should not raise exception but log it (guarded by try-except)
-    await controller._check_tuf_updates()
-    assert controller.updateAvailable is False
+    def test_current_version(self, controller):
+        import skill_manager
+        assert controller.currentVersion == skill_manager.__version__
 
 
-@pytest.mark.asyncio
-async def test_properties():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-    assert (
-        controller.downloadUrl == "https://github.com/dishanagalawatta/SkillManager/releases/latest"
-    )
-    assert controller.isUpdating is False
-    assert controller.updateProgress == 0.0
+class TestCheckForUpdates:
+    def test_check_for_updates_skip_in_dev_mode(self, controller, mock_app):
+        with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+            mock_sys.frozen = False
+            controller.checkForUpdates()
+        assert controller.hasCheckedForUpdates is True
 
+    def test_check_for_updates_production_mode(self, controller, mock_app):
+        with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+            mock_sys.frozen = True
+            controller.checkForUpdates()
+        assert controller.isCheckingForUpdates is True
+        mock_app.task_runner.submit.assert_called_once()
 
-@pytest.mark.asyncio
-async def test_check_for_updates_slots():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    controller.isCheckingForUpdatesChanged = MagicMock()
-
-    # When is_updating, should return early without changing checking state
-    controller._is_updating = True
-    controller.checkForUpdates()
-    assert controller._is_checking_for_updates is False
-
-    # Production mode: sets checking to True before submission
-    controller._is_updating = False
-    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
-        mock_sys.frozen = True
-        controller.checkForUpdates()
-    assert controller._is_checking_for_updates is True
-    mock_app.task_runner.submit.assert_called_once_with(controller._sync_check_updates, ANY)
-
-
-@pytest.mark.asyncio
-async def test_manual_check_for_updates_feedback():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    # 1. Dev mode manual feedback - resets checking + records check
-    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
-        mock_sys.frozen = False
-        controller.checkForUpdates(manual=True)
-        mock_app._set_status.assert_called_with("Update check skipped in development mode.")
-        assert controller._is_checking_for_updates is False
-        assert controller._has_checked_for_updates is True
-
-    # 2. Production mode manual feedback (start)
-    mock_app._set_status.reset_mock()
-    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
-        mock_sys.frozen = True
-        controller.checkForUpdates(manual=True)
+    def test_check_for_updates_manual_skips_dev_check(self, controller, mock_app):
+        with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+            mock_sys.frozen = False
+            controller.checkForUpdates(manual=True)
         mock_app._set_status.assert_any_call("Checking for app updates...")
-        assert controller._is_checking_for_updates is True
+        assert controller.isCheckingForUpdates is True
 
-    # 3. Success feedback - clears checking
-    mock_app._set_status.reset_mock()
-    controller._on_updates_checked("2.0.0", manual=True)
-    mock_app._set_status.assert_called_with("Update available: v2.0.0")
-    assert controller._is_checking_for_updates is False
-    assert controller._has_checked_for_updates is True
-
-    # 4. Up to date feedback - clears checking
-    mock_app._set_status.reset_mock()
-    controller._on_updates_checked(None, manual=True)
-    mock_app._set_status.assert_called_with("SkillManager is up to date.")
-    assert controller._is_checking_for_updates is False
-
-    # 5. Error feedback - clears checking and shows error
-    mock_app._set_status.reset_mock()
-    controller._on_updates_checked(None, manual=True, error="Network failure")
-    mock_app._set_status.assert_called_with("Update check failed: Network failure")
-    assert controller._is_checking_for_updates is False
-    assert controller._update_available is False
-
-
-@pytest.mark.asyncio
-async def test_check_tuf_updates_no_client():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-    controller._client = None
-    # Should return early without error
-    await controller._check_tuf_updates()
-
-
-def test_download_and_apply_update_early_returns():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    # Client is None
-    controller._client = None
-    controller.downloadAndApplyUpdate()
-
-    # Is updating
-    controller._client = MagicMock()
-    controller._is_updating = True
-    controller.downloadAndApplyUpdate()
-
-    # Not available
-    controller._is_updating = False
-    controller._update_available = False
-    controller.downloadAndApplyUpdate()
-    assert controller._is_updating is False
-
-
-def test_download_and_apply_update_success():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    controller._client = MagicMock()
-    controller._update_available = True
-
-    controller.downloadAndApplyUpdate()
-    assert controller._is_updating is True
-    mock_app.task_runner.run.assert_called_once_with(controller._sync_apply_update)
-
-
-def test_apply_update_success():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-
-    # Call progress hook to test it
-    def side_effect(*args, **kwargs):
-        kwargs["progress_hook"](50, 100)
-        return True
-
-    mock_client.download_and_apply_update.side_effect = side_effect
-    controller._client = mock_client
-
-    controller.isUpdatingChanged = MagicMock()
-    controller.updateProgressChanged = MagicMock()
-
-    controller._sync_apply_update()
-
-    assert controller.updateProgress == 0.5
-    controller.updateProgressChanged.emit.assert_called_with(0.5)
-    mock_app._set_status.assert_called_with("Update applied. Please restart SkillManager.")
-    assert controller.isUpdating is False
-
-
-def test_apply_update_failure():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-    mock_client.download_and_apply_update.return_value = False
-    controller._client = mock_client
-
-    controller._sync_apply_update()
-    mock_app._set_status.assert_called_with("Update failed.")
-
-
-def test_apply_update_exception():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-    mock_client.download_and_apply_update.side_effect = Exception("Download error")
-    controller._client = mock_client
-
-    controller._sync_apply_update()
-    mock_app._set_status.assert_called_with("Update error: Download error")
-
-
-def test_sync_check_updates_handles_exception():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-    mock_client.check_for_updates.side_effect = Exception("Network error")
-    controller._client = mock_client
-
-    result, error = controller._sync_check_updates()
-    assert result is None
-    assert "Network error" in error
-
-
-def test_sync_check_updates_handles_timeout():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    mock_client = MagicMock()
-
-    def slow_check():
-        import time
-
-        time.sleep(30)
-        return "2.0.0"
-
-    mock_client.check_for_updates.side_effect = slow_check
-    controller._client = mock_client
-
-    result, error = controller._sync_check_updates()
-    assert result is None
-    assert "timed out" in error
-
-
-def test_sync_check_updates_no_client():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
-    controller._client = None
-
-    result, error = controller._sync_check_updates()
-    assert result is None
-    assert "not initialized" in error
-
-
-def test_is_checking_for_updates_state_transitions():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    assert controller.isCheckingForUpdates is False
-    assert controller._is_checking_for_updates is False
-
-    # Production mode: check starts
-    with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
-        mock_sys.frozen = True
+    def test_check_for_updates_early_return_when_updating(self, controller):
+        controller._state.is_updating = True
         controller.checkForUpdates()
-    assert controller._is_checking_for_updates is True
+        assert controller.isCheckingForUpdates is False
 
-    # Completion clears checking
-    controller._on_updates_checked(None)
-    assert controller._is_checking_for_updates is False
-    assert controller._has_checked_for_updates is True
-
-
-def test_check_for_updates_early_return_preserves_checking_state():
-    mock_app = MagicMock()
-    mock_app.task_runner = MagicMock()
-    controller = AppUpdateController(mock_app)
-
-    assert controller._is_checking_for_updates is False
-
-    # Early return when is_updating - should not set checking to True
-    controller._is_updating = True
-    controller.checkForUpdates()
-    assert controller._is_checking_for_updates is False
+    def test_check_for_updates_early_return_when_checking(self, controller):
+        controller._state.is_checking = True
+        controller.checkForUpdates()
+        assert controller.isCheckingForUpdates is True
 
 
-def test_on_updates_checked_clears_checking_and_sets_has_checked():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
+class TestOnUpdatesChecked:
+    def test_on_updates_checked_with_new_version(self, controller, mock_app):
+        controller._on_updates_checked("2.0.0", manual=True)
+        assert controller.updateAvailable is True
+        assert controller.latestVersion == "2.0.0"
+        assert controller.isCheckingForUpdates is False
+        mock_app._set_status.assert_called_with("Update available: v2.0.0")
 
-    controller._is_checking_for_updates = True
-    controller._has_checked_for_updates = False
+    def test_on_updates_checked_no_update(self, controller, mock_app):
+        controller._on_updates_checked(None, manual=True)
+        assert controller.updateAvailable is False
+        assert controller.isCheckingForUpdates is False
+        mock_app._set_status.assert_called_with("SkillManager is up to date.")
 
-    controller._on_updates_checked("2.0.0")
-    assert controller._is_checking_for_updates is False
-    assert controller._has_checked_for_updates is True
-    assert controller._update_available is True
+    def test_on_updates_checked_with_error(self, controller, mock_app):
+        controller._on_updates_checked(None, manual=True, error="Network failure")
+        assert controller.updateAvailable is False
+        assert controller.isCheckingForUpdates is False
+        mock_app._set_status.assert_called_with("Update check failed: Network failure")
 
-    controller._on_updates_checked(None)
-    assert controller._is_checking_for_updates is False
-    assert controller._has_checked_for_updates is True
-    assert controller._update_available is False
+    def test_on_updates_checked_non_manual(self, controller, mock_app):
+        controller._on_updates_checked("2.0.0", manual=False)
+        assert controller.updateAvailable is True
+        mock_app._set_status.assert_not_called()
 
 
-def test_has_checked_for_updates_property():
-    mock_app = MagicMock()
-    controller = AppUpdateController(mock_app)
+class TestDownloadAndApplyUpdate:
+    def test_download_early_return_when_updating(self, controller):
+        controller._state.is_updating = True
+        controller.downloadAndApplyUpdate()
+        assert controller.isUpdating is True
 
-    assert controller.hasCheckedForUpdates is False
+    def test_download_early_return_when_not_available(self, controller):
+        controller._state.update_available = False
+        controller.downloadAndApplyUpdate()
+        assert controller.isUpdating is False
 
-    controller._has_checked_for_updates = True
-    assert controller.hasCheckedForUpdates is True
+    def test_download_success(self, controller, mock_app):
+        controller._state.update_available = True
+        controller.downloadAndApplyUpdate()
+        assert controller.isUpdating is True
+        mock_app.task_runner.run.assert_called_once()
+
+    def test_download_no_task_runner(self, controller):
+        controller._state.update_available = True
+        del controller.app.task_runner
+        controller.downloadAndApplyUpdate()
+        assert controller.isUpdating is False
+
+
+class TestApplyUpdateSync:
+    def test_apply_success(self, controller, mock_app):
+        controller._service.apply_update = MagicMock(return_value=True)
+        controller._apply_update_sync()
+        mock_app._set_status.assert_called_with("Update applied. Please restart SkillManager.")
+        assert controller.isUpdating is False
+
+    def test_apply_failure(self, controller, mock_app):
+        controller._service.apply_update = MagicMock(return_value=False)
+        controller._apply_update_sync()
+        mock_app._set_status.assert_called_with("Update failed.")
+        assert controller.isUpdating is False
+
+    def test_apply_exception(self, controller, mock_app):
+        controller._service.apply_update = MagicMock(side_effect=Exception("Download error"))
+        controller._apply_update_sync()
+        mock_app._set_status.assert_called_with("Update error: Download error")
+        assert controller.isUpdating is False
+
+    def test_apply_progress_callback(self, controller, mock_app):
+        def fake_apply(progress_callback=None, **kwargs):
+            if progress_callback:
+                progress_callback(0.5)
+            return True
+
+        controller._service.apply_update = MagicMock(side_effect=fake_apply)
+        controller._apply_update_sync()
+        assert controller.updateProgress == 0.5
+
+
+class TestStateTransitions:
+    def test_is_checking_for_updates_state_transitions(self, controller, mock_app):
+        assert controller.isCheckingForUpdates is False
+
+        with patch("skill_manager.controllers.app_update_controller.sys") as mock_sys:
+            mock_sys.frozen = True
+            controller.checkForUpdates()
+        assert controller.isCheckingForUpdates is True
+
+        controller._on_updates_checked(None)
+        assert controller.isCheckingForUpdates is False
+        assert controller.hasCheckedForUpdates is True
+
+    def test_has_checked_for_updates_property(self, controller):
+        assert controller.hasCheckedForUpdates is False
+        controller._state.has_checked = True
+        assert controller.hasCheckedForUpdates is True

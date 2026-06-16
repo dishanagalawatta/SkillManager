@@ -43,7 +43,7 @@ class SkillIndexer:
 
         # Metadata keywords
         metadata = skill.get("metadata") or {}
-        tags = metadata.get("tags", [])
+        tags = metadata.get("tags") or skill.get("tags") or []
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 

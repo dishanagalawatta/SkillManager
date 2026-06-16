@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
-from PySide6.QtGui import QColor, QGuiApplication, QPainter
+from PySide6.QtGui import QGuiApplication
 
 logger = logging.getLogger(__name__)
 
@@ -87,28 +87,39 @@ class ScreenshotController(QObject):
         logger.info("Screenshot capture initiated via captureScreen().")
 
     @Slot(QRect, list)
-    def saveScreenshot(self, crop_rect: QRect, redactions: list):
+    def saveScreenshot(self, crop_rect: QRect, raw_redactions: list):
         """Crops the image, applies redactions, saves to disk, and copies to clipboard."""
+        from skill_manager.core.image_processing import ImageProcessor
+        from skill_manager.core.schemas import ScreenshotParams
+
         if self._current_full_pixmap is None or self._current_full_pixmap.isNull():
             logger.error("No pixmap available to save.")
             return
 
-        # 1. Create a copy and crop
-        # Note: crop_rect comes from QML, coordinates should match the screen capture
-        final_image = self._current_full_pixmap.copy(crop_rect)
+        # 1. Validate inputs via Pydantic
+        try:
+            params = ScreenshotParams(
+                crop_x=crop_rect.x(),
+                crop_y=crop_rect.y(),
+                crop_width=crop_rect.width(),
+                crop_height=crop_rect.height(),
+                redactions=raw_redactions
+            )
+        except Exception as e:
+            logger.error("Validation failed for screenshot parameters: %s", e)
+            self.app._set_status("Failed to save: invalid crop or redaction parameters.")
+            return
 
-        # 2. Draw redactions
-        painter = QPainter(final_image)
-        painter.setBrush(QColor("black"))
-        painter.setPen(QColor("black"))
+        validated_crop_rect = QRect(params.crop_x, params.crop_y, params.crop_width, params.crop_height)
 
-        for r in redactions:
-            # redactions list of dicts: {'x': ..., 'y': ..., 'width': ..., 'height': ...}
-            # coordinates are relative to the crop_rect
-            rect = QRect(r["x"], r["y"], r["width"], r["height"])
-            painter.drawRect(rect)
-
-        painter.end()
+        # 2. Process image
+        try:
+            final_image = ImageProcessor.crop_and_redact(
+                self._current_full_pixmap, validated_crop_rect, params.redactions
+            )
+        except ValueError as e:
+            logger.error("Image processing failed: %s", e)
+            return
 
         # 3. Determine save path
         project_label_or_path = self.app.quickCopyModel.projectFilter

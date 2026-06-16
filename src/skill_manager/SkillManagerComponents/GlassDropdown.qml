@@ -24,7 +24,7 @@ ComboBox {
     indicator: Canvas {
         id: canvas
         x: control.width - width - control.rightPadding
-        y: control.topPadding + (control.availableHeight - height) / 2
+        y: control.topPadding + ((control.height - control.topPadding - control.bottomPadding) - height) / 2
         width: 12
         height: 8
         contextType: "2d"

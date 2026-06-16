@@ -10,6 +10,7 @@ from PySide6.QtCore import QTimer, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.schemas import UpdatePackageRecord
 from skill_manager.core.update_service import UpdateService
 from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
@@ -27,10 +28,16 @@ class UpdateController(BaseController):
             resolve_package_storage,
         )
 
-        packages = [
-            {**normalize_skill_package_config(package), **package}
-            for package in self.app._update_packages
-        ]
+        packages = []
+        for package in self.app._update_packages:
+            try:
+                # Ensure each package in memory is a valid record
+                normalized = normalize_skill_package_config(package)
+                record = UpdatePackageRecord.model_validate({**normalized, **package})
+                packages.append(record.model_dump())
+            except Exception as e:
+                logger.error("Failed to normalize package during storage resolution: %s", e)
+
         self.app._update_packages = resolve_package_storage(
             packages, load_package_skill_inventory()
         )
@@ -208,17 +215,19 @@ class UpdateController(BaseController):
         """Adds a basic NPX-style source."""
         if not package_name:
             return
-        new_source = {
-            "name": package_name,
-            "source_type": "npx",
-            "package_name": package_name,
-            "last_updated": "Never",
-            "is_updating": False,
-        }
-        self.app._update_packages.append(new_source)
-        self.config.set("skills", self.app._update_packages)
-        self.app.updatePackagesChanged.emit()
-        self.app._set_status(f"Added update package: {package_name}")
+        try:
+            record = UpdatePackageRecord(
+                name=package_name,
+                source_type="npx",
+                package_name=package_name,
+            )
+            self.app._update_packages.append(record.model_dump())
+            self.config.set("skills", self.app._update_packages)
+            self.app.updatePackagesChanged.emit()
+            self.app._set_status(f"Added update package: {package_name}")
+        except Exception as e:
+            logger.error("Failed to add update package: %s", e)
+            self.app._set_status(f"Error adding package: {e}")
 
     @Slot(dict)
     def addSkillPackage(self, data: dict):
@@ -230,43 +239,57 @@ class UpdateController(BaseController):
             normalize_skill_package_config,
         )
 
-        new_source = normalize_skill_package_config(data)
-        new_source["is_updating"] = False
-        new_source["last_updated"] = "Never"
+        try:
+            # 1. Normalize and Validate
+            normalized = normalize_skill_package_config(data)
+            record = UpdatePackageRecord.model_validate(normalized)
+            record.is_updating = False
+            record.last_updated = "Never"
 
-        # Immediate version check
-        new_source = check_skill_package_versions(new_source)
+            # 2. Version Check (returns dict, so we re-validate)
+            checked_data = check_skill_package_versions(record.model_dump())
+            final_record = UpdatePackageRecord.model_validate(checked_data)
 
-        self.app._update_packages.append(new_source)
-        self._resolvePackageStorageState()
-        self.app.updatePackagesChanged.emit()
-        self.app._set_status(f"Added skill package: {new_source.get('name')}")
-        capture_event(
-            "skill_package_added", {"source_type": new_source.get("source_type", "unknown")}
-        )
+            # 3. Commit to state
+            self.app._update_packages.append(final_record.model_dump())
+            self._resolvePackageStorageState()
+            self.app.updatePackagesChanged.emit()
+            self.app._set_status(f"Added skill package: {final_record.name}")
+            capture_event(
+                "skill_package_added", {"source_type": final_record.source_type}
+            )
+        except Exception as e:
+            logger.error("Failed to add skill package: %s", e)
+            self.app._set_status(f"Error adding skill package: {e}")
 
     @Slot(int, dict)
     def updateUpdatePackage(self, index: int, data: dict):
         """Updates configuration for an existing skill package."""
         if 0 <= index < len(self.app._update_packages):
-            # Preserve internal state
-            is_updating = self.app._update_packages[index].get("is_updating", False)
+            try:
+                # Preserve internal state
+                is_updating = self.app._update_packages[index].get("is_updating", False)
 
-            from skill_manager.core.skill_packages import (
-                check_skill_package_versions,
-                normalize_skill_package_config,
-            )
+                from skill_manager.core.skill_packages import (
+                    check_skill_package_versions,
+                    normalize_skill_package_config,
+                )
 
-            updated_source = normalize_skill_package_config(data)
-            updated_source["is_updating"] = is_updating
+                normalized = normalize_skill_package_config(data)
+                record = UpdatePackageRecord.model_validate(normalized)
+                record.is_updating = is_updating
 
-            # Refresh versions
-            updated_source = check_skill_package_versions(updated_source)
+                # Refresh versions
+                checked_data = check_skill_package_versions(record.model_dump())
+                final_record = UpdatePackageRecord.model_validate(checked_data)
 
-            self.app._update_packages[index] = updated_source
-            self._resolvePackageStorageState()
-            self.app.updatePackagesChanged.emit()
-            self.app._set_status(f"Updated skill package: {updated_source.get('name')}")
+                self.app._update_packages[index] = final_record.model_dump()
+                self._resolvePackageStorageState()
+                self.app.updatePackagesChanged.emit()
+                self.app._set_status(f"Updated skill package: {final_record.name}")
+            except Exception as e:
+                logger.error("Failed to update skill package: %s", e)
+                self.app._set_status(f"Error updating skill package: {e}")
 
     @Slot(int)
     def removeUpdatePackage(self, index: int):

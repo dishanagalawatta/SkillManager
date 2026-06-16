@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Dialogs
 import App 1.0
 
 Rectangle {
@@ -18,6 +19,17 @@ Rectangle {
     }
 
     signal closed()
+
+    FontPickerDialog {
+        id: fontPickerDialog
+        selectedFamily: root.activeFontFamily
+        selectedSize: root.activeFontSize
+        previewColor: root.activeColor
+        onFontSelected: (family, style, size) => {
+            root.activeFontFamily = family
+            root.activeFontSize = size
+        }
+    }
 
     GlassMenu {
         id: inspectorContextMenu
@@ -68,12 +80,12 @@ Rectangle {
     property color activeColor: "#FF0000"
     property real strokeWidth: 3
     property var annotations: []
+    property var redoStack: []
     property int selectedIndex: -1
     property bool isDrawing: false
     property real drawStartX: 0
     property real drawStartY: 0
     property var currentPath: []
-    property bool isFullscreen: false
     property bool isDragging: false
     property real dragOffsetX: 0
     property real dragOffsetY: 0
@@ -90,6 +102,13 @@ Rectangle {
     property real textInputY: 0
     property string textInputValue: ""
 
+    // Eraser properties
+    property real eraserRadius: 20
+
+    // Font properties
+    property string activeFontFamily: "Segoe UI"
+    property int activeFontSize: 16
+
     // Preset colors for the color picker
     property var presetColors: [
         "#FF0000", "#FF6B00", "#FFD600", "#00C853",
@@ -100,9 +119,19 @@ Rectangle {
     function getAnnotationAt(mx, my) {
         for (var i = annotations.length - 1; i >= 0; i--) {
             var a = annotations[i]
-            if (a.type === "rect" || a.type === "redact" || a.type === "highlight") {
+            if (a.type === "rect" || a.type === "filledRect" || a.type === "highlight") {
                 if (mx >= a.x && mx <= a.x + a.width && my >= a.y && my <= a.y + a.height)
                     return i
+            } else if (a.type === "ellipse" || a.type === "filledEllipse") {
+                var cx = a.x + a.width / 2
+                var cy = a.y + a.height / 2
+                var rx = Math.abs(a.width / 2)
+                var ry = Math.abs(a.height / 2)
+                if (rx > 0 && ry > 0) {
+                    var dx = (mx - cx) / rx
+                    var dy = (my - cy) / ry
+                    if (dx * dx + dy * dy <= 1.0) return i
+                }
             } else if (a.type === "arrow") {
                 var dx1 = mx - a.x1, dy1 = my - a.y1
                 var dx2 = mx - a.x2, dy2 = my - a.y2
@@ -132,6 +161,69 @@ Rectangle {
         var cx = ix * zoomLevel + panOffset.x
         var cy = iy * zoomLevel + panOffset.y
         return Qt.point(cx, cy)
+    }
+
+    function getAnnotationsUnderEraser(mx, my, radius) {
+        var indicesToRemove = []
+        for (var i = annotations.length - 1; i >= 0; i--) {
+            var a = annotations[i]
+            if (isAnnotationHitByEraser(a, mx, my, radius)) {
+                indicesToRemove.push(i)
+            }
+        }
+        return indicesToRemove
+    }
+
+    function isAnnotationHitByEraser(ann, ex, ey, radius) {
+        if (ann.type === "rect" || ann.type === "filledRect" || ann.type === "highlight") {
+            return ex >= ann.x && ex <= ann.x + ann.width && ey >= ann.y && ey <= ann.y + ann.height
+        } else if (ann.type === "ellipse" || ann.type === "filledEllipse") {
+            var cx = ann.x + ann.width / 2
+            var cy = ann.y + ann.height / 2
+            var rx = Math.abs(ann.width / 2)
+            var ry = Math.abs(ann.height / 2)
+            if (rx === 0 || ry === 0) return false
+            var dx = (ex - cx) / rx
+            var dy = (ey - cy) / ry
+            return (dx * dx + dy * dy) <= 1.0
+        } else if (ann.type === "arrow") {
+            var dist = pointToSegmentDistance(ex, ey, ann.x1, ann.y1, ann.x2, ann.y2)
+            return dist < radius
+        } else if (ann.type === "text") {
+            var textWidth = (ann.text || "").length * (ann.fontSize || 16) * 0.6
+            var textHeight = (ann.fontSize || 16) * 1.4
+            return ex >= ann.x - 5 && ex <= ann.x + textWidth && ey >= ann.y - textHeight && ey <= ann.y + 5
+        } else if (ann.type === "freehand" && ann.points) {
+            for (var j = 0; j < ann.points.length; j++) {
+                var dx = ex - ann.points[j].x
+                var dy = ey - ann.points[j].y
+                if (Math.sqrt(dx * dx + dy * dy) < radius) return true
+            }
+        }
+        return false
+    }
+
+    function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+        var dx = x2 - x1, dy = y2 - y1
+        var lenSq = dx * dx + dy * dy
+        if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2)
+        var t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq))
+        var projX = x1 + t * dx, projY = y1 + t * dy
+        return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2)
+    }
+
+    function eraseAtPoint(mx, my) {
+        var indices = getAnnotationsUnderEraser(mx, my, root.eraserRadius / root.zoomLevel)
+        if (indices.length > 0) {
+            var updated = root.annotations.slice()
+            for (var k = 0; k < indices.length; k++) {
+                var removed = updated.splice(indices[k], 1)[0]
+                var rs = root.redoStack.slice()
+                rs.push(removed)
+                root.redoStack = rs
+            }
+            root.annotations = updated
+        }
     }
 
     // --- Root styling (same as SkillInspector) ---
@@ -200,59 +292,6 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                // Action buttons
-                IconButton {
-                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-undo.svg")
-                    tooltipText: "Undo (Ctrl+Z)"
-                    role: "ghost"
-                    buttonSize: 28
-                    iconSize: 14
-                    enabled: root.annotations.length > 0
-                    onClicked: {
-                        if (root.selectedIndex >= 0) {
-                            var updated = root.annotations.slice()
-                            updated.splice(root.selectedIndex, 1)
-                            root.annotations = updated
-                            root.selectedIndex = -1
-                        } else {
-                            var updated = root.annotations.slice()
-                            updated.pop()
-                            root.annotations = updated
-                        }
-                    }
-                }
-
-                IconButton {
-                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-x.svg")
-                    tooltipText: "Clear All"
-                    role: "ghost"
-                    buttonSize: 28
-                    iconSize: 14
-                    enabled: root.annotations.length > 0
-                    onClicked: {
-                        root.annotations = []
-                        root.selectedIndex = -1
-                    }
-                }
-
-                ActionButton {
-                    text: "Apply"
-                    role: "primary"
-                    enabled: root.annotations.length > 0
-                    buttonHeight: 28
-                    onClicked: {
-                        AppController.image_inspector_controller.saveAnnotations(root.imagePath, root.annotations)
-                        root.annotations = []
-                        root.selectedIndex = -1
-                    }
-                }
-
-                Rectangle {
-                    width: 1
-                    height: 20
-                    color: Theme.separator
-                }
-
                 // Zoom controls
                 IconButton {
                     iconSource: AppController.ui_controller.getAssetUri("ui/tool-minus.svg")
@@ -263,13 +302,110 @@ Rectangle {
                     onClicked: root.zoomLevel = Math.max(root.minZoom, root.zoomLevel - 0.25)
                 }
 
-                Text {
-                    text: Math.round(root.zoomLevel * 100) + "%"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    color: Theme.secondaryLabel
-                    Layout.preferredWidth: 40
-                    horizontalAlignment: Text.AlignHCenter
+                Item {
+                    Layout.preferredWidth: 44
+                    Layout.preferredHeight: 28
+
+                    TextInput {
+                        id: zoomInput
+                        anchors.fill: parent
+                        text: Math.round(root.zoomLevel * 100) + "%"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.label
+                        horizontalAlignment: TextInput.AlignHCenter
+                        verticalAlignment: TextInput.AlignVCenter
+                        selectByMouse: true
+                        
+                        onEditingFinished: {
+                            let val = parseInt(text.replace("%", ""))
+                            if (!isNaN(val)) {
+                                root.zoomLevel = Math.max(root.minZoom, Math.min(root.maxZoom, val / 100.0))
+                            }
+                            text = Math.round(root.zoomLevel * 100) + "%"
+                            focus = false
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.IBeamCursor
+                            acceptedButtons: Qt.NoButton
+                            onEntered: zoomPopup.open()
+                            onExited: zoomHoverTimer.restart()
+                        }
+                    }
+
+                    Timer {
+                        id: zoomHoverTimer
+                        interval: 300
+                        onTriggered: {
+                            if (!popupHover.hovered) {
+                                zoomPopup.close()
+                            }
+                        }
+                    }
+
+                    Popup {
+                        id: zoomPopup
+                        y: parent.height
+                        x: (parent.width - width) / 2
+                        width: 60
+                        padding: 4
+                        background: Rectangle {
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            radius: Theme.radiusSmall
+                        }
+
+                        contentItem: Item {
+                            implicitWidth: 52
+                            implicitHeight: zoomColumn.implicitHeight
+
+                            HoverHandler {
+                                id: popupHover
+                                onHoveredChanged: {
+                                    if (hovered) zoomHoverTimer.stop()
+                                    else zoomHoverTimer.restart()
+                                }
+                            }
+
+                            Column {
+                                id: zoomColumn
+                                anchors.fill: parent
+                                spacing: 2
+
+                                Repeater {
+                                    model: [25, 50, 75, 100, 150, 200, 400]
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 24
+                                        color: itemMouse.containsMouse ? Theme.glassHover : "transparent"
+                                        radius: Theme.radiusSmall
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData + "%"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            color: itemMouse.containsMouse ? Theme.label : Theme.secondaryLabel
+                                        }
+
+                                        MouseArea {
+                                            id: itemMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                root.zoomLevel = modelData / 100.0
+                                                zoomPopup.close()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 IconButton {
@@ -290,13 +426,70 @@ Rectangle {
                     onClicked: zoomToFit()
                 }
 
+                Rectangle {
+                    width: 1
+                    height: 20
+                    color: Theme.separator
+                }
+
+                // Action buttons
                 IconButton {
-                    iconText: "1:1"
-                    tooltipText: "Zoom to 100% (Ctrl+1)"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-undo.svg")
+                    tooltipText: "Undo (Ctrl+Z)"
                     role: "ghost"
                     buttonSize: 28
                     iconSize: 14
-                    onClicked: root.zoomLevel = 1.0
+                    enabled: root.annotations.length > 0
+                    onClicked: {
+                        if (root.selectedIndex >= 0) {
+                            var updated = root.annotations.slice()
+                            updated.splice(root.selectedIndex, 1)
+                            root.annotations = updated
+                            root.selectedIndex = -1
+                        } else {
+                            var updated = root.annotations.slice()
+                            var popped = updated.pop()
+                            if (popped) {
+                                var rs = root.redoStack.slice()
+                                rs.push(popped)
+                                root.redoStack = rs
+                            }
+                            root.annotations = updated
+                        }
+                    }
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-redo.svg")
+                    tooltipText: "Redo (Ctrl+Y)"
+                    role: "ghost"
+                    buttonSize: 28
+                    iconSize: 14
+                    enabled: root.redoStack.length > 0
+                    onClicked: {
+                        var rs = root.redoStack.slice()
+                        var item = rs.pop()
+                        root.redoStack = rs
+                        if (item) {
+                            var updated = root.annotations.slice()
+                            updated.push(item)
+                            root.annotations = updated
+                        }
+                    }
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-x.svg")
+                    tooltipText: "Clear All"
+                    role: "ghost"
+                    buttonSize: 28
+                    iconSize: 14
+                    enabled: root.annotations.length > 0
+                    onClicked: {
+                        root.annotations = []
+                        root.redoStack = []
+                        root.selectedIndex = -1
+                    }
                 }
 
                 Rectangle {
@@ -306,21 +499,25 @@ Rectangle {
                 }
 
                 IconButton {
-                    iconSource: root.isFullscreen ? AppController.ui_controller.getAssetUri("ui/tool-minimize.svg") : AppController.ui_controller.getAssetUri("ui/tool-maximize.svg")
-                    tooltipText: root.isFullscreen ? "Exit Fullscreen" : "Fullscreen"
-                    role: "ghost"
-                    buttonSize: 28
-                    iconSize: 14
-                    onClicked: toggleFullscreen()
-                }
-
-                IconButton {
                     iconSource: AppController.ui_controller.getAssetUri("ui/tool-external-link.svg")
                     tooltipText: "Open Externally"
                     role: "ghost"
                     buttonSize: 28
                     iconSize: 14
                     onClicked: AppController.image_inspector_controller.openExternally(root.imagePath)
+                }
+
+                ActionButton {
+                    text: "Apply"
+                    role: "primary"
+                    enabled: root.annotations.length > 0
+                    buttonHeight: 28
+                    onClicked: {
+                        AppController.image_inspector_controller.saveAnnotations(root.imagePath, root.annotations)
+                        root.annotations = []
+                        root.redoStack = []
+                        root.selectedIndex = -1
+                    }
                 }
 
                 IconButton {
@@ -377,6 +574,22 @@ Rectangle {
                             zoomToFit()
                         }
                     }
+
+                    Timer {
+                        id: imageReloadTimer
+                        interval: 50
+                        onTriggered: {
+                            imageItem.source = root.imagePath
+                        }
+                    }
+
+                    Connections {
+                        target: AppController.image_inspector_controller
+                        function onImageSaved(savedPath) {
+                            imageItem.source = ""
+                            imageReloadTimer.restart()
+                        }
+                    }
                 }
 
                 // Annotation overlay layer
@@ -395,15 +608,15 @@ Rectangle {
                             property int annIndex: index
                             property bool isSelected: root.selectedIndex === index
 
-                            // Rect / Redact / Highlight
+                            // Rect / FilledRect / Highlight
                             Rectangle {
-                                visible: annData.type === "rect" || annData.type === "redact" || annData.type === "highlight"
+                                visible: annData.type === "rect" || annData.type === "filledRect" || annData.type === "highlight"
                                 x: annData.x * root.zoomLevel + root.panOffset.x
                                 y: annData.y * root.zoomLevel + root.panOffset.y
                                 width: annData.width * root.zoomLevel
                                 height: annData.height * root.zoomLevel
                                 color: {
-                                    if (annData.type === "redact") return annData.color || "#000000"
+                                    if (annData.type === "filledRect") return annData.color || "#000000"
                                     if (annData.type === "highlight") {
                                         var c = Qt.color(annData.color || "#FFFF00")
                                         return Qt.rgba(c.r, c.g, c.b, 0.3)
@@ -495,20 +708,9 @@ Rectangle {
                                             onReleased: {
                                                 root.isResizing = false
                                                 root.resizeHandle = -1
-                }
-            }
-
-            // Mouse wheel zoom
-            MouseArea {
-                anchors.fill: parent
-                z: 50
-                acceptedButtons: Qt.NoButton
-                onWheel: (wheel) => {
-                    var delta = wheel.angleDelta.y > 0 ? 0.15 : -0.15
-                    root.zoomLevel = Math.max(root.minZoom, Math.min(root.maxZoom, root.zoomLevel + delta))
-                }
-            }
-        }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -532,15 +734,19 @@ Rectangle {
                                     var x2 = annData.x2 * root.zoomLevel + root.panOffset.x
                                     var y2 = annData.y2 * root.zoomLevel + root.panOffset.y
 
+                                    var angle = Math.atan2(y2 - y1, x2 - x1)
+                                    var len = (12 + annData.strokeWidth * 2) * root.zoomLevel
+                                    var shorten = len * 0.8
+                                    var lineX2 = x2 - shorten * Math.cos(angle)
+                                    var lineY2 = y2 - shorten * Math.sin(angle)
+
                                     // Line
                                     ctx.beginPath()
                                     ctx.moveTo(x1, y1)
-                                    ctx.lineTo(x2, y2)
+                                    ctx.lineTo(lineX2, lineY2)
                                     ctx.stroke()
 
                                     // Arrowhead
-                                    var angle = Math.atan2(y2 - y1, x2 - x1)
-                                    var len = 12 * root.zoomLevel
                                     var ang = Math.PI / 6
                                     ctx.beginPath()
                                     ctx.moveTo(x2, y2)
@@ -593,13 +799,74 @@ Rectangle {
                                 }
                             }
 
+                            // Ellipse
+                            Canvas {
+                                id: ellipseCanvas
+                                visible: annData.type === "ellipse"
+                                anchors.fill: parent
+                                z: 1
+
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    ctx.strokeStyle = annData.color || "#FF0000"
+                                    ctx.lineWidth = (annData.strokeWidth || 3) * root.zoomLevel
+
+                                    var cx = (annData.x + annData.width / 2) * root.zoomLevel + root.panOffset.x
+                                    var cy = (annData.y + annData.height / 2) * root.zoomLevel + root.panOffset.y
+                                    var rx = Math.abs(annData.width / 2) * root.zoomLevel
+                                    var ry = Math.abs(annData.height / 2) * root.zoomLevel
+
+                                    ctx.beginPath()
+                                    ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI)
+                                    ctx.stroke()
+                                }
+
+                                Connections {
+                                    target: root
+                                    function onAnnotationsChanged() { ellipseCanvas.requestPaint() }
+                                    function onZoomLevelChanged() { ellipseCanvas.requestPaint() }
+                                    function onPanOffsetChanged() { ellipseCanvas.requestPaint() }
+                                }
+                            }
+
+                            // Filled Ellipse
+                            Canvas {
+                                id: filledEllipseCanvas
+                                visible: annData.type === "filledEllipse"
+                                anchors.fill: parent
+                                z: 1
+
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = annData.color || "#000000"
+
+                                    var cx = (annData.x + annData.width / 2) * root.zoomLevel + root.panOffset.x
+                                    var cy = (annData.y + annData.height / 2) * root.zoomLevel + root.panOffset.y
+                                    var rx = Math.abs(annData.width / 2) * root.zoomLevel
+                                    var ry = Math.abs(annData.height / 2) * root.zoomLevel
+
+                                    ctx.beginPath()
+                                    ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI)
+                                    ctx.fill()
+                                }
+
+                                Connections {
+                                    target: root
+                                    function onAnnotationsChanged() { filledEllipseCanvas.requestPaint() }
+                                    function onZoomLevelChanged() { filledEllipseCanvas.requestPaint() }
+                                    function onPanOffsetChanged() { filledEllipseCanvas.requestPaint() }
+                                }
+                            }
+
                             // Text
                             Text {
                                 visible: annData.type === "text"
                                 x: annData.x * root.zoomLevel + root.panOffset.x
                                 y: (annData.y - annData.fontSize) * root.zoomLevel + root.panOffset.y
                                 text: annData.text || ""
-                                font.family: "Segoe UI"
+                                font.family: annData.fontFamily || "Segoe UI"
                                 font.pixelSize: (annData.fontSize || 16) * root.zoomLevel
                                 font.weight: Font.DemiBold
                                 color: annData.color || "#FF0000"
@@ -624,7 +891,7 @@ Rectangle {
                                     id: textLabel
                                     anchors.centerIn: parent
                                     text: annData.text || ""
-                                    font.family: "Segoe UI"
+                                    font.family: annData.fontFamily || "Segoe UI"
                                     font.pixelSize: (annData.fontSize || 16) * root.zoomLevel
                                     visible: false
                                 }
@@ -652,7 +919,7 @@ Rectangle {
                             var sx = root.drawStartX * root.zoomLevel + root.panOffset.x
                             var sy = root.drawStartY * root.zoomLevel + root.panOffset.y
 
-                            if (root.activeTool === "rect" || root.activeTool === "redact" || root.activeTool === "highlight") {
+                            if (root.activeTool === "rect" || root.activeTool === "filledRect" || root.activeTool === "highlight") {
                                 var last = root.currentPath.length > 0 ? root.currentPath[root.currentPath.length - 1] : null
                                 if (!last) return
                                 var ex = last.x * root.zoomLevel + root.panOffset.x
@@ -661,7 +928,7 @@ Rectangle {
                                 var rx = Math.min(sx, ex), ry = Math.min(sy, ey)
                                 var rw = Math.abs(ex - sx), rh = Math.abs(ey - sy)
 
-                                if (root.activeTool === "redact") {
+                                if (root.activeTool === "filledRect") {
                                     ctx.setLineDash([])
                                     ctx.globalAlpha = 0.7
                                     ctx.fillRect(rx, ry, rw, rh)
@@ -674,19 +941,44 @@ Rectangle {
                                 } else {
                                     ctx.strokeRect(rx, ry, rw, rh)
                                 }
+                            } else if (root.activeTool === "ellipse" || root.activeTool === "filledEllipse") {
+                                var lastEllipse = root.currentPath.length > 0 ? root.currentPath[root.currentPath.length - 1] : null
+                                if (!lastEllipse) return
+                                var eex = lastEllipse.x * root.zoomLevel + root.panOffset.x
+                                var eey = lastEllipse.y * root.zoomLevel + root.panOffset.y
+
+                                var ecx = (sx + eex) / 2
+                                var ecy = (sy + eey) / 2
+                                var erx = Math.abs(eex - sx) / 2
+                                var ery = Math.abs(eey - sy) / 2
+
+                                ctx.beginPath()
+                                ctx.ellipse(ecx, ecy, erx, ery, 0, 0, 2 * Math.PI)
+                                if (root.activeTool === "filledEllipse") {
+                                    ctx.setLineDash([])
+                                    ctx.globalAlpha = 0.7
+                                    ctx.fill()
+                                    ctx.globalAlpha = 1.0
+                                } else {
+                                    ctx.stroke()
+                                }
                             } else if (root.activeTool === "arrow") {
                                 var lastPt = root.currentPath.length > 0 ? root.currentPath[root.currentPath.length - 1] : null
                                 if (!lastPt) return
                                 var ax2 = lastPt.x * root.zoomLevel + root.panOffset.x
                                 var ay2 = lastPt.y * root.zoomLevel + root.panOffset.y
 
+                                var angle = Math.atan2(ay2 - sy, ax2 - sx)
+                                var len = (12 + root.strokeWidth * 2) * root.zoomLevel
+                                var shorten = len * 0.8
+                                var lineX2 = ax2 - shorten * Math.cos(angle)
+                                var lineY2 = ay2 - shorten * Math.sin(angle)
+
                                 ctx.beginPath()
                                 ctx.moveTo(sx, sy)
-                                ctx.lineTo(ax2, ay2)
+                                ctx.lineTo(lineX2, lineY2)
                                 ctx.stroke()
 
-                                var angle = Math.atan2(ay2 - sy, ax2 - sx)
-                                var len = 12 * root.zoomLevel
                                 var ang = Math.PI / 6
                                 ctx.setLineDash([])
                                 ctx.beginPath()
@@ -718,6 +1010,23 @@ Rectangle {
                                 ctx.moveTo(sx, sy - 8)
                                 ctx.lineTo(sx, sy + 8)
                                 ctx.stroke()
+                            } else if (root.activeTool === "eraser") {
+                                // Show eraser cursor
+                                ctx.setLineDash([4, 2])
+                                ctx.strokeStyle = Qt.rgba(1, 0, 0, 0.8)
+                                ctx.lineWidth = 2
+                                ctx.beginPath()
+                                ctx.arc(sx, sy, root.eraserRadius * root.zoomLevel, 0, 2 * Math.PI)
+                                ctx.stroke()
+
+                                // Crosshair
+                                ctx.setLineDash([])
+                                ctx.beginPath()
+                                ctx.moveTo(sx - root.eraserRadius * 0.3 * root.zoomLevel, sy)
+                                ctx.lineTo(sx + root.eraserRadius * 0.3 * root.zoomLevel, sy)
+                                ctx.moveTo(sx, sy - root.eraserRadius * 0.3 * root.zoomLevel)
+                                ctx.lineTo(sx, sy + root.eraserRadius * 0.3 * root.zoomLevel)
+                                ctx.stroke()
                             }
                         }
                     }
@@ -730,6 +1039,7 @@ Rectangle {
                         enabled: root.activeTool !== "none" || root.selectedIndex >= 0
                         cursorShape: {
                             if (root.activeTool === "text") return Qt.IBeamCursor
+                            if (root.activeTool === "eraser") return Qt.ClosedHandCursor
                             if (root.activeTool !== "none") return Qt.CrossCursor
                             return Qt.ArrowCursor
                         }
@@ -754,6 +1064,14 @@ Rectangle {
                                 } else {
                                     root.selectedIndex = -1
                                 }
+                                return
+                            }
+
+                            if (root.activeTool === "eraser") {
+                                var imgPtEraser = canvasToImage(mouse.x, mouse.y)
+                                root.isDrawing = true
+                                root.currentPath = [Qt.point(imgPtEraser.x, imgPtEraser.y)]
+                                eraseAtPoint(imgPtEraser.x, imgPtEraser.y)
                                 return
                             }
 
@@ -801,6 +1119,14 @@ Rectangle {
                                 return
                             }
 
+                            if (root.activeTool === "eraser" && root.isDrawing) {
+                                var imgPtEraser = canvasToImage(mouse.x, mouse.y)
+                                root.currentPath.push(Qt.point(imgPtEraser.x, imgPtEraser.y))
+                                eraseAtPoint(imgPtEraser.x, imgPtEraser.y)
+                                drawPreview.requestPaint()
+                                return
+                            }
+
                             if (!root.isDrawing) return
                             var imgPt = canvasToImage(mouse.x, mouse.y)
 
@@ -818,13 +1144,19 @@ Rectangle {
                                 return
                             }
 
+                            if (root.activeTool === "eraser") {
+                                root.isDrawing = false
+                                root.currentPath = []
+                                return
+                            }
+
                             if (!root.isDrawing) return
                             root.isDrawing = false
                             drawPreview.requestPaint()
 
                             var newAnn = null
 
-                            if (root.activeTool === "rect" || root.activeTool === "redact" || root.activeTool === "highlight") {
+                            if (root.activeTool === "rect" || root.activeTool === "filledRect" || root.activeTool === "highlight") {
                                 if (root.currentPath.length >= 2) {
                                     var p1 = root.currentPath[0], p2 = root.currentPath[1]
                                     var rx = Math.min(p1.x, p2.x), ry = Math.min(p1.y, p2.y)
@@ -833,6 +1165,19 @@ Rectangle {
                                         newAnn = {
                                             type: root.activeTool,
                                             x: rx, y: ry, width: rw, height: rh,
+                                            color: root.activeColor.toString(), strokeWidth: root.strokeWidth
+                                        }
+                                    }
+                                }
+                            } else if (root.activeTool === "ellipse" || root.activeTool === "filledEllipse") {
+                                if (root.currentPath.length >= 2) {
+                                    var ep1 = root.currentPath[0], ep2 = root.currentPath[1]
+                                    var erx = Math.min(ep1.x, ep2.x), ery = Math.min(ep1.y, ep2.y)
+                                    var erw = Math.abs(ep2.x - ep1.x), erh = Math.abs(ep2.y - ep1.y)
+                                    if (erw > 3 && erh > 3) {
+                                        newAnn = {
+                                            type: root.activeTool,
+                                            x: erx, y: ery, width: erw, height: erh,
                                             color: root.activeColor.toString(), strokeWidth: root.strokeWidth
                                         }
                                     }
@@ -865,6 +1210,7 @@ Rectangle {
                             if (newAnn) {
                                 var updated = root.annotations.slice()
                                 updated.push(newAnn)
+                                root.redoStack = []
                                 root.annotations = updated
                             }
 
@@ -891,7 +1237,7 @@ Rectangle {
                             anchors.fill: parent
                             anchors.margins: 6
                             color: Theme.label
-                            font.family: "Segoe UI"
+                            font.family: root.activeFontFamily
                             font.pixelSize: 14
                             clip: true
                             focus: root.isTextInputActive
@@ -908,8 +1254,10 @@ Rectangle {
                                         x: imgPt.x, y: imgPt.y,
                                         text: text,
                                         color: root.activeColor.toString(),
-                                        fontSize: 16
+                                        fontSize: root.activeFontSize,
+                                        fontFamily: root.activeFontFamily
                                     })
+                                    root.redoStack = []
                                     root.annotations = updated
                                 }
                                 root.isTextInputActive = false
@@ -920,54 +1268,73 @@ Rectangle {
                 }
             }
 
-            // Zoom indicator overlay
-            Rectangle {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.margins: 8
-                width: zoomLabel.implicitWidth + 16
-                height: 28
-                color: Theme.alpha(Theme.glassPill, 0.8)
-                radius: Theme.radiusSmall
-                visible: root.zoomLevel !== 1.0
+            // Mouse wheel zoom
+            MouseArea {
+                anchors.fill: parent
+                z: 50
+                acceptedButtons: Qt.NoButton
+                onWheel: (wheel) => {
+                    wheel.accepted = true
+                    
+                    var zoomFactor = 0.15 / 120.0
+                    var delta = wheel.angleDelta.y * zoomFactor
+                    
+                    var oldZoom = root.zoomLevel
+                    var newZoom = Math.max(root.minZoom, Math.min(root.maxZoom, oldZoom + delta))
+                    
+                    if (oldZoom === newZoom) return
 
-                Text {
-                    id: zoomLabel
-                    anchors.centerIn: parent
-                    text: Math.round(root.zoomLevel * 100) + "%"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    color: Theme.secondaryLabel
+                    // Zoom towards mouse cursor
+                    var imgX = (wheel.x - root.panOffset.x) / oldZoom
+                    var imgY = (wheel.y - root.panOffset.y) / oldZoom
+
+                    root.zoomLevel = newZoom
+                    
+                    root.panOffset = Qt.point(
+                        wheel.x - imgX * newZoom,
+                        wheel.y - imgY * newZoom
+                    )
                 }
             }
-        }
 
-        // === Annotation Toolbar ===
-        Rectangle {
-            id: annotationToolbar
-            Layout.fillWidth: true
-            Layout.preferredHeight: 52
-            Layout.leftMargin: 4
-            Layout.rightMargin: 4
-            Layout.bottomMargin: 4
-            color: Theme.glassHover
-            radius: Theme.radiusSmall
+            // === Annotation Toolbar ===
+            Rectangle {
+                id: annotationToolbar
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottomMargin: 24
+                height: 44
+                implicitWidth: toolbarLayout.implicitWidth + 24
+                color: Theme.glassPill
+                border.color: Theme.glassOuterBorder
+                border.width: 1
+                radius: 22
+                z: 100
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
+                opacity: toolbarHover.hovered ? 1.0 : 0.4
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                HoverHandler {
+                    id: toolbarHover
+                }
+
+                RowLayout {
+                    id: toolbarLayout
+                    anchors.centerIn: parent
                 spacing: 4
 
                 // Tool buttons
                 Repeater {
                     model: [
                         { tool: "rect", iconSource: "ui/tool-rect.svg", tip: "Rectangle" },
+                        { tool: "filledRect", iconSource: "ui/tool-filled-rect.svg", tip: "Filled Rectangle" },
                         { tool: "arrow", iconSource: "ui/tool-arrow.svg", tip: "Arrow" },
-                        { tool: "redact", iconSource: "ui/tool-redact.svg", tip: "Redact" },
+                        { tool: "ellipse", iconSource: "ui/tool-ellipse.svg", tip: "Ellipse" },
+                        { tool: "filledEllipse", iconSource: "ui/tool-filled-ellipse.svg", tip: "Filled Ellipse" },
                         { tool: "freehand", iconSource: "ui/tool-freehand.svg", tip: "Freehand" },
                         { tool: "text", iconSource: "ui/tool-text.svg", tip: "Text" },
-                        { tool: "highlight", iconSource: "ui/tool-highlight.svg", tip: "Highlight" }
+                        { tool: "highlight", iconSource: "ui/tool-highlight.svg", tip: "Highlight" },
+                        { tool: "eraser", iconSource: "ui/tool-eraser.svg", tip: "Eraser" }
                     ]
 
                     IconButton {
@@ -1002,8 +1369,8 @@ Rectangle {
 
                     Rectangle {
                         anchors.centerIn: parent
-                        width: 24; height: 24
-                        radius: 12
+                        width: 18; height: 18
+                        radius: 9
                         color: root.activeColor
                         border.color: Theme.glassBorder
                         border.width: 1
@@ -1177,10 +1544,195 @@ Rectangle {
                     }
                 }
 
+                Rectangle {
+                    width: 1; height: 24
+                    color: Theme.separator
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
+                }
+
+                // Eraser size (only visible when eraser tool is active)
+                Item {
+                    visible: root.activeTool === "eraser"
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 24; height: 24
+                        radius: 12
+                        color: "transparent"
+                        border.color: Theme.glassBorder
+                        border.width: 1
+                        opacity: 0.7
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: root.eraserRadius / 3
+                            height: root.eraserRadius / 3
+                            radius: root.eraserRadius / 6
+                            color: Theme.label
+                            opacity: 0.7
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: eraserSizePopup.open()
+                            ToolTip.visible: containsMouse
+                            ToolTip.text: "Eraser Size"
+                            ToolTip.delay: 500
+                        }
+                    }
+
+                    Popup {
+                        id: eraserSizePopup
+                        y: -height - 8
+                        x: -width / 2 + 16
+                        padding: 8
+                        background: Rectangle {
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            radius: Theme.radiusCard
+                        }
+
+                        Row {
+                            spacing: 8
+                            Repeater {
+                                model: [10, 20, 40, 60]
+                                Rectangle {
+                                    required property int modelData
+                                    property bool isSelected: root.eraserRadius === modelData
+
+                                    width: 28; height: 28
+                                    radius: 4
+                                    color: isSelected ? Theme.accent : "transparent"
+                                    border.color: isSelected ? Theme.accent : Theme.glassBorder
+                                    border.width: isSelected ? 2 : 1
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: modelData / 3
+                                        height: modelData / 3
+                                        radius: modelData / 6
+                                        color: isSelected ? "white" : Theme.label
+                                        opacity: 0.7
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.eraserRadius = modelData
+                                            eraserSizePopup.close()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Font controls (only visible when text tool is active)
+                Item {
+                    visible: root.activeTool === "text"
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 24; height: 24
+                        radius: 4
+                        color: "transparent"
+                        border.color: Theme.glassBorder
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.activeFontSize
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: Theme.label
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: fontSizePopup.open()
+                            ToolTip.visible: containsMouse
+                            ToolTip.text: "Text Size"
+                            ToolTip.delay: 500
+                        }
+                    }
+
+                    Popup {
+                        id: fontSizePopup
+                        y: -height - 8
+                        x: -width / 2 + 16
+                        padding: 8
+                        background: Rectangle {
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            radius: Theme.radiusCard
+                        }
+
+                        Row {
+                            spacing: 6
+                            Repeater {
+                                model: [12, 14, 16, 18, 20, 24, 32, 48, 64]
+                                Rectangle {
+                                    required property int modelData
+                                    property bool isSelected: root.activeFontSize === modelData
+
+                                    width: 28; height: 28
+                                    radius: 4
+                                    color: isSelected ? Theme.accent : "transparent"
+                                    border.color: isSelected ? Theme.accent : Theme.glassBorder
+                                    border.width: isSelected ? 2 : 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        font.pixelSize: 11
+                                        color: isSelected ? "white" : Theme.label
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.activeFontSize = modelData
+                                            fontSizePopup.close()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Font family button (only visible when text tool is active)
+                IconButton {
+                    visible: root.activeTool === "text"
+                    iconSource: AppController.ui_controller.getAssetUri("ui/tool-text.svg")
+                    tooltipText: "Choose Font"
+                    role: "ghost"
+                    buttonSize: 32
+                    iconSize: 14
+                    onClicked: {
+                        fontPickerDialog.selectedFamily = root.activeFontFamily
+                        fontPickerDialog.selectedSize = root.activeFontSize
+                        fontPickerDialog.open()
+                    }
+                }
+
                 Item { Layout.fillWidth: true }
             }
-        }
-    }
+        } // annotationToolbar
+    } // canvasContainer
+} // ColumnLayout
 
     // --- Keyboard Shortcuts ---
     Shortcut {
@@ -1260,13 +1812,6 @@ Rectangle {
             (cw - imageItem.implicitWidth * root.zoomLevel) / 2,
             (ch - imageItem.implicitHeight * root.zoomLevel) / 2
         )
-    }
-
-    function toggleFullscreen() {
-        root.isFullscreen = !root.isFullscreen
-        if (root.isFullscreen) {
-            zoomToFit()
-        }
     }
 
     // --- Width animation ---

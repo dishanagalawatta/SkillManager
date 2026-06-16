@@ -6,10 +6,10 @@ import App 1.0
 
 ScrollView {
     id: root
-    contentWidth: availableWidth
+    contentWidth: width - leftPadding - rightPadding
     clip: true
 
-ColumnLayout {
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: 4
         spacing: 20

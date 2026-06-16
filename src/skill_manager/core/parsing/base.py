@@ -10,10 +10,16 @@ def normalize_description(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, list):
-        value = " ".join(str(item) for item in value)
+        value = "\n".join(str(item) for item in value)
     elif not isinstance(value, str):
         value = str(value)
-    return " ".join(value.split()).strip(" \"'")
+
+    # Normalize spaces within lines but preserve line breaks
+    lines = [
+        " ".join(line.split()).strip(" \"'")
+        for line in value.splitlines()
+    ]
+    return "\n".join(line for line in lines if line)
 
 
 def extract_markdown_description(content: str) -> str:

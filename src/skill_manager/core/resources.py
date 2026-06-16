@@ -1,6 +1,10 @@
+import logging
 import os
+import shutil
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def resource_path(relative_path: str, *, base_path: str | None = None) -> str:
@@ -39,6 +43,69 @@ def qml_components_dir(
         return base / "skill_manager" / "SkillManagerComponents"
 
     return Path(package_file).resolve().parent / "SkillManagerComponents"
+
+
+_QML_CACHE_VERSION_MARKER = ".qmlcache_version"
+
+
+def qml_disk_cache_dir() -> Path | None:
+    """Return Qt's standard on-disk QML cache directory, if available.
+
+    Returns None when the cache directory has not been created yet (first run).
+    """
+    if sys.platform != "win32":
+        cache_root = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+    else:
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not local_app_data:
+            return None
+        cache_root = Path(local_app_data)
+    return cache_root / "python" / "cache" / "qmlcache"
+
+
+def invalidate_qml_disk_cache_if_stale(current_version: str) -> bool:
+    """Clear Qt's QML disk cache when its version marker is missing or stale.
+
+    Stale `.qmlc` files can survive QML source changes and produce cryptic load
+    errors (e.g. "Cannot assign object of type X to list property 'data'"). This
+    guard writes a small version marker next to the cache files and clears the
+    directory on version mismatch. Returns True when a clear was performed.
+    """
+    cache_dir = qml_disk_cache_dir()
+    if cache_dir is None or not cache_dir.exists():
+        return False
+
+    marker = cache_dir / _QML_CACHE_VERSION_MARKER
+    existing: str | None = None
+    if marker.is_file():
+        try:
+            existing = marker.read_text(encoding="utf-8").strip() or None
+        except OSError as exc:
+            logger.warning("Could not read QML cache version marker: %s", exc)
+
+    if existing == current_version:
+        return False
+
+    try:
+        for entry in cache_dir.iterdir():
+            try:
+                if entry.is_file() or entry.is_symlink():
+                    entry.unlink()
+                elif entry.is_dir():
+                    shutil.rmtree(entry)
+            except OSError as exc:
+                logger.warning("Failed to remove stale QML cache entry %s: %s", entry, exc)
+        marker.write_text(current_version, encoding="utf-8")
+        logger.info(
+            "Cleared stale QML disk cache (marker=%s, current=%s) at %s",
+            existing,
+            current_version,
+            cache_dir,
+        )
+        return True
+    except OSError as exc:
+        logger.warning("Could not refresh QML cache version marker: %s", exc)
+        return False
 
 
 def logo_asset_for_client(fmt: str) -> str:

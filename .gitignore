@@ -1,26 +1,74 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
+# Distribution / packaging
 build/
 dist/
 data/
 *.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
 
+# Temporary scratch
 tmp*/
-TODO.md
+scratch/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
+# Local task tracking (managed externally)
+TODO.md
+conductor/
 .agents/
 .agent/
 .claude/
 _references/
-scratch
-conductor
+
+# Secrets
 .env
+.env.*
+!.env.example
 
 # TUF Auto-Updater
 tuf_keys/
 tuf_repo/
 .tufup-repo-config
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.cache
+.mypy_cache/
+.ruff_cache/
+
+# Build / packaging
+*.spec
+*.manifest
+artifacts/
+wheelhouse/
+
+# PySide6 / QML
+.qmlcache/
+.qmltypes/
+*.qmlc
+*.jsc
+*.pyd
+designer/
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+build-*/

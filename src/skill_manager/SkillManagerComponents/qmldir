@@ -1,5 +1,7 @@
 module SkillManagerComponents
 singleton Theme 1.0 Theme.qml
+ColorOverlay 1.0 ColorOverlay.qml
+DropShadow 1.0 DropShadow.qml
 GlassPill 1.0 GlassPill.qml
 Sidebar 1.0 Sidebar.qml
 SidebarButton 1.0 SidebarButton.qml

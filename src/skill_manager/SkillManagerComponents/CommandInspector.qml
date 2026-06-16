@@ -147,26 +147,14 @@ Rectangle {
                 }
             }
 
-            // Body Content (editable)
+            // Command Details Section (editable)
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 8
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "Command Body"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        color: Theme.secondaryLabel
-                    }
-                }
-
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 400
                     Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
@@ -182,9 +170,9 @@ Rectangle {
 
                         TextArea {
                             id: bodyArea
-                            width: parent.availableWidth
+                            width: parent.width - parent.leftPadding - parent.rightPadding
                             Accessible.role: Accessible.EditableText
-                            Accessible.name: "Command Body"
+                            Accessible.name: "Command Details"
                             text: root.skill.body_content || ""
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
@@ -207,8 +195,6 @@ Rectangle {
                     }
                 }
             }
-
-            Item { Layout.preferredHeight: 12 }
         }
     }
 

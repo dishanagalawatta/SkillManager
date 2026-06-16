@@ -26,7 +26,7 @@ def test_parse_frontmatter_multiline():
 
 def test_normalize_description():
     assert normalize_description("  Too   many   spaces  ") == "Too many spaces"
-    assert normalize_description(["part1", "part2"]) == "part1 part2"
+    assert normalize_description(["part1", "part2"]) == "part1\npart2"
     assert normalize_description(None) == ""
 
 

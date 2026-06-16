@@ -5,6 +5,7 @@ Usage: Accessed via AppController.ops
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QTimer, Signal, Slot
 
@@ -23,6 +24,7 @@ from skill_manager.core.persistence import (
 from skill_manager.core.quick_copy import (
     delete_project_skill_folders,
 )
+from skill_manager.core.schemas import SkillRecord
 
 logger = logging.getLogger(__name__)
 
@@ -41,79 +43,57 @@ class OpsController(BaseController):
             self.minimizeAppRequested.emit()
             logger.info("Auto-minimize on Quick Copy triggered.")
 
-    def _updateModelsSource(self, path: str, key: str, value: bool) -> None:
-        """Updates a property for all skills matching the local_path across both models.
-
-        Uses targeted ``dataChanged`` signals instead of full ``_apply_filter()``.
-        """
+    def _updateModelsProperty(self, path: str, key: str, value: Any) -> None:
+        """Updates a property for all skills matching the local_path across both models."""
+        updated = False
         for model in (self.app._library_model, self.app._quick_copy_model):
-            all_skills = getattr(model, "_all_skills", None)
-            if isinstance(all_skills, list):
-                for skill in all_skills:
-                    lp = (
-                        skill.local_path
-                        if hasattr(skill, "local_path")
-                        else skill.get("local_path")
-                    )
-                    if lp == path:
-                        if isinstance(skill, dict):
-                            skill[key] = value
-                        else:
-                            setattr(skill, key, value)
+            if model.updateSkillProperty(path, key, value):
+                updated = True
 
-            # Emit targeted dataChanged for the affected row instead of full rebuild
-            filtered = getattr(model, "_filtered_skills", [])
-            for i, skill in enumerate(filtered):
-                lp = skill.local_path if hasattr(skill, "local_path") else skill.get("local_path")
-                if lp == path:
-                    idx = model.index(i, 0)
-                    model.dataChanged.emit(idx, idx)
-                    break
+        if updated:
+            logger.debug("Updated property '%s' to %s for path: %s", key, value, path)
 
-            model.selectionStateChanged.emit()
-
-    @Slot()
-    def toggleArchive(self):
-        """Toggles archived status for the currently selected skill."""
+    def _toggle_skill_boolean(self, attr_name: str, path_list: list[str], persist_fn: callable, event_name: str):
+        """Generic helper to toggle a boolean property on a skill."""
         skill = self.app._selected_skill
         if not skill:
             return
 
-        path = (
-            skill.get("local_path")
-            if isinstance(skill, dict)
-            else getattr(skill, "local_path", None)
-        )
+        path = skill.get("local_path") if isinstance(skill, dict) else getattr(skill, "local_path", None)
         if not path:
             return
 
-        is_archived = (
-            skill.get("is_archived", False)
-            if isinstance(skill, dict)
-            else getattr(skill, "is_archived", False)
-        )
-        new_state = not is_archived
+        current_val = skill.get(attr_name, False) if isinstance(skill, dict) else getattr(skill, attr_name, False)
+        new_state = not current_val
 
+        # Update global list
         if new_state:
-            if path not in self.app._archive_paths:
-                self.app._archive_paths.append(path)
+            if path not in path_list:
+                path_list.append(path)
         else:
-            if path in self.app._archive_paths:
-                self.app._archive_paths.remove(path)
+            if path in path_list:
+                path_list.remove(path)
 
-        self._saveArchive()
-        self._updateModelsSource(path, "is_archived", new_state)
+        # Persist and Sync
+        persist_fn()
+        self._updateModelsProperty(path, attr_name, new_state)
 
-        # Ensure the selected skill object itself is updated
+        # Update the selected object reference
         if isinstance(skill, dict):
-            skill["is_archived"] = new_state
+            skill[attr_name] = new_state
         else:
-            skill.is_archived = new_state
+            setattr(skill, attr_name, new_state)
 
         self.app.selectedSkillChanged.emit()
-        status = "archived" if new_state else "restored"
-        self.app._set_status(f"Skill {status}")
-        capture_event("skill_archived", {"action": status})
+        status_label = attr_name.replace("is_", "") + ("d" if not attr_name.endswith("d") else "")
+        action = status_label if new_state else "un" + status_label
+        self.app._set_status(f"Skill {action}")
+        capture_event(event_name, {"action": action})
+
+    @Slot()
+    def toggleArchive(self):
+        """Toggles archived status for the currently selected skill."""
+        self._toggle_skill_boolean("is_archived", self.app._archive_paths, self._saveArchive, "skill_archived")
 
     @Slot()
     def toggleCurrentSkillArchive(self):
@@ -123,45 +103,7 @@ class OpsController(BaseController):
     @Slot()
     def toggleStarred(self):
         """Toggles starred status for the currently selected skill."""
-        skill = self.app._selected_skill
-        if not skill:
-            return
-
-        path = (
-            skill.get("local_path")
-            if isinstance(skill, dict)
-            else getattr(skill, "local_path", None)
-        )
-        if not path:
-            return
-
-        is_starred = (
-            skill.get("is_starred", False)
-            if isinstance(skill, dict)
-            else getattr(skill, "is_starred", False)
-        )
-        new_state = not is_starred
-
-        if new_state:
-            if path not in self.app._starred_paths:
-                self.app._starred_paths.append(path)
-        else:
-            if path in self.app._starred_paths:
-                self.app._starred_paths.remove(path)
-
-        self._saveStarred()
-        self._updateModelsSource(path, "is_starred", new_state)
-
-        # Ensure the selected skill object itself is updated
-        if isinstance(skill, dict):
-            skill["is_starred"] = new_state
-        else:
-            skill.is_starred = new_state
-
-        self.app.selectedSkillChanged.emit()
-        status = "starred" if new_state else "unstarred"
-        self.app._set_status(f"Skill {status}")
-        capture_event("skill_starred", {"action": status})
+        self._toggle_skill_boolean("is_starred", self.app._starred_paths, self._saveStarred, "skill_starred")
 
     @Slot()
     def toggleCurrentSkillStarred(self):
@@ -173,8 +115,27 @@ class OpsController(BaseController):
         if not items:
             return
 
+        validated_records = []
+        for item in items:
+            try:
+                # Handle both dicts and dataclasses (Skill objects)
+                if hasattr(item, "__dataclass_fields__"):
+                    from dataclasses import asdict
+                    data = asdict(item)
+                else:
+                    data = item
+
+                # We use model_validate to enforce structure (Zod equivalent)
+                record = SkillRecord.model_validate(data)
+                validated_records.append(record)
+            except Exception as e:
+                logger.warning("Invalid item skipped during deletion: %s. Error: %s", item, e)
+
+        if not validated_records:
+            return
+
         # ── Step 0: Optimistic UI Removal
-        paths_to_delete = [i.get("local_path") for i in items if i.get("local_path")]
+        paths_to_delete = [r.local_path for r in validated_records if r.local_path]
         self.app._library_model.removeSkillsByPath(paths_to_delete)
         self.app._quick_copy_model.removeSkillsByPath(paths_to_delete)
 
@@ -182,11 +143,10 @@ class OpsController(BaseController):
             deleted = 0
             failed = 0
             paths_to_remove = []
-            skill_items = [
-                i for i in items if not i.get("is_command") and not i.get("is_screenshot")
-            ]
-            command_items = [i for i in items if i.get("is_command")]
-            screenshot_items = [i for i in items if i.get("is_screenshot")]
+
+            skill_items = [r.model_dump() for r in validated_records if not r.is_command and not r.is_screenshot]
+            command_items = [r for r in validated_records if r.is_command]
+            screenshot_items = [r for r in validated_records if r.is_screenshot]
 
             # ── Step 1: Delete Skill Folders (FS)
             if skill_items:
@@ -199,14 +159,13 @@ class OpsController(BaseController):
 
             # ── Step 2: Delete Files (Commands + Screenshots) via unlink
             file_items = command_items + screenshot_items
-            for item in file_items:
-                path_str = item.get("local_path", "") if isinstance(item, dict) else item.local_path
-                p = Path(path_str)
+            for record in file_items:
+                p = Path(record.local_path)
                 try:
                     if p.is_file():
                         p.unlink()
                         deleted += 1
-                        paths_to_remove.append(path_str)
+                        paths_to_remove.append(record.local_path)
                 except Exception as exc:
                     logger.error("[DELETE] FAILED %s: %s", p, exc)
                     failed += 1
@@ -218,10 +177,14 @@ class OpsController(BaseController):
             if failed:
                 parts.append(f"{failed} failed")
             status = f"Deletion complete: {', '.join(parts) or 'nothing happened'}"
-            QTimer.singleShot(0, self.app, lambda: self.app._set_status(status))
 
-            # Note: No longer need full refreshSkills here as we were optimistic.
-            # Only need it if we wanted to rollback failures, but for now we just log them.
+            # Use a safer way to call back to the UI, especially for tests
+            if hasattr(self.app, "_set_status"):
+                try:
+                    QTimer.singleShot(0, lambda: self.app._set_status(status))
+                except TypeError:
+                    # Fallback for environments where QTimer.singleShot signature matches fail (like MagicMock context)
+                    self.app._set_status(status)
 
         self.app.task_runner.run(_background_delete)
 
@@ -264,20 +227,8 @@ class OpsController(BaseController):
 
         if count > 0:
             self._saveArchive()
-            paths_set = set(selected_paths)
-            for model in (self.app._library_model, self.app._quick_copy_model):
-                all_skills = getattr(model, "_all_skills", None)
-                if isinstance(all_skills, list):
-                    for skill in all_skills:
-                        lp = (
-                            skill.get("local_path") if isinstance(skill, dict) else skill.local_path
-                        )
-                        if lp in paths_set:
-                            if isinstance(skill, dict):
-                                skill["is_archived"] = True
-                            else:
-                                skill.is_archived = True
-                model._apply_filter()
+            for path in selected_paths:
+                self._updateModelsProperty(path, "is_archived", True)
             self.app.skillModel.clearSelection()
             self.app._set_status(f"{count} skills archived")
         else:
@@ -289,7 +240,7 @@ class OpsController(BaseController):
         if skill_local_path and skill_local_path not in self.app._archive_paths:
             self.app._archive_paths.append(skill_local_path)
             self._saveArchive()
-            self._updateModelsSource(skill_local_path, "is_archived", True)
+            self._updateModelsProperty(skill_local_path, "is_archived", True)
             self.app._set_status(f"Skill archived: {skill_local_path}")
 
     def cleanup_temp_copies(self):
@@ -597,8 +548,6 @@ class OpsController(BaseController):
         - New clients get a file created.
         - Excluded clients' files are left untouched.
         """
-        from pathlib import Path
-
         from skill_manager.core.commands import (
             build_command_filename,
             create_custom_command_file,

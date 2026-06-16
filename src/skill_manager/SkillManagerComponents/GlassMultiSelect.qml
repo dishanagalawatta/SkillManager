@@ -8,10 +8,12 @@ Item {
 
     property var model: []
     property var selectedValues: []
+    property string placeholderText: "Select clients..."
+    property string allLabel: "All Clients"
 
     property string displayText: {
-        if (selectedValues.length === 0) return "Select clients..."
-        if (selectedValues.length === model.length) return "All Clients"
+        if (selectedValues.length === 0) return placeholderText
+        if (selectedValues.length === model.length) return allLabel
         return selectedValues.join(", ")
     }
 
@@ -132,7 +134,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "All Clients"
+                        text: root.allLabel
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         color: Theme.label

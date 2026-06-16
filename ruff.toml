@@ -28,10 +28,11 @@ ignore = [
 "__init__.py" = ["F401"]
 "src/skill_manager/gui/*" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/core/models/*" = ["N802", "N803", "N806", "N815", "B008"]
+"src/skill_manager/core/schemas.py" = ["N815"]
 "src/skill_manager/controllers/*" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/app.py" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/utils/win32.py" = ["N806", "N802", "F401", "F403", "F405"]
-"tests/*" = ["ARG001", "ARG005"]
+"tests/*" = ["ARG001", "ARG002", "ARG005"]
 
 [lint.isort]
 known-first-party = ["skill_manager"]

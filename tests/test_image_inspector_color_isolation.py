@@ -11,9 +11,17 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import TypeAdapter
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 from skill_manager.controllers.image_inspector_controller import ImageInspectorController
+from skill_manager.core.annotations import AnnotationEngine
+from skill_manager.core.schemas import Annotation
+
+
+def _validate(raw: list[dict]) -> list[Annotation]:
+    adapter = TypeAdapter(list[Annotation])
+    return adapter.validate_python(raw)
 
 
 @pytest.fixture
@@ -68,25 +76,24 @@ class TestAnnotationColorIsolation:
         assert anns[2]["color"] == "#0000FF"
         assert anns[0]["color"] != anns[1]["color"]
 
-    def test_painter_receives_correct_colors(self, controller, tmp_path):
+    def test_painter_receives_correct_colors(self, tmp_path):
         pixmap = QPixmap(300, 300)
         pixmap.fill(QColor(255, 255, 255))
         painter = QPainter(pixmap)
 
-        anns = _make_annotations()
+        anns = _validate(_make_annotations())
         for ann in anns:
-            color = QColor(ann["color"])
-            assert color.isValid(), f"Invalid color for annotation: {ann['color']}"
-            controller._drawAnnotation(pixmap, painter, ann)
+            assert QColor(ann.color).isValid(), f"Invalid color for annotation: {ann.color}"
 
+        AnnotationEngine.draw_annotations(painter, anns)
         painter.end()
 
         out_path = tmp_path / "color_test.png"
         assert pixmap.save(str(out_path)), "Failed to save test image"
         assert out_path.exists()
 
-    def test_color_independence_after_multiple_annotations(self, controller):
-        anns = [
+    def test_color_independence_after_multiple_annotations(self):
+        anns_raw = [
             {
                 "type": "rect",
                 "x": 0,
@@ -111,9 +118,7 @@ class TestAnnotationColorIsolation:
         pixmap.fill(QColor(255, 255, 255))
         painter = QPainter(pixmap)
 
-        for ann in anns:
-            controller._drawAnnotation(pixmap, painter, ann)
-
+        AnnotationEngine.draw_annotations(painter, _validate(anns_raw))
         painter.end()
 
         c1 = QColor(pixmap.toImage().pixel(1, 1))
@@ -122,7 +127,7 @@ class TestAnnotationColorIsolation:
         assert c1.red() > 200, f"Expected red stroke at (1,1), got R={c1.red()}"
         assert c2.green() > 200, f"Expected green stroke at (31,1), got G={c2.green()}"
 
-    def test_all_annotation_types_accept_string_color(self, controller, tmp_path):
+    def test_all_annotation_types_accept_string_color(self, tmp_path):
         pixmap = QPixmap(400, 400)
         pixmap.fill(QColor(255, 255, 255))
         painter = QPainter(pixmap)
@@ -174,20 +179,20 @@ class TestAnnotationColorIsolation:
         for ann in annotations:
             color = QColor(ann["color"])
             assert color.isValid(), f"QColor failed to parse: {ann['color']}"
-            controller._drawAnnotation(pixmap, painter, ann)
 
+        AnnotationEngine.draw_annotations(painter, _validate(annotations))
         painter.end()
 
         out_path = tmp_path / "all_types.png"
         assert pixmap.save(str(out_path)), "Failed to save test image"
         assert out_path.exists()
 
-    def test_redact_default_color(self, controller):
+    def test_redact_default_color(self):
         ann = {"type": "redact", "x": 0, "y": 0, "width": 10, "height": 10}
         pixmap = QPixmap(20, 20)
         pixmap.fill(QColor(255, 255, 255))
         painter = QPainter(pixmap)
-        controller._drawAnnotation(pixmap, painter, ann)
+        AnnotationEngine.draw_annotations(painter, _validate([ann]))
         painter.end()
 
         c = QColor(pixmap.toImage().pixel(5, 5))

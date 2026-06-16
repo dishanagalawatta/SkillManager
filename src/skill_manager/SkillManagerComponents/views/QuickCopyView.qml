@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import Qt5Compat.GraphicalEffects
 import ".."
 import App 1.0
 import ".."
@@ -15,6 +14,8 @@ Item {
     property bool _isInternalSelectionChange: false
     property bool showImageInspector: false
     property bool showCommandInspector: false
+    property var editingCollectionClients: []
+    property var editingCollectionProjects: []
 
     function focusSearch() {
         searchInput.forceActiveFocus()
@@ -97,6 +98,8 @@ Item {
                             onEditCollectionClicked: (collectionName) => {
                                 qcv_root.isEditingCollection = true
                                 qcv_root.editingCollectionName = collectionName
+                                qcv_root.editingCollectionClients = AppController.config_controller.getCollectionClients(collectionName)
+                                qcv_root.editingCollectionProjects = AppController.config_controller.getCollectionProjects(collectionName)
                                 qcv_root._isInternalSelectionChange = true
                                 AppController.config_controller.applyCollectionSelection(collectionName)
                                 AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", collectionName)
@@ -381,7 +384,7 @@ Item {
                         TextField {
                             id: qcv_colNameField
                             Layout.preferredHeight: 32
-                            Layout.preferredWidth: 200
+                            Layout.preferredWidth: 150
                             placeholderText: "Collection Name"
                             Accessible.role: Accessible.EditableText
                             Accessible.name: placeholderText
@@ -396,6 +399,28 @@ Item {
                             onTextChanged: qcv_root.editingCollectionName = text
                         }
 
+                        GlassMultiSelect {
+                            id: qcv_colClientSelect
+                            Layout.preferredWidth: 160
+                            Layout.preferredHeight: 32
+                            model: AppController.clientFormats
+                            selectedValues: qcv_root.editingCollectionClients
+                            placeholderText: "Select clients..."
+                            allLabel: "All Clients"
+                            onSelectionChanged: qcv_root.editingCollectionClients = selectedValues
+                        }
+
+                        GlassMultiSelect {
+                            id: qcv_colProjectSelect
+                            Layout.preferredWidth: 160
+                            Layout.preferredHeight: 32
+                            model: AppController.projectLabels
+                            selectedValues: qcv_root.editingCollectionProjects
+                            placeholderText: "Select projects..."
+                            allLabel: "All Projects"
+                            onSelectionChanged: qcv_root.editingCollectionProjects = selectedValues
+                        }
+
                         IconButton {
                             id: qcv_saveColBtn
                             buttonSize: 32
@@ -404,10 +429,33 @@ Item {
                             role: "primary"
                             tooltipText: "Save collection"
                             flat: true
+                            enabled: qcv_root.editingCollectionName !== "" && qcv_root.editingCollectionClients.length > 0 && qcv_root.editingCollectionProjects.length > 0
                             onClicked: (mouse) => {
-                                AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, AppController.quickCopyModel.getSelectedPaths())
+                                let paths = AppController.quickCopyModel.getSelectedPaths()
+                                let clients = qcv_colClientSelect.selectedValues
+                                let projects = qcv_colProjectSelect.selectedValues
+                                
+                                AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, clients, projects)
+                                
+                                let missingJson = AppController.config_controller.checkMissingSkills(qcv_root.editingCollectionName)
+                                let missing = JSON.parse(missingJson)
+                                let missingProjects = Object.keys(missing)
+                                
+                                if (missingProjects.length > 0) {
+                                    qcv_missingSkillsDialog.currentCallback = function(action, checkedProjects) {
+                                        if (action === "copy") {
+                                            AppController.config_controller.copyMissingSkills(qcv_root.editingCollectionName, checkedProjects)
+                                        } else if (action === "remove_projects") {
+                                            AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, clients, [])
+                                        }
+                                    }
+                                    qcv_missingSkillsDialog.openWithMissing(qcv_root.editingCollectionName, missing)
+                                }
+                                
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
+                                qcv_root.editingCollectionClients = []
+                                qcv_root.editingCollectionProjects = []
                             }
                         }
 
@@ -422,6 +470,8 @@ Item {
                             onClicked: (mouse) => {
                                 qcv_root.isEditingCollection = false
                                 qcv_root.editingCollectionName = ""
+                                qcv_root.editingCollectionClients = []
+                                qcv_root.editingCollectionProjects = []
                             }
                         }
                     }
@@ -643,5 +693,9 @@ Item {
 
     DeleteConfirmDialog {
         id: qcv_deleteConfirmDialog
+    }
+
+    MissingSkillsDialog {
+        id: qcv_missingSkillsDialog
     }
 }

@@ -3,16 +3,24 @@ Purpose: Manages skill sources, projects, and configuration state.
 Usage: Accessed via AppController.config_mgr
 """
 
-import os
+import logging
+from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Property, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.schemas import AppConfig, CollectionConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigController(BaseController):
-    """Controller for project configuration and sources."""
+    """Controller for project configuration and sources.
+
+    Uses Pydantic (AppConfig) for strict validation of configuration updates.
+    """
 
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
@@ -35,15 +43,31 @@ class ConfigController(BaseController):
     _cached_update_projects: list[dict] | None = None
     _cached_project_labels: list[str] | None = None
 
+    def _set_config_value(self, key: str, value: Any, signal: Signal = None):
+        """Unified setter that validates against AppConfig before persisting."""
+        try:
+            # Create a partial config to validate this specific key
+            validated = AppConfig.model_validate({key: value})
+            final_value = getattr(validated, key)
+
+            if self.config.get(key) != final_value:
+                self.config.set(key, final_value)
+                if signal:
+                    signal.emit()
+                return True
+        except Exception as e:
+            logger.warning("[CONFIG] Validation failed for %s=%s: %s", key, value, e)
+        return False
+
     @Property(float, notify=scrollSpeedMultiplierChanged)
     def scrollSpeedMultiplier(self):
         return self.config.get("scroll_speed_multiplier", 1.0)
 
     @scrollSpeedMultiplier.setter
     def scrollSpeedMultiplier(self, value):
-        if self.scrollSpeedMultiplier != value:
-            self.config.set("scroll_speed_multiplier", float(value))
-            self.scrollSpeedMultiplierChanged.emit()
+        self._set_config_value(
+            "scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged
+        )
 
     @Property(bool, notify=showMenuIconsChanged)
     def showMenuIcons(self):
@@ -51,9 +75,7 @@ class ConfigController(BaseController):
 
     @showMenuIcons.setter
     def showMenuIcons(self, value):
-        if self.showMenuIcons != value:
-            self.config.set("show_menu_icons", bool(value))
-            self.showMenuIconsChanged.emit()
+        self._set_config_value("show_menu_icons", value, self.showMenuIconsChanged)
 
     @Property(bool, notify=compactMenuChanged)
     def compactMenu(self):
@@ -61,9 +83,7 @@ class ConfigController(BaseController):
 
     @compactMenu.setter
     def compactMenu(self, value):
-        if self.compactMenu != value:
-            self.config.set("compact_menu", bool(value))
-            self.compactMenuChanged.emit()
+        self._set_config_value("compact_menu", value, self.compactMenuChanged)
 
     @Property(bool, notify=autoCheckUpdatesChanged)
     def autoCheckUpdates(self):
@@ -71,9 +91,7 @@ class ConfigController(BaseController):
 
     @autoCheckUpdates.setter
     def autoCheckUpdates(self, value):
-        if self.autoCheckUpdates != value:
-            self.config.set("auto_check_updates", bool(value))
-            self.autoCheckUpdatesChanged.emit()
+        self._set_config_value("auto_check_updates", value, self.autoCheckUpdatesChanged)
 
     @Property(bool, notify=autoDownloadUpdatesChanged)
     def autoDownloadUpdates(self):
@@ -81,9 +99,7 @@ class ConfigController(BaseController):
 
     @autoDownloadUpdates.setter
     def autoDownloadUpdates(self, value):
-        if self.autoDownloadUpdates != value:
-            self.config.set("auto_download_updates", bool(value))
-            self.autoDownloadUpdatesChanged.emit()
+        self._set_config_value("auto_download_updates", value, self.autoDownloadUpdatesChanged)
 
     @Property(int, notify=updateCheckIntervalHoursChanged)
     def updateCheckIntervalHours(self):
@@ -91,9 +107,9 @@ class ConfigController(BaseController):
 
     @updateCheckIntervalHours.setter
     def updateCheckIntervalHours(self, value):
-        if self.updateCheckIntervalHours != value:
-            self.config.set("update_check_interval_hours", int(value))
-            self.updateCheckIntervalHoursChanged.emit()
+        self._set_config_value(
+            "update_check_interval_hours", value, self.updateCheckIntervalHoursChanged
+        )
 
     @Property(bool, notify=skillPackageAutoUpdateChanged)
     def skillPackageAutoUpdate(self):
@@ -101,9 +117,9 @@ class ConfigController(BaseController):
 
     @skillPackageAutoUpdate.setter
     def skillPackageAutoUpdate(self, value):
-        if self.skillPackageAutoUpdate != value:
-            self.config.set("skill_package_auto_update", bool(value))
-            self.skillPackageAutoUpdateChanged.emit()
+        self._set_config_value(
+            "skill_package_auto_update", value, self.skillPackageAutoUpdateChanged
+        )
 
     @Property(str, notify=skillPackageAutoUpdateModeChanged)
     def skillPackageAutoUpdateMode(self):
@@ -111,9 +127,9 @@ class ConfigController(BaseController):
 
     @skillPackageAutoUpdateMode.setter
     def skillPackageAutoUpdateMode(self, value):
-        if self.skillPackageAutoUpdateMode != value:
-            self.config.set("skill_package_auto_update_mode", str(value))
-            self.skillPackageAutoUpdateModeChanged.emit()
+        self._set_config_value(
+            "skill_package_auto_update_mode", value, self.skillPackageAutoUpdateModeChanged
+        )
 
     @Property(bool, notify=autoMinimizeOnScreenshotChanged)
     def autoMinimizeOnScreenshot(self):
@@ -121,9 +137,9 @@ class ConfigController(BaseController):
 
     @autoMinimizeOnScreenshot.setter
     def autoMinimizeOnScreenshot(self, value):
-        if self.autoMinimizeOnScreenshot != value:
-            self.config.set("auto_minimize_on_screenshot", bool(value))
-            self.autoMinimizeOnScreenshotChanged.emit()
+        self._set_config_value(
+            "auto_minimize_on_screenshot", value, self.autoMinimizeOnScreenshotChanged
+        )
 
     @Property(bool, notify=autoMinimizeOnQuickCopyChanged)
     def autoMinimizeOnQuickCopy(self):
@@ -131,9 +147,9 @@ class ConfigController(BaseController):
 
     @autoMinimizeOnQuickCopy.setter
     def autoMinimizeOnQuickCopy(self, value):
-        if self.autoMinimizeOnQuickCopy != value:
-            self.config.set("auto_minimize_on_quick_copy", bool(value))
-            self.autoMinimizeOnQuickCopyChanged.emit()
+        self._set_config_value(
+            "auto_minimize_on_quick_copy", value, self.autoMinimizeOnQuickCopyChanged
+        )
 
     @Property(bool, notify=temporaryScreenshotsChanged)
     def temporaryScreenshots(self):
@@ -141,9 +157,7 @@ class ConfigController(BaseController):
 
     @temporaryScreenshots.setter
     def temporaryScreenshots(self, value):
-        if self.temporaryScreenshots != value:
-            self.config.set("temporary_screenshots", bool(value))
-            self.temporaryScreenshotsChanged.emit()
+        self._set_config_value("temporary_screenshots", value, self.temporaryScreenshotsChanged)
 
     @Property(dict, notify=updateProjectsChanged)
     def project_aliases(self):
@@ -219,16 +233,25 @@ class ConfigController(BaseController):
             self.app._is_recording_shortcut = value
             self.isRecordingShortcutChanged.emit()
 
+    def _normalize_path(self, raw_url: str) -> str:
+        """Helper to convert file URLs or raw strings to absolute local paths."""
+        if not raw_url:
+            return ""
+        path_str = raw_url.replace("file:///", "").replace("/", "\\") if raw_url.startswith("file://") else raw_url
+        try:
+            # Expand ~ and make absolute
+            return str(Path(path_str).expanduser().resolve())
+        except Exception:
+            return path_str
+
     @Slot(str)
     def addSource(self, url: str):
         """Adds a local skill source directory."""
-        path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
-        raw_path = str(path or "").strip()
-        if not raw_path:
+        resolved_path = self._normalize_path(url)
+        if not resolved_path:
             return
 
         try:
-            resolved_path = os.path.abspath(os.path.expanduser(raw_path))
             if resolved_path not in self.app._sources:
                 self.app._sources.append(resolved_path)
                 self.config.set("sources", self.app._sources)
@@ -260,13 +283,17 @@ class ConfigController(BaseController):
         """Adds a project directory."""
         if not url or not str(url).strip():
             return
-        path = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
+
         from skill_manager.core.copier import normalize_project_skills_path
 
-        resolved_path, error = normalize_project_skills_path(path)
+        # First try specialized normalization for .agents/skills
+        path_str = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
+        resolved_path, error = normalize_project_skills_path(path_str)
         if error:
-            resolved_path = os.path.abspath(os.path.expanduser(path))
-        if resolved_path not in self.app._projects:
+            # Fallback to standard absolute path
+            resolved_path = self._normalize_path(url)
+
+        if resolved_path and resolved_path not in self.app._projects:
             self.app._projects.append(resolved_path)
             self.config.set("projects", self.app._projects)
             self._emit_projects_changed()
@@ -331,13 +358,14 @@ class ConfigController(BaseController):
         norm_path = path.replace("\\", "/")
         label = self.app._project_aliases.get(path) or self.app._project_aliases.get(norm_path)
         if not label:
+            p = Path(path)
             if norm_path.endswith("/.agents/skills"):
-                label = os.path.basename(os.path.dirname(os.path.dirname(path)))
-            elif os.path.basename(path).lower() == "skills" and len(norm_path.split("/")) > 2:
-                parent = norm_path.split("/")[-2]
-                label = norm_path.split("/")[-3] if parent == ".agents" else parent
+                label = p.parent.parent.name
+            elif p.name.lower() == "skills" and len(p.parts) > 2:
+                parent = p.parent.name
+                label = p.parent.parent.name if parent == ".agents" else parent
             else:
-                label = os.path.basename(path)
+                label = p.name
         return label
 
     @Property(list, notify=updateProjectsChanged)
@@ -346,29 +374,20 @@ class ConfigController(BaseController):
         if self._cached_update_projects is not None:
             return self._cached_update_projects
         results = []
-        from pathlib import Path
 
         for p in self.app._projects:
             count = 0
             try:
                 resolved_path = Path(p)
                 if resolved_path.name.lower() not in ("skills", ".agents"):
-                    found = False
                     potential = resolved_path / ".agents" / "skills"
                     if potential.exists() and potential.is_dir():
                         resolved_path = potential
-                        found = True
-                    if not found:
+                    else:
                         resolved_path = resolved_path / ".agents" / "skills"
-                scan_path = str(resolved_path)
-                if os.path.exists(scan_path):
-                    count = len(
-                        [
-                            d
-                            for d in os.listdir(scan_path)
-                            if os.path.isdir(os.path.join(scan_path, d))
-                        ]
-                    )
+
+                if resolved_path.exists():
+                    count = len([d for d in resolved_path.iterdir() if d.is_dir()])
             except Exception:
                 pass
             results.append(
@@ -476,12 +495,13 @@ class ConfigController(BaseController):
         self.shortcutsChanged.emit()
         self.app._set_status("All shortcuts reset to defaults")
 
-    @Slot(str, list)
-    def saveCustomCollection(self, name: str, paths: list):
-        """Saves a list of skill paths as a named collection."""
+    @Slot(str, list, list, list)
+    def saveCustomCollection(self, name: str, paths: list, clients: list, projects: list):
+        """Saves a collection with paths, clients, and projects."""
         if not name:
             return
-        self.app._custom_collections[name] = paths
+        config = CollectionConfig(paths=paths, clients=clients, projects=projects)
+        self.app._custom_collections[name] = config.model_dump()
         self.config.set("custom_collections", self.app._custom_collections)
         self._emit_collections_changed()
         self.app._set_status(f"Collection saved: {name}")
@@ -499,7 +519,8 @@ class ConfigController(BaseController):
     def applyCollectionSelection(self, name: str):
         """Selects all skills in the active model that belong to the collection."""
         if name in self.app._custom_collections:
-            paths = self.app._custom_collections[name]
+            entry = self.app._custom_collections[name]
+            paths = entry["paths"] if isinstance(entry, dict) and "paths" in entry else entry
             self.app.skillModel.clearSelection()
             self.app.skillModel.selectByPaths(paths)
             self.app._set_status(f"Applied collection: {name}")
@@ -507,4 +528,77 @@ class ConfigController(BaseController):
     @Slot(str, result=list)
     def getCollectionPaths(self, name: str) -> list:
         """Returns the list of paths for a named collection."""
-        return self.app._custom_collections.get(name, [])
+        entry = self.app._custom_collections.get(name, {})
+        if isinstance(entry, dict) and "paths" in entry:
+            return entry["paths"]
+        return entry if isinstance(entry, list) else []
+
+    @Slot(str, result=list)
+    def getCollectionClients(self, name: str) -> list:
+        """Returns the list of clients for a named collection."""
+        entry = self.app._custom_collections.get(name, {})
+        if isinstance(entry, dict) and "clients" in entry:
+            return entry["clients"]
+        return []
+
+    @Slot(str, result=list)
+    def getCollectionProjects(self, name: str) -> list:
+        """Returns the list of projects for a named collection."""
+        entry = self.app._custom_collections.get(name, {})
+        if isinstance(entry, dict) and "projects" in entry:
+            return entry["projects"]
+        return []
+
+    @Slot(str, result=str)
+    def checkMissingSkills(self, name: str) -> str:
+        """Checks if collection skills exist in selected projects. Returns JSON of missing skills."""
+        import json
+
+        entry = self.app._custom_collections.get(name, {})
+        if not isinstance(entry, dict) or "paths" not in entry:
+            return json.dumps({})
+
+        paths = entry["paths"]
+        projects = entry.get("projects", [])
+        if not projects:
+            return json.dumps({})
+
+        missing = {}
+        for project_label in projects:
+            project_path = self.getProjectPath(project_label)
+            if not project_path:
+                continue
+
+            skills_dir = Path(project_path) / ".agents" / "skills"
+            missing_in_project = []
+            for skill_path in paths:
+                skill_folder = Path(skill_path).name
+                if not (skills_dir / skill_folder).exists():
+                    missing_in_project.append(skill_path)
+            if missing_in_project:
+                missing[project_label] = missing_in_project
+
+        return json.dumps(missing)
+
+    @Slot(str, list)
+    def copyMissingSkills(self, name: str, project_labels: list):
+        """Copies missing skills to specified projects."""
+        entry = self.app._custom_collections.get(name, {})
+        if not isinstance(entry, dict) or "paths" not in entry:
+            return
+
+        paths = entry["paths"]
+
+        from skill_manager.core.copier import copy_skill_folders_to_projects
+
+        for project_label in project_labels:
+            project_path = self.getProjectPath(project_label)
+            if not project_path:
+                continue
+
+            skills_to_copy = []
+            for skill_path in paths:
+                skill_folder = Path(skill_path).name
+                skills_to_copy.append({"local_path": skill_path, "name": skill_folder})
+
+            copy_skill_folders_to_projects(skills_to_copy, [project_path])
