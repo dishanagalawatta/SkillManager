@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-06-16 - Safe optimization with rapidfuzz.process.extractOne
+**Learning:** When replacing manual Python loops evaluating string similarity with `rapidfuzz.process.extractOne`, you must be careful to preserve the scoring logic when fuzzy matches fall below the threshold. If the original loop evaluated and stored scores under a certain threshold, passing a hardcoded `score_cutoff` will cause `extractOne` to return `None`, throwing away that lower score and changing functionality.
+**Action:** Always map the original threshold logic by dynamically passing the score tracking variable (e.g., `score_cutoff=max_token_match`) to short-circuit matching while safely preserving the actual maximum score even if it's low.
