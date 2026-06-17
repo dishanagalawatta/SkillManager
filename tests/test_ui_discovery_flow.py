@@ -16,21 +16,33 @@ class TestUIDiscoveryFlow:
         app_controller.discovery._previous_skills = {}
 
         # Mock the DiscoveryService.discover_all to return a fixed state
-        with patch("skill_manager.controllers.discovery_controller.DiscoveryService") as mock_service_class:
+        with patch(
+            "skill_manager.controllers.discovery_controller.DiscoveryService"
+        ) as mock_service_class:
             mock_service = mock_service_class.return_value
 
             # Setup discovery result
             # IMPORTANT: is_package must be True because models filter for packages by default
             mock_skills = [
-                {"name": "Skill Alpha", "local_path": "/path/alpha", "category": "General", "is_package": True},
-                {"name": "Skill Beta", "local_path": "/path/beta", "category": "Tests", "is_package": True}
+                {
+                    "name": "Skill Alpha",
+                    "local_path": "/path/alpha",
+                    "category": "General",
+                    "is_package": True,
+                },
+                {
+                    "name": "Skill Beta",
+                    "local_path": "/path/beta",
+                    "category": "Tests",
+                    "is_package": True,
+                },
             ]
             mock_service.discover_all.return_value = {
                 "skills": mock_skills,
                 "projects": [],
                 "categories": ["General", "Tests"],
                 "project_labels": [],
-                "status": "Scan Complete"
+                "status": "Scan Complete",
             }
 
             # 1. Trigger discovery
@@ -59,21 +71,35 @@ class TestUIDiscoveryFlow:
         ]
         app_controller.libraryModel.setSkills(initial_skills)
         app_controller.discovery._previous_skills = {
-            "/old": SkillRecord(name="Old Skill", local_path="/old", category="Misc", is_package=True)
+            "/old": SkillRecord(
+                name="Old Skill", local_path="/old", category="Misc", is_package=True
+            )
         }
 
         # 2. Mock discovery with one added skill
-        with patch("skill_manager.controllers.discovery_controller.DiscoveryService") as mock_service_class:
+        with patch(
+            "skill_manager.controllers.discovery_controller.DiscoveryService"
+        ) as mock_service_class:
             mock_service = mock_service_class.return_value
             mock_service.discover_all.return_value = {
                 "skills": [
-                    {"name": "Old Skill", "local_path": "/old", "category": "Misc", "is_package": True},
-                    {"name": "New Skill", "local_path": "/new", "category": "Misc", "is_package": True}
+                    {
+                        "name": "Old Skill",
+                        "local_path": "/old",
+                        "category": "Misc",
+                        "is_package": True,
+                    },
+                    {
+                        "name": "New Skill",
+                        "local_path": "/new",
+                        "category": "Misc",
+                        "is_package": True,
+                    },
                 ],
                 "projects": [],
                 "categories": ["Misc"],
                 "project_labels": [],
-                "status": "Update Done"
+                "status": "Update Done",
             }
 
             # 3. Trigger discovery
@@ -87,6 +113,11 @@ class TestUIDiscoveryFlow:
             assert app_controller.statusMessage == "Update Done"
 
             # Verify specific skill names
-            names = [app_controller.libraryModel.data(app_controller.libraryModel.index(i, 0), app_controller.libraryModel.NameRole) for i in range(2)]
+            names = [
+                app_controller.libraryModel.data(
+                    app_controller.libraryModel.index(i, 0), app_controller.libraryModel.NameRole
+                )
+                for i in range(2)
+            ]
             assert "New Skill" in names
             assert "Old Skill" in names

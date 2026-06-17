@@ -10,12 +10,15 @@ real app uses (Basic style, SkillManagerComponents import path) and reports:
 
 Run with:  uv run pytest tests/test_qml_settings_diagnostic.py -v
 """
+
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QUrl
 from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 
-QML_DIR = Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+QML_DIR = (
+    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+)
 
 
 def _format_errors(errors):
@@ -77,8 +80,7 @@ def test_settings_view_loads_without_errors(qapp, app_controller):
     )
     assert obj is not None, "SettingsView component.create() returned None"
     assert len(obj.children()) > 0, (
-        "SettingsView root has no children — view will render empty. "
-        f"Warnings: {warnings}"
+        f"SettingsView root has no children — view will render empty. Warnings: {warnings}"
     )
 
 
@@ -136,7 +138,10 @@ def test_settings_view_stacklayout_has_content(qapp, app_controller):
     # Find the StackLayout by checking for the `currentIndex` property
     stack = None
     for child in obj.findChildren(QObject):
-        if child.metaObject().indexOfProperty("currentIndex") >= 0 and child.metaObject().indexOfProperty("count") >= 0:
+        if (
+            child.metaObject().indexOfProperty("currentIndex") >= 0
+            and child.metaObject().indexOfProperty("count") >= 0
+        ):
             stack = child
             break
 
@@ -163,7 +168,5 @@ def test_glass_pill_loads_without_data_property_error(qapp, app_controller):
 
     engine, component, obj, errors, warnings = _load_qml(qapp, path, app_controller)
 
-    assert not errors, (
-        f"GlassPill.qml failed to load:\n{_format_errors(errors)}"
-    )
+    assert not errors, f"GlassPill.qml failed to load:\n{_format_errors(errors)}"
     assert obj is not None

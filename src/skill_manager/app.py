@@ -50,6 +50,7 @@ from skill_manager.core.categories import get_category_emoji
 from skill_manager.core.config import (
     ConfigManager,
 )
+from skill_manager.core.diagnostics import get_diagnostic_logger
 from skill_manager.core.file_watch import SkillFolderWatcher
 from skill_manager.core.global_hotkey import GlobalHotkeyManager
 from skill_manager.core.image_provider import ScreenshotImageProvider
@@ -146,7 +147,6 @@ class AppController(QObject):
             except Exception as e:
                 logger.warning("Invalid skill package config found: %s. Error: %s", s, e)
         self._custom_collections = self._config.get("custom_collections", {})
-        self._migrate_collections()
 
         # Shared project state (syncs across all project selectors)
         self._current_project_label = ""
@@ -695,9 +695,9 @@ class AppController(QObject):
     def resetShortcuts(self):
         self.config_mgr.resetShortcuts()
 
-    @Slot(str, list, list, list)
-    def saveCustomCollection(self, n, p, c, proj):
-        self.config_mgr.saveCustomCollection(n, p, c, proj)
+    @Slot(str, list, list)
+    def saveCustomCollection(self, n, p, proj):
+        self.config_mgr.saveCustomCollection(n, p, proj)
 
     @Slot(str)
     def deleteCustomCollection(self, n):
@@ -710,10 +710,6 @@ class AppController(QObject):
     @Slot(str, result=list)
     def getCollectionPaths(self, n):
         return self.config_mgr.getCollectionPaths(n)
-
-    @Slot(str, result=list)
-    def getCollectionClients(self, n):
-        return self.config_mgr.getCollectionClients(n)
 
     @Slot(str, result=list)
     def getCollectionProjects(self, n):
@@ -775,13 +771,13 @@ class AppController(QObject):
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
-    @Slot(str, str, str, str, str, str)
-    def updateCustomCommandFull(self, lp, n, cl, b, pl, cat):
-        self.ops.updateCustomCommandFull(lp, n, cl, b, pl, cat)
+    @Slot(str, str, str)
+    def updateCustomCommandFull(self, lp, n, b):
+        self.ops.updateCustomCommandFull(lp, n, b)
 
-    @Slot(str, str, str, str, str)
-    def createCustomCommand(self, n, cl, b, pl, cat):
-        self.ops.createCustomCommand(n, cl, b, pl, cat)
+    @Slot(str, str, str, str)
+    def createCustomCommand(self, n, b, pl, cat):
+        self.ops.createCustomCommand(n, b, pl, cat)
 
     @Slot(str)
     def addToArchive(self, p):
@@ -866,20 +862,15 @@ class AppController(QObject):
             self._current_project_label = labels[0] if labels else ""
             self.currentProjectChanged.emit()
 
-    def _migrate_collections(self):
-        """Migrate old format {name: [paths]} to new format {name: {paths, clients, projects}}."""
-        migrated = False
-        for name, value in list(self._custom_collections.items()):
-            if isinstance(value, list):
-                self._custom_collections[name] = {"paths": value, "clients": [], "projects": []}
-                migrated = True
-        if migrated:
-            self._config.set("custom_collections", self._custom_collections)
-
     def _set_status(self, msg):
         self._status_message = msg
         self.statusMessageChanged.emit()
         logger.info(f"Status: {msg}")
+        get_diagnostic_logger().log_event(
+            "DEBUG",
+            "status_message",
+            msg,
+        )
 
     # Forwarding helper for sub-controllers to access labels
     def getProjectLabel(self, path):

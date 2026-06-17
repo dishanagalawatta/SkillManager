@@ -77,10 +77,7 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
             # Fast pre-filter: skip rapidfuzz if no regex matches
             cat_patterns = patterns.get(category, [])
             if cat_patterns:
-                regex_match = any(
-                    p.search(name_text) or p.search(desc_text)
-                    for p in cat_patterns
-                )
+                regex_match = any(p.search(name_text) or p.search(desc_text) for p in cat_patterns)
                 if not regex_match:
                     continue
 

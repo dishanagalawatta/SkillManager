@@ -37,7 +37,9 @@ class TestSkillMetadata:
 
 class TestSkillRecord:
     def test_record_coerces_none_to_string(self):
-        record = SkillRecord.model_validate({"name": "Valid", "category": None, "local_path": "/test"})
+        record = SkillRecord.model_validate(
+            {"name": "Valid", "category": None, "local_path": "/test"}
+        )
         assert record.name == "Valid"
         assert record.category == ""
 
@@ -47,7 +49,9 @@ class TestSkillRecord:
         assert record.category == "45.6"
 
     def test_record_ignores_extra_fields(self):
-        record = SkillRecord.model_validate({"name": "Record", "local_path": "/test", "internal_id": "ABC"})
+        record = SkillRecord.model_validate(
+            {"name": "Record", "local_path": "/test", "internal_id": "ABC"}
+        )
         assert "internal_id" not in record.model_dump()
 
 
@@ -56,7 +60,7 @@ class TestAppConfig:
         data = {
             "targets": ["project1"],
             "target_aliases": {"p1": "Project 1"},
-            "show_menu_icons": False
+            "show_menu_icons": False,
         }
         config = AppConfig.from_legacy(data)
         assert config.projects == ["project1"]
@@ -69,7 +73,7 @@ class TestAppConfig:
             "targets": ["old"],
             "projects": ["new"],
             "target_aliases": {"o": "O"},
-            "project_aliases": {"n": "N"}
+            "project_aliases": {"n": "N"},
         }
         config = AppConfig.from_legacy(data)
         assert config.projects == ["new"]
@@ -86,9 +90,9 @@ class TestCacheState:
         data = {
             "skills": [
                 {"name": "Skill 1", "local_path": "/s1", "extra": "strip me"},
-                {"name": "Skill 2", "local_path": "/s2", "category": "Tests"}
+                {"name": "Skill 2", "local_path": "/s2", "category": "Tests"},
             ],
-            "projects": [{"id": "p1"}]
+            "projects": [{"id": "p1"}],
         }
         cache = CacheState.model_validate(data)
         assert len(cache.skills) == 2

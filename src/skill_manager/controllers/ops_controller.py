@@ -53,17 +53,27 @@ class OpsController(BaseController):
         if updated:
             logger.debug("Updated property '%s' to %s for path: %s", key, value, path)
 
-    def _toggle_skill_boolean(self, attr_name: str, path_list: list[str], persist_fn: callable, event_name: str):
+    def _toggle_skill_boolean(
+        self, attr_name: str, path_list: list[str], persist_fn: callable, event_name: str
+    ):
         """Generic helper to toggle a boolean property on a skill."""
         skill = self.app._selected_skill
         if not skill:
             return
 
-        path = skill.get("local_path") if isinstance(skill, dict) else getattr(skill, "local_path", None)
+        path = (
+            skill.get("local_path")
+            if isinstance(skill, dict)
+            else getattr(skill, "local_path", None)
+        )
         if not path:
             return
 
-        current_val = skill.get(attr_name, False) if isinstance(skill, dict) else getattr(skill, attr_name, False)
+        current_val = (
+            skill.get(attr_name, False)
+            if isinstance(skill, dict)
+            else getattr(skill, attr_name, False)
+        )
         new_state = not current_val
 
         # Update global list
@@ -93,7 +103,9 @@ class OpsController(BaseController):
     @Slot()
     def toggleArchive(self):
         """Toggles archived status for the currently selected skill."""
-        self._toggle_skill_boolean("is_archived", self.app._archive_paths, self._saveArchive, "skill_archived")
+        self._toggle_skill_boolean(
+            "is_archived", self.app._archive_paths, self._saveArchive, "skill_archived"
+        )
 
     @Slot()
     def toggleCurrentSkillArchive(self):
@@ -103,7 +115,9 @@ class OpsController(BaseController):
     @Slot()
     def toggleStarred(self):
         """Toggles starred status for the currently selected skill."""
-        self._toggle_skill_boolean("is_starred", self.app._starred_paths, self._saveStarred, "skill_starred")
+        self._toggle_skill_boolean(
+            "is_starred", self.app._starred_paths, self._saveStarred, "skill_starred"
+        )
 
     @Slot()
     def toggleCurrentSkillStarred(self):
@@ -121,6 +135,7 @@ class OpsController(BaseController):
                 # Handle both dicts and dataclasses (Skill objects)
                 if hasattr(item, "__dataclass_fields__"):
                     from dataclasses import asdict
+
                     data = asdict(item)
                 else:
                     data = item
@@ -144,7 +159,11 @@ class OpsController(BaseController):
             failed = 0
             paths_to_remove = []
 
-            skill_items = [r.model_dump() for r in validated_records if not r.is_command and not r.is_screenshot]
+            skill_items = [
+                r.model_dump()
+                for r in validated_records
+                if not r.is_command and not r.is_screenshot
+            ]
             command_items = [r for r in validated_records if r.is_command]
             screenshot_items = [r for r in validated_records if r.is_screenshot]
 
@@ -472,46 +491,29 @@ class OpsController(BaseController):
         self.app._set_status(f"Copied reference: {ref}")
         self._maybeMinimizeOnCopy()
 
-    @Slot(str, str, str, str, str)
-    def createCustomCommand(
-        self, name: str, clients_str: str, body: str, project_label: str, category: str
-    ):
-        """Creates Custom Command .md files for each selected client."""
+    @Slot(str, str, str, str)
+    def createCustomCommand(self, name: str, body: str, project_label: str, category: str):
+        """Creates a Custom Command .md file."""
         from skill_manager.core.commands import create_custom_command_file
 
-        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
-        if not clients:
-            self.app._set_status("Error: No client selected")
+        result = create_custom_command_file(
+            name=name,
+            body=body,
+            project_label_name=project_label,
+            category=category,
+            project_paths=self.app._projects,
+        )
+
+        if not result.ok:
+            self.app._set_status(result.message)
             return
 
-        results = [
-            create_custom_command_file(
-                name=name,
-                client=client,
-                body=body,
-                project_label_name=project_label,
-                category=category,
-                project_paths=self.app._projects,
-            )
-            for client in clients
-        ]
+        self.app._set_status(result.message)
 
-        ok_results = [r for r in results if r.ok]
-        fail_results = [r for r in results if not r.ok]
-
-        if fail_results:
-            errors = "; ".join(r.message for r in fail_results)
-            self.app._set_status(
-                f"Created {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
-            )
-        else:
-            self.app._set_status(f"Created {len(results)} command(s)")
-
-        if ok_results:
+        if result.path:
             from skill_manager.core.discovery import DiscoveryService
             from skill_manager.core.persistence import patch_cache_add
 
-            discovered = []
             service = DiscoveryService(
                 sources=list(self.app._sources),
                 projects=self.app._projects,
@@ -519,116 +521,40 @@ class OpsController(BaseController):
                 starred_paths=self.app._starred_paths,
                 project_aliases=self.app._project_aliases,
             )
-            for r in ok_results:
-                if r.path:
-                    try:
-                        skill_data = service.discover_single_skill(r.path, r.path.parent)
-                        if skill_data:
-                            discovered.append(skill_data)
-                    except Exception as exc:
-                        logger.error("[CREATE COMMAND] Failed scanning %s: %s", r.path, exc)
+            try:
+                skill_data = service.discover_single_skill(result.path, result.path.parent)
+                if skill_data:
+                    patch_cache_add([skill_data])
+                    self._merge_discovered_skills([skill_data])
+            except Exception as exc:
+                logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
-            if discovered:
-                patch_cache_add(discovered)
-                self._merge_discovered_skills(discovered)
-
-    @Slot(str, str, str, str, str, str)
+    @Slot(str, str, str)
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
-        clients_str: str,
         body: str,
-        project_label: str,
-        category: str,
     ):
-        """Full update: update/create command files for all selected clients.
+        """Updates an existing Custom Command .md file."""
+        from skill_manager.core.commands import update_custom_command_file
 
-        - Existing client files are updated in place.
-        - New clients get a file created.
-        - Excluded clients' files are left untouched.
-        """
-        from skill_manager.core.commands import (
-            build_command_filename,
-            create_custom_command_file,
-            resolve_commands_dir,
-            update_custom_command_file_full,
+        result = update_custom_command_file(
+            local_path=local_path,
+            name=name,
+            body=body,
         )
 
-        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
-        if not clients:
-            self.app._set_status("Error: No client selected")
+        if not result.ok:
+            self.app._set_status(result.message)
             return
 
-        commands_dir = resolve_commands_dir(project_label, self.app._projects)
+        self.app._set_status(result.message)
 
-        original_client = None
-        path = Path(local_path)
-        if path.is_file():
-            try:
-                from skill_manager.core.parsing.base import split_frontmatter
-
-                content = path.read_text(encoding="utf-8-sig")
-                metadata, _ = split_frontmatter(content)
-                original_client = metadata.get("client", "") if metadata else ""
-            except Exception:
-                pass
-
-        primary_client = original_client if original_client in clients else clients[0]
-
-        results = []
-        for client in clients:
-            if client == primary_client:
-                result = update_custom_command_file_full(
-                    local_path=local_path,
-                    name=name,
-                    client=client,
-                    body=body,
-                    category=category,
-                    project_label_name=project_label,
-                    project_paths=self.app._projects,
-                )
-            else:
-                existing_path = (
-                    commands_dir / build_command_filename(name, client) if commands_dir else None
-                )
-                if existing_path and existing_path.is_file():
-                    result = update_custom_command_file_full(
-                        local_path=str(existing_path),
-                        name=name,
-                        client=client,
-                        body=body,
-                        category=category,
-                        project_label_name=project_label,
-                        project_paths=self.app._projects,
-                    )
-                else:
-                    result = create_custom_command_file(
-                        name=name,
-                        client=client,
-                        body=body,
-                        project_label_name=project_label,
-                        category=category,
-                        project_paths=self.app._projects,
-                    )
-            results.append(result)
-
-        ok_results = [r for r in results if r.ok]
-        fail_results = [r for r in results if not r.ok]
-
-        if fail_results:
-            errors = "; ".join(r.message for r in fail_results)
-            self.app._set_status(
-                f"Updated {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
-            )
-        else:
-            self.app._set_status(f"Updated {len(results)} command(s)")
-
-        if ok_results:
+        if result.path:
             from skill_manager.core.discovery import DiscoveryService
             from skill_manager.core.persistence import patch_cache_add
 
-            discovered = []
             service = DiscoveryService(
                 sources=list(self.app._sources),
                 projects=self.app._projects,
@@ -636,18 +562,13 @@ class OpsController(BaseController):
                 starred_paths=self.app._starred_paths,
                 project_aliases=self.app._project_aliases,
             )
-            for r in ok_results:
-                if r.path:
-                    try:
-                        skill_data = service.discover_single_skill(r.path, r.path.parent)
-                        if skill_data:
-                            discovered.append(skill_data)
-                    except Exception as exc:
-                        logger.error("[UPDATE COMMAND] Failed scanning %s: %s", r.path, exc)
-
-            if discovered:
-                patch_cache_add(discovered)
-                self._merge_discovered_skills(discovered)
+            try:
+                skill_data = service.discover_single_skill(result.path, result.path.parent)
+                if skill_data:
+                    patch_cache_add([skill_data])
+                    self._merge_discovered_skills([skill_data])
+            except Exception as exc:
+                logger.error("[UPDATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
     def _saveArchive(self):
         """Internal helper to persist archive state."""

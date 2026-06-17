@@ -242,7 +242,7 @@ def test_ui_controller_selection_proxies(ui_controller, mock_app):
 def test_ui_controller_model_for_view(ui_controller, mock_app):
     assert ui_controller._modelForView("Library") == mock_app._library_model
     assert ui_controller._modelForView("QuickCopy") == mock_app._quick_copy_model
-    assert ui_controller._modelForView("Unknown") == mock_app._library_model # Default fallback
+    assert ui_controller._modelForView("Unknown") == mock_app._library_model  # Default fallback
 
 
 def test_ui_controller_reset_state_complex(ui_controller, mock_app):

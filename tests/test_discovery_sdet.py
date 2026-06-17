@@ -24,9 +24,11 @@ def mock_app():
     app.isTesting = True
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     return DiscoveryController(mock_app)
+
 
 class TestDiscoveryControllerSDET:
     def test_load_initial_data_triggers_task(self, controller, mock_app):
@@ -43,7 +45,7 @@ class TestDiscoveryControllerSDET:
             "projects": [],
             "categories": ["Cat 1"],
             "project_labels": [],
-            "status": "Done"
+            "status": "Done",
         }
         mock_service.discover_all.return_value = mock_result
 
@@ -58,7 +60,7 @@ class TestDiscoveryControllerSDET:
         state = CacheState(
             skills=[SkillRecord(name="Skill 1", local_path="/path/1")],
             categories=["Cat 1"],
-            status="Ready"
+            status="Ready",
         )
 
         controller._finalize_loading(state, is_final=True)
@@ -118,7 +120,9 @@ class TestDiscoveryControllerSDET:
         controller._discoverySuccess.connect(lambda state, final: success_emitted.append(state))
 
         def mock_discover(cache_callback):
-            cache_callback({"skills": [{"name": "Cached", "local_path": "/c"}], "status": "From Cache"})
+            cache_callback(
+                {"skills": [{"name": "Cached", "local_path": "/c"}], "status": "From Cache"}
+            )
             return {"skills": [], "status": "Final"}
 
         mock_service.discover_all.side_effect = mock_discover

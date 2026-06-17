@@ -53,6 +53,7 @@ TUF_TARGETS_URL = (
     "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
 )
 
+
 def _log_update(level: str, event: str, **fields: Any) -> None:
     details = " ".join(
         f"{key}={sanitize_token(str(value))}"
@@ -77,6 +78,7 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
 
 class UpdateService:
     """Service for handling background skill updates and project syncing."""
+
     def __init__(
         self,
         sources: list[str],
@@ -611,6 +613,7 @@ class AppUpdateService:
             return
 
         import shutil
+
         if getattr(sys, "frozen", False):
             bundled = Path(sys._MEIPASS) / "skill_manager" / "assets" / "tuf" / "root.json"
         else:

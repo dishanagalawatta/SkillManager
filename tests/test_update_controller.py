@@ -272,9 +272,15 @@ def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_pa
 
     with (
         patch.object(update_controller, "_resolvePackageStorageState"),
-        patch("skill_manager.controllers.update_controller.QTimer.singleShot", side_effect=mock_single_shot),
+        patch(
+            "skill_manager.controllers.update_controller.QTimer.singleShot",
+            side_effect=mock_single_shot,
+        ),
         patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
-        patch("skill_manager.core.skill_packages.run_skill_package_update", return_value={"status": "ok"}),
+        patch(
+            "skill_manager.core.skill_packages.run_skill_package_update",
+            return_value={"status": "ok"},
+        ),
         patch(
             "skill_manager.core.skill_packages.scan_package_inventory",
             return_value={"scan_ok": True, "skills": {"new_skill": {"name": "new_skill"}}},
@@ -336,9 +342,15 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
 
     with (
         patch.object(update_controller, "_resolvePackageStorageState"),
-        patch("skill_manager.controllers.update_controller.QTimer.singleShot", side_effect=mock_single_shot),
+        patch(
+            "skill_manager.controllers.update_controller.QTimer.singleShot",
+            side_effect=mock_single_shot,
+        ),
         patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
-        patch("skill_manager.core.skill_packages.run_skill_package_update", return_value={"status": "ok"}),
+        patch(
+            "skill_manager.core.skill_packages.run_skill_package_update",
+            return_value={"status": "ok"},
+        ),
         patch(
             "skill_manager.core.skill_packages.scan_package_inventory",
             return_value={"scan_ok": True, "skills": {"kept_skill": {"name": "kept_skill"}}},
@@ -351,7 +363,9 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
         patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add"),
-        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None),
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None
+        ),
     ):
         update_controller.runPackageUpdate(0)
 

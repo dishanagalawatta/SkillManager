@@ -15,10 +15,7 @@ def normalize_description(value: Any) -> str:
         value = str(value)
 
     # Normalize spaces within lines but preserve line breaks
-    lines = [
-        " ".join(line.split()).strip(" \"'")
-        for line in value.splitlines()
-    ]
+    lines = [" ".join(line.split()).strip(" \"'") for line in value.splitlines()]
     return "\n".join(line for line in lines if line)
 
 

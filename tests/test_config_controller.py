@@ -119,17 +119,20 @@ def test_config_controller_shortcuts(config_controller, mock_app):
 def test_config_controller_custom_collections(config_controller, mock_app):
     mock_app._custom_collections = {}
 
-    # Save collection with new format
-    config_controller.saveCustomCollection("MyColl", ["/path/1", "/path/2"], ["Codex"], ["ProjectA"])
-    assert mock_app._custom_collections["MyColl"] == {"paths": ["/path/1", "/path/2"], "clients": ["Codex"], "projects": ["ProjectA"]}
+    # Save collection
+    config_controller.saveCustomCollection("MyColl", ["/path/1", "/path/2"], ["ProjectA"])
+    assert mock_app._custom_collections["MyColl"] == {
+        "paths": ["/path/1", "/path/2"],
+        "projects": ["ProjectA"],
+    }
     mock_app._config.set.assert_called_with("custom_collections", mock_app._custom_collections)
 
     # Delete collection
     config_controller.deleteCustomCollection("MyColl")
     assert "MyColl" not in mock_app._custom_collections
 
-    # Apply selection (with new format)
-    mock_app._custom_collections = {"MyColl": {"paths": ["/path/1"], "clients": [], "projects": []}}
+    # Apply selection
+    mock_app._custom_collections = {"MyColl": {"paths": ["/path/1"], "projects": []}}
     config_controller.applyCollectionSelection("MyColl")
     mock_app.skillModel.clearSelection.assert_called_once()
     mock_app.skillModel.selectByPaths.assert_called_with(["/path/1"])

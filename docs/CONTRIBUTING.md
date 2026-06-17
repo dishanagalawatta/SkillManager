@@ -30,7 +30,7 @@ bumping the version.
 ## Code Style
 
 - **Python**: ruff (rules in `pyproject.toml`). Line length 100, target
-  Python 3.14. Run `uv run ruff check . --fix` and `uv run ruff format .`
+  Python 3.12+. Run `uv run ruff check . --fix` and `uv run ruff format .`
   before committing.
 - **QML**: 4-space indent. No QObject-derived children of `QQuickItem`
   (see [ADR-0003](https://github.com/dishanagalawatta/SkillManager/blob/main/ADR_INDEX.md#adr-0003)).

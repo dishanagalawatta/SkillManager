@@ -4,7 +4,9 @@ from PySide6.QtGui import QColor, QPixmap
 
 @pytest.mark.usefixtures("setup_qml_style")
 class TestUIImageInspectorFlow:
-    def test_save_annotations_ui_signal_propagation(self, qml_engine, app_controller, qtbot, tmp_path):
+    def test_save_annotations_ui_signal_propagation(
+        self, qml_engine, app_controller, qtbot, tmp_path
+    ):
         """Verify that calling saveAnnotations emits the imageSaved signal and updates disk."""
 
         # 1. Create a dummy image
@@ -21,7 +23,7 @@ class TestUIImageInspectorFlow:
             # Simulating what QML would send
             annotations = [
                 {"type": "rect", "x": 10, "y": 10, "width": 50, "height": 50, "color": "#FF0000"},
-                {"type": "text", "x": 100, "y": 100, "text": "UI Test", "color": "#FFFFFF"}
+                {"type": "text", "x": 100, "y": 100, "text": "UI Test", "color": "#FFFFFF"},
             ]
             success = inspector.saveAnnotations(str(img_path), annotations)
             assert success is True

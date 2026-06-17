@@ -543,7 +543,6 @@ class DiscoveryService:
             "is_package": False,
             "is_source": False,  # Compatibility
             "is_command": True,
-            "client": cmd_data_raw.get("client", ""),
         }
         data["search_text"] = build_skill_search_text(data)
         return data

@@ -17,9 +17,11 @@ def mock_app():
     app._is_recording_shortcut = False
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     return ConfigController(mock_app)
+
 
 class TestConfigControllerSDET:
     def test_scroll_speed_multiplier_validation(self, controller, mock_app):

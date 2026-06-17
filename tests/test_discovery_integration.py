@@ -10,6 +10,7 @@ def discovery_controller(session_mock_config, session_temp_dir):
     """Provides an AppController specifically for discovery testing."""
     # Clear the discovery cache before each test to ensure isolation
     from skill_manager.core.discovery import get_discovery_cache
+
     with get_discovery_cache() as cache:
         cache.clear()
 
@@ -29,7 +30,7 @@ def test_discovery_ui_integration(qtbot, qapp, discovery_controller, temp_dir):
     # Use a very explicit SKILL.md that MUST be categorized as Testing
     (skill_folder / "SKILL.md").write_text(
         "---\nname: Test Automation\ncategory: Testing\n---\nThis is a testing skill for automation.",
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     # 2. Add source via config controller
@@ -75,6 +76,7 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
 
     # Wait to ensure mtime change
     import time
+
     time.sleep(1.1)
 
     skill_md.write_text("---\nname: Version 2\n---\nBody", encoding="utf-8")
@@ -90,7 +92,7 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
     for i in range(discovery_controller.libraryModel.rowCount()):
         name = discovery_controller.libraryModel.data(
             discovery_controller.libraryModel.index(i, 0),
-            discovery_controller.libraryModel.NameRole
+            discovery_controller.libraryModel.NameRole,
         )
         if name == "Version 2":
             return

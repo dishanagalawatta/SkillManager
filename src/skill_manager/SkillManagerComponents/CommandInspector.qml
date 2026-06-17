@@ -84,9 +84,10 @@ Rectangle {
                     selectByMouse: true
                     readOnly: true
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = nameField
                             inspectorContextMenu.popup()
                         }
@@ -184,9 +185,10 @@ Rectangle {
                             padding: 12
                             verticalAlignment: TextArea.AlignTop
 
-                            TapHandler {
+                            MouseArea {
+                                anchors.fill: parent
                                 acceptedButtons: Qt.RightButton
-                                onTapped: {
+                                onClicked: (mouse) => {
                                     inspectorContextMenu.targetControl = bodyArea
                                     inspectorContextMenu.popup()
                                 }

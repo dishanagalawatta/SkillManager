@@ -7,7 +7,9 @@ from PySide6.QtGui import QGuiApplication, QPixmap
 
 @pytest.mark.usefixtures("setup_qml_style")
 class TestUIScreenshotFlow:
-    def test_full_screenshot_capture_and_save_flow(self, qml_engine, app_controller, qtbot, temp_dir):
+    def test_full_screenshot_capture_and_save_flow(
+        self, qml_engine, app_controller, qtbot, temp_dir
+    ):
         # 1. Setup the environment
         app_controller.config_controller.autoMinimizeOnScreenshot = False
         app_controller.config_controller.temporaryScreenshots = False
@@ -29,7 +31,9 @@ class TestUIScreenshotFlow:
         redactions = [{"x": 10, "y": 10, "width": 20, "height": 20}]
 
         # Save screenshot should emit captureFinished with the saved path
-        with qtbot.waitSignal(app_controller.screenshot_controller.captureFinished, timeout=2000) as blocker:
+        with qtbot.waitSignal(
+            app_controller.screenshot_controller.captureFinished, timeout=2000
+        ) as blocker:
             app_controller.screenshot_controller.saveScreenshot(crop_rect, redactions)
 
         saved_path = blocker.args[0]

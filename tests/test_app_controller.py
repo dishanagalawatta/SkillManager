@@ -73,7 +73,9 @@ def test_controller_status_message(controller):
 def test_controller_load_initial_data_logic(controller):
     # Test _finalize_loading directly to avoid threads
     state = CacheState(
-        skills=[SkillRecord(name="Skill A", local_path="/test/skill_a", category="Dev", is_package=True)],
+        skills=[
+            SkillRecord(name="Skill A", local_path="/test/skill_a", category="Dev", is_package=True)
+        ],
         categories=["Dev"],
         project_labels=[],
         status="Success",
@@ -253,7 +255,7 @@ def test_controller_small_branch_slots(controller):
     assert controller.statusMessage == "Refreshing library..."
     controller.loadInitialData.assert_called_once()
 
-    controller.saveCustomCollection("", ["/p1"], [], [])
+    controller.saveCustomCollection("", ["/p1"], [])
     assert "" not in controller.customCollections
 
     controller.syncProject("/not-a-project")
@@ -284,7 +286,7 @@ def test_controller_custom_collections(controller):
     controller.skillModel.clearSelection = MagicMock()
     controller.skillModel.selectByPaths = MagicMock()
 
-    controller.saveCustomCollection("Core", ["/a", "/b"], ["Codex"], ["ProjectA"])
+    controller.saveCustomCollection("Core", ["/a", "/b"], ["ProjectA"])
     assert "Core" in controller.customCollections
     assert controller.getCollectionPaths("Core") == ["/a", "/b"]
 
@@ -299,21 +301,22 @@ def test_controller_custom_collections(controller):
 def test_controller_create_custom_command_delegates(controller, temp_dir):
     project_path = temp_dir / "proj"
     project_path.mkdir(parents=True, exist_ok=True)
-    # create_custom_command_file uses project_paths to find targets
     controller._projects = [str(project_path)]
 
     with (
         patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
-        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None),
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None
+        ),
     ):
         from skill_manager.core.commands import CommandCreateResult
 
         mock_create.return_value = CommandCreateResult(
-            ok=True, message="Created command: Deploy.Codex.md"
+            ok=True, message="Created command: Deploy.md"
         )
-        controller.createCustomCommand("Deploy", "Codex", "body", "proj", "Ops")
+        controller.createCustomCommand("Deploy", "body", "proj", "Ops")
 
-    assert controller.statusMessage == "Created 1 command(s)"
+    assert controller.statusMessage == "Created command: Deploy.md"
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -509,7 +512,16 @@ def test_controller_cache_save_load_and_corruption(controller, tmp_path):
 
     with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
         controller.config_mgr.save_cache(
-            {"skills": [{"name": "A", "local_path": "/test", "raw_content": "large", "body_content": "body"}]}
+            {
+                "skills": [
+                    {
+                        "name": "A",
+                        "local_path": "/test",
+                        "raw_content": "large",
+                        "body_content": "body",
+                    }
+                ]
+            }
         )
         saved = cache_file.read_text(encoding="utf-8")
         assert "raw_content" not in saved
