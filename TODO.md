@@ -2,7 +2,7 @@
 
 * **Project Name:** CourseBar
 * **Important Links:** 
-  * [Code Repository](https://github.com/dishanagalawatta/CourseBar)
+  * [Code Repository](https://github.com/dishanagalawatta/SkillManager)
   * [README](README.md)
   * [DESIGN](DESIGN.md)
   * [Environment](docs/ENVIRONMENT.md)
