@@ -52,7 +52,8 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: ""
         color: Theme.label
-        font: control.font
+        font.family: Theme.fontFamily
+        font.pixelSize: 12
     }
 
     MouseArea {
