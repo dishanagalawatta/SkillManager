@@ -181,7 +181,10 @@ class TestDiagnosticTUFEvents:
         tuf_dir = tmp_path / "tuf"
         target_dir = tmp_path / "updates"
         with (
-            patch("skill_manager.core.update_service.TUFClient", side_effect=RuntimeError("key invalid")),
+            patch(
+                "skill_manager.core.update_service.TUFClient",
+                side_effect=RuntimeError("key invalid"),
+            ),
             patch("skill_manager.core.update_service.get_diagnostic_logger") as mock_diag,
         ):
             mock_log = MagicMock()
