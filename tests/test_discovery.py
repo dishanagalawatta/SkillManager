@@ -114,7 +114,7 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
     assert skills[0]["name"] == "Skill One"
 
     # Verify cache was populated
-    resolved_path = _resolve_resilient_path(source_lib)
+    resolved_path = os.path.normcase(str(_resolve_resilient_path(source_lib)))
     fp_key = f"dir_fp:{resolved_path}"
     assert disk_cache.get(fp_key) is not None
     assert disk_cache.get(f"pkg_skills:{fp_key}") == skills
