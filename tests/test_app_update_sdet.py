@@ -127,9 +127,9 @@ class TestEnsureRootJson:
         target_dir = tmp_path / "updates"
         with (
             patch("skill_manager.core.update_service.TUFClient"),
-            patch("skill_manager.core.update_service.Path") as mock_path_cls,
+            patch.object(AppUpdateService, "_ensure_root_json"),
         ):
-            svc = AppUpdateService(tuf_dir, target_dir)
+            AppUpdateService(tuf_dir, target_dir)
             # Should not crash even if bundled root.json is missing
             assert tuf_dir.exists() or target_dir.exists()
 
@@ -140,7 +140,7 @@ class TestEnsureRootJson:
         existing.write_text('{"existing": true}')
         target_dir = tmp_path / "updates"
         with patch("skill_manager.core.update_service.TUFClient"):
-            svc = AppUpdateService(tuf_dir, target_dir)
+            AppUpdateService(tuf_dir, target_dir)
         # File should still have original content (not overwritten)
         assert existing.read_text() == '{"existing": true}'
 

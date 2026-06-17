@@ -4,7 +4,6 @@ Verifies structured diagnostic events are emitted at each branch in
 AppUpdateController and AppUpdateService.
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -171,10 +170,10 @@ class TestDiagnosticTUFEvents:
         diag, _ = diag_log
         tuf_dir, target_dir = diag_log[0]._log_file.parent, diag_log[0]._log_file.parent
         with (
-            patch("skill_manager.core.update_service.TUFClient") as mock_client,
+            patch("skill_manager.core.update_service.TUFClient"),
             patch.object(diag, "log_event") as mock_emit,
         ):
-            svc = AppUpdateService(tuf_dir, target_dir)
+            AppUpdateService(tuf_dir, target_dir)
             calls = {c.args[1] for c in mock_emit.call_args_list}
             assert CATEGORY_TUF_CLIENT_INIT in calls
 
@@ -187,6 +186,6 @@ class TestDiagnosticTUFEvents:
         ):
             mock_log = MagicMock()
             mock_diag.return_value = mock_log
-            svc = AppUpdateService(tuf_dir, target_dir)
+            AppUpdateService(tuf_dir, target_dir)
             emit_calls = {c.args[1] for c in mock_log.log_event.call_args_list}
             assert CATEGORY_TUF_CLIENT_INIT in emit_calls

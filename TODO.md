@@ -1,7 +1,8 @@
 # 1. Project Metadata
 
 * **Project Name:** CourseBar
-* **Important Links:** * [Code Repository](#)
+* **Important Links:** 
+  * [Code Repository](https://github.com/dishanagalawatta/CourseBar)
   * [README](README.md)
   * [DESIGN](DESIGN.md)
   * [Environment](docs/ENVIRONMENT.md)
@@ -30,20 +31,18 @@
 
 ## In Progress
 
-- [ ] 
+- [ ] **[High Severity]** Investigate and fix the update process validation
 
 ---
 
 # 4. Bug Tracker
 
-- [ ] **[High Severity]** Investigate and fix the update process validation
 - [ ] **[Low Severity]** Staring skill motion refining
 
 ---
 
 # 5. Icebox / Backlog
 
-- [ ] Always selected items
 - [ ] Drop any file to quick copy
 - [ ] Custom method to bring your own client AI agent copy/paste style to users
 

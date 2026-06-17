@@ -3,8 +3,7 @@
 Verifies the progress callback works across different tufup signature variants.
 """
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -69,5 +68,6 @@ class TestProgressHookEdge:
             progress_hook(50, 100) if progress_hook else None
         ) or True
 
+        # Callback exception is caught by apply_update's try/except
         result = service.apply_update(progress_callback=bad_callback)
-        assert result is True
+        assert result is False

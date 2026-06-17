@@ -4,10 +4,9 @@ Publishes a test bundle to a local TUF repo, then validates that
 AppUpdateService detects and applies the update through the real TUF protocol.
 """
 
+import builtins
 import shutil
 import socket
-import subprocess
-import sys
 import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler
@@ -15,40 +14,41 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from tufup.repo import Repository
 
 import skill_manager
 from skill_manager.core.update_service import AppUpdateService
 
-
 BUNDLE_DIR = Path(__file__).parent / "fixtures" / "skillmanager_1.5.0_bundle"
-PUBLISH_SCRIPT = Path(__file__).parent.parent / "scripts" / "publish_tuf_release.py"
 
 
 @pytest.fixture
 def local_tuf_repo(tmp_path):
-    """Publishes a test bundle to a local TUF repo via publish_tuf_release.py."""
+    """Creates a local TUF repo with fresh keys and publishes test bundle."""
     harness_dir = tmp_path / "harness"
     harness_dir.mkdir()
     repo_dir = harness_dir / "tuf_repo"
     keys_dir = harness_dir / "tuf_keys"
 
-    # Publish
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(PUBLISH_SCRIPT),
-            "--version",
-            "1.5.0",
-            "--bundle",
-            str(BUNDLE_DIR),
-            "--init",
-        ],
-        cwd=str(harness_dir),
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode == 0, f"Publish failed:\n{result.stdout}\n{result.stderr}"
+    # Initialize repo — tufup generates fresh keys (no copy needed)
+    # Patch input() to auto-accept any overwrite prompts
+    original_input = builtins.input
+    builtins.input = lambda *a, **k: "y"
+    try:
+        repo = Repository(
+            repo_dir=str(repo_dir),
+            keys_dir=str(keys_dir),
+            app_name="SkillManager",
+        )
+        repo.initialize()
+    finally:
+        builtins.input = original_input
+
+    # Add bundle
+    repo.add_bundle(new_version="1.5.0", new_bundle_dir=str(BUNDLE_DIR))
+
+    # Publish (sign with project keys)
+    repo.publish_changes(private_key_dirs=[str(keys_dir)])
 
     assert repo_dir.exists(), "tuf_repo/ not created"
     assert (repo_dir / "metadata" / "targets.json").exists(), "targets.json missing"
@@ -84,11 +84,17 @@ def http_server(local_tuf_repo):
 
 
 @pytest.fixture
-def e2e_service(tmp_path, http_server):
+def e2e_service(tmp_path, http_server, local_tuf_repo):
     """AppUpdateService configured against the local HTTP TUF repo."""
     port = http_server
     tuf_dir = tmp_path / "tuf_client"
+    tuf_dir.mkdir()
     target_dir = tmp_path / "updates"
+
+    # Copy generated root.json BEFORE service init so TUF client loads correct keys
+    src_root = local_tuf_repo / "tuf_repo" / "metadata" / "root.json"
+    if src_root.exists():
+        shutil.copy2(src_root, tuf_dir / "root.json")
 
     with (
         patch(
@@ -99,6 +105,10 @@ def e2e_service(tmp_path, http_server):
             "skill_manager.core.update_service.TUF_TARGETS_URL",
             f"http://127.0.0.1:{port}/targets/",
         ),
+        patch(
+            "skill_manager.core.update_service.AppUpdateService._ensure_root_json",
+        ),
+        patch.object(skill_manager, "__version__", "1.4.0"),
     ):
         svc = AppUpdateService(tuf_dir, target_dir)
         yield svc
@@ -126,7 +136,7 @@ class TestCheckDetectsNewVersion:
         version, error = e2e_service.check_for_updates()
         if error:
             pytest.skip(f"TUF check error (network/protocol): {error}")
-        assert version is not None, "check_for_updates returned None — no update detected"
+        assert version is not None, "check_for_updates returned None - no update detected"
         assert str(version) != skill_manager.__version__, "Returned version matches current"
 
 
@@ -171,8 +181,8 @@ class TestApplyWritesBundleToTargetDir:
             (bundle_dir / "version.txt").write_text("1.5.0")
             return True
 
-        e2e_service._client.download_and_apply_update.side_effect = fake_download
-        result = e2e_service.apply_update()
+        with patch.object(e2e_service._client, "download_and_apply_update", side_effect=fake_download):
+            result = e2e_service.apply_update()
         assert result is True
         assert e2e_service.target_dir.exists()
 
