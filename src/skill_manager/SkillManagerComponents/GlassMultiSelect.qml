@@ -108,9 +108,16 @@ Item {
 
         implicitHeight: Math.min(listContent.implicitHeight + topPadding + bottomPadding, 300)
 
-        contentItem: ColumnLayout {
-            id: listContent
-            spacing: 0
+        contentItem: ScrollView {
+            id: scrollView
+            clip: true
+            contentWidth: availableWidth
+            ScrollBar.vertical: AppScrollBar { }
+
+            ColumnLayout {
+                id: listContent
+                width: scrollView.width
+                spacing: 0
 
             Rectangle {
                 Layout.fillWidth: true
@@ -204,6 +211,8 @@ Item {
             }
         }
 
+        }
+        
         background: Rectangle {
             radius: Theme.radiusCard
             color: Theme.glassPill
