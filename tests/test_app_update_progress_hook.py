@@ -23,8 +23,8 @@ def service(tmp_path):
 class TestProgressHookTwoArg:
     def test_normal_two_arg(self, service):
         service._client.download_and_apply_update.side_effect = lambda progress_hook=None: (
-            progress_hook(50, 100) if progress_hook else None
-        ) or True
+            (progress_hook(50, 100) if progress_hook else None) or True
+        )
 
         captured = []
         result = service.apply_update(progress_callback=captured.append)
@@ -33,8 +33,8 @@ class TestProgressHookTwoArg:
 
     def test_zero_total(self, service):
         service._client.download_and_apply_update.side_effect = lambda progress_hook=None: (
-            progress_hook(50, 0) if progress_hook else None
-        ) or True
+            (progress_hook(50, 0) if progress_hook else None) or True
+        )
 
         captured = []
         result = service.apply_update(progress_callback=captured.append)
@@ -45,8 +45,8 @@ class TestProgressHookTwoArg:
 class TestProgressHookOneArg:
     def test_one_arg_float(self, service):
         service._client.download_and_apply_update.side_effect = lambda progress_hook=None: (
-            progress_hook(0.75) if progress_hook else None
-        ) or True
+            (progress_hook(0.75) if progress_hook else None) or True
+        )
 
         captured = []
         result = service.apply_update(progress_callback=captured.append)
@@ -65,8 +65,8 @@ class TestProgressHookEdge:
             raise RuntimeError("callback broke")
 
         service._client.download_and_apply_update.side_effect = lambda progress_hook=None: (
-            progress_hook(50, 100) if progress_hook else None
-        ) or True
+            (progress_hook(50, 100) if progress_hook else None) or True
+        )
 
         # Callback exception is caught by apply_update's try/except
         result = service.apply_update(progress_callback=bad_callback)

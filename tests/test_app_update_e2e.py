@@ -181,7 +181,9 @@ class TestApplyWritesBundleToTargetDir:
             (bundle_dir / "version.txt").write_text("1.5.0")
             return True
 
-        with patch.object(e2e_service._client, "download_and_apply_update", side_effect=fake_download):
+        with patch.object(
+            e2e_service._client, "download_and_apply_update", side_effect=fake_download
+        ):
             result = e2e_service.apply_update()
         assert result is True
         assert e2e_service.target_dir.exists()
@@ -262,5 +264,6 @@ class TestRealDownloadAndExtract:
         # Step 4: verify version.json content
         vf = extract_dir / "version.json"
         import json
+
         data = json.loads(vf.read_text())
         assert data.get("version") == "1.5.0", f"Wrong version in bundle: {data}"
