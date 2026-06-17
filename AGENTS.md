@@ -20,3 +20,4 @@ Use **uv**: `uv sync`, `uv run skill-manager`, `python run_tests.py`
 - **Logic**: Follow patterns in `src/skill_manager/core/`.
 - **Categorization**: Keep logic in `src/skill_manager/core/parsing/` synced with `docs/CATEGORIES.md`.
 - **Releases**: Strictly Opt-in. Use `[patch]`, `[minor]`, `[major]`, or `[dev]` in commits.
+- **Diagnostic Logging**: Use `skill_manager.core.diagnostics.get_diagnostic_logger().log_event()` with a `CATEGORY_*` constant for UI/Agent-facing events. Do not use standard `logging`.

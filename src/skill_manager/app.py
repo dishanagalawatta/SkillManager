@@ -843,6 +843,13 @@ class AppController(QObject):
     def loadInitialData(self):
         self.discovery.loadInitialData()
 
+    @Slot(str, str, str)
+    def logDiagnosticEvent(self, level: str, category: str, msg: str):
+        try:
+            get_diagnostic_logger().log_event(level, category, msg)
+        except Exception as e:
+            logger.error(f"Failed to log QML diagnostic event: {e}")
+
     @Slot(str, result=str)
     def getCategoryEmoji(self, category_name: str) -> str:
         return get_category_emoji(category_name)

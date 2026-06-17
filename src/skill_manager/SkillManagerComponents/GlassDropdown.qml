@@ -4,12 +4,34 @@ import App 1.0
 
 ComboBox {
     id: control
+    property bool keyboardNavigated: false
+    
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            keyboardNavigated = true
+        }
+        event.accepted = false
+    }
     
     model: ["All Categories"]
     
     delegate: ItemDelegate {
-        width: control.width
+        width: dropdownList.width
+        height: 32 // FIX: Fixed height prevents list implicitHeight jitter which causes Flickable out-of-bounds jump
+        padding: 0 // FIX: Remove default Qt padding which clips contentItem in fixed-height delegates
+        hoverEnabled: true
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered) {
+                    control.keyboardNavigated = false
+                }
+            }
+        }
+
         contentItem: Text {
+            leftPadding: 10
+            rightPadding: 10
             text: modelData !== undefined ? modelData : ""
             color: Theme.label
             font.family: Theme.fontFamily
@@ -17,7 +39,8 @@ ComboBox {
             verticalAlignment: Text.AlignVCenter
         }
         background: Rectangle {
-            color: highlighted ? Theme.glassHover : "transparent"
+            radius: 6
+            color: (hovered || (control.keyboardNavigated && control.highlightedIndex === index)) ? Theme.glassHover : "transparent"
         }
     }
 
@@ -71,17 +94,41 @@ ComboBox {
     popup: Popup {
         y: control.height + 4
         width: control.width
-        padding: 5
+        padding: 6
         
-        // Use contentHeight from ListView for the popup's implicitHeight
-        implicitHeight: Math.min(dropdownList.contentHeight + (topPadding + bottomPadding), 250)
+        implicitHeight: Math.min(dropdownList.implicitHeight + topPadding + bottomPadding, 250)
 
         contentItem: SmoothListView {
             id: dropdownList
             clip: true
+            implicitHeight: contentHeight
             model: control.delegateModel
-            currentIndex: control.highlightedIndex
-            // Removed implicitHeight: contentHeight to avoid height mismatch with constrained Popup
+            boundsBehavior: Flickable.StopAtBounds
+            highlightRangeMode: ListView.NoHighlightRange
+            highlightFollowsCurrentItem: false
+
+            onContentYChanged: {
+                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")
+            }
+            onContentHeightChanged: {
+                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentHeight changed: " + contentHeight)
+            }
+            
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                    control.keyboardNavigated = true
+                }
+                event.accepted = false
+            }
+
+            Connections {
+                target: control
+                function onHighlightedIndexChanged() {
+                    if (control.popup.opened && control.keyboardNavigated) {
+                        dropdownList.positionViewAtIndex(control.highlightedIndex, ListView.Contain)
+                    }
+                }
+            }
         }
 
         background: Rectangle {

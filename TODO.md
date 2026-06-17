@@ -1,7 +1,7 @@
 # 1. Project Metadata
 
 * **Project Name:** CourseBar
-* **Important Links:** 
+* **Important Links:**
   * [Code Repository](https://github.com/dishanagalawatta/SkillManager)
   * [README](README.md)
   * [DESIGN](DESIGN.md)
@@ -32,6 +32,7 @@
 ## In Progress
 
 - [ ] **[High Severity]** Investigate and fix the update process validation
+- [ ] **[High Severity]** fix failing github actions
 
 ---
 

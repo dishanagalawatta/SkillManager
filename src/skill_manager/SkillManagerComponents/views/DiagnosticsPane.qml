@@ -21,6 +21,8 @@ Item {
     property string recentEventsJson: "[]"
     property string bundleExportResult: ""
 
+    implicitHeight: contentLayout.implicitHeight + 32
+
     function refresh() {
         collectionsJson = AppController.config_controller.getCollectionsDiagnostic()
         projectResolutionJson = AppController.config_controller.getProjectResolutionTable()
@@ -32,7 +34,11 @@ Item {
     }
 
     ColumnLayout {
-        anchors.fill: parent
+        id: contentLayout
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 16
         spacing: 12
 
         // Section header
@@ -75,15 +81,19 @@ Item {
         // Diagnostic body — collapsed by default
         Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: root.expanded ? bodyContentLayout.implicitHeight + 32 : 0
             visible: root.expanded
+            clip: true
             radius: Theme.radiusCard
             color: Theme.glassPill
             border.color: Theme.glassBorder
             border.width: 1
 
             ColumnLayout {
-                anchors.fill: parent
+                id: bodyContentLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
                 anchors.margins: 16
                 spacing: 16
 
@@ -157,7 +167,7 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 120
+                    implicitHeight: 120
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: Theme.glassBorder
@@ -250,7 +260,7 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 120
+                    implicitHeight: 120
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: Theme.glassBorder
@@ -300,7 +310,7 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 120
+                    implicitHeight: 120
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: Theme.glassBorder
@@ -387,7 +397,7 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    implicitHeight: 120
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: Theme.glassBorder

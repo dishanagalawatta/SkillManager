@@ -718,17 +718,24 @@ Item {
                                 }
                             }
 
-                            // Diagnostics separator and pane
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
+                        }
+                    }
 
-                            DiagnosticsPane {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                            }
+                    // Diagnostics card (separate from About card so its
+                    // expanded body has room to render — see the
+                    // test_diagnostics_pane_actually_renders_when_expanded
+                    // regression test for the exact failure mode this prevents).
+                    GlassPill {
+                        id: diagnosticsGlassPill
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: diagnosticsPane.implicitHeight
+                        radius: Theme.radiusCard
+
+                        DiagnosticsPane {
+                            id: diagnosticsPane
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
                         }
                     }
                 }

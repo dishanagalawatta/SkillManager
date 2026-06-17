@@ -536,3 +536,17 @@ def test_color_overlay_is_a_thin_reexport_of_qt5compat_coloroverlay():
             f"{qml_file.name} must not import Qt5Compat.GraphicalEffects directly; "
             "use the local ColorOverlay component instead"
         )
+
+
+def test_dropdowns_use_implicit_height_for_popup():
+    """Verify that Glass dropdowns and multi-select components use implicitHeight properly to avoid binding loops and jumpy scrolling."""
+    dropdown = (QML_DIR / "GlassDropdown.qml").read_text(encoding="utf-8")
+    collection_dropdown = (QML_DIR / "GlassCollectionDropdown.qml").read_text(encoding="utf-8")
+
+    for content, name in [(dropdown, "GlassDropdown.qml"), (collection_dropdown, "GlassCollectionDropdown.qml")]:
+        assert "implicitHeight: contentHeight" in content, (
+            f"{name} must set implicitHeight: contentHeight on its inner ListView."
+        )
+        assert "implicitHeight: Math.min(dropdownList.implicitHeight" in content, (
+            f"{name} Popup must derive its implicitHeight from dropdownList.implicitHeight, not contentHeight, to prevent jumping."
+        )
