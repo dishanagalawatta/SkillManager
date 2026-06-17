@@ -215,3 +215,52 @@ class TestApplySignatureVerification:
             assert version is None or error is not None, (
                 f"Expected failure with corrupt targets.json, got version={version}, error={error}"
             )
+
+
+class TestRealDownloadAndExtract:
+    def test_real_download_extracts_bundle(self, e2e_service, tmp_path):
+        """Full E2E: check -> download real bundle -> extract -> verify files."""
+        if e2e_service._client is None:
+            pytest.skip("TUF client failed to initialize")
+
+        # Step 1: detect update
+        version, error = e2e_service.check_for_updates()
+        if error:
+            pytest.skip(f"TUF check error: {error}")
+        assert version is not None, "No update detected"
+
+        # Step 2: real download + extract with no-op install
+        extract_dir = tmp_path / "extracted"
+        extract_dir.mkdir()
+        e2e_service._client.extract_dir = extract_dir
+
+        written = {}
+
+        def capture_install(src_dir, dst_dir, **kwargs):
+            written["src"] = str(src_dir)
+            written["dst"] = str(dst_dir)
+            for f in src_dir.rglob("*"):
+                if f.is_file():
+                    dest = e2e_service.target_dir / f.relative_to(src_dir)
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, dest)
+
+        e2e_service._client.download_and_apply_update(
+            skip_confirmation=True,
+            install=capture_install,
+        )
+
+        # Step 3: verify extracted files exist
+        extracted_files = list(extract_dir.rglob("*"))
+        extracted_files = [f for f in extracted_files if f.is_file()]
+        assert len(extracted_files) >= 2, (
+            f"Expected >=2 extracted files, got {len(extracted_files)}: {extracted_files}"
+        )
+        names = {f.name for f in extracted_files}
+        assert "version.json" in names, f"version.json missing from {names}"
+
+        # Step 4: verify version.json content
+        vf = extract_dir / "version.json"
+        import json
+        data = json.loads(vf.read_text())
+        assert data.get("version") == "1.5.0", f"Wrong version in bundle: {data}"
