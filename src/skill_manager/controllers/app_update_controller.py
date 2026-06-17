@@ -104,7 +104,7 @@ class AppUpdateController(BaseController):
                 "INFO",
                 CATEGORY_APP_UPDATE_SKIPPED_DEV,
                 "Update check skipped in dev mode",
-                current_version=self._state.current_version,
+                data={"current_version": self._state.current_version},
             )
             self.updateStateChanged.emit()
             return
@@ -116,9 +116,11 @@ class AppUpdateController(BaseController):
             "INFO",
             CATEGORY_APP_UPDATE_CHECK,
             "Update check initiated",
-            manual=manual,
-            current_version=self._state.current_version,
-            frozen=getattr(sys, "frozen", False),
+            data={
+                "manual": manual,
+                "current_version": self._state.current_version,
+                "frozen": getattr(sys, "frozen", False),
+            },
         )
 
         if manual:
@@ -148,8 +150,7 @@ class AppUpdateController(BaseController):
                 "ERROR",
                 CATEGORY_APP_UPDATE_FAILED,
                 "Update check failed",
-                error=error,
-                current_version=self._state.current_version,
+                data={"error": error, "current_version": self._state.current_version},
             )
             if manual:
                 self.app._set_status(f"Update check failed: {error}")
@@ -161,8 +162,10 @@ class AppUpdateController(BaseController):
                 "INFO",
                 CATEGORY_APP_UPDATE_AVAILABLE,
                 "Update available",
-                latest_version=new_version,
-                current_version=self._state.current_version,
+                data={
+                    "latest_version": new_version,
+                    "current_version": self._state.current_version,
+                },
             )
             if manual:
                 self.app._set_status(f"Update available: v{new_version}")
@@ -173,7 +176,7 @@ class AppUpdateController(BaseController):
                 "INFO",
                 CATEGORY_APP_UPDATE_UP_TO_DATE,
                 "SkillManager is up to date",
-                current_version=self._state.current_version,
+                data={"current_version": self._state.current_version},
             )
             if manual:
                 self.app._set_status("SkillManager is up to date.")
@@ -218,8 +221,10 @@ class AppUpdateController(BaseController):
                     "INFO",
                     CATEGORY_APP_UPDATE_APPLIED,
                     "Update applied successfully",
-                    latest_version=self._state.latest_version,
-                    current_version=self._state.current_version,
+                    data={
+                        "latest_version": self._state.latest_version,
+                        "current_version": self._state.current_version,
+                    },
                 )
                 self.app._set_status("Update applied. Please restart SkillManager.")
             else:
@@ -227,8 +232,10 @@ class AppUpdateController(BaseController):
                     "ERROR",
                     CATEGORY_APP_UPDATE_FAILED,
                     "Update apply returned False",
-                    latest_version=self._state.latest_version,
-                    current_version=self._state.current_version,
+                    data={
+                        "latest_version": self._state.latest_version,
+                        "current_version": self._state.current_version,
+                    },
                 )
                 self.app._set_status("Update failed.")
         except Exception as e:
@@ -237,9 +244,11 @@ class AppUpdateController(BaseController):
                 "ERROR",
                 CATEGORY_APP_UPDATE_FAILED,
                 "Update apply raised exception",
-                error=str(e),
-                latest_version=self._state.latest_version,
-                current_version=self._state.current_version,
+                data={
+                    "error": str(e),
+                    "latest_version": self._state.latest_version,
+                    "current_version": self._state.current_version,
+                },
             )
             self.app._set_status(f"Update error: {e}")
         finally:

@@ -19,10 +19,8 @@ import skill_manager
 from skill_manager.core.copier import copy_skill_folders_to_projects
 from skill_manager.core.diagnostics import (
     CATEGORY_APP_UPDATE_APPLIED,
-    CATEGORY_APP_UPDATE_AVAILABLE,
     CATEGORY_APP_UPDATE_CHECK,
     CATEGORY_APP_UPDATE_FAILED,
-    CATEGORY_TUF_BUNDLE_VALIDATION,
     CATEGORY_TUF_CLIENT_INIT,
     get_diagnostic_logger,
 )
@@ -616,7 +614,7 @@ class AppUpdateService:
                 "INFO",
                 CATEGORY_TUF_CLIENT_INIT,
                 "TUF client initialized successfully",
-                current_version=skill_manager.__version__,
+                data={"current_version": skill_manager.__version__},
             )
         except Exception as e:
             logger.warning("Failed to initialize TUF client: %s", e)
@@ -624,7 +622,7 @@ class AppUpdateService:
                 "ERROR",
                 CATEGORY_TUF_CLIENT_INIT,
                 "TUF client initialization failed",
-                error=str(e),
+                data={"error": str(e)},
             )
 
     def _ensure_root_json(self):
@@ -671,7 +669,7 @@ class AppUpdateService:
                 "ERROR",
                 CATEGORY_APP_UPDATE_FAILED,
                 "Apply update called with no client",
-                current_version=skill_manager.__version__,
+                data={"current_version": skill_manager.__version__},
             )
             return False
 
@@ -701,7 +699,7 @@ class AppUpdateService:
             "INFO",
             CATEGORY_APP_UPDATE_CHECK,
             "Apply update started",
-            current_version=skill_manager.__version__,
+            data={"current_version": skill_manager.__version__},
         )
 
         try:
@@ -713,14 +711,14 @@ class AppUpdateService:
                     "INFO",
                     CATEGORY_APP_UPDATE_APPLIED,
                     "Update applied successfully",
-                    current_version=skill_manager.__version__,
+                    data={"current_version": skill_manager.__version__},
                 )
             else:
                 self._diag.log_event(
                     "ERROR",
                     CATEGORY_APP_UPDATE_FAILED,
                     "Update apply returned False",
-                    current_version=skill_manager.__version__,
+                    data={"current_version": skill_manager.__version__},
                 )
 
             return success
@@ -730,8 +728,7 @@ class AppUpdateService:
                 "ERROR",
                 CATEGORY_APP_UPDATE_FAILED,
                 "Update apply raised exception",
-                error=str(e),
-                current_version=skill_manager.__version__,
+                data={"error": str(e), "current_version": skill_manager.__version__},
             )
             return False
         finally:
