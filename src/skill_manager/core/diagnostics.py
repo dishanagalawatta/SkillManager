@@ -52,6 +52,14 @@ CATEGORY_SKILL_COPY = "skill_copy"
 CATEGORY_ERROR = "error"
 CATEGORY_WARNING = "warning"
 CATEGORY_UV_RUN_DETECTED = "uv_run_detected"
+CATEGORY_APP_UPDATE_CHECK = "app_update_check"
+CATEGORY_APP_UPDATE_AVAILABLE = "app_update_available"
+CATEGORY_APP_UPDATE_UP_TO_DATE = "app_update_up_to_date"
+CATEGORY_APP_UPDATE_APPLIED = "app_update_applied"
+CATEGORY_APP_UPDATE_FAILED = "app_update_failed"
+CATEGORY_APP_UPDATE_SKIPPED_DEV = "app_update_skipped_dev"
+CATEGORY_TUF_CLIENT_INIT = "tuf_client_init"
+CATEGORY_TUF_BUNDLE_VALIDATION = "tuf_bundle_validation"
 
 # ---------------------------------------------------------------------------
 # Helpers

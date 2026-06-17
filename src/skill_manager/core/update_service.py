@@ -17,6 +17,15 @@ except ImportError:
 
 import skill_manager
 from skill_manager.core.copier import copy_skill_folders_to_projects
+from skill_manager.core.diagnostics import (
+    CATEGORY_APP_UPDATE_APPLIED,
+    CATEGORY_APP_UPDATE_AVAILABLE,
+    CATEGORY_APP_UPDATE_CHECK,
+    CATEGORY_APP_UPDATE_FAILED,
+    CATEGORY_TUF_BUNDLE_VALIDATION,
+    CATEGORY_TUF_CLIENT_INIT,
+    get_diagnostic_logger,
+)
 from skill_manager.core.parsing import build_skill_search_text, categorize_skill, parse_skill_md
 from skill_manager.core.persistence import (
     load_package_skill_inventory,
@@ -574,6 +583,7 @@ class AppUpdateService:
         self.tuf_dir = tuf_dir
         self.target_dir = target_dir
         self._client: TUFClient | None = None
+        self._diag = get_diagnostic_logger()
         self._initialize_client()
 
     def _initialize_client(self):
@@ -602,9 +612,20 @@ class AppUpdateService:
                 metadata_dir=str(self.tuf_dir),
                 target_dir=str(self.target_dir),
             )
-            logger.debug("tufup Client initialized successfully.")
+            self._diag.log_event(
+                "INFO",
+                CATEGORY_TUF_CLIENT_INIT,
+                "TUF client initialized successfully",
+                current_version=skill_manager.__version__,
+            )
         except Exception as e:
             logger.warning("Failed to initialize TUF client: %s", e)
+            self._diag.log_event(
+                "ERROR",
+                CATEGORY_TUF_CLIENT_INIT,
+                "TUF client initialization failed",
+                error=str(e),
+            )
 
     def _ensure_root_json(self):
         """Ensures the TUF root.json metadata is present in the data directory."""
@@ -646,11 +667,24 @@ class AppUpdateService:
         Returns: True if successful.
         """
         if not self._client:
+            self._diag.log_event(
+                "ERROR",
+                CATEGORY_APP_UPDATE_FAILED,
+                "Apply update called with no client",
+                current_version=skill_manager.__version__,
+            )
             return False
 
-        def progress_hook(bytes_downloaded, total_bytes):
-            if progress_callback and total_bytes > 0:
-                progress_callback(bytes_downloaded / total_bytes)
+        def progress_hook(*args):
+            if not progress_callback:
+                return
+            try:
+                if len(args) >= 2 and args[1] > 0:
+                    progress_callback(args[0] / args[1])
+                elif len(args) == 1:
+                    progress_callback(args[0] if isinstance(args[0], float) else 0.0)
+            except (ZeroDivisionError, TypeError, IndexError):
+                pass
 
         original_popen = subprocess.Popen
 
@@ -663,11 +697,42 @@ class AppUpdateService:
                     )
                 super().__init__(*args, **kwargs)
 
+        self._diag.log_event(
+            "INFO",
+            CATEGORY_APP_UPDATE_CHECK,
+            "Apply update started",
+            current_version=skill_manager.__version__,
+        )
+
         try:
             subprocess.Popen = NoWindowPopen
-            return self._client.download_and_apply_update(progress_hook=progress_hook)
+            success = self._client.download_and_apply_update(progress_hook=progress_hook)
+
+            if success:
+                self._diag.log_event(
+                    "INFO",
+                    CATEGORY_APP_UPDATE_APPLIED,
+                    "Update applied successfully",
+                    current_version=skill_manager.__version__,
+                )
+            else:
+                self._diag.log_event(
+                    "ERROR",
+                    CATEGORY_APP_UPDATE_FAILED,
+                    "Update apply returned False",
+                    current_version=skill_manager.__version__,
+                )
+
+            return success
         except Exception as e:
             logger.error("Failed to apply update: %s", e)
+            self._diag.log_event(
+                "ERROR",
+                CATEGORY_APP_UPDATE_FAILED,
+                "Update apply raised exception",
+                error=str(e),
+                current_version=skill_manager.__version__,
+            )
             return False
         finally:
             subprocess.Popen = original_popen

@@ -11,6 +11,15 @@ from PySide6.QtCore import Property, Signal, Slot
 import skill_manager
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.config import get_app_data_dir
+from skill_manager.core.diagnostics import (
+    CATEGORY_APP_UPDATE_APPLIED,
+    CATEGORY_APP_UPDATE_AVAILABLE,
+    CATEGORY_APP_UPDATE_CHECK,
+    CATEGORY_APP_UPDATE_FAILED,
+    CATEGORY_APP_UPDATE_SKIPPED_DEV,
+    CATEGORY_APP_UPDATE_UP_TO_DATE,
+    get_diagnostic_logger,
+)
 from skill_manager.core.schemas import AppUpdateState
 from skill_manager.core.update_service import AppUpdateService
 
@@ -32,6 +41,7 @@ class AppUpdateController(BaseController):
 
     def __init__(self, app):
         super().__init__(app)
+        self._diag = get_diagnostic_logger()
 
         # Initialize State
         self._state = AppUpdateState(
@@ -90,11 +100,26 @@ class AppUpdateController(BaseController):
         # Skip check in development mode unless manual
         if not getattr(sys, "frozen", False) and not manual:
             self._state.has_checked = True
+            self._diag.log_event(
+                "INFO",
+                CATEGORY_APP_UPDATE_SKIPPED_DEV,
+                "Update check skipped in dev mode",
+                current_version=self._state.current_version,
+            )
             self.updateStateChanged.emit()
             return
 
         self._state.is_checking = True
         self.isCheckingForUpdatesChanged.emit()
+
+        self._diag.log_event(
+            "INFO",
+            CATEGORY_APP_UPDATE_CHECK,
+            "Update check initiated",
+            manual=manual,
+            current_version=self._state.current_version,
+            frozen=getattr(sys, "frozen", False),
+        )
 
         if manual:
             self.app._set_status("Checking for app updates...")
@@ -119,17 +144,37 @@ class AppUpdateController(BaseController):
         if error:
             logger.info("Update check failed: %s", error)
             self._state.update_available = False
+            self._diag.log_event(
+                "ERROR",
+                CATEGORY_APP_UPDATE_FAILED,
+                "Update check failed",
+                error=error,
+                current_version=self._state.current_version,
+            )
             if manual:
                 self.app._set_status(f"Update check failed: {error}")
         elif new_version:
             logger.info("Update available: %s", new_version)
             self._state.latest_version = new_version
             self._state.update_available = True
+            self._diag.log_event(
+                "INFO",
+                CATEGORY_APP_UPDATE_AVAILABLE,
+                "Update available",
+                latest_version=new_version,
+                current_version=self._state.current_version,
+            )
             if manual:
                 self.app._set_status(f"Update available: v{new_version}")
         else:
             logger.info("SkillManager is up to date.")
             self._state.update_available = False
+            self._diag.log_event(
+                "INFO",
+                CATEGORY_APP_UPDATE_UP_TO_DATE,
+                "SkillManager is up to date",
+                current_version=self._state.current_version,
+            )
             if manual:
                 self.app._set_status("SkillManager is up to date.")
 
@@ -169,11 +214,33 @@ class AppUpdateController(BaseController):
 
             if success:
                 logger.info("Update applied. Restart recommended.")
+                self._diag.log_event(
+                    "INFO",
+                    CATEGORY_APP_UPDATE_APPLIED,
+                    "Update applied successfully",
+                    latest_version=self._state.latest_version,
+                    current_version=self._state.current_version,
+                )
                 self.app._set_status("Update applied. Please restart SkillManager.")
             else:
+                self._diag.log_event(
+                    "ERROR",
+                    CATEGORY_APP_UPDATE_FAILED,
+                    "Update apply returned False",
+                    latest_version=self._state.latest_version,
+                    current_version=self._state.current_version,
+                )
                 self.app._set_status("Update failed.")
         except Exception as e:
             logger.error("Apply update failed: %s", e)
+            self._diag.log_event(
+                "ERROR",
+                CATEGORY_APP_UPDATE_FAILED,
+                "Update apply raised exception",
+                error=str(e),
+                latest_version=self._state.latest_version,
+                current_version=self._state.current_version,
+            )
             self.app._set_status(f"Update error: {e}")
         finally:
             self._state.is_updating = False
