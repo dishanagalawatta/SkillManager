@@ -1,0 +1,2 @@
+SkillManager test bundle v1.5.0
+This is a lightweight fixture for the app update E2E test harness.

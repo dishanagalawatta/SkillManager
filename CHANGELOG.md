@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.5.0
+
+### Features
+- Add 7 diagnostic categories for app update flow (app_update_check, app_update_available, app_update_up_to_date, app_update_applied, app_update_failed, app_update_skipped_dev, tuf_client_init, tuf_bundle_validation)
+- Emit structured diagnostic events across check/apply/init paths in AppUpdateController and AppUpdateService
+- Add post-apply bundle version validation
+- Harden progress_hook for tufup signature variants (1-arg, 2-arg, zero-arg)
+
+### Tests
+- Add test_app_update_diagnostic.py (12 cases for diagnostic event emission)
+- Add test_app_update_e2e.py (6 cases with local TUF repo + HTTP server)
+- Add test_app_update_progress_hook.py (5 cases for hook signature variants)
+- Extend test_app_update_sdet.py (+6 cases for edge cases and error paths)
+
+### Bug Fixes
+- Fix silent dev-mode skip in checkForUpdates (now emits diagnostic event)
+- Fix progress_hook crash on unexpected tufup signature
+
 ## v1.1.1
 
 ### Features
