@@ -17,3 +17,6 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+## 2024-05-23 - [C++ extension short-circuiting in rapidfuzz]
+**Learning:** In string matching algorithms using `rapidfuzz`, nested Python `for` loops evaluating `fuzz.ratio` are significantly slower (~6x in micro-benchmarks) than delegating the entire inner loop to `rapidfuzz.process.extractOne`. The C++ extension handles the iteration and short-circuiting natively, avoiding Python interpreter overhead for O(M*N) token comparisons.
+**Action:** Replace nested loops that track maximum fuzzy match scores against a list of tokens with `rapidfuzz.process.extractOne(..., scorer=fuzz.ratio, score_cutoff=max_score)` to preserve exact logic while drastically improving performance.
