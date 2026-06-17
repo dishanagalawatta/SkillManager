@@ -69,7 +69,7 @@ def replace_skill_references_in_command(content: str, client_format: str, all_sk
     # 1. Codex: [$name](path) -> \[\$([^\]]+)\]\([^)]+\)
     # 2. Antigravity: /name -> \/[a-zA-Z0-9_-]+
     # 3. Gemini CLI: @name or @path/to/name -> @[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*
-    pattern = r'\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*'
+    pattern = r"\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*"
     return re.sub(pattern, replacer, str(content))
 
 

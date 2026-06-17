@@ -79,7 +79,6 @@ Body here.
 
     data = parse_command_md(str(cmd_file))
     assert data["name"] == "Deploy"
-    assert data["client"] == "Codex"
     assert data["description"] == "Deploy command"
 
 

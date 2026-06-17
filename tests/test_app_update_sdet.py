@@ -12,6 +12,7 @@ def mock_app():
     app._config = MagicMock()
     return app
 
+
 @pytest.fixture
 def service(tmp_path):
     tuf_dir = tmp_path / "tuf"
@@ -21,10 +22,14 @@ def service(tmp_path):
         service._client = mock_client.return_value
         return service
 
+
 @pytest.fixture
 def controller(mock_app, service):
-    with patch("skill_manager.controllers.app_update_controller.AppUpdateService", return_value=service):
+    with patch(
+        "skill_manager.controllers.app_update_controller.AppUpdateService", return_value=service
+    ):
         return AppUpdateController(mock_app)
+
 
 class TestAppUpdateService:
     def test_check_for_updates_success(self, service):
@@ -65,6 +70,7 @@ class TestAppUpdateService:
         service._client.download_and_apply_update.side_effect = Exception("Save failed")
         assert service.apply_update() is False
 
+
 class TestAppUpdateControllerSDET:
     def test_check_for_updates_manual_success(self, controller, service):
         service._client.check_for_updates.return_value = "2.0.0"
@@ -72,6 +78,7 @@ class TestAppUpdateControllerSDET:
         # Simulate background task execution
         def mock_submit(fn, callback):
             callback(fn())
+
         controller.app.task_runner.submit.side_effect = mock_submit
 
         controller.checkForUpdates(manual=True)
@@ -85,6 +92,7 @@ class TestAppUpdateControllerSDET:
 
         def mock_submit(fn, callback):
             callback(fn())
+
         controller.app.task_runner.submit.side_effect = mock_submit
 
         controller.checkForUpdates(manual=True)
@@ -98,6 +106,7 @@ class TestAppUpdateControllerSDET:
 
         def mock_run(fn):
             fn()
+
         controller.app.task_runner.run.side_effect = mock_run
 
         controller.downloadAndApplyUpdate()

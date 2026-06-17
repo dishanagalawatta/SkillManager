@@ -15,10 +15,16 @@ class TestUIUpdateFlow:
 
         # 2. Trigger an update for that package
         # We find the index
-        _idx = next(i for i, p in enumerate(app_controller.updatePackages) if p["name"] == "test-flow-package")
+        _idx = next(
+            i
+            for i, p in enumerate(app_controller.updatePackages)
+            if p["name"] == "test-flow-package"
+        )
 
         # Mock the service and background task to avoid real network/git calls
-        with patch("skill_manager.controllers.update_controller.UpdateService") as mock_service_class:
+        with patch(
+            "skill_manager.controllers.update_controller.UpdateService"
+        ) as mock_service_class:
             mock_service = mock_service_class.return_value
 
             # Mock successful update behavior
@@ -31,7 +37,9 @@ class TestUIUpdateFlow:
             app_controller.updates.updateNow()
 
             # Verify status message updated (wait for it as it happens on UI thread via QTimer)
-            qtbot.waitUntil(lambda: "Global update complete" in app_controller.statusMessage, timeout=2000)
+            qtbot.waitUntil(
+                lambda: "Global update complete" in app_controller.statusMessage, timeout=2000
+            )
 
     def test_package_removal_flow(self, qml_engine, app_controller, qtbot):
         # 1. Add package
@@ -39,7 +47,9 @@ class TestUIUpdateFlow:
         assert any(p["name"] == "to-remove" for p in app_controller.updatePackages)
 
         # 2. Remove it
-        idx = next(i for i, p in enumerate(app_controller.updatePackages) if p["name"] == "to-remove")
+        idx = next(
+            i for i, p in enumerate(app_controller.updatePackages) if p["name"] == "to-remove"
+        )
 
         with qtbot.waitSignal(app_controller.updatePackagesChanged, timeout=1000):
             app_controller.updates.removeUpdatePackage(idx)

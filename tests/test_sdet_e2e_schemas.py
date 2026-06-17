@@ -28,6 +28,7 @@ category: SDET Test
     app_controller.refreshSkills()
     QApplication.instance().processEvents()
 
+
 def test_ui_displays_coerced_schema_data(qtbot, qml_engine, app_controller, sdet_setup_data):
     """E2E test: Verify that UI correctly displays data coerced by our refactored schemas."""
     _root = qml_engine.rootObjects()[0]

@@ -13,6 +13,7 @@ SkillManagerComponents import path) and asserts that:
 
 Each failure prints the exact QML error so the next fix has a clear target.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,7 +23,9 @@ from PySide6.QtCore import QObject, QUrl
 from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 from PySide6.QtWidgets import QApplication
 
-QML_DIR = Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+QML_DIR = (
+    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+)
 VIEWS_DIR = QML_DIR / "views"
 DIALOGS_DIR = QML_DIR / "dialogs"
 
@@ -88,6 +91,7 @@ SHARED_COMPONENTS = [
     "Theme.qml",
     "TopBar.qml",
     "TopBarButton.qml",
+    "views/DiagnosticsPane.qml",
 ]
 
 
@@ -157,9 +161,8 @@ def _give_size(obj: QObject, w: int = 800, h: int = 600) -> None:
 def test_public_view_loads_cleanly(qapp, app_controller, filename):
     path = VIEWS_DIR / filename
     obj, errors, warnings = _load(qapp, path, app_controller)
-    assert not errors, (
-        f"{filename} failed to load with {len(errors)} error(s):\n"
-        + "\n".join(f"  - {e}" for e in errors)
+    assert not errors, f"{filename} failed to load with {len(errors)} error(s):\n" + "\n".join(
+        f"  - {e}" for e in errors
     )
     assert obj is not None, f"{filename}: create() returned None"
     _give_size(obj)
@@ -178,9 +181,7 @@ def test_dialog_loads_cleanly(qapp, app_controller, filename):
     if not path.exists():
         pytest.skip(f"{filename} not present in repo")
     obj, errors, warnings = _load(qapp, path, app_controller)
-    assert not errors, (
-        f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
-    )
+    assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
     assert obj is not None
     _give_size(obj)
 
@@ -192,8 +193,6 @@ def test_dialog_loads_cleanly(qapp, app_controller, filename):
 def test_shared_component_loads_cleanly(qapp, app_controller, filename):
     path = QML_DIR / filename
     obj, errors, warnings = _load(qapp, path, app_controller)
-    assert not errors, (
-        f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
-    )
+    assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
     # Not every shared component is a top-level visual (e.g. Theme is a
     # singleton); we don't assert on size for the shared pool.

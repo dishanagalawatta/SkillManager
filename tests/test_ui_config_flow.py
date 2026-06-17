@@ -52,16 +52,27 @@ class TestUIConfigFlow:
         # 1. Setup initial project and skill
         proj_path = "/path/p1"
         app_controller._projects = [proj_path]
-        app_controller.libraryModel.setSkills([
-            {"name": "Skill 1", "project_path": proj_path, "project_label": "p1", "is_package": True}
-        ])
+        app_controller.libraryModel.setSkills(
+            [
+                {
+                    "name": "Skill 1",
+                    "project_path": proj_path,
+                    "project_label": "p1",
+                    "is_package": True,
+                }
+            ]
+        )
 
         # 2. Set Alias
         with qtbot.waitSignal(config_mgr.updateProjectsChanged, timeout=1000):
             config_mgr.setProjectAlias(proj_path, "Cool Project")
 
         # 3. Verify labels in model updated
-        names = [app_controller.libraryModel.data(app_controller.libraryModel.index(0, 0), app_controller.libraryModel.ProjectRole)]
+        names = [
+            app_controller.libraryModel.data(
+                app_controller.libraryModel.index(0, 0), app_controller.libraryModel.ProjectRole
+            )
+        ]
         assert "Cool Project" in names
         assert config_mgr.getProjectLabel(proj_path) == "Cool Project"
 

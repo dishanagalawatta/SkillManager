@@ -24,12 +24,14 @@ def mock_app():
 
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
         # Simulate immediate execution of the functor
         mock_timer.side_effect = lambda msec, functor: functor()
         return OpsController(mock_app)
+
 
 class TestOpsControllerSDET:
     def test_toggle_archive_success(self, controller, mock_app):
@@ -70,14 +72,20 @@ class TestOpsControllerSDET:
             "name": "Skill 1",
             "local_path": "/path/1",
             "project_path": "/proj",
-            "category": "Cat"
+            "category": "Cat",
         }
         invalid_item = {"missing": "fields"}
 
         items = [valid_item, invalid_item]
 
-        with patch("skill_manager.controllers.ops_controller.delete_project_skill_folders") as mock_delete_fs:
-            mock_delete_fs.return_value = {"deleted": 1, "failed": 0, "details": [{"path": "/path/1", "status": "deleted"}]}
+        with patch(
+            "skill_manager.controllers.ops_controller.delete_project_skill_folders"
+        ) as mock_delete_fs:
+            mock_delete_fs.return_value = {
+                "deleted": 1,
+                "failed": 0,
+                "details": [{"path": "/path/1", "status": "deleted"}],
+            }
 
             # Act
             controller.deleteSkills(items)
@@ -101,17 +109,19 @@ class TestOpsControllerSDET:
                 "name": "Skill",
                 "local_path": str(skill_path),
                 "project_path": str(tmp_path),
-                "is_command": False
+                "is_command": False,
             },
             {
                 "name": "Cmd",
                 "local_path": str(cmd_path),
                 "project_path": str(tmp_path),
-                "is_command": True
-            }
+                "is_command": True,
+            },
         ]
 
-        with patch("skill_manager.controllers.ops_controller.delete_project_skill_folders") as mock_delete_fs:
+        with patch(
+            "skill_manager.controllers.ops_controller.delete_project_skill_folders"
+        ) as mock_delete_fs:
             mock_delete_fs.return_value = {"deleted": 1, "failed": 0, "details": []}
 
             # Act

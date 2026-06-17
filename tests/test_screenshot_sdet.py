@@ -28,6 +28,7 @@ def mock_app():
         mock_gui.clipboard.return_value = clipboard_mock
         yield app
 
+
 @pytest.fixture
 def controller(mock_app):
     ctrl = ScreenshotController(mock_app)
@@ -36,6 +37,7 @@ def controller(mock_app):
     pixmap.fill(QColor("white"))
     ctrl._current_full_pixmap = pixmap
     return ctrl
+
 
 class TestImageProcessor:
     def test_crop_and_redact_success(self):
@@ -73,12 +75,14 @@ class TestImageProcessor:
 
 class TestScreenshotControllerSDET:
     def test_save_screenshot_invalid_params(self, controller, mock_app):
-        crop_rect = QRect(-10, -10, 0, 0) # Invalid
+        crop_rect = QRect(-10, -10, 0, 0)  # Invalid
 
         controller.saveScreenshot(crop_rect, [])
 
         # Should set status to error and not proceed
-        mock_app._set_status.assert_called_with("Failed to save: invalid crop or redaction parameters.")
+        mock_app._set_status.assert_called_with(
+            "Failed to save: invalid crop or redaction parameters."
+        )
 
     def test_save_screenshot_null_pixmap(self, controller, mock_app):
         controller._current_full_pixmap = None

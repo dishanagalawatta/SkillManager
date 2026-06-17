@@ -180,8 +180,8 @@ Use an Apple-style sidebar for top-level destinations when redesigning the main 
 
 - Quick Copy
 - Library
-- Projects
 - Updates
+- Settings
 
 The sidebar is a functional glass layer. It should feel elevated above the window background but not distract from the list/content layer. The main area should change content based on the sidebar selection. This matches HIG guidance for desktop utilities with hierarchical or productivity-focused content.
 

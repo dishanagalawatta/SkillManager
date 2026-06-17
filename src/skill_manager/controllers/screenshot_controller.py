@@ -103,14 +103,16 @@ class ScreenshotController(QObject):
                 crop_y=crop_rect.y(),
                 crop_width=crop_rect.width(),
                 crop_height=crop_rect.height(),
-                redactions=raw_redactions
+                redactions=raw_redactions,
             )
         except Exception as e:
             logger.error("Validation failed for screenshot parameters: %s", e)
             self.app._set_status("Failed to save: invalid crop or redaction parameters.")
             return
 
-        validated_crop_rect = QRect(params.crop_x, params.crop_y, params.crop_width, params.crop_height)
+        validated_crop_rect = QRect(
+            params.crop_x, params.crop_y, params.crop_width, params.crop_height
+        )
 
         # 2. Process image
         try:

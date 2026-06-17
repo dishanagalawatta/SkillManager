@@ -3,7 +3,6 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import ".."
 import App 1.0
-import ".."
 
 Item {
     id: sv_root
@@ -717,6 +716,18 @@ Item {
                                     font.pixelSize: Theme.sizeCaption
                                     color: Theme.secondaryLabel
                                 }
+                            }
+
+                            // Diagnostics separator and pane
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            DiagnosticsPane {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
                             }
                         }
                     }

@@ -7,6 +7,7 @@ from skill_manager.core.schemas import Redaction
 
 logger = logging.getLogger(__name__)
 
+
 class ImageProcessor:
     """Handles pure image manipulation logic (cropping and redacting)."""
 

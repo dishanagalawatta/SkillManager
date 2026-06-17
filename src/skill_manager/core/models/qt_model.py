@@ -263,33 +263,7 @@ class SkillModel(QAbstractListModel):
     @clientFilter.setter
     def clientFilter(self, value):
         if self._state.client_filter != value:
-            old_client = self._state.client_filter
             self._state.client_filter = value
-
-            if old_client and value and self._state.filter_by_client:
-                new_selected_ids = set()
-                changed = False
-                for selected_path in self._selected_ids:
-                    old_skill = next((s for s in self._all_skills if s.local_path == selected_path), None)
-                    if (old_skill and old_skill.is_command and old_skill.client
-                        and old_skill.client.lower() == old_client.lower()):
-
-                        new_skill = next((s for s in self._all_skills
-                                          if s.is_command and s.name == old_skill.name
-                                          and s.client and s.client.lower() == value.lower()), None)
-                        if new_skill and new_skill.local_path:
-                            new_selected_ids.add(new_skill.local_path)
-                            changed = True
-                            continue
-
-                    new_selected_ids.add(selected_path)
-
-                if changed:
-                    self._selected_ids = new_selected_ids
-                    self._emit_selection_data_changed()
-                    self._update_selection_counts()
-                    self.selectionStateChanged.emit()
-                    self._save_project_selections()
 
             if self._state.filter_by_client:
                 self._apply_filter()

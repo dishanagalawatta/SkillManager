@@ -39,13 +39,12 @@ Dialog {
     property bool editMode: false
     property string editLocalPath: ""
 
-    function openWithContext(client) {
+    function openWithContext() {
         editMode = false
         editLocalPath = ""
         cmdNameInput.text = ""
         cmdCategoryInput.text = ""
         cmdBodyInput.text = ""
-        clientSelect.selectedValues = client ? [client] : []
         open()
     }
 
@@ -55,7 +54,6 @@ Dialog {
         cmdNameInput.text = skill.name || ""
         cmdCategoryInput.text = skill.category || ""
         cmdBodyInput.text = skill.body_content || ""
-        clientSelect.selectedValues = skill.client ? [skill.client] : []
         open()
     }
 
@@ -184,7 +182,7 @@ Dialog {
                 }
             }
             
-            // Project and Client
+            // Project
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 16
@@ -206,17 +204,6 @@ Dialog {
                                 AppController.setCurrentProject(AppController.projectLabels[index])
                             }
                         }
-                    }
-                }
-                
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 4
-                    Text { text: "Client Format"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    GlassMultiSelect {
-                        id: clientSelect
-                        Layout.fillWidth: true
-                        model: AppController.clientFormats
                     }
                 }
             }
@@ -302,20 +289,15 @@ Dialog {
                     enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== ""
                     
                     onClicked: {
-                        var clients = clientSelect.selectedValues.join(",")
                         if (editMode) {
                             AppController.updateCustomCommandFull(
                                 editLocalPath,
                                 cmdNameInput.text,
-                                clients,
-                                cmdBodyInput.text,
-                                projectDrop.currentText,
-                                cmdCategoryInput.text
+                                cmdBodyInput.text
                             )
                         } else {
                             AppController.createCustomCommand(
                                 cmdNameInput.text,
-                                clients,
                                 cmdBodyInput.text,
                                 projectDrop.currentText,
                                 cmdCategoryInput.text

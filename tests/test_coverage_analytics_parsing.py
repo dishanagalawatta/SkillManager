@@ -47,17 +47,6 @@ def test_parse_command_md_skips_common_files(tmp_path):
     assert parse_command_md(str(f)) is None
 
 
-def test_parse_command_md_client_from_formats(tmp_path):
-    # Stem 'cursor' is likely in CLIENT_FORMATS
-    f = tmp_path / "cursor.md"
-    f.write_text("# Command Name\nDescription")
-
-    # Mock CLIENT_FORMATS to ensure 'cursor' is there
-    with patch("skill_manager.core.quick_copy.CLIENT_FORMATS", {"cursor": {}}):
-        data = parse_command_md(str(f))
-        assert data["client"] == "cursor"
-
-
 def test_parse_command_md_exception_handling(tmp_path):
     f = tmp_path / "bad.md"
     # Trigger exception by mocking open

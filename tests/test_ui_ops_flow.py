@@ -23,7 +23,7 @@ class TestUIOpsFlow:
             "project_label": "Test Project",
             "category": "TestCat",
             "is_command": False,
-            "is_package": False
+            "is_package": False,
         }
 
         # 2. Configure model for maximum visibility
@@ -32,7 +32,7 @@ class TestUIOpsFlow:
         model.filterText = ""
         model.showCommands = True
         model.showStarred = True
-        model._state.is_package_only = None # Show both source and packages
+        model._state.is_package_only = None  # Show both source and packages
 
         # 3. Set skills and verify
         model.setSkills([skill_data])
@@ -69,7 +69,7 @@ class TestUIOpsFlow:
             "project_label": "StarProj",
             "category": "StarCat",
             "is_starred": False,
-            "is_package": False
+            "is_package": False,
         }
 
         model.projectFilter = ""

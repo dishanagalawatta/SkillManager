@@ -21,23 +21,13 @@ def find_project_path_by_label(project_label_name: str, project_paths: list[str]
     return None
 
 
-def build_command_filename(name: str, client: str) -> str:
+def build_command_filename(name: str) -> str:
     safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-    return f"{safe_name}.{client}.md"
-
-
-def resolve_commands_dir(project_label_name: str, project_paths: list[str]) -> Path | None:
-    """Resolve the .agents/commands directory for a given project label."""
-    project_path = find_project_path_by_label(project_label_name, project_paths)
-    if not project_path:
-        return None
-    project_root = _project_root_for_project(project_path)
-    return project_root / ".agents" / "commands"
+    return f"{safe_name}.md"
 
 
 def build_command_content(
     name: str,
-    client: str,
     body: str,
     category: str,
     created_on: date | None = None,
@@ -46,7 +36,6 @@ def build_command_content(
     return (
         "---\n"
         f"name: {name}\n"
-        f"client: {client}\n"
         f"category: {category}\n"
         "type: command\n"
         f"date: {created_on.strftime('%Y-%m-%d')}\n"
@@ -55,55 +44,13 @@ def build_command_content(
     )
 
 
-def update_custom_command_file_full(
-    *,
-    local_path: str,
-    name: str,
-    client: str,
-    body: str,
-    category: str,
-    project_label_name: str,
-    project_paths: list[str],
-) -> CommandCreateResult:
-    """Full update: change name, client, body, category, and optionally project."""
-    path = Path(local_path)
-    if not path.is_file():
-        return CommandCreateResult(False, f"Error: Command file not found at {local_path}")
-
-    project_path = find_project_path_by_label(project_label_name, project_paths)
-    if not project_path:
-        return CommandCreateResult(
-            False, f"Error: Could not find project directory for {project_label_name}"
-        )
-
-    project_root = _project_root_for_project(project_path)
-    commands_dir = project_root / ".agents" / "commands"
-    filename = build_command_filename(name, client)
-    new_path = commands_dir / filename
-
-    if new_path.exists() and new_path != path:
-        return CommandCreateResult(False, f"Error: Command {filename} already exists")
-
-    new_content = build_command_content(name, client, body, category)
-
-    try:
-        commands_dir.mkdir(parents=True, exist_ok=True)
-        new_path.write_text(new_content, encoding="utf-8")
-        if new_path != path:
-            path.unlink()
-    except Exception as exc:
-        return CommandCreateResult(False, f"Error updating command: {exc}", new_path)
-
-    return CommandCreateResult(True, f"Updated command: {filename}", new_path)
-
-
 def update_custom_command_file(
     *,
     local_path: str,
     name: str,
     body: str,
 ) -> CommandCreateResult:
-    """Updates an existing command file's name and body content."""
+    """Updates an existing command file in place. Renames file if name changed."""
     path = Path(local_path)
     if not path.is_file():
         return CommandCreateResult(False, f"Error: Command file not found at {local_path}")
@@ -116,16 +63,15 @@ def update_custom_command_file(
     except Exception as exc:
         return CommandCreateResult(False, f"Error reading command file: {exc}")
 
-    client = metadata.get("client", "") if metadata else ""
     category = metadata.get("category", "") if metadata else ""
 
-    new_filename = build_command_filename(name, client)
+    new_filename = build_command_filename(name)
     new_path = path.parent / new_filename
 
     if new_path.exists() and new_path != path:
         return CommandCreateResult(False, f"Error: Command {new_filename} already exists")
 
-    new_content = build_command_content(name, client, body, category)
+    new_content = build_command_content(name, body, category)
 
     try:
         new_path.write_text(new_content, encoding="utf-8")
@@ -140,7 +86,6 @@ def update_custom_command_file(
 def create_custom_command_file(
     *,
     name: str,
-    client: str,
     body: str,
     project_label_name: str,
     category: str,
@@ -159,7 +104,7 @@ def create_custom_command_file(
             False, f"Error: Could not find project directory for {project_label_name}"
         )
 
-    filename = build_command_filename(name, client)
+    filename = build_command_filename(name)
     project_root = _project_root_for_project(project_path)
     commands_dir = project_root / ".agents" / "commands"
     file_path = commands_dir / filename
@@ -169,7 +114,7 @@ def create_custom_command_file(
     try:
         commands_dir.mkdir(parents=True, exist_ok=True)
         file_path.write_text(
-            build_command_content(name, client, body, category, created_on),
+            build_command_content(name, body, category, created_on),
             encoding="utf-8",
         )
     except Exception as exc:

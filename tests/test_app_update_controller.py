@@ -33,6 +33,7 @@ class TestAppUpdateControllerProperties:
 
     def test_current_version(self, controller):
         import skill_manager
+
         assert controller.currentVersion == skill_manager.__version__
 
 

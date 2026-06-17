@@ -57,7 +57,7 @@ def test_compute_dir_fingerprint(temp_dir):
     # 3. Modify internal file and touch subdir
     time.sleep(0.1)
     (skill_dir / "SKILL.md").write_text("updated")
-    os.utime(skill_dir, None) # Important for fingerprint to pick up change
+    os.utime(skill_dir, None)  # Important for fingerprint to pick up change
 
     fp3 = _compute_dir_fingerprint(temp_dir)
     assert fp3 != fp2

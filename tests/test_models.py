@@ -243,50 +243,6 @@ def test_skill_model_data_various_roles(qapp, skill_list):
     assert model.data(idx, SkillModel.IsCollapsedRole) is False
 
 
-def test_skill_model_client_filter_migration(qapp):
-    skills = [
-        {
-            "name": "Debug",
-            "local_path": "/cmd/debug.clienta.md",
-            "is_command": True,
-            "client": "ClientA",
-            "category": "Dev",
-        },
-        {
-            "name": "Debug",
-            "local_path": "/cmd/debug.clientb.md",
-            "is_command": True,
-            "client": "ClientB",
-            "category": "Dev",
-        },
-        {
-            "name": "Other",
-            "local_path": "/cmd/other.md",
-            "is_command": False,
-            "category": "Dev",
-        }
-    ]
-    model = SkillModel()
-    model.setSkills(skills)
-    model.filterByClient = True
-    model.clientFilter = "ClientA"
-
-    # Toggle selection by path to avoid row index confusion during filters
-    model.selectByPaths(["/cmd/debug.clienta.md", "/cmd/other.md"])
-
-    selected = set(model.getSelectedPaths())
-    assert "/cmd/debug.clienta.md" in selected
-    assert "/cmd/other.md" in selected
-
-    # Change client
-    model.clientFilter = "ClientB"
-
-    selected = set(model.getSelectedPaths())
-    assert "/cmd/debug.clientb.md" in selected
-    assert "/cmd/other.md" in selected
-    assert "/cmd/debug.clienta.md" not in selected
-
-
 def test_skill_model_show_commands_setter(qapp, skill_list):
     skill_list[0]["is_command"] = True
     model = SkillModel()

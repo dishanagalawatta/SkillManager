@@ -196,14 +196,17 @@ def app_controller(session_mock_config, session_temp_dir):
 
     def controller_factory(qml_engine):
         from PySide6.QtQml import QQmlEngine
+
         ctrl = skill_manager.app.current_test_controller
         if ctrl:
             QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
         return ctrl
 
     from contextlib import suppress
+
     with suppress(Exception):
         from PySide6.QtQml import qmlRegisterSingletonType
+
         # This registration is process-wide
         qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
 

@@ -35,8 +35,7 @@ class AppUpdateController(BaseController):
 
         # Initialize State
         self._state = AppUpdateState(
-            current_version=skill_manager.__version__,
-            latest_version=skill_manager.__version__
+            current_version=skill_manager.__version__, latest_version=skill_manager.__version__
         )
 
         # Initialize Service
@@ -161,6 +160,7 @@ class AppUpdateController(BaseController):
     def _apply_update_sync(self):
         """Sync wrapper for service call in background thread."""
         try:
+
             def progress_callback(p):
                 self._state.progress = p
                 self.updateProgressChanged.emit(p)

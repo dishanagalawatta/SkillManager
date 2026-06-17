@@ -11,9 +11,18 @@ from PySide6.QtCore import Property, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.diagnostics import get_diagnostic_logger
 from skill_manager.core.schemas import AppConfig, CollectionConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _is_command_path(p: str) -> bool:
+    """True if path points to a command file in .agents/commands/."""
+    if not isinstance(p, str):
+        return False
+    normalized = p.replace("\\", "/")
+    return "/.agents/commands/" in normalized
 
 
 class ConfigController(BaseController):
@@ -65,9 +74,7 @@ class ConfigController(BaseController):
 
     @scrollSpeedMultiplier.setter
     def scrollSpeedMultiplier(self, value):
-        self._set_config_value(
-            "scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged
-        )
+        self._set_config_value("scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged)
 
     @Property(bool, notify=showMenuIconsChanged)
     def showMenuIcons(self):
@@ -237,7 +244,11 @@ class ConfigController(BaseController):
         """Helper to convert file URLs or raw strings to absolute local paths."""
         if not raw_url:
             return ""
-        path_str = raw_url.replace("file:///", "").replace("/", "\\") if raw_url.startswith("file://") else raw_url
+        path_str = (
+            raw_url.replace("file:///", "").replace("/", "\\")
+            if raw_url.startswith("file://")
+            else raw_url
+        )
         try:
             # Expand ~ and make absolute
             return str(Path(path_str).expanduser().resolve())
@@ -287,7 +298,9 @@ class ConfigController(BaseController):
         from skill_manager.core.copier import normalize_project_skills_path
 
         # First try specialized normalization for .agents/skills
-        path_str = url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
+        path_str = (
+            url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
+        )
         resolved_path, error = normalize_project_skills_path(path_str)
         if error:
             # Fallback to standard absolute path
@@ -299,6 +312,17 @@ class ConfigController(BaseController):
             self._emit_projects_changed()
             self.app._set_status(f"Added project: {resolved_path}")
             capture_event("project_target_added", {"target_count": len(self.app._projects)})
+
+            get_diagnostic_logger().log_event(
+                "INFO",
+                "project_added",
+                f"Project added: {resolved_path}",
+                data={
+                    "raw_input": url,
+                    "normalized": resolved_path,
+                    "error": error,
+                },
+            )
 
     @Slot(str)
     def removeProject(self, path: str):
@@ -446,7 +470,11 @@ class ConfigController(BaseController):
                 all_skills = getattr(model, "_all_skills", None)
                 if isinstance(all_skills, list):
                     for skill in all_skills:
-                        sp = skill.get("project_path") if isinstance(skill, dict) else getattr(skill, "project_path", None)
+                        sp = (
+                            skill.get("project_path")
+                            if isinstance(skill, dict)
+                            else getattr(skill, "project_path", None)
+                        )
                         if sp and str(sp) == str(path):
                             if isinstance(skill, dict):
                                 skill["project_label"] = new_label
@@ -495,16 +523,35 @@ class ConfigController(BaseController):
         self.shortcutsChanged.emit()
         self.app._set_status("All shortcuts reset to defaults")
 
-    @Slot(str, list, list, list)
-    def saveCustomCollection(self, name: str, paths: list, clients: list, projects: list):
-        """Saves a collection with paths, clients, and projects."""
+    @Slot(str)
+    def setStatus(self, msg: str):
+        """Sets the application status message from QML."""
+        self.app._set_status(msg)
+
+    @Slot(str, list, list)
+    def saveCustomCollection(self, name: str, paths: list, projects: list):
+        """Saves a collection with paths and projects."""
         if not name:
             return
-        config = CollectionConfig(paths=paths, clients=clients, projects=projects)
+        # Commands live in .agents/commands/ — they're per-project, not installable across projects.
+        # Exclude them so checkMissingSkills doesn't report false positives.
+        if isinstance(paths, list):
+            paths = [p for p in paths if not _is_command_path(p)]
+        config = CollectionConfig(paths=paths, projects=projects)
         self.app._custom_collections[name] = config.model_dump()
         self.config.set("custom_collections", self.app._custom_collections)
         self._emit_collections_changed()
         self.app._set_status(f"Collection saved: {name}")
+        get_diagnostic_logger().log_event(
+            "INFO",
+            "collection_saved",
+            f"Collection saved: {name}",
+            data={
+                "name": name,
+                "path_count": len(paths),
+                "project_count": len(projects),
+            },
+        )
 
     @Slot(str)
     def deleteCustomCollection(self, name: str):
@@ -534,14 +581,6 @@ class ConfigController(BaseController):
         return entry if isinstance(entry, list) else []
 
     @Slot(str, result=list)
-    def getCollectionClients(self, name: str) -> list:
-        """Returns the list of clients for a named collection."""
-        entry = self.app._custom_collections.get(name, {})
-        if isinstance(entry, dict) and "clients" in entry:
-            return entry["clients"]
-        return []
-
-    @Slot(str, result=list)
     def getCollectionProjects(self, name: str) -> list:
         """Returns the list of projects for a named collection."""
         entry = self.app._custom_collections.get(name, {})
@@ -559,24 +598,104 @@ class ConfigController(BaseController):
             return json.dumps({})
 
         paths = entry["paths"]
+        if not isinstance(paths, list):
+            return json.dumps({})
+
         projects = entry.get("projects", [])
         if not projects:
             return json.dumps({})
 
+        from skill_manager.core.copier import get_skills_dir
+
         missing = {}
+        projects_checked = []
+        projects_with_missing = []
+        total_checked = 0
+
         for project_label in projects:
+            if not isinstance(project_label, str):
+                continue
             project_path = self.getProjectPath(project_label)
             if not project_path:
                 continue
 
-            skills_dir = Path(project_path) / ".agents" / "skills"
+            skills_dir = get_skills_dir(project_path)
+            skills_dir_exists = skills_dir.exists() if skills_dir else False
+            projects_checked.append(project_label)
+
             missing_in_project = []
             for skill_path in paths:
+                if not isinstance(skill_path, str):
+                    continue
+                if _is_command_path(skill_path):
+                    continue  # Commands are not installable across projects
                 skill_folder = Path(skill_path).name
-                if not (skills_dir / skill_folder).exists():
+                target_full = skills_dir / skill_folder if skill_folder else None
+                exists = target_full.exists() if target_full else False
+                total_checked += 1
+
+                # DEBUG: per-skill trace (high volume, dev only)
+                get_diagnostic_logger().log_event(
+                    "DEBUG",
+                    "missing_skills_per_skill",
+                    f"{'exists' if exists else 'MISSING'}: {skill_folder} in {project_label}",
+                    data={
+                        "collection": name,
+                        "label": project_label,
+                        "skill_path": skill_path,
+                        "skill_folder": skill_folder,
+                        "target_full_path": str(target_full) if target_full else "",
+                        "exists": exists,
+                        "is_missing": not exists,
+                    },
+                )
+
+                if skill_folder and not exists:
                     missing_in_project.append(skill_path)
+
+            # INFO: per-project summary (low volume, production-visible)
+            missing_count = len(missing_in_project)
+            missing_skills_preview = (
+                [Path(p).name for p in missing_in_project[:5]] if missing_in_project else []
+            )
+            if missing_count > 5:
+                missing_skills_preview.append(f"... and {missing_count - 5} more")
+
+            get_diagnostic_logger().log_event(
+                "INFO",
+                "missing_skills_check",
+                f"Project '{project_label}': {missing_count} missing "
+                f"(skills_dir={skills_dir}, exists={skills_dir_exists})",
+                data={
+                    "collection": name,
+                    "label": project_label,
+                    "raw_project_path": project_path,
+                    "computed_skills_dir": str(skills_dir),
+                    "skills_dir_exists": skills_dir_exists,
+                    "missing_count": missing_count,
+                    "missing_skills": missing_skills_preview,
+                },
+            )
+
             if missing_in_project:
                 missing[project_label] = missing_in_project
+                projects_with_missing.append(project_label)
+
+        # INFO: overall summary
+        total_missing = sum(len(v) for v in missing.values()) if isinstance(missing, dict) else 0
+        get_diagnostic_logger().log_event(
+            "INFO",
+            "missing_skills_result",
+            f"Collection '{name}': {total_missing} missing across {len(projects_with_missing)}/{len(projects_checked)} projects "
+            f"({total_checked} skills checked)",
+            data={
+                "collection": name,
+                "total_projects": len(projects_checked),
+                "projects_checked": projects_checked,
+                "total_missing": total_missing,
+                "projects_with_missing": projects_with_missing,
+            },
+        )
 
         return json.dumps(missing)
 
@@ -589,16 +708,143 @@ class ConfigController(BaseController):
 
         paths = entry["paths"]
 
-        from skill_manager.core.copier import copy_skill_folders_to_projects
+        from skill_manager.core.copier import copy_skill_folders_to_projects, get_skills_dir
 
         for project_label in project_labels:
             project_path = self.getProjectPath(project_label)
             if not project_path:
                 continue
 
+            target_dir = get_skills_dir(project_path)
             skills_to_copy = []
             for skill_path in paths:
                 skill_folder = Path(skill_path).name
                 skills_to_copy.append({"local_path": skill_path, "name": skill_folder})
 
-            copy_skill_folders_to_projects(skills_to_copy, [project_path])
+            result = copy_skill_folders_to_projects(skills_to_copy, [project_path])
+
+            get_diagnostic_logger().log_event(
+                "INFO",
+                "missing_skills_copy",
+                f"Copied to '{project_label}': {result['copied']} copied, {result['failed']} failed",
+                data={
+                    "collection": name,
+                    "label": project_label,
+                    "project_path": project_path,
+                    "target_dir": str(target_dir),
+                    "copied": result["copied"],
+                    "merged": result["merged"],
+                    "failed": result["failed"],
+                    "skills_copied": len(skills_to_copy),
+                },
+            )
+
+    @Slot(result=str)
+    def getCollectionsDiagnostic(self) -> str:
+        """Returns JSON dump of all collections with type-coerced views for diagnostics."""
+        import json
+
+        result = {}
+        for name, entry in self.app._custom_collections.items():
+            if isinstance(entry, dict):
+                result[name] = {
+                    "paths": [str(p) for p in entry.get("paths", []) if p is not None],
+                    "projects": [str(p) for p in entry.get("projects", []) if p is not None],
+                    "paths_type": type(entry.get("paths")).__name__,
+                    "projects_type": type(entry.get("projects")).__name__,
+                }
+            elif isinstance(entry, list):
+                result[name] = {
+                    "paths": [str(p) for p in entry if p is not None],
+                    "projects": [],
+                    "paths_type": "list (legacy)",
+                    "projects_type": "N/A",
+                }
+            else:
+                result[name] = {
+                    "paths": [],
+                    "projects": [],
+                    "paths_type": type(entry).__name__,
+                    "error": "unexpected entry type",
+                }
+        return json.dumps(result, indent=2)
+
+    @Slot(result=str)
+    def getProjectResolutionTable(self) -> str:
+        """Returns JSON list of project label → path resolution for diagnostics."""
+        import json
+
+        from skill_manager.core.copier import get_skills_dir
+
+        rows = []
+        for project_label in self.app._custom_collections.get("projects", []):
+            if not isinstance(project_label, str):
+                continue
+            resolved = self.getProjectPath(project_label)
+            skills_dir = get_skills_dir(resolved) if resolved else None
+            rows.append(
+                {
+                    "label": project_label,
+                    "path": resolved,
+                    "resolved_skills_dir": str(skills_dir) if skills_dir else "",
+                    "skills_dir_exists": skills_dir.exists() if skills_dir else False,
+                    "resolvable": bool(resolved),
+                }
+            )
+
+        # Also include all registered project labels
+        all_labels = []
+        for p in self.app._projects:
+            label = self.getProjectLabel(p)
+            skills_dir = get_skills_dir(p)
+            all_labels.append(
+                {
+                    "label": label,
+                    "path": p,
+                    "resolved_skills_dir": str(skills_dir),
+                    "skills_dir_exists": skills_dir.exists() if skills_dir else False,
+                    "resolvable": True,
+                }
+            )
+
+        return json.dumps(
+            {
+                "registered_projects": all_labels,
+                "collection_project_labels": rows,
+            },
+            indent=2,
+        )
+
+    # --- Diagnostic Slots (Agent-Accessible) ---
+
+    @Slot(result=str)
+    def getDiagnosticLogPath(self) -> str:
+        """Returns the path to the diagnostic log file."""
+        return get_diagnostic_logger().get_log_path()
+
+    @Slot(int, result=str)
+    def getRecentDiagnosticEvents(self, count: int = 100) -> str:
+        """Returns JSON array of the most recent diagnostic events."""
+        import json
+
+        events = get_diagnostic_logger().get_recent_events(count)
+        return json.dumps(events, ensure_ascii=False, default=str)
+
+    @Slot(str, result=str)
+    def exportDiagnosticBundle(self, output_dir: str = "") -> str:
+        """Export diagnostic bundle (logs + manifest) as a zip file.
+
+        Args:
+            output_dir: Directory to write the zip. Defaults to log dir.
+
+        Returns:
+            Path to the created zip, or empty string on failure.
+        """
+        dir_path = output_dir if output_dir else None
+        return get_diagnostic_logger().export_bundle(dir_path)
+
+    @Slot()
+    def clearDiagnosticLogs(self):
+        """Clear all diagnostic log files and ring buffer."""
+        get_diagnostic_logger().clear_logs()
+        self.app._set_status("Diagnostic logs cleared")

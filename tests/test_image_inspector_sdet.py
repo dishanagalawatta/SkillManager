@@ -24,9 +24,11 @@ def mock_app():
     app._config = MagicMock()
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     return ImageInspectorController(mock_app)
+
 
 class TestAnnotationEngine:
     def test_draw_all_types(self):
@@ -37,11 +39,11 @@ class TestAnnotationEngine:
             RectAnnotation(x=0, y=0, width=10, height=10),
             ArrowAnnotation(x1=0, y1=0, x2=10, y2=10),
             FilledRectAnnotation(x=20, y=20, width=5, height=5),
-            FreehandAnnotation(points=[AnnotationPoint(x=0,y=0), AnnotationPoint(x=5,y=5)]),
+            FreehandAnnotation(points=[AnnotationPoint(x=0, y=0), AnnotationPoint(x=5, y=5)]),
             TextAnnotation(x=40, y=40, text="Test"),
             HighlightAnnotation(x=50, y=50, width=20, height=10),
             EllipseAnnotation(x=10, y=10, width=30, height=20),
-            FilledEllipseAnnotation(x=60, y=60, width=25, height=15)
+            FilledEllipseAnnotation(x=60, y=60, width=25, height=15),
         ]
 
         # Should not crash
@@ -86,6 +88,7 @@ class TestAnnotationEngine:
 
         AnnotationEngine._draw_freehand(painter, mock_ann)
         painter.end()
+
 
 class TestImageInspectorControllerSDET:
     def test_save_annotations_success(self, controller, tmp_path):
@@ -133,5 +136,5 @@ class TestImageInspectorControllerSDET:
         f = tmp_path / "test.png"
         f.touch()
         result = controller.openExternally(str(f))
-        assert result is not None # QDesktopServices returns bool
+        assert result is not None  # QDesktopServices returns bool
         mock_open.assert_called_once()

@@ -114,9 +114,10 @@ Rectangle {
                     cursorVisible: false
                     wrapMode: TextEdit.Wrap
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = skillNameEdit
                             inspectorContextMenu.popup()
                         }
@@ -141,9 +142,10 @@ Rectangle {
                         border.color: Theme.glassBorder
                     }
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = argField
                             inspectorContextMenu.popup()
                         }
@@ -227,9 +229,10 @@ Rectangle {
                     selectByMouse: true
                     cursorVisible: false
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = descriptionEdit
                             inspectorContextMenu.popup()
                         }
@@ -287,9 +290,10 @@ Rectangle {
                                 cursorVisible: false
                                 anchors.verticalCenter: parent.verticalCenter
                                 
-                                TapHandler {
+                                MouseArea {
+                                    anchors.fill: parent
                                     acceptedButtons: Qt.RightButton
-                                    onTapped: {
+                                    onClicked: (mouse) => {
                                         inspectorContextMenu.targetControl = metaValEdit
                                         inspectorContextMenu.popup()
                                     }
@@ -437,9 +441,10 @@ Rectangle {
                             // Ensure text is correctly aligned
                             verticalAlignment: TextArea.AlignTop
 
-                            TapHandler {
+                            MouseArea {
+                                anchors.fill: parent
                                 acceptedButtons: Qt.RightButton
-                                onTapped: {
+                                onClicked: (mouse) => {
                                     inspectorContextMenu.targetControl = rawContentArea
                                     inspectorContextMenu.popup()
                                 }

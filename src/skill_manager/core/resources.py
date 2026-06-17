@@ -108,6 +108,31 @@ def invalidate_qml_disk_cache_if_stale(current_version: str) -> bool:
         return False
 
 
+def force_clear_qml_disk_cache() -> bool:
+    """Unconditionally remove the entire QML disk cache directory.
+
+    Used during development (uv run, editable installs) where source QML
+    changes frequently and stale .qmlc files cause load errors. Unlike
+    ``invalidate_qml_disk_cache_if_stale``, this always clears the
+    cache regardless of version markers.
+
+    Returns True when a cache was cleared or confirmed absent.
+    """
+    cache_dir = qml_disk_cache_dir()
+    if cache_dir is None:
+        return True
+    if not cache_dir.exists():
+        return True
+
+    try:
+        shutil.rmtree(cache_dir)
+        logger.info("Force-cleared QML disk cache at %s", cache_dir)
+        return True
+    except OSError as exc:
+        logger.warning("Could not force-clear QML cache at %s: %s", cache_dir, exc)
+        return False
+
+
 def logo_asset_for_client(fmt: str) -> str:
     fmt_lower = str(fmt or "").lower()
     if "antigravity" in fmt_lower:

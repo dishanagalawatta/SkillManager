@@ -10,10 +10,11 @@ class TestUIAppUpdateFlow:
         controller = app_controller.app_updater
 
         # Mock service check
-        with patch.object(controller._service, "check_for_updates", return_value=("1.6.0", None)), \
-             patch.object(app_controller.task_runner, "submit") as mock_submit, \
-             patch.object(app_controller, "_set_status") as mock_status:
-
+        with (
+            patch.object(controller._service, "check_for_updates", return_value=("1.6.0", None)),
+            patch.object(app_controller.task_runner, "submit") as mock_submit,
+            patch.object(app_controller, "_set_status") as mock_status,
+        ):
             # Simulate task runner calling back immediately
             mock_submit.side_effect = lambda fn, cb: cb(fn())
 
@@ -33,10 +34,11 @@ class TestUIAppUpdateFlow:
         controller._state.update_available = True
 
         # Mock service apply
-        with patch.object(controller._service, "apply_update", return_value=True), \
-             patch.object(app_controller.task_runner, "run") as mock_run, \
-             patch.object(app_controller, "_set_status") as mock_status:
-
+        with (
+            patch.object(controller._service, "apply_update", return_value=True),
+            patch.object(app_controller.task_runner, "run") as mock_run,
+            patch.object(app_controller, "_set_status") as mock_status,
+        ):
             # Simulate task runner running immediately
             mock_run.side_effect = lambda fn: fn()
 
@@ -53,10 +55,13 @@ class TestUIAppUpdateFlow:
         """Verify that update check errors are shown in the UI status."""
         controller = app_controller.app_updater
 
-        with patch.object(controller._service, "check_for_updates", return_value=(None, "Connection timeout")), \
-             patch.object(app_controller.task_runner, "submit") as mock_submit, \
-             patch.object(app_controller, "_set_status") as mock_status:
-
+        with (
+            patch.object(
+                controller._service, "check_for_updates", return_value=(None, "Connection timeout")
+            ),
+            patch.object(app_controller.task_runner, "submit") as mock_submit,
+            patch.object(app_controller, "_set_status") as mock_status,
+        ):
             mock_submit.side_effect = lambda fn, cb: cb(fn())
 
             with qtbot.waitSignal(controller.updateStateChanged, timeout=2000):

@@ -1,20 +1,50 @@
-# TODO
+# 1. Project Metadata
 
-## Active Tasks
+* **Project Name:** CourseBar
+* **Important Links:** * [Code Repository](#)
+  * [README](README.md)
+  * [DESIGN](DESIGN.md)
+  * [Environment](docs/ENVIRONMENT.md)
+  * [Development](docs/DEVELOPMENT.md)
+  * [ARCHITECTURE](docs/ARCHITECTURE.md)
+  * [API](docs/API.md)
+  * [VERSIONING](docs/VERSIONING.md)
 
-- [ ] Improve Test Coverage
+---
+
+# 2. High-Level Milestones
+
+* **Goal A:** Patch Things up
+* **Goal B:** Cover Backlog
+
+---
+
+# 3. Active Task Tracker
+
+## To Do (Ready for Pickup)
+
+- [ ] `[P0]` Order for copy to clipboard - selected order
+- [ ] `[P1]` Disable Shortcut keys
+- [ ] `[P1]` Develop automated reply method for GitHub issues
+- [ ] `[P99]` Improve Test Coverage
+
+## In Progress
+
+- [ ] 
+
+---
+
+# 4. Bug Tracker
+
+- [ ] **[High Severity]** Investigate and fix the update process validation
+- [ ] **[Low Severity]** Staring skill motion refining
+
+---
+
+# 5. Icebox / Backlog
+
 - [ ] Always selected items
-- [ ] Order for copy to clipboard - selected order
-- [ ] Custom method to bring your own client AI agent copy/paste style to users
-- [ ] Feature to select multiple clients when creating collections
 - [ ] Drop any file to quick copy
+- [ ] Custom method to bring your own client AI agent copy/paste style to users
 
-## Bug Tracker
-
-* [ ] Investigate and fix the update process validation
-* [ ] Staring skill motion refining
-
-## Backlog
-
-- Develop automated reply method for GitHub issues
-- Develop staging environment for the app
+---

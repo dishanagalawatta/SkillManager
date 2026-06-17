@@ -228,7 +228,9 @@ def test_ops_controller_update_models_source(ops_controller, mock_app):
     ops_controller._updateModelsProperty("/path/s", "is_archived", True)
 
     mock_app._library_model.updateSkillProperty.assert_called_with("/path/s", "is_archived", True)
-    mock_app._quick_copy_model.updateSkillProperty.assert_called_with("/path/s", "is_archived", True)
+    mock_app._quick_copy_model.updateSkillProperty.assert_called_with(
+        "/path/s", "is_archived", True
+    )
 
 
 def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, mock_app):
@@ -495,7 +497,7 @@ def test_ops_controller_create_custom_command(
     mock_app._project_aliases = {}
     mock_app._categories = []
 
-    ops_controller.createCustomCommand("cmd", "G", "body", "proj", "cat")
+    ops_controller.createCustomCommand("cmd", "body", "proj", "cat")
     mock_create.assert_called_once()
     mock_discover.assert_called_once_with(
         Path("/project/.agents/commands/test.md"), Path("/project/.agents/commands")
@@ -507,7 +509,7 @@ def test_ops_controller_create_custom_command(
     # Verify category update
     assert "Commands" in mock_app._categories
     mock_app.categoriesChanged.emit.assert_called()
-    mock_app._set_status.assert_called_with("Created 1 command(s)")
+    mock_app._set_status.assert_called_with("Created command: test.md")
 
 
 def test_ops_controller_toggle_starred_none(ops_controller, mock_app):
@@ -564,76 +566,49 @@ def test_set_project_alias_no_refresh(mock_app):
 
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
-@patch("skill_manager.core.commands.create_custom_command_file")
-@patch("skill_manager.core.commands.update_custom_command_file_full")
-@patch("skill_manager.core.commands.resolve_commands_dir")
-def test_update_custom_command_full_multi_client(
-    mock_resolve_dir,
-    mock_update_full,
-    mock_create,
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_full(
+    mock_update,
     mock_discover,
     mock_patch_cache,
     ops_controller,
     mock_app,
     tmp_path,
 ):
-    """updateCustomCommandFull should iterate all selected clients."""
-    from pathlib import Path
-
-    mock_app._projects = ["/project"]
+    """updateCustomCommandFull updates a single command file."""
     mock_app._sources = []
+    mock_app._projects = ["/project"]
     mock_app._archive_paths = []
     mock_app._starred_paths = []
     mock_app._project_aliases = {}
-
-    mock_app._project_aliases = {}
+    mock_app._categories = []
 
     commands_dir = tmp_path / "commands"
     commands_dir.mkdir(parents=True, exist_ok=True)
-    mock_resolve_dir.return_value = commands_dir
 
-    local_path = commands_dir / "Cmd.Codex.md"
-    local_path.write_text("---\nclient: Codex\n---\nbody", encoding="utf-8")
-    mock_resolve_dir.return_value = commands_dir
+    local_path = commands_dir / "Cmd.md"
+    local_path.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
 
-    # First client: update existing file
-    update_result = MagicMock(
-        ok=True, message="Updated", path=Path("/project/.agents/commands/Cmd.Codex.md")
-    )
-    mock_update_full.return_value = update_result
-
-    # Second client: file exists → update
-    (commands_dir / "Cmd.Antigravity.md").write_text("old")
-
-    # Third client: file doesn't exist → create
-    create_result = MagicMock(
-        ok=True, message="Created", path=Path("/project/.agents/commands/Cmd.Gemini.md")
-    )
-    mock_create.return_value = create_result
+    update_result = MagicMock(ok=True, message="Updated command: Cmd.md", path=local_path)
+    mock_update.return_value = update_result
 
     mock_discover.return_value = {
-        "local_path": "/project/.agents/commands/Cmd.Codex.md",
+        "local_path": str(local_path),
         "name": "Cmd",
         "category": "Commands",
     }
-    mock_app._categories = []
 
     ops_controller.updateCustomCommandFull(
         str(local_path),
         "Cmd",
-        "Antigravity, Codex, Gemini CLI",
-        "body",
-        "proj",
-        "Cat",
+        "new body",
     )
 
-    # update_custom_command_file_full called twice (client 0 + client 1 which exists)
-    assert mock_update_full.call_count == 2
-    # create_custom_command_file called once (client 2 which didn't exist)
-    assert mock_create.call_count == 1
-
-    # Verify first update call used the existing Antigravity path
-    first_call = mock_update_full.call_args_list[0]
-    assert "Antigravity" in str(first_call)
-
-    mock_app._set_status.assert_called()
+    mock_update.assert_called_once_with(
+        local_path=str(local_path),
+        name="Cmd",
+        body="new body",
+    )
+    mock_discover.assert_called_once()
+    mock_patch_cache.assert_called_once()
+    mock_app._set_status.assert_called_with("Updated command: Cmd.md")

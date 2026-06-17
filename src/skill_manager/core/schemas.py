@@ -122,7 +122,6 @@ class CollectionConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     paths: list[str] = Field(default_factory=list)
-    clients: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
 
 

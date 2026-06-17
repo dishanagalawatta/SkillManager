@@ -79,13 +79,13 @@ def test_image_inspector_default_width_increased() -> None:
 
 def _check_persisted_width_binding(inspector_type: str, view_content: str) -> None:
     """Check that an inspector type in a view uses persisted width from ui_controller."""
-    marker = 'SplitView.preferredWidth: {\n                    var p = AppController.ui_controller.inspectorWidth\n                    return p > 0 ? Math.max(p, targetWidth) : targetWidth\n                }'
+    marker = "SplitView.preferredWidth: {\n                    var p = AppController.ui_controller.inspectorWidth\n                    return p > 0 ? Math.max(p, targetWidth) : targetWidth\n                }"
     assert marker in view_content, f"{inspector_type} missing persisted width binding"
 
 
 def _check_width_save_handler(inspector_type: str, view_content: str) -> None:
     """Check that an inspector saves width changes to ui_controller."""
-    marker = 'AppController.ui_controller.setInspectorWidth(width)'
+    marker = "AppController.ui_controller.setInspectorWidth(width)"
     assert marker in view_content, f"{inspector_type} missing width save handler"
 
 

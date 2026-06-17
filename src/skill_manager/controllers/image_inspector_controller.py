@@ -89,4 +89,5 @@ class ImageInspectorController(BaseController):
             return False
 
         from PySide6.QtGui import QDesktopServices
+
         return QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))

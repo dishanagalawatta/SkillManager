@@ -5,32 +5,15 @@ import App 1.0
 
 ComboBox {
     id: control
-    
+
     signal collectionSelected(string name)
     signal editCollectionClicked(string name)
 
     function getFilteredCollections() {
-        let all = AppController.customCollections
-        let activeClient = AppController.clientFormat
-        let filtered = []
-        for (let i = 0; i < all.length; i++) {
-            let name = all[i]
-            let clients = AppController.config_controller.getCollectionClients(name)
-            if (clients.length === 0 || clients.indexOf(activeClient) >= 0) {
-                filtered.push(name)
-            }
-        }
-        return filtered
+        return AppController.customCollections || []
     }
 
     model: ["All Collections"].concat(getFilteredCollections())
-    
-    Connections {
-        target: AppController
-        function onClientFormatChanged() {
-            control.model = ["All Collections"].concat(control.getFilteredCollections())
-        }
-    }
 
     Connections {
         target: AppController
@@ -38,7 +21,7 @@ ComboBox {
             control.model = ["All Collections"].concat(control.getFilteredCollections())
         }
     }
-    
+
     delegate: ItemDelegate {
         width: control.width
         contentItem: RowLayout {
@@ -51,7 +34,7 @@ ComboBox {
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
             }
-            
+
             // Edit Button
             IconButton {
                 id: editBtn
@@ -61,7 +44,7 @@ ComboBox {
                 role: "ghost"
                 tooltipText: "Edit Collection"
                 visible: index > 0 // Only for custom collections
-                
+
                 onClicked: {
                     control.popup.close()
                     control.editCollectionClicked(modelData !== undefined ? modelData : "")
