@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2024-05-26 - visualFocus in Custom QML Components
+**Learning:** Custom interactive components built on `Item` or `Rectangle` do not have a `visualFocus` property (which belongs to `Control`). Attempting to use `visualFocus` causes undefined property errors and broken focus rings.
+**Action:** When building custom focusable controls from base types, always bind visual focus indicators to `activeFocus` instead of `visualFocus`, and explicitly call `forceActiveFocus()` on mouse interaction to synchronize the visual state.
