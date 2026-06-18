@@ -6,6 +6,11 @@
   <b>A professional workspace to manage, sync, and deploy your AI agent skills.</b>
 </p>
 
+<p align="center">
+  <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+</p>
+
 ---
 
 ## Overview & Demo
@@ -99,6 +104,7 @@ release tagging.
 | Engineer | [Development](docs/DEVELOPMENT.md) | Local-dev loop, debugging |
 | Engineer | [Categories](docs/CATEGORIES.md) | Skill taxonomy and parser rules |
 | Engineer | [Versioning](docs/VERSIONING.md) | Release trigger rules |
+| Engineer | [Releasing](docs/RELEASING.md) | Release lifecycle guide |
 | Contributor | [Contributing](docs/CONTRIBUTING.md) | PR + commit + review rules |
 | Decision | [ADR Index](ADR_INDEX.md) | All architecture decisions |
 | Agent | [AGENTS.md](AGENTS.md) | Agent-facing instructions (concise) |

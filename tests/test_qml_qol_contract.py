@@ -543,7 +543,10 @@ def test_dropdowns_use_implicit_height_for_popup():
     dropdown = (QML_DIR / "GlassDropdown.qml").read_text(encoding="utf-8")
     collection_dropdown = (QML_DIR / "GlassCollectionDropdown.qml").read_text(encoding="utf-8")
 
-    for content, name in [(dropdown, "GlassDropdown.qml"), (collection_dropdown, "GlassCollectionDropdown.qml")]:
+    for content, name in [
+        (dropdown, "GlassDropdown.qml"),
+        (collection_dropdown, "GlassCollectionDropdown.qml"),
+    ]:
         assert "implicitHeight: contentHeight" in content, (
             f"{name} must set implicitHeight: contentHeight on its inner ListView."
         )

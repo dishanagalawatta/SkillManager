@@ -113,13 +113,13 @@ SkillManager is distributed as native standalone executables for Windows, macOS,
 - **macOS**: `.app` bundle converted to `.dmg` via `create-dmg`.
 - **Linux**: Output directory packaged as `.tar.gz`.
 
-### 3. CI/CD Pipeline (`.github/workflows/release.yml`)
-The project uses a unified release pipeline handling both pre-releases and stable versions:
+### 3. CI/CD Pipeline
+The project uses [release-please](https://github.com/googleapis/release-please-action) with Conventional Commits:
 1. **Dual-Branch Strategy**:
-   - `develop` branch: Development pre-releases (e.g., `v1.0.0-dev.1`).
-   - `main` branch: Stable releases (e.g., `v1.0.0`).
-2. **Trigger-Based Versioning**: `scripts/version_bump_calculator.py` parses commit messages for `[dev]`, `[patch]`, `[minor]`, `[major]`, `[preminor]`, `[premajor]` triggers and maps to `python-semantic-release` flags.
-3. **Parallel Build Matrix**: `windows-latest`, `macos-latest`, `ubuntu-latest`.
+   - `develop` branch: Development pre-releases (e.g., `v1.5.1-dev.1`).
+   - `main` branch: Stable releases (e.g., `v1.5.0`).
+2. **Conventional Commits**: `feat:` (minor), `fix:` (patch), `feat!:` (major) drive version bumps automatically.
+3. **Parallel Build Matrix**: `ubuntu-latest`, `macos-latest`, `windows-latest` × Python 3.12 + 3.13.
 4. **Artifact Publishing**: Native installers and portable ZIPs attached to GitHub Release.
 
 ### 4. TUF Secure Updates

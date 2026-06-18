@@ -1,50 +1,79 @@
-# Semantic Versioning Tagging Guide: `x.y.z-dev.n`
+# Semantic Versioning Tagging Guide
 
-This document outlines the standard behavior, state transitions, and edge-case handling for the `x.y.z-dev.n` pre-release versioning scheme under the Semantic Versioning (SemVer 2.0.0) standard utilized in this repository.
+This document outlines the versioning scheme and release process under the Semantic Versioning (SemVer 2.0.0) standard.
 
 ## Core Principle
 
-A pre-release tag always targets the **upcoming** release. For example, `1.2.4-dev.1` signifies the first development build working *towards* the stable `1.2.4` release. It has a lower precedence (is mathematically older) than the final `1.2.4` version.
+A pre-release tag always targets the **upcoming** release. For example, `1.5.1-dev.1` signifies the first development build working *towards* the stable `1.5.1` release. It has lower precedence (is mathematically older) than the final `1.5.1` version.
 
 ---
 
-## 1. Version Bump State Machine (Trigger Words)
+## 1. Release Automation
 
-Releases are triggered automatically via GitHub Actions based on specific keywords in commit messages. The `scripts/version_bump_calculator.py` script parses commit messages and maps triggers to `python-semantic-release` flags.
+Releases are now driven by **[release-please](https://github.com/googleapis/release-please-action)** using Conventional Commits. There are no manual `[patch]`/`[minor]`/`[major]` triggers in commit messages.
 
-**Assumption:** The current stable release in production is `1.2.3`.
+### How It Works
 
-| Current State | Commit Tag | Resulting State | Description & Automation Logic |
-| :--- | :--- | :--- | :--- |
-| `1.2.3` *(Stable)* | `[dev]` | `1.2.4-dev.1` | Initializes a dev cycle targeting the next patch. Sets `n=1`. |
-| `1.2.3` *(Stable)* | `[patch]` | `1.2.4` | Standard SemVer patch increment. |
-| `1.2.3` *(Stable)* | `[minor]` | `1.3.0` | Standard SemVer minor increment. Resets `z` to `0`. |
-| `1.2.3` *(Stable)* | `[major]` | `2.0.0` | Standard SemVer major increment. Resets `y` and `z` to `0`. |
-| | | | |
-| `1.2.4-dev.2` *(Dev)* | `[dev]` | `1.2.4-dev.3` | Increments the pre-release counter `n`. Continues current cycle. |
-| `1.2.4-dev.2` *(Dev)* | `[patch]` | `1.2.4` | Graduation: Drops the `-dev.n` suffix. Finalizes the target patch. |
-| `1.2.4-dev.2` *(Dev)* | `[minor]` | `1.3.0` | Skips `1.2.4`. Bumps the minor version and resets `z` to `0`. |
-| `1.2.4-dev.2` *(Dev)* | `[major]` | `2.0.0` | Skips `1.2.4`. Bumps the major version. Resets `y` and `z`. |
+1. Push commits to `main` or `develop` following [Conventional Commits](https://www.conventionalcommits.org/)
+2. Release-please automatically opens/updates a Release PR
+3. Reviewer merges the Release PR → creates a git tag + GitHub Release
+4. CI builds artifacts and attaches them to the release
+
+### Branch Strategy
+
+| Branch | Target Version | Example |
+|---|---|---|
+| `main` | Stable releases | `v1.5.0` |
+| `develop` | Development pre-releases | `v1.5.1-dev.1` |
 
 ---
 
-## 2. Edge Cases and Complex Behaviors
+## 2. Commit Convention (Conventional Commits)
 
-The CI/CD pipeline enforces strict state management to prevent corrupted histories.
+All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-### A. Pivoting the Release Scope (Scope Creep)
-**Scenario:** You are iterating on a patch branch (`1.2.4-dev.2`), but a new feature is merged, necessitating a minor release bump instead of a patch.
-- **Tag Needed:** `[preminor]`
-- **Resulting State:** `1.2.4-dev.2` → `1.3.0-dev.1`.
-- **Behavior:** The system recognizes the shift in the target (`1.3.0`) and resets the `dev.n` counter back to `1`. (Similarly, `[premajor]` handles a shift to a major release).
+| Prefix | Type | Release Bump | Example |
+|---|---|---|---|
+| `feat:` | New feature | Minor | `feat: add new view` |
+| `fix:` | Bug fix | Patch | `fix: ui alignment` |
+| `feat!:` | Breaking change | Major | `feat!: redesign API` |
+| `perf:` | Performance | Patch | `perf: optimize search` |
+| `docs:`, `test:`, `chore:`, `ci:` | Maintenance | None | `docs: update README` |
 
-### B. The "Pre-Release to Pre-Release" Cross-Grade Guard
-**Scenario:** The system is currently at `1.3.0-dev.2` (working towards a minor release), and a `[patch]` tag is pushed.
-- **System Behavior:** `version_bump_calculator.py` will strictly fail with a **Cross-grade detected** error.
-- **Rationale:** Graduating a minor pre-release (`1.3.0-dev.2`) via a patch command would result in `1.3.1`, skipping `1.3.0` entirely.
+---
 
-### C. One-Indexing for `n`
-The automation enforces 1-indexing for all pre-release tags (e.g., `1.2.4-dev.1`). This prevents boolean falsy evaluation issues across deployment scripts.
+## 3. Version Bump Rules
 
-### D. Sorting and Precedence Rules
-Pre-release versions always have *lower* precedence than their standard counterpart (`1.2.4-dev.1` < `1.2.4-dev.2` < `1.2.4`). We exclusively use the `-dev.n` format to prevent alphanumeric sorting anomalies across GitHub Releases and local environments.
+- **Patch** (`x.y.z` → `x.y.(z+1)`): `fix:`, `perf:`
+- **Minor** (`x.y.z` → `x.(y+1).0`): `feat:`
+- **Major** (`x.y.z` → `(x+1).0.0`): `feat!:`, `BREAKING CHANGE:`
+
+---
+
+## 4. Pre-Release Versions
+
+Development pre-releases use the format `x.y.z-dev.n` (e.g., `1.5.1-dev.1`). Release-please handles the pre-release counter automatically when merging into `develop`.
+
+---
+
+## 5. Breaking Changes
+
+To signal a major version bump, use the `!` suffix after the type prefix:
+
+```
+feat!: redesign configuration API
+```
+
+Or include a `BREAKING CHANGE:` footer:
+
+```
+feat: redesign configuration API
+
+BREAKING CHANGE: config file format has changed
+```
+
+---
+
+## 6. Sorting and Precedence Rules
+
+Pre-release versions always have *lower* precedence than their standard counterpart (`1.5.1-dev.1` < `1.5.1-dev.2` < `1.5.1`). We use the `-dev.n` format for consistent sorting.
