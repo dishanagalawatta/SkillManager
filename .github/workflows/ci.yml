@@ -16,23 +16,23 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    uses: ./.github/workflows/_reusable/lint.yml
+    uses: ./.github/workflows/_lint.yml
 
   test-py312:
     name: "Test (Py 3.12)"
-    uses: ./.github/workflows/_reusable/test-python.yml
+    uses: ./.github/workflows/_test-python.yml
     with:
       python-version: "3.12"
 
   test-py313:
     name: "Test (Py 3.13)"
-    uses: ./.github/workflows/_reusable/test-python.yml
+    uses: ./.github/workflows/_test-python.yml
     with:
       python-version: "3.13"
 
   security:
     name: Security
-    uses: ./.github/workflows/_reusable/security-scan.yml
+    uses: ./.github/workflows/_security-scan.yml
 
   ci-gate:
     name: CI Gate

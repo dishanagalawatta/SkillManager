@@ -10,12 +10,10 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 .github/workflows/
 ├── ci.yml                    # PR + main/develop push gate
 ├── release.yml               # release-please PR-driven releases
-└── _reusable/
-    ├── setup-python-uv.yml   # Checkout + uv + Python + cache
-    ├── lint.yml              # ruff check + format
-    ├── test-python.yml       # Matrix test (3 OS × Python version)
-    ├── build-pyinstaller.yml # OS-specific PyInstaller build
-    └── security-scan.yml     # pip-audit
+├── _lint.yml                 # Ruff check + format (reusable)
+├── _test-python.yml          # Matrix test 3 OS × Python version (reusable)
+├── _build-pyinstaller.yml    # OS-specific PyInstaller build (reusable)
+└── _security-scan.yml        # pip-audit (reusable)
 ```
 
 ## CI Pipeline (`ci.yml`)
