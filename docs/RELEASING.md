@@ -53,7 +53,7 @@ When a maintainer merges the Release PR:
 
 ### 4. CI Builds Artifacts
 
-The [release workflow](../.github/workflows/release.yml) runs the [build job](../.github/workflows/_reusable/build-pyinstaller.yml) on 3 OS:
+The [release workflow](../.github/workflows/release.yml) runs the [build job](../.github/workflows/_build-pyinstaller.yml) on 3 OS:
 
 | OS | Artifact | Built By |
 |---|---|---|
@@ -136,6 +136,6 @@ Triggered by merging a Release PR:
 | `.github/release-please-config.json` | Package config, changelog sections, extra files |
 | `.github/.release-please-manifest.json` | Current version tracking |
 | `.github/workflows/release.yml` | Release workflow (release-please + build) |
-| `.github/workflows/_reusable/build-pyinstaller.yml` | Reusable build job |
+| `.github/workflows/_build-pyinstaller.yml` | Reusable build job |
 | `scripts/build_app.py` | PyInstaller build script |
 | `scripts/publish_tuf_release.py` | TUF publish script |

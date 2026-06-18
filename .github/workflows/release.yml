@@ -32,7 +32,7 @@ jobs:
     name: Build
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
-    uses: ./.github/workflows/_reusable/build-pyinstaller.yml
+    uses: ./.github/workflows/_build-pyinstaller.yml
     with:
       ref: ${{ needs.release-please.outputs.tag_name }}
 
