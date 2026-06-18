@@ -35,11 +35,15 @@ Uses [release-please](https://github.com/googleapis/release-please-action) for a
 
 ```
 Push to main/develop
-  └─► release-please opens/updates Release PR
-        └─► Reviewer merges Release PR
-              └─► Creates tag + GitHub Release
-                    └─► build.yml attaches Windows artifacts
+  └─► CI workflow runs (lint, tests, security, gate)
+        └─► Release workflow triggers on CI completion
+              └─► release-please opens/updates Release PR
+                    └─► Reviewer merges Release PR
+                          └─► Creates tag + GitHub Release
+                                └─► build.yml attaches Windows artifacts
 ```
+
+The Release workflow is gated on CI success via `workflow_run` trigger — release-please only runs when CI passes. This prevents creating releases from broken commits.
 
 ### Commit Convention (Conventional Commits)
 
@@ -97,6 +101,18 @@ uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest --cov=skill_manager --cov-fail-under=90
 ```
+
+## Required Repo Settings
+
+The Release workflow depends on the following repo-level setting (Settings → Actions → General → Workflow permissions):
+
+- **Workflow permissions**: "Read and write permissions"
+- **Allow GitHub Actions to create and approve pull requests**: enabled
+
+Without the second checkbox, `release-please-action` fails with
+"GitHub Actions is not permitted to create or approve pull requests",
+because the `GITHUB_TOKEN` cannot open the release PR regardless of the
+per-workflow `permissions:` block.
 
 ## Troubleshooting
 
