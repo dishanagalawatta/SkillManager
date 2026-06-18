@@ -689,10 +689,8 @@ class AppUpdateService:
         # Monkey-patch Popen to hide windows on Windows during the update process
         class NoWindowPopen(original_popen):
             def __init__(self, *args, **kwargs):
-                if sys.platform == "win32":
-                    kwargs["creationflags"] = (
-                        kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
-                    )
+                if sys.platform == "win32" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+                    kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
                 super().__init__(*args, **kwargs)
 
         self._diag.log_event(

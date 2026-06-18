@@ -14,6 +14,25 @@ from skill_manager.core.skill_packages.process import (
 def test_sanitize_token():
     assert sanitize_token("https://token@github.com") == "https://***@github.com"
     assert sanitize_token("echo password=secret") == "echo password=***"
+    assert (
+        sanitize_token(
+            "credential.helper=!f() { echo username=token; echo password='my_secret_token'; }; f"
+        )
+        == "credential.helper=!f() { echo username=token; echo password='***'; }; f"
+    )
+    assert (
+        sanitize_token(
+            'credential.helper=!f() { echo username=token; echo password="my_secret_token"; }; f'
+        )
+        == 'credential.helper=!f() { echo username=token; echo password="***"; }; f'
+    )
+    assert (
+        sanitize_token(
+            "credential.helper=!f() { echo username=token; echo password=my_secret_token; }; f"
+        )
+        == "credential.helper=!f() { echo username=token; echo password=***; }; f"
+    )
+    assert sanitize_token('echo password="secret\\"with\\"quotes"') == 'echo password="***"'
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
 
