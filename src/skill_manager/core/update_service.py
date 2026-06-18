@@ -690,7 +690,9 @@ class AppUpdateService:
         class NoWindowPopen(original_popen):
             def __init__(self, *args, **kwargs):
                 if sys.platform == "win32" and hasattr(subprocess, "CREATE_NO_WINDOW"):
-                    kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                    kwargs["creationflags"] = (
+                        kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                    )
                 super().__init__(*args, **kwargs)
 
         self._diag.log_event(
