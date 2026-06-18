@@ -47,15 +47,8 @@ def get_app_data_dir() -> Path:
     if override:
         return Path(override).expanduser()
 
-    if os.name == "nt" and (
-        base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    ):
+    if base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA"):
         app_dir = Path(base_dir) / APP_NAME
-    elif os.name != "nt":
-        if xdg_data_home := os.environ.get("XDG_DATA_HOME"):
-            app_dir = Path(xdg_data_home) / APP_NAME
-        else:
-            app_dir = Path.home() / ".local" / "share" / APP_NAME
     else:
         app_dir = Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
 

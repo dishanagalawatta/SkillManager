@@ -11,7 +11,7 @@ Reference for every environment variable SkillManager reads.
 | `QML_DISABLE_DISK_CACHE` | Disable QML disk cache. Set user-scope permanently. PySide6 6.11.1 serves stale cached bytecode after QML edits; this prevents that class of bug. | unset |
 | `SKILL_MANAGER_TESTING` | When set, `AppController` skips non-essential startup (analytics, real network, state restore). | unset |
 | `SKILL_MANAGER_SKIP_INITIAL_LOAD` | When set, `AppController.__init__` does not auto-load skills on startup. | unset |
-| `SKILL_MANAGER_DATA_DIR` | Override per-user data dir (`%APPDATA%/SkillManager` on Windows, `~/.local/share/SkillManager` on Linux). Tests should point to a per-run tempdir. | platform default |
+| `SKILL_MANAGER_DATA_DIR` | Override per-user data dir (`%APPDATA%/SkillManager`). Tests should point to a per-run tempdir. | platform default |
 | `SKILL_MANAGER_LOG_LEVEL` | Log level for the QML console bridge. `DEBUG` / `INFO` / `WARNING` / `ERROR`. | `INFO` |
 
 ## Analytics (PostHog)

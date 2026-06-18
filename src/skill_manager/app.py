@@ -960,25 +960,24 @@ def main():  # pragma: no cover
         release=f"skill-manager@{skill_manager.__version__}",
     )
 
-    if sys.platform == "win32":
-        # Acquire mutex so Inno Setup installer can cleanly close the app
-        global _app_mutex
-        _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
+    # Acquire mutex so Inno Setup installer can cleanly close the app
+    global _app_mutex
+    _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
 
-        # Use a standard AppUserModelID format
-        myappid = "Antigravity.SkillManager.App.1.0"
-        if not getattr(sys, "frozen", False):
-            # Development mode: Append .dev to distinguish from release builds.
-            # Do NOT append a timestamp, as it breaks Windows taskbar icon grouping.
-            myappid += ".dev"
+    # Use a standard AppUserModelID format
+    myappid = "Antigravity.SkillManager.App.1.0"
+    if not getattr(sys, "frozen", False):
+        # Development mode: Append .dev to distinguish from release builds.
+        # Do NOT append a timestamp, as it breaks Windows taskbar icon grouping.
+        myappid += ".dev"
 
-        try:
-            res = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-            logger.info(
-                f"Windows: Pre-init SetCurrentProcessExplicitAppUserModelID('{myappid}') returned {res}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to set AppUserModelID: {e}")
+    try:
+        res = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        logger.info(
+            f"Windows: Pre-init SetCurrentProcessExplicitAppUserModelID('{myappid}') returned {res}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to set AppUserModelID: {e}")
 
     # Safety net: drop any stale Qt QML disk cache before loading QML.
     # Runs even when QML_DISABLE_DISK_CACHE=1 is honored (defense in depth).
@@ -994,7 +993,7 @@ def main():  # pragma: no cover
     app.setOrganizationDomain("antigravity.io")
 
     # Robust icon loading
-    icon_ext = "ico" if sys.platform == "win32" else "png"
+    icon_ext = "ico"
     icon_candidates = [
         resolve_resource_path(f"assets/brand/logo.{icon_ext}"),
         os.path.join(os.path.dirname(__file__), "assets", "brand", f"logo.{icon_ext}"),
@@ -1081,7 +1080,7 @@ def main():  # pragma: no cover
 
                 # Force native Windows taskbar icon via Win32 API.
                 # LoadImageW with LR_LOADFROMFILE supports both ICO and PNG on Windows 10+.
-                if sys.platform == "win32" and loaded_icon_path:
+                if loaded_icon_path:
                     WM_SETICON = 0x0080
                     ICON_SMALL = 0
                     ICON_BIG = 1

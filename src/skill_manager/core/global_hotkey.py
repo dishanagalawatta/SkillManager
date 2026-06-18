@@ -6,7 +6,6 @@ which hooks into the system to listen for global hotkeys without exclusive locks
 """
 
 import logging
-import sys
 import threading
 
 from pynput import keyboard
@@ -98,10 +97,6 @@ class GlobalHotkeyManager(QObject):
             hotkey_id: Unique identifier for this hotkey.
             sequence: Key sequence string like "Ctrl+Shift+S".
         """
-        if sys.platform != "win32":
-            logger.debug("Global hotkeys only supported on Windows")
-            return
-
         if not sequence:
             return
 
@@ -117,9 +112,6 @@ class GlobalHotkeyManager(QObject):
     @Slot(int)
     def unregister(self, hotkey_id: int):
         """Unregister a global hotkey by ID."""
-        if sys.platform != "win32":
-            return
-
         with self._lock:
             if hotkey_id in self._registered_hotkeys:
                 del self._registered_hotkeys[hotkey_id]
@@ -132,9 +124,6 @@ class GlobalHotkeyManager(QObject):
 
     def stop(self):
         """Unregister all hotkeys and stop listener."""
-        if sys.platform != "win32":
-            return
-
         with self._lock:
             self._registered_hotkeys.clear()
             if self._listener is not None:

@@ -30,7 +30,7 @@ SkillManager is designed for developers who need to manage growing libraries of 
 - **Screenshot & Redaction**: Capture screenshots with PII redaction capabilities for AI context.
 - **Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
 - **Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
-- **Zero-Config Entry**: Professional installers for Windows, macOS, and Linux.
+- **Zero-Config Entry**: Professional installer for Windows.
 
 ---
 
@@ -78,10 +78,8 @@ Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design 
 You don't need Python or any developer tools to use SkillManager.
 
 1. Visit the **[Releases](https://github.com/dishanagalawatta/SkillManager/releases)** page.
-2. Download the installer for your OS:
+2. Download the installer for Windows:
    - **Windows**: `SkillManager_Setup.exe`
-   - **macOS**: `SkillManager_Portable_macos.zip`
-   - **Linux**: `SkillManager_Portable_linux.zip`
 3. Install and launch!
 
 ### For Developers

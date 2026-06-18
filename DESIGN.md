@@ -9,8 +9,8 @@ Skill Manager follows a **Solid Matte** aesthetic inspired by high-end pro-devel
 - **Name:** Skill Manager
 - **Category:** Desktop productivity / developer utility
 - **Current stack:** Python 3.12+, PySide6 (Qt 6.8+), QML, `uv`, `ruff`, `sentry-sdk`, `posthog`, `apscheduler`
-- **Primary platforms:** Windows (Native Mica/Acrylic), macOS, Linux
-- **Design project:** Apple Liquid Glass-inspired desktop software, grounded in macOS utility conventions while utilizing modern hardware acceleration via Qt 6.
+- **Primary platforms:** Windows (Native Mica/Acrylic)
+- **Design project:** Desktop software utilizing modern hardware acceleration via Qt 6.
 - **Primary users:** Developers and power users managing local skill folders across multiple project repositories.
 
 ## Existing Workflows To Preserve
@@ -315,7 +315,7 @@ Avoid vague labels like `OK`. Dialog buttons should use specific verbs such as `
 - Show clear empty states:
   - `No skills match this search.`
   - `No project skills found in configured projects.`
-- Support `Ctrl+F` now; use `Cmd+F` if a macOS build is introduced.
+- Support `Ctrl+F` now.
 
 ### Menus And Context Menus
 
@@ -413,15 +413,15 @@ Every future UI change must satisfy these basics:
 
 Recommended shortcuts:
 
-| Command | Windows/Linux | macOS future |
-|---|---|---|
-| Search current view | `Ctrl+F` | `Cmd+F` |
-| Refresh current view | `Ctrl+R` | `Cmd+R` |
-| Copy selected/reference | `Ctrl+C` | `Cmd+C` |
-| Select all visible | `Ctrl+A` | `Cmd+A` |
-| Delete selected | `Delete` | `Delete` |
-| Open selected skill | `Enter` | `Return` |
-| Close detail tab/view | `Ctrl+W` | `Cmd+W` |
+| Command | Windows |
+|---|---|
+| Search current view | `Ctrl+F` |
+| Refresh current view | `Ctrl+R` |
+| Copy selected/reference | `Ctrl+C` |
+| Select all visible | `Ctrl+A` |
+| Delete selected | `Delete` |
+| Open selected skill | `Enter` |
+| Close detail tab/view | `Ctrl+W` |
 
 Pointer behavior:
 
@@ -472,7 +472,6 @@ Implementation constraints:
 
 - Do not use per-row glass cards in tree/list views.
 - Do not introduce decorative animations before layout and state behavior are stable.
-- Do not block future native macOS support by hard-coding Windows-only visual assumptions into design tokens.
 - Validate layout at default size and moderately resized windows after each UI phase.
 
 ## Non-Goals
