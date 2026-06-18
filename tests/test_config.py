@@ -190,16 +190,17 @@ class ConfigManagerTests(unittest.TestCase):
             self.assertEqual(resolved, legacy_file)
 
     def test_get_app_data_dir_fallback_to_user_data_dir(self):
-        with temporary_directory() as tmp:
+        import importlib
+
+        import skill_manager.core.config as cfg
+
+        with temporary_directory():
             env = {
                 "SKILL_MANAGER_DATA_DIR": "",
                 "LOCALAPPDATA": "",
                 "APPDATA": "",
             }
             with mock.patch.dict(os.environ, env, clear=False):
-                import importlib
-                import skill_manager.core.config as cfg
-
                 importlib.reload(cfg)
                 app_dir = cfg.get_app_data_dir()
                 self.assertTrue(app_dir.exists())
