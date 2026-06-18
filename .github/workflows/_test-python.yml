@@ -11,11 +11,7 @@ on:
 jobs:
   test:
     name: Test (Python ${{ inputs.python-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -31,12 +27,6 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
 
-      - name: Install Linux OpenGL dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libegl1 libgl1
-
       - name: Install dependencies
         run: uv sync
 
@@ -44,16 +34,12 @@ jobs:
         run: uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q
         env:
           QT_QPA_PLATFORM: offscreen
-          QT_QUICK_BACKEND: software
-          QT_LOGGING_RULES: qt.qpa.*=false
-          __GL_THREADED_OPTIMIZATIONS: "0"
-          MESA_GL_VERSION_OVERRIDE: "3.3"
 
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
-          name: coverage-${{ matrix.os }}-py${{ inputs.python-version }}
+          name: coverage-windows-py${{ inputs.python-version }}
           path: coverage.xml
           retention-days: 7
 

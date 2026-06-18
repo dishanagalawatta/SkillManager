@@ -1,23 +1,18 @@
 import os
+import subprocess
 import sys
 from pathlib import Path
 
 
 def _patch_subprocess():
-    if sys.platform == "win32":
-        import subprocess
+    original_popen = subprocess.Popen
 
-        original_popen = subprocess.Popen
+    class NoWindowPopen(original_popen):
+        def __init__(self, *args, **kwargs):
+            kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+            super().__init__(*args, **kwargs)
 
-        class NoWindowPopen(original_popen):
-            def __init__(self, *args, **kwargs):
-                # Ensure CREATE_NO_WINDOW is set for all subprocesses
-                kwargs["creationflags"] = (
-                    kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
-                )
-                super().__init__(*args, **kwargs)
-
-        subprocess.Popen = NoWindowPopen
+    subprocess.Popen = NoWindowPopen
 
 
 def _disable_qml_disk_cache():

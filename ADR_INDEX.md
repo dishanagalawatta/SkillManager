@@ -197,7 +197,7 @@ with [Conventional Commits](https://www.conventionalcommits.org/):
 - `docs:`, `test:`, `chore:`, `ci:` → no bump
 
 Release-please automatically opens/updates a Release PR. Merging it
-creates a git tag + GitHub Release. CI builds 3-OS artifacts and attaches
+creates a git tag + GitHub Release. CI builds Windows artifacts and attaches
 them. TUF publishing remains manual per-project policy.
 
 **Consequences:**
@@ -206,3 +206,21 @@ them. TUF publishing remains manual per-project policy.
 - Version is tracked in both `pyproject.toml` and `.release-please-manifest.json`.
 - `__init__.py` is updated via `extra-files` in release-please config.
 - Branch protection: `ci-gate` is the required status check.
+
+---
+
+## ADR-0008: Windows-Only Distribution
+
+**Status:** Accepted
+**Date:** 2026
+
+**Context:** CI tests failed on macOS/Linux because source code contains Windows-specific APIs (`ctypes.windll`, `subprocess.CREATE_NO_WINDOW`, `os.startfile`, Win32 shell integration) with `sys.platform`/`os.name` guards that return no-ops on non-Windows. The app cannot be verified on macOS/Linux — only Windows is available for testing.
+
+**Decision:** Remove all `sys.platform`/`os.name` conditional branches from source code. Strip macOS/Linux from CI workflows (`_test-python.yml`, `_build-pyinstaller.yml`). Ship only Windows `.exe` installer and portable ZIP.
+
+**Consequences:**
+- CI runs on `windows-latest` × Python 3.12 + 3.13 only.
+- Source code has no cross-platform branches — Windows APIs are called directly.
+- Two non-Windows tests deleted from `test_win32_utils.py`.
+- macOS/Linux portable ZIP no longer attached to GitHub Releases.
+- `docs/CI_CD.md`, `docs/RELEASING.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, `docs/ENVIRONMENT.md`, `DESIGN.md`, `README.md` updated to reflect Windows-only scope.

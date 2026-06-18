@@ -85,28 +85,6 @@ def test_ui_controller_open_path_windows(ui_controller, mock_app):
         mock_app._set_status.assert_called_with("Opened: test.txt")
 
 
-def test_ui_controller_open_path_linux(ui_controller, mock_app):
-    with (
-        patch("skill_manager.controllers.ui_controller.sys.platform", "linux"),
-        patch("subprocess.run") as mock_run,
-    ):
-        ui_controller.openPath("/path/to/file")
-        mock_run.assert_called_with(["xdg-open", "/path/to/file"])
-
-        # Test path starting with '-'
-        ui_controller.openPath("-test")
-        mock_run.assert_called_with(["xdg-open", "./-test"])
-
-
-def test_ui_controller_open_path_darwin(ui_controller, mock_app):
-    with (
-        patch("skill_manager.controllers.ui_controller.sys.platform", "darwin"),
-        patch("subprocess.run") as mock_run,
-    ):
-        ui_controller.openPath("/path/to/file")
-        mock_run.assert_called_with(["open", "--", "/path/to/file"])
-
-
 def test_ui_controller_open_path_failure(ui_controller, mock_app):
     with (
         patch("skill_manager.controllers.ui_controller.sys.platform", "win32"),

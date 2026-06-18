@@ -76,9 +76,8 @@ def run_process(
         "encoding": "utf-8",
         "errors": "replace",
         "bufsize": 1,
+        "creationflags": subprocess.CREATE_NO_WINDOW,
     }
-    if os.name == "nt":
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     process = subprocess.Popen(command, **kwargs)
     last_emit_time = 0

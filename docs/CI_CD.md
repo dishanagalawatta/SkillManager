@@ -2,7 +2,7 @@
 
 ## Overview
 
-SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, matrix testing, and release-please for automated releases.
+SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, and release-please for automated releases.
 
 ## Workflows
 
@@ -11,8 +11,8 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 ├── ci.yml                    # PR + main/develop push gate
 ├── release.yml               # release-please PR-driven releases
 ├── _lint.yml                 # Ruff check + format (reusable)
-├── _test-python.yml          # Matrix test 3 OS × Python version (reusable)
-├── _build-pyinstaller.yml    # OS-specific PyInstaller build (reusable)
+├── _test-python.yml          # Test on Windows (reusable)
+├── _build-pyinstaller.yml    # PyInstaller build for Windows (reusable)
 └── _security-scan.yml        # pip-audit (reusable)
 ```
 
@@ -22,8 +22,8 @@ Triggers: push to `main`/`develop`, pull requests, manual dispatch.
 
 ```
 lint ──────────────────┐
-test-py312 (3 OS) ────┤
-test-py313 (3 OS) ────┼──► ci-gate (must all pass)
+test-py312 (Windows) ──┤
+test-py313 (Windows) ──┼──► ci-gate (must all pass)
 security-scan ────────┘
 ```
 
@@ -38,7 +38,7 @@ Push to main/develop
   └─► release-please opens/updates Release PR
         └─► Reviewer merges Release PR
               └─► Creates tag + GitHub Release
-                    └─► build.yml attaches 3-OS artifacts
+                    └─► build.yml attaches Windows artifacts
 ```
 
 ### Commit Convention (Conventional Commits)
@@ -110,4 +110,4 @@ Ensure commits on `main`/`develop` follow Conventional Commits format. Release-p
 
 ### Artifact upload fails
 
-Artifacts are uploaded per-OS. If one OS fails, others still upload. Check the specific build job logs.
+Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml).

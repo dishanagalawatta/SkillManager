@@ -53,13 +53,10 @@ def qml_disk_cache_dir() -> Path | None:
 
     Returns None when the cache directory has not been created yet (first run).
     """
-    if sys.platform != "win32":
-        cache_root = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
-    else:
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if not local_app_data:
-            return None
-        cache_root = Path(local_app_data)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    cache_root = Path(local_app_data)
     return cache_root / "python" / "cache" / "qmlcache"
 
 

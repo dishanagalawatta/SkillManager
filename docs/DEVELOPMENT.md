@@ -99,7 +99,7 @@ SkillManager maintains a strict parity between the Python categorization logic a
 ## Building Executables
 
 ### Automated Builds
-The GitHub Action `release.yml` automatically builds installers for Windows, macOS, and Linux on version bumps.
+The GitHub Action `release.yml` automatically builds installers for Windows on version bumps.
 
 ### Manual Builds
 To build locally for testing:

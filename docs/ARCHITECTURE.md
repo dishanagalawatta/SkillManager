@@ -1,6 +1,6 @@
 # SkillManager Architecture
 
-SkillManager is a cross-platform desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
+SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
 ## System Overview
 
@@ -99,7 +99,7 @@ SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously d
 
 ## Distribution & Packaging Architecture
 
-SkillManager is distributed as native standalone executables for Windows, macOS, and Linux. The packaging pipeline is fully automated via GitHub Actions.
+SkillManager is distributed as a native standalone executable for Windows. The packaging pipeline is fully automated via GitHub Actions.
 
 ### 1. Freezing & Compilation (`scripts/build_app.py` / `packaging/skill_manager.spec`)
 - Compilation is orchestrated by `scripts/build_app.py` which:
@@ -110,8 +110,6 @@ SkillManager is distributed as native standalone executables for Windows, macOS,
 
 ### 2. Native OS Wrappers
 - **Windows**: PyInstaller output wrapped into `SkillManager_Setup.exe` via Inno Setup (`packaging/windows/installer.iss`). Portable ZIP also generated.
-- **macOS**: `.app` bundle converted to `.dmg` via `create-dmg`.
-- **Linux**: Output directory packaged as `.tar.gz`.
 
 ### 3. CI/CD Pipeline
 The project uses [release-please](https://github.com/googleapis/release-please-action) with Conventional Commits:
@@ -119,8 +117,8 @@ The project uses [release-please](https://github.com/googleapis/release-please-a
    - `develop` branch: Development pre-releases (e.g., `v1.5.1-dev.1`).
    - `main` branch: Stable releases (e.g., `v1.5.0`).
 2. **Conventional Commits**: `feat:` (minor), `fix:` (patch), `feat!:` (major) drive version bumps automatically.
-3. **Parallel Build Matrix**: `ubuntu-latest`, `macos-latest`, `windows-latest` × Python 3.12 + 3.13.
-4. **Artifact Publishing**: Native installers and portable ZIPs attached to GitHub Release.
+3. **Build**: `windows-latest` × Python 3.12 + 3.13.
+4. **Artifact Publishing**: Native installer and portable ZIP attached to GitHub Release.
 
 ### 4. TUF Secure Updates
 - `scripts/publish_tuf_release.py` manages the TUF repository for secure background updates.
@@ -134,7 +132,7 @@ The project uses [release-please](https://github.com/googleapis/release-please-a
 
 Dependencies are kept behind narrow internal boundaries:
 
-- `platformdirs` for platform-aware data directory resolution.
+- `platformdirs` for data directory resolution.
 - `pydantic`/`pydantic-settings` for tolerant internal schemas.
 - `python-frontmatter` and `markdown-it-py` for parsing skill/command Markdown.
 - `pathspec` for `.gitignore`-style discovery filtering.
@@ -162,7 +160,7 @@ The `AppController` remains thin. New logic goes in specialized controllers and 
 Filesystem operations (deletion, archive) immediately update `SkillModel` for instant feedback, then execute in a background thread.
 
 ### 4. Subprocess Patching (`__main__.py`)
-On Windows, `subprocess.Popen` is patched with `CREATE_NO_WINDOW` to prevent console windows from appearing during background operations.
+`subprocess.Popen` is patched with `CREATE_NO_WINDOW` to prevent console windows from appearing during background operations.
 
 ### 5. Lifecycle Management
 - `on_quit()` ensures clean shutdown: watcher stop, scheduler shutdown, state save, Sentry flush, PostHog shutdown with timeout.

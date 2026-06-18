@@ -1,7 +1,6 @@
 import contextlib
 import ctypes
 import logging
-import sys
 from ctypes import wintypes
 
 with contextlib.suppress(ImportError):
@@ -9,28 +8,29 @@ with contextlib.suppress(ImportError):
 
 logger = logging.getLogger(__name__)
 
-if sys.platform == "win32":
 
-    class POINT(ctypes.Structure):
-        _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+class POINT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
 
-    class RECT(ctypes.Structure):
-        _fields_ = [
-            ("left", wintypes.LONG),
-            ("top", wintypes.LONG),
-            ("right", wintypes.LONG),
-            ("bottom", wintypes.LONG),
-        ]
 
-    class WINDOWPLACEMENT(ctypes.Structure):
-        _fields_ = [
-            ("length", wintypes.UINT),
-            ("flags", wintypes.UINT),
-            ("showCmd", wintypes.UINT),
-            ("ptMinPosition", POINT),
-            ("ptMaxPosition", POINT),
-            ("rcNormalPosition", RECT),
-        ]
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", wintypes.LONG),
+        ("top", wintypes.LONG),
+        ("right", wintypes.LONG),
+        ("bottom", wintypes.LONG),
+    ]
+
+
+class WINDOWPLACEMENT(ctypes.Structure):
+    _fields_ = [
+        ("length", wintypes.UINT),
+        ("flags", wintypes.UINT),
+        ("showCmd", wintypes.UINT),
+        ("ptMinPosition", POINT),
+        ("ptMaxPosition", POINT),
+        ("rcNormalPosition", RECT),
+    ]
 
 
 def apply_native_style(window, style_name: str) -> None:
@@ -42,9 +42,6 @@ def apply_native_style(window, style_name: str) -> None:
         window: The tkinter window object (Tk or Toplevel).
         style_name: The name of the style to apply.
     """
-    if sys.platform != "win32":
-        return
-
     try:
         # Update the window to ensure HWND is available
         window.update()
@@ -58,9 +55,6 @@ def apply_native_style(window, style_name: str) -> None:
 
 def get_window_placement(hwnd: int) -> tuple | None:
     """Returns the placement of the window identified by hwnd."""
-    if sys.platform != "win32":
-        return None
-
     placement = WINDOWPLACEMENT()
     placement.length = ctypes.sizeof(WINDOWPLACEMENT)
     if ctypes.windll.user32.GetWindowPlacement(hwnd, ctypes.byref(placement)):
@@ -81,9 +75,6 @@ def get_window_placement(hwnd: int) -> tuple | None:
 
 def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     """Sets the placement of the window identified by hwnd."""
-    if sys.platform != "win32":
-        return False
-
     placement = WINDOWPLACEMENT()
     placement.length = ctypes.sizeof(WINDOWPLACEMENT)
     placement.flags = placement_data[0]

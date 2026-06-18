@@ -11,7 +11,7 @@ SkillManager uses [release-please](https://github.com/googleapis/release-please-
 1. You write a commit following [Conventional Commits](https://www.conventionalcommits.org/)
 2. Release-please opens/updates a Release PR
 3. A maintainer merges the Release PR → creates a git tag + GitHub Release
-4. CI builds 3-OS artifacts and attaches them to the release
+4. CI builds Windows artifacts and attaches them to the release
 5. Users receive the update via TUF (manual post-release step)
 
 **Never push a version tag manually.**
@@ -53,13 +53,11 @@ When a maintainer merges the Release PR:
 
 ### 4. CI Builds Artifacts
 
-The [release workflow](../.github/workflows/release.yml) runs the [build job](../.github/workflows/_build-pyinstaller.yml) on 3 OS:
+The [release workflow](../.github/workflows/release.yml) runs the [build job](../.github/workflows/_build-pyinstaller.yml) on Windows:
 
 | OS | Artifact | Built By |
 |---|---|---|
 | Windows | `SkillManager-Setup-{version}.exe` | Inno Setup |
-| macOS | `SkillManager-macOS-{version}.zip` | PyInstaller |
-| Linux | `SkillManager-Linux-{version}.zip` | PyInstaller |
 
 Artifacts are automatically attached to the GitHub Release.
 
@@ -97,14 +95,14 @@ See [DEVELOPMENT.md](DEVELOPMENT.md#auto-update-releases-tufup) for detailed ins
 
 Every PR triggers:
 1. **Lint** — `ruff check` + `ruff format --check`
-2. **Test** — Matrix: `{ubuntu, macos, windows}` × `{3.12, 3.13}`
+2. **Test** — `{windows}` × `{3.12, 3.13}`
 3. **Security** — `pip-audit` (non-blocking)
 4. **CI Gate** — Aggregation job (required status check)
 
 ### Release Pipeline (`release.yml`)
 
 Triggered by merging a Release PR:
-1. **Build** — PyInstaller on 3 OS
+1. **Build** — PyInstaller on Windows
 2. **Attach** — Artifacts uploaded to GitHub Release
 
 ---
@@ -117,7 +115,7 @@ Triggered by merging a Release PR:
 - Check the [release-please-action logs](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
 - Verify `.github/release-please-config.json` is correct
 
-### Build failed on one OS
+### Build failed
 
 - Check the specific job in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
 - Common issues: missing system dependencies, PyInstaller hooks, Inno Setup path
