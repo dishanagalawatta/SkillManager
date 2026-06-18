@@ -10,6 +10,7 @@ Covers uncovered paths:
 
 import json
 import os
+import sys
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -594,6 +595,7 @@ class TestFilterEngineCategorizer:
         result = categorize_skill("Design Tools", "A set of design tools for the UI")
         assert "main_category" in result
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only test")
     def test_win32_get_window_placement(self):
         from skill_manager.utils.win32 import get_window_placement
 
