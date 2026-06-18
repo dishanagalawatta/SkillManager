@@ -10,6 +10,7 @@ from skill_manager.core.discovery import (
     DiscoveryService,
     _compute_dir_fingerprint,
 )
+from skill_manager.core.quick_copy import _resolve_resilient_path
 from skill_manager.core.schemas import CacheState, SkillRecord
 
 
@@ -113,7 +114,9 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
     assert skills[0]["name"] == "Skill One"
 
     # Verify cache was populated
-    fp_key = f"dir_fp:{os.path.normcase(str(source_lib))}"
+    # Use resolved path to match production code's normalization (resolves 8.3 short names on Windows)
+    resolved = _resolve_resilient_path(str(source_lib))
+    fp_key = f"dir_fp:{os.path.normcase(str(resolved))}"
     assert disk_cache.get(fp_key) is not None
     assert disk_cache.get(f"pkg_skills:{fp_key}") == skills
 

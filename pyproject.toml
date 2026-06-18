@@ -86,44 +86,6 @@ show_missing = true
 skip_covered = false
 
 
-[tool.semantic_release]
-version_variables = [
-    "src/skill_manager/__init__.py:__version__",
-]
-version_toml = [
-    "pyproject.toml:project.version",
-]
-major_on_zero = true
-vcs_release = true
-upload_to_release = false
-upload_to_pypi = false
-remove_dist = false
-patch_without_tag = false
-tag_format = "v{version}"
-
-[tool.semantic_release.branches.main]
-match = "main"
-prerelease = false
-prerelease_token = "rc"
-
-[tool.semantic_release.branches.develop]
-match = "develop"
-prerelease = true
-prerelease_token = "dev"
-
-[tool.semantic_release.commit_parser_options]
-allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"]
-minor_tags = []
-patch_tags = []
-
-[tool.semantic_release.remote]
-name = "origin"
-type = "github"
-
-
-
-
-
 
 
 
@@ -141,7 +103,6 @@ dev = [
     "ruff>=0.8.0",
     "pyinstaller>=6.0.0",
     "pillow>=10.0.0",
-    "python-semantic-release>=9.0.0",
     "pytest-xdist",
     "pytest-sugar",
 ]

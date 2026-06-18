@@ -9,23 +9,29 @@
    done until `python run_tests.py` is green and ruff is clean.
 4. **Open a PR to `develop`** with the track's spec linked in the
    description. CI must be green before review.
-5. **Merge** with a release trigger in the squash-merge commit message
-   (`[patch]`, `[minor]`, `[major]`, or `[dev]`). See
-   [VERSIONING.md](VERSIONING.md).
+5. **Merge** — release-please detects Conventional Commits and
+   automatically opens/updates a Release PR. See
+   [VERSIONING.md](VERSIONING.md) and [RELEASING.md](RELEASING.md).
 
 ## Commit Style
 
-Conventional Commits, plus a release trigger token. Examples:
+All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Prefix | Type | Release Bump | Example |
+|---|---|---|---|
+| `feat:` | New feature | Minor | `feat: add new view` |
+| `fix:` | Bug fix | Patch | `fix: ui alignment` |
+| `perf:` | Performance | Patch | `perf: optimize search` |
+| `feat!:` | Breaking change | Major | `feat!: redesign API` |
+| `docs:`, `test:`, `chore:`, `ci:` | Maintenance | None | `docs: update README` |
+
+Example commits:
 
 ```
-feat(qml): add glass dropdown component [minor]
-fix(opfs): handle missing manifest gracefully [patch]
-chore(deps): bump pyside6 to 6.11.1 [dev]
+feat(qml): add glass dropdown component
+fix(opfs): handle missing manifest gracefully
+perf(search): optimize fuzzy matching
 ```
-
-Release triggers are matched case-sensitively, on a single line, anywhere
-in the commit message. Commits without a trigger are merged without
-bumping the version.
 
 ## Code Style
 
@@ -47,7 +53,7 @@ bumping the version.
 - [ ] New environment variables are documented in `docs/ENVIRONMENT.md`
 - [ ] Architectural changes are reflected in `ADR_INDEX.md`
 - [ ] No secrets in the diff (`.env` is git-ignored — never commit it)
-- [ ] Commit messages include a release trigger token
+- [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 ## Test Requirements
 
@@ -60,9 +66,8 @@ bumping the version.
 
 ## Release Process
 
-Releases are produced by the CI release pipeline, not by hand. The
-release commit on `main` is the one that contains the trigger token.
-Never push a version tag manually.
+Releases are automated via [release-please](https://github.com/googleapis/release-please-action).
+See [RELEASING.md](RELEASING.md) for the full process. Never push a version tag manually.
 
 ## Security
 

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint
+    uses: ./.github/workflows/_reusable/lint.yml
+
+  test-py312:
+    name: "Test (Py 3.12)"
+    uses: ./.github/workflows/_reusable/test-python.yml
+    with:
+      python-version: "3.12"
+
+  test-py313:
+    name: "Test (Py 3.13)"
+    uses: ./.github/workflows/_reusable/test-python.yml
+    with:
+      python-version: "3.13"
+
+  security:
+    name: Security
+    uses: ./.github/workflows/_reusable/security-scan.yml
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs: [lint, test-py312, test-py313, security]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "Lint failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-py312.result }}" != "success" ]]; then
+            echo "Test (Py 3.12) failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-py313.result }}" != "success" ]]; then
+            echo "Test (Py 3.13) failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security.result }}" != "success" && "${{ needs.security.result }}" != "skipped" ]]; then
+            echo "Security scan failed"
+            exit 1
+          fi
+          echo "All checks passed"

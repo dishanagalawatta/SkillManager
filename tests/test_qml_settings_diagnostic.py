@@ -261,7 +261,11 @@ def test_diagnostics_pane_root_is_columnlayout(qapp, app_controller):
     has_content = False
     for child in obj.findChildren(QObject):
         cn = child.metaObject().className()
-        if "ColumnLayout" in cn and hasattr(child, "implicitHeight") and child.implicitHeight() > 100:
+        if (
+            "ColumnLayout" in cn
+            and hasattr(child, "implicitHeight")
+            and child.implicitHeight() > 100
+        ):
             has_content = True
             break
 
@@ -337,11 +341,11 @@ def test_diagnostics_pane_flickables_have_height(qapp, app_controller):
     QApplication.processEvents()
 
     flickables = [c for c in obj.findChildren(QObject) if "Flickable" in c.metaObject().className()]
-    assert len(flickables) >= 3, f"Expected at least 3 Flickable areas in DiagnosticsPane, found {len(flickables)}"
+    assert len(flickables) >= 3, (
+        f"Expected at least 3 Flickable areas in DiagnosticsPane, found {len(flickables)}"
+    )
 
     for i, f in enumerate(flickables):
         assert f.height() > 0, (
-            f"Found a Flickable (index {i}) with 0 height. "
-            f"This causes overlapping text in the UI. "
+            f"Found a Flickable (index {i}) with 0 height. This causes overlapping text in the UI. "
         )
-
