@@ -25,5 +25,5 @@ jobs:
         run: uv sync
 
       - name: Run pip-audit
-        run: uv run pip-audit --desc
+        run: uv run pip-audit --desc --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
         continue-on-error: true

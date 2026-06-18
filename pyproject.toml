@@ -27,6 +27,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "rapidfuzz",
     "packaging",
+    "cryptography>=48.0.1",
     "tenacity",
     "watchdog",
     "orjson",
