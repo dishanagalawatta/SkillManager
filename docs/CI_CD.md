@@ -92,6 +92,11 @@ Apply via GitHub UI or `gh api`:
 
 No external API keys are required for CI. Release-please uses `GITHUB_TOKEN` for PR creation and tagging.
 
+### Suppressed CVEs
+
+See [docs/SECURITY.md](SECURITY.md) for the list of CVEs silenced in
+`pip-audit --ignore-vuln` and the threat-model rationale.
+
 ## Local Parity
 
 Run the same checks locally:
