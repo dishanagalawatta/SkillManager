@@ -39,6 +39,7 @@
 # 4. Bug Tracker
 
 - [ ] **[Low Severity]** Staring skill motion refining
+- [ ] check
 
 ---
 
