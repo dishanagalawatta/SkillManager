@@ -187,6 +187,37 @@ class TestOnUpdatesChecked:
         controller._on_updates_checked(new_version=None, manual=False, error=None)
         mock_app_mock_runner._set_status.assert_not_called()
 
+    def test_same_version_not_an_update(self, mock_app_mock_runner):
+        """GitHub returning the same version as current must NOT set updateAvailable."""
+        import skill_manager
+
+        controller = AppUpdateController(mock_app_mock_runner)
+        same_version = skill_manager.__version__
+        controller._on_updates_checked(new_version=same_version, manual=True, error=None)
+
+        assert controller.updateAvailable is False
+        assert controller.latestVersion == same_version
+        assert controller.hasCheckedForUpdates is True
+        mock_app_mock_runner._set_status.assert_called_with("SkillManager is up to date.")
+
+    def test_older_version_not_an_update(self, mock_app_mock_runner):
+        """GitHub returning a version older than current must NOT set updateAvailable."""
+        controller = AppUpdateController(mock_app_mock_runner)
+        # Force current_version to something higher so we can craft an older remote
+        controller._state.current_version = "2.0.0"
+        controller._on_updates_checked(new_version="1.0.0", manual=True, error=None)
+
+        assert controller.updateAvailable is False
+        assert controller.latestVersion == "1.0.0"
+        mock_app_mock_runner._set_status.assert_called_with("SkillManager is up to date.")
+
+    def test_invalid_version_string_not_an_update(self, mock_app_mock_runner):
+        """An unparseable version string from GitHub must not crash or show update."""
+        controller = AppUpdateController(mock_app_mock_runner)
+        controller._on_updates_checked(new_version="not-a-version", manual=True, error=None)
+
+        assert controller.updateAvailable is False
+
 
 # --- openReleasesPage ---
 
