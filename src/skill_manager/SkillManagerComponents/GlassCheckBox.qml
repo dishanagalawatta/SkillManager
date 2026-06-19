@@ -10,6 +10,8 @@ Item {
     property int buttonSize: 28
     property int iconSize: 12
 
+    activeFocusOnTab: true
+
     signal toggled()
 
     width: buttonSize
@@ -29,12 +31,13 @@ Item {
         }
         
         border.color: {
+            if (control.activeFocus) return Theme.accent
             if (control.checkState === Qt.Checked || control.checkState === Qt.PartiallyChecked) {
                 return "transparent"
             }
             return mouseArea.containsMouse ? Theme.accent : Theme.alpha(Theme.label, 0.15)
         }
-        border.width: 1
+        border.width: control.activeFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
@@ -87,13 +90,23 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: control.toggled()
+        onClicked: {
+            control.forceActiveFocus()
+            control.toggled()
+        }
     }
 
     ToolTip.visible: mouseArea.containsMouse && tooltipText !== ""
     ToolTip.delay: 400
     ToolTip.text: tooltipText
     
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            control.toggled()
+            event.accepted = true
+        }
+    }
+
     Accessible.role: Accessible.CheckBox
     Accessible.name: tooltipText
     Accessible.checked: checkState === Qt.Checked || checkState === Qt.PartiallyChecked

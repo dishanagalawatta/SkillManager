@@ -5,12 +5,20 @@ import App 1.0
 
 Item {
     id: root
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+            event.accepted = true
+        }
+    }
+
     width: parent.width
 
     property string mainCatName: "" // Passed from ListView section
     property bool isMainCollapsed: AppController.skillModel.collapsedCategories.includes(mainCatName)
 
     height: 44 // Fixed height for main header
+    activeFocusOnTab: true
     visible: mainCatName !== ""
 
     Rectangle {
@@ -18,6 +26,8 @@ Item {
         color: mouseAreaMain.containsMouse ? Theme.glassHover : "transparent"
         radius: Theme.radiusSmall
         anchors.margins: 2
+        border.color: root.activeFocus ? Theme.accent : "transparent"
+        border.width: root.activeFocus ? 2 : 0
     }
 
     RowLayout {
@@ -102,13 +112,16 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+        onClicked: (mouse) => {
+            root.forceActiveFocus()
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+        }
 
         ToolTip.text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
         ToolTip.visible: containsMouse
         ToolTip.delay: 400
 
-        Accessible.role: Accessible.Button
+    Accessible.role: Accessible.Button
         Accessible.name: root.mainCatName
         Accessible.description: ToolTip.text
     }

@@ -10,3 +10,6 @@
 ## 2024-05-25 - Custom QML Item Focus Accessibility
 **Learning:** Custom interactive QML components built on plain `Item` or `Rectangle` (like `KeySequenceCapture`) are not reachable via keyboard navigation by default, even if their inner `MouseArea` has accessibility mappings.
 **Action:** Always add `activeFocusOnTab: true` to the root `Item` of custom controls, map `activeFocus` to visual indicators like border width and color, and handle `Keys.onPressed` for standard activation keys (Space, Enter) so users can trigger them via keyboard.
+## 2024-05-26 - Key Event Propagation in QML
+**Learning:** In QML, key events propagate upwards to parents, not down to children. When adding keyboard accessibility to a custom component by setting `activeFocusOnTab: true` on the root `Item` and focusing the root, attach the `Keys.onPressed` handler directly to that root `Item`. Nesting it inside child elements like `MouseArea` creates a "focus trap" UX bug where the component is focusable but not operable.
+**Action:** Always place `Keys.onPressed` on the element that holds the `activeFocus` (usually the root `Item` for custom components), not inside its child `MouseArea`.
