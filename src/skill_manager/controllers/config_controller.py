@@ -39,9 +39,6 @@ class ConfigController(BaseController):
     scrollSpeedMultiplierChanged = Signal()
     showMenuIconsChanged = Signal()
     compactMenuChanged = Signal()
-    autoCheckUpdatesChanged = Signal()
-    autoDownloadUpdatesChanged = Signal()
-    updateCheckIntervalHoursChanged = Signal()
     skillPackageAutoUpdateChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
     autoMinimizeOnScreenshotChanged = Signal()
@@ -91,32 +88,6 @@ class ConfigController(BaseController):
     @compactMenu.setter
     def compactMenu(self, value):
         self._set_config_value("compact_menu", value, self.compactMenuChanged)
-
-    @Property(bool, notify=autoCheckUpdatesChanged)
-    def autoCheckUpdates(self):
-        return self.config.get("auto_check_updates", True)
-
-    @autoCheckUpdates.setter
-    def autoCheckUpdates(self, value):
-        self._set_config_value("auto_check_updates", value, self.autoCheckUpdatesChanged)
-
-    @Property(bool, notify=autoDownloadUpdatesChanged)
-    def autoDownloadUpdates(self):
-        return self.config.get("auto_download_updates", False)
-
-    @autoDownloadUpdates.setter
-    def autoDownloadUpdates(self, value):
-        self._set_config_value("auto_download_updates", value, self.autoDownloadUpdatesChanged)
-
-    @Property(int, notify=updateCheckIntervalHoursChanged)
-    def updateCheckIntervalHours(self):
-        return self.config.get("update_check_interval_hours", 24)
-
-    @updateCheckIntervalHours.setter
-    def updateCheckIntervalHours(self, value):
-        self._set_config_value(
-            "update_check_interval_hours", value, self.updateCheckIntervalHoursChanged
-        )
 
     @Property(bool, notify=skillPackageAutoUpdateChanged)
     def skillPackageAutoUpdate(self):

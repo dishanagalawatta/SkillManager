@@ -16,6 +16,7 @@
 | [ADR-0007](#adr-0007-release-please-conventional-commits) | Release-please with Conventional Commits | Superseded | 2026 |
 | [ADR-0008](#adr-0008-windows-only-distribution) | Windows-Only Distribution | Accepted | 2026 |
 | [ADR-0009](#adr-0009-python-semantic-release-with-opt-in-tokens) | python-semantic-release with opt-in tokens | Accepted | 2026 |
+| [ADR-0010](#adr-0010-drop-tuf-use-github-releases-api) | Drop TUF, use GitHub Releases API for version checks | Accepted | 2026 |
 
 ---
 
@@ -252,3 +253,23 @@ Commits without a token are ignored by the release system. The `[dev]` token is 
 - Branch protection: `ci-gate` is the required status check.
 - Release-please config files (`.github/release-please-config.json`, `.github/.release-please-manifest.json`) deleted.
 - TUF signing keys are stored as GitHub secrets and written to files during CI.
+
+---
+
+## ADR-0010: Drop TUF, use GitHub Releases API for version checks
+
+**Status:** Accepted
+**Date:** 2026
+
+**Context:** The TUF self-update system creates a ~320 MB tar.gz bundle (`SkillManager-1.5.4.tar.gz`) from the PyInstaller output. This file exceeds GitHub Pages' 100 MB file size limit, blocking the `gh-pages` deploy step. We considered:
+1. Git LFS on `gh-pages` — `raw.githubusercontent.com` returns LFS pointer files, not content.
+2. Custom URL routing (Cloudflare Worker, etc.) — adds infrastructure not justified for a single-platform app.
+3. Subclass `tufup.Client` to rewrite URLs — adds maintenance burden for a security-critical code path.
+
+**Decision:** Drop TUF entirely. Distribute via GitHub Releases (manual download). Replace `AppUpdateController`'s TUF check with a one-call GitHub Releases API check (`GET /repos/.../releases/latest`) that shows a banner if the latest release tag is greater than the running version.
+
+**Consequences:**
+- Users must manually download updates. Mitigated by a clear in-app banner and a "View Releases" button.
+- The `gh-pages` branch is deleted. The four `TUF_KEY_*` secrets are deleted.
+- One new dependency: `httpx` (for the GitHub API call).
+- ADR-0008 (Windows-only distribution) is unchanged.

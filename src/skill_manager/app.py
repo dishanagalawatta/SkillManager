@@ -105,9 +105,6 @@ class AppController(QObject):
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
-    autoCheckUpdatesChanged = Signal()
-    autoDownloadUpdatesChanged = Signal()
-    updateCheckIntervalHoursChanged = Signal()
     skillPackageAutoUpdateChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
     statsChanged = Signal()
@@ -188,11 +185,6 @@ class AppController(QObject):
         self.projectsChanged.connect(self._on_projects_changed)
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
-        self.config_mgr.autoCheckUpdatesChanged.connect(self.autoCheckUpdatesChanged.emit)
-        self.config_mgr.autoDownloadUpdatesChanged.connect(self.autoDownloadUpdatesChanged.emit)
-        self.config_mgr.updateCheckIntervalHoursChanged.connect(
-            self.updateCheckIntervalHoursChanged.emit
-        )
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -249,17 +241,6 @@ class AppController(QObject):
             self._watcher.start()
             QTimer.singleShot(100, self.loadInitialData)
 
-            # Application Update Checks
-            if self._config.get("auto_check_updates", True):
-                QTimer.singleShot(500, self.app_updater.checkForUpdates)
-
-            # Setup periodic check timer
-            self._update_check_timer = QTimer(self)
-            self._update_check_timer.timeout.connect(self.app_updater.checkForUpdates)
-            self._update_periodic_check()
-            self.config_mgr.autoCheckUpdatesChanged.connect(self._update_periodic_check)
-            self.config_mgr.updateCheckIntervalHoursChanged.connect(self._update_periodic_check)
-
             # Skill Package Update Scheduler
             self._scheduler = QtScheduler()
             self._scheduler.start()
@@ -283,19 +264,6 @@ class AppController(QObject):
     def _update_package_scheduler(self):
         """Placeholder for periodic skill package updates if we decide to add them later."""
         pass
-
-    def _update_periodic_check(self):
-        """Starts or stops the periodic update check timer based on config."""
-        enabled = self._config.get("auto_check_updates", True)
-        interval_hours = self._config.get("update_check_interval_hours", 24)
-
-        if enabled and interval_hours > 0:
-            interval_ms = interval_hours * 60 * 60 * 1000
-            self._update_check_timer.start(interval_ms)
-            logger.info(f"Periodic update check enabled (every {interval_hours}h)")
-        else:
-            self._update_check_timer.stop()
-            logger.info("Periodic update check disabled")
 
     # --- Gateway Properties ---
 
@@ -926,8 +894,6 @@ class AppController(QObject):
             self._watcher.stop()
         if hasattr(self, "_scheduler") and self._scheduler.running:
             self._scheduler.shutdown(wait=False)
-        if hasattr(self, "_update_check_timer") and self._update_check_timer.isActive():
-            self._update_check_timer.stop()
         if self.ui._save_timer.isActive():
             self.ui._save_timer.stop()
             self.ui.saveUiState()

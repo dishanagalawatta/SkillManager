@@ -135,9 +135,6 @@ class AppConfig(BaseSettings):
     scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
     show_menu_icons: bool = True
     compact_menu: bool = False
-    auto_check_updates: bool = True
-    auto_download_updates: bool = False
-    update_check_interval_hours: int = Field(default=24, ge=1, le=168)
     skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
@@ -164,14 +161,6 @@ class AppConfig(BaseSettings):
             return float(value)
         except (ValueError, TypeError):
             return 1.0
-
-    @field_validator("update_check_interval_hours", mode="before")
-    @classmethod
-    def _coerce_int(cls, value: Any) -> int:
-        try:
-            return int(float(value))
-        except (ValueError, TypeError):
-            return 24
 
     @classmethod
     def from_legacy(cls, data: dict[str, Any]) -> AppConfig:
@@ -329,12 +318,10 @@ Annotation = (
 class AppUpdateState(BaseModel):
     model_config = ConfigDict(extra="ignore")
     is_checking: bool = False
-    is_updating: bool = False
     update_available: bool = False
     has_checked: bool = False
     current_version: str = ""
     latest_version: str = ""
-    progress: float = 0.0
     error: str | None = None
 
 

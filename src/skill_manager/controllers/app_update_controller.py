@@ -1,18 +1,17 @@
 """
-Purpose: Controller for application updates, delegating to AppUpdateService.
-Refactored to use Pydantic for state management and decoupled service logic.
+Purpose: Controller for checking if a newer SkillManager release exists
+on GitHub. No in-app download or install — opens the releases page.
 """
 
 import logging
 import sys
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices
 
 import skill_manager
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.config import get_app_data_dir
 from skill_manager.core.diagnostics import (
-    CATEGORY_APP_UPDATE_APPLIED,
     CATEGORY_APP_UPDATE_AVAILABLE,
     CATEGORY_APP_UPDATE_CHECK,
     CATEGORY_APP_UPDATE_FAILED,
@@ -20,38 +19,27 @@ from skill_manager.core.diagnostics import (
     CATEGORY_APP_UPDATE_UP_TO_DATE,
     get_diagnostic_logger,
 )
+from skill_manager.core.release_check_service import RELEASES_PAGE, check_latest_release
 from skill_manager.core.schemas import AppUpdateState
-from skill_manager.core.update_service import AppUpdateService
 
 logger = logging.getLogger(__name__)
 
 
 class AppUpdateController(BaseController):
-    """Controller for application updates."""
+    """Controller for checking application updates via GitHub Releases API."""
 
-    # QML Signals
-    updateStateChanged = Signal()
-    updateProgressChanged = Signal(float)
-
-    # Legacy signals for QML compatibility
     updateAvailableChanged = Signal()
     latestVersionChanged = Signal()
-    isUpdatingChanged = Signal()
     isCheckingForUpdatesChanged = Signal()
+    updateStateChanged = Signal()
 
     def __init__(self, app):
         super().__init__(app)
         self._diag = get_diagnostic_logger()
-
-        # Initialize State
         self._state = AppUpdateState(
-            current_version=skill_manager.__version__, latest_version=skill_manager.__version__
+            current_version=skill_manager.__version__,
+            latest_version=skill_manager.__version__,
         )
-
-        # Initialize Service
-        tuf_dir = get_app_data_dir() / "tuf"
-        target_dir = get_app_data_dir() / "updates"
-        self._service = AppUpdateService(tuf_dir, target_dir)
 
     # --- Properties ---
 
@@ -68,17 +56,8 @@ class AppUpdateController(BaseController):
         return self._state.current_version
 
     @Property(str, constant=True)
-    def downloadUrl(self):
-        # This is primarily for manual downloads if auto fails
-        return "https://github.com/dishanagalawatta/SkillManager/releases/latest"
-
-    @Property(bool, notify=isUpdatingChanged)
-    def isUpdating(self):
-        return self._state.is_updating
-
-    @Property(float, notify=updateProgressChanged)
-    def updateProgress(self):
-        return self._state.progress
+    def releaseUrl(self):
+        return RELEASES_PAGE
 
     @Property(bool, notify=isCheckingForUpdatesChanged)
     def isCheckingForUpdates(self):
@@ -93,11 +72,10 @@ class AppUpdateController(BaseController):
     @Slot()
     @Slot(bool)
     def checkForUpdates(self, manual=False):
-        """Checks for updates asynchronously using the service."""
-        if self._state.is_updating or self._state.is_checking:
+        """Checks for updates via GitHub Releases API."""
+        if self._state.is_checking:
             return
 
-        # Skip check in development mode unless manual
         if not getattr(sys, "frozen", False) and not manual:
             self._state.has_checked = True
             self._diag.log_event(
@@ -127,12 +105,12 @@ class AppUpdateController(BaseController):
             self.app._set_status("Checking for app updates...")
 
         if hasattr(self.app, "task_runner"):
-            # Wrap callback to handle results
+
             def on_checked(result):
                 new_version, error = result
                 self._on_updates_checked(new_version, manual, error)
 
-            self.app.task_runner.submit(self._service.check_for_updates, on_checked)
+            self.app.task_runner.submit(check_latest_release, on_checked)
         else:
             logger.warning("No task_runner found to check for updates.")
             self._state.is_checking = False
@@ -181,77 +159,12 @@ class AppUpdateController(BaseController):
             if manual:
                 self.app._set_status("SkillManager is up to date.")
 
-        # Emit all related signals
         self.isCheckingForUpdatesChanged.emit()
         self.updateAvailableChanged.emit()
         self.latestVersionChanged.emit()
         self.updateStateChanged.emit()
 
     @Slot()
-    def downloadAndApplyUpdate(self):
-        """Downloads and applies the update via the service."""
-        if self._state.is_updating or not self._state.update_available:
-            return
-
-        self._state.is_updating = True
-        self._state.progress = 0.0
-        self.isUpdatingChanged.emit()
-        self.updateProgressChanged.emit(0.0)
-
-        if hasattr(self.app, "task_runner"):
-            self.app.task_runner.run(self._apply_update_sync)
-        else:
-            logger.warning("No task_runner found to apply update.")
-            self._state.is_updating = False
-            self.isUpdatingChanged.emit()
-
-    def _apply_update_sync(self):
-        """Sync wrapper for service call in background thread."""
-        try:
-
-            def progress_callback(p):
-                self._state.progress = p
-                self.updateProgressChanged.emit(p)
-
-            success = self._service.apply_update(progress_callback=progress_callback)
-
-            if success:
-                logger.info("Update applied. Restart recommended.")
-                self._diag.log_event(
-                    "INFO",
-                    CATEGORY_APP_UPDATE_APPLIED,
-                    "Update applied successfully",
-                    data={
-                        "latest_version": self._state.latest_version,
-                        "current_version": self._state.current_version,
-                    },
-                )
-                self.app._set_status("Update applied. Please restart SkillManager.")
-            else:
-                self._diag.log_event(
-                    "ERROR",
-                    CATEGORY_APP_UPDATE_FAILED,
-                    "Update apply returned False",
-                    data={
-                        "latest_version": self._state.latest_version,
-                        "current_version": self._state.current_version,
-                    },
-                )
-                self.app._set_status("Update failed.")
-        except Exception as e:
-            logger.error("Apply update failed: %s", e)
-            self._diag.log_event(
-                "ERROR",
-                CATEGORY_APP_UPDATE_FAILED,
-                "Update apply raised exception",
-                data={
-                    "error": str(e),
-                    "latest_version": self._state.latest_version,
-                    "current_version": self._state.current_version,
-                },
-            )
-            self.app._set_status(f"Update error: {e}")
-        finally:
-            self._state.is_updating = False
-            self.isUpdatingChanged.emit()
-            self.updateStateChanged.emit()
+    def openReleasesPage(self):
+        """Opens the GitHub Releases page in the default browser."""
+        QDesktopServices.openUrl(QUrl(RELEASES_PAGE))

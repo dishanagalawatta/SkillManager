@@ -43,20 +43,6 @@ class TestConfigControllerSDET:
         controller.scrollSpeedMultiplier = "3.14"
         mock_app._config.set.assert_called_with("scroll_speed_multiplier", 3.14)
 
-    def test_update_interval_validation(self, controller, mock_app):
-        # Valid
-        controller.updateCheckIntervalHours = 48
-        mock_app._config.set.assert_called_with("update_check_interval_hours", 48)
-
-        # Out of range (max 168)
-        mock_app._config.reset_mock()
-        controller.updateCheckIntervalHours = 200
-        mock_app._config.set.assert_not_called()
-
-        # Negative
-        controller.updateCheckIntervalHours = -5
-        mock_app._config.set.assert_not_called()
-
     def test_update_mode_validation(self, controller, mock_app):
         # Valid
         controller.skillPackageAutoUpdateMode = "auto"

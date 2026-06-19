@@ -18,7 +18,7 @@ Releases are driven by **[python-semantic-release](https://python-semantic-relea
 2. CI runs and passes
 3. python-semantic-release automatically bumps version, creates tag + GitHub Release
 4. CI builds artifacts and attaches them to the release
-5. TUF publish deploys the update to gh-pages
+5. Users download updates from the GitHub Releases page
 
 ---
 

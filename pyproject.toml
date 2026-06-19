@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.5.4"
+version = "1.6.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
@@ -33,7 +33,6 @@ dependencies = [
     "orjson",
     "diskcache",
     "sentry-sdk",
-    "tufup>=0.10.0",
     "gitpython>=3.1.50",
     "apscheduler>=3.11.2",
     "pynput>=1.8.2",
@@ -74,7 +73,7 @@ where = ["src"]
 include = ["skill_manager*"]
 
 [tool.setuptools.package-data]
-skill_manager = ["assets/tuf/*", "assets/brand/*", "assets/ui/*", "assets/clients/*"]
+skill_manager = ["assets/brand/*", "assets/ui/*", "assets/clients/*"]
 
 
 [tool.coverage.run]

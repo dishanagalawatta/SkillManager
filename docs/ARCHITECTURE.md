@@ -23,7 +23,7 @@ To prevent the `AppController` from becoming a "God Object," responsibilities ar
 - **`DiscoveryController`**: Handles filesystem scanning for skills, project discovery, and initial data loading.
 - **`ScreenshotController`**: Manages screenshot capture workflow with region selection, PII redaction, and saving.
 - **`ImageInspectorController`**: Handles color isolation and pixel inspection within captured screenshots.
-- **`AppUpdateController`**: Manages application self-update checks, download, and installation via TUF.
+- **`AppUpdateController`**: Manages application self-update checks via GitHub Releases API.
 
 ### 2. Data Models (`core/models/`)
 
@@ -120,9 +120,9 @@ The project uses [release-please](https://github.com/googleapis/release-please-a
 3. **Build**: `windows-latest` × Python 3.12 + 3.13.
 4. **Artifact Publishing**: Native installer and portable ZIP attached to GitHub Release.
 
-### 4. TUF Secure Updates
-- `scripts/publish_tuf_release.py` manages the TUF repository for secure background updates.
-- Metadata and targets served via `gh-pages` branch.
+### 4. Application Updates
+- `AppUpdateController` checks the GitHub Releases API for new versions.
+- Users download updates manually from the GitHub Releases page.
 
 ---
 

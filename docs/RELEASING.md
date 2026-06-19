@@ -12,7 +12,7 @@ SkillManager uses [python-semantic-release](https://python-semantic-release.read
 2. Push to `main` → CI runs → Release workflow triggers
 3. python-semantic-release bumps version, creates tag + GitHub Release
 4. CI builds Windows artifacts and attaches them to the release
-5. TUF publish deploys the update to gh-pages → users auto-update
+5. Users download updates from the GitHub Releases page
 
 **Never push a version tag manually.**
 
@@ -59,14 +59,11 @@ When CI passes, the [Release workflow](../.github/workflows/release.yml) trigger
    - PyInstaller builds `SkillManager-Setup-{version}.exe` on Windows
    - Artifacts uploaded to GitHub Release
 
-3. **TUF Publish** job:
-   - Builds TUF bundle from artifacts
-   - Signs and publishes TUF metadata
-   - Deploys to `gh-pages` branch
+4. **GitHub Release** — Assets are attached to the release tag
 
-### 4. Users Receive the Update
+### 5. Users Receive the Update
 
-The installed app polls `gh-pages` for TUF metadata, finds the new version, and auto-updates.
+Users download the update manually from the GitHub Releases page.
 
 ---
 
@@ -95,7 +92,6 @@ Triggered when CI passes on `main`:
 1. **Semantic Release** — Version bump + tag + GitHub Release
 2. **Build** — PyInstaller on Windows
 3. **Attach** — Artifacts uploaded to GitHub Release
-4. **TUF Publish** — Deploy update metadata to gh-pages
 
 ---
 
@@ -119,19 +115,6 @@ Pre-release versions:
 
 ## Troubleshooting
 
-### TUF update not reaching users
-
-If the app doesn't auto-update after a release:
-
-1. **Check the TUF Publish job** in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml) — it should succeed with a "Repository published successfully" message.
-2. **If it failed with `Environment variable TUF_KEY_ROOT is not set`**, the signing key secrets are missing from the repo. Re-add them using the Setup instructions above.
-3. **Verify `gh-pages`** has the latest metadata:
-   ```bash
-   gh api repos/dishanagalawatta/SkillManager/contents/metadata --ref gh-pages | jq -r '.[].name'
-   ```
-   You should see a directory matching the latest version (e.g., `1.5.2`).
-4. **If `gh-pages` is stale**, the TUF deploy step in the release workflow failed — check the "Deploy to gh-pages" step logs.
-
 ### Semantic Release didn't create a release
 
 - Check that the commit subject contains `[patch]`, `[minor]`, `[major]`, or `[dev]`
@@ -150,38 +133,6 @@ If the app doesn't auto-update after a release:
 | Secret | Purpose | Required |
 |---|---|---|
 | `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
-| `TUF_KEY_ROOT` | TUF root signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_SNAPSHOT` | TUF snapshot signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_TARGETS` | TUF targets signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_TIMESTAMP` | TUF timestamp signing key (JSON) | Yes (for TUF publish) |
-
-### Setup
-
-The TUF signing keys are generated locally during initial repo setup (`python scripts/publish_tuf_release.py --init`) and stored in `tuf_keys/` (gitignored). Each key file is a single-line ed25519 JSON object.
-
-**Upload all 4 keys to GitHub:**
-
-```powershell
-# Run from repo root
-Get-Content tuf_keys/root -Raw | gh secret set TUF_KEY_ROOT --repo dishanagalawatta/SkillManager
-Get-Content tuf_keys/snapshot -Raw | gh secret set TUF_KEY_SNAPSHOT --repo dishanagalawatta/SkillManager
-Get-Content tuf_keys/targets -Raw | gh secret set TUF_KEY_TARGETS --repo dishanagalawatta/SkillManager
-Get-Content tuf_keys/timestamp -Raw | gh secret set TUF_KEY_TIMESTAMP --repo dishanagalawatta/SkillManager
-```
-
-Or set them via the GitHub UI: Settings → Secrets and variables → Actions → New repository secret.
-
-**To regenerate locally** (emergency only — you'll need to re-upload):
-
-```bash
-python scripts/publish_tuf_release.py --init
-```
-
-**If secrets are missing**, the TUF Publish job will fail with:
-
-```
-ERROR:__main__:Environment variable TUF_KEY_ROOT is not set
-```
 
 ---
 
@@ -191,6 +142,5 @@ ERROR:__main__:Environment variable TUF_KEY_ROOT is not set
 |---|---|
 | `pyproject.toml` `[tool.semantic_release]` | python-semantic-release config |
 | `src/skill_manager/commit_parser_optin.py` | Custom parser for `[patch]`/`[minor]`/`[major]`/`[dev]` tokens |
-| `.github/workflows/release.yml` | Release workflow (semantic-release + build + TUF) |
+| `.github/workflows/release.yml` | Release workflow (semantic-release + build + attach assets) |
 | `.github/workflows/_build-pyinstaller.yml` | Reusable build job |
-| `scripts/publish_tuf_release.py` | TUF publish script |

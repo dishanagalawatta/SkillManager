@@ -300,32 +300,6 @@ Item {
                                 color: Theme.separator
                             }
 
-                            RowLayout {
-                                Text {
-                                    text: "Auto Check for Updates"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.autoCheckUpdates : true
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoCheckUpdates = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Auto Download Updates"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.autoDownloadUpdates : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoDownloadUpdates = checked
-                                }
-                            }
-
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 1
@@ -367,33 +341,6 @@ Item {
                                         if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = model[index]
                                     }
                                     Layout.preferredWidth: 100
-                                }
-                            }
-
-                            RowLayout {
-                                spacing: 12
-                                ColumnLayout {
-                                    spacing: 2
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: "Check Interval"
-                                        font.family: Theme.fontFamily
-                                        color: Theme.label
-                                    }
-                                    Text {
-                                        text: "Every " + (AppController.config_controller ? AppController.config_controller.updateCheckIntervalHours : 24) + " hours"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        color: Theme.secondaryLabel
-                                    }
-                                }
-                                Slider {
-                                    Layout.preferredWidth: 150
-                                    from: 1
-                                    to: 168
-                                    stepSize: 1
-                                    value: AppController.config_controller ? AppController.config_controller.updateCheckIntervalHours : 24
-                                    onMoved: if (AppController.config_controller) AppController.config_controller.updateCheckIntervalHours = value
                                 }
                             }
                         }
@@ -622,55 +569,28 @@ Item {
                                     Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
 
                                     ActionButton {
-                                        labelText: "Release Notes"
+                                        labelText: "View Releases"
                                         role: "secondary"
-                                        visible: !AppController.app_update_controller.isUpdating
-                                        onClicked: (mouse) => Qt.openUrlExternally("https://github.com/dishanagalawatta/SkillManager/releases")
+                                        onClicked: (mouse) => AppController.app_update_controller.openReleasesPage()
                                     }
 
                                     ActionButton {
                                         id: updateNowBtn
                                         visible: !AppController.app_update_controller.isCheckingForUpdates
                                         labelText: {
-                                            if (AppController.app_update_controller.isUpdating) return "Updating..."
-                                            if (AppController.app_update_controller.updateAvailable) return "Update Now"
+                                            if (AppController.app_update_controller.updateAvailable) return "Update Available"
                                             if (AppController.app_update_controller.hasCheckedForUpdates) return "Up to Date"
                                             return "Check for Updates"
                                         }
-                                        role: (AppController.app_update_controller.updateAvailable && !AppController.app_update_controller.isUpdating) ? "primary" : "secondary"
+                                        role: (AppController.app_update_controller.updateAvailable) ? "primary" : "secondary"
                                         enabled: {
-                                            if (AppController.app_update_controller.isUpdating) return false
                                             if (AppController.app_update_controller.updateAvailable) return true
                                             if (AppController.app_update_controller.hasCheckedForUpdates) return false
                                             return true
                                         }
                                         onClicked: (mouse) => {
-                                            if (AppController.app_update_controller.updateAvailable) {
-                                                AppController.app_update_controller.downloadAndApplyUpdate()
-                                            } else {
-                                                AppController.app_update_controller.checkForUpdates(true)
-                                            }
+                                            AppController.app_update_controller.checkForUpdates(true)
                                         }
-                                    }
-                                }
-                            }
-
-                            // Update Progress Bar
-                            ProgressBar {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 4
-                                visible: AppController.app_update_controller.isUpdating
-                                value: AppController.app_update_controller.updateProgress
-                                background: Rectangle {
-                                    color: Theme.alpha(Theme.label, 0.1)
-                                    radius: 2
-                                }
-                                contentItem: Item {
-                                    Rectangle {
-                                        width: parent.visualPosition * parent.width
-                                        height: parent.height
-                                        color: Theme.accent
-                                        radius: 2
                                     }
                                 }
                             }
@@ -711,7 +631,7 @@ Item {
                                     color: Theme.secondaryLabel
                                 }
                                 Text {
-                                    text: "Powered by PySide6 and tufup"
+                                    text: "Powered by PySide6"
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.sizeCaption
                                     color: Theme.secondaryLabel
