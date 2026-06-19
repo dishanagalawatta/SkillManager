@@ -119,6 +119,19 @@ Pre-release versions:
 
 ## Troubleshooting
 
+### TUF update not reaching users
+
+If the app doesn't auto-update after a release:
+
+1. **Check the TUF Publish job** in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml) — it should succeed with a "Repository published successfully" message.
+2. **If it failed with `Environment variable TUF_KEY_ROOT is not set`**, the signing key secrets are missing from the repo. Re-add them using the Setup instructions above.
+3. **Verify `gh-pages`** has the latest metadata:
+   ```bash
+   gh api repos/dishanagalawatta/SkillManager/contents/metadata --ref gh-pages | jq -r '.[].name'
+   ```
+   You should see a directory matching the latest version (e.g., `1.5.2`).
+4. **If `gh-pages` is stale**, the TUF deploy step in the release workflow failed — check the "Deploy to gh-pages" step logs.
+
 ### Semantic Release didn't create a release
 
 - Check that the commit subject contains `[patch]`, `[minor]`, `[major]`, or `[dev]`
@@ -129,11 +142,6 @@ Pre-release versions:
 
 - Check the specific job in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
 - Common issues: missing system dependencies, PyInstaller hooks, Inno Setup path
-
-### TUF update not reaching users
-
-- Verify TUF metadata was pushed to `gh-pages`
-- Check that TUF signing keys are correctly configured as repository secrets
 
 ---
 
@@ -146,6 +154,34 @@ Pre-release versions:
 | `TUF_KEY_SNAPSHOT` | TUF snapshot signing key (JSON) | Yes (for TUF publish) |
 | `TUF_KEY_TARGETS` | TUF targets signing key (JSON) | Yes (for TUF publish) |
 | `TUF_KEY_TIMESTAMP` | TUF timestamp signing key (JSON) | Yes (for TUF publish) |
+
+### Setup
+
+The TUF signing keys are generated locally during initial repo setup (`python scripts/publish_tuf_release.py --init`) and stored in `tuf_keys/` (gitignored). Each key file is a single-line ed25519 JSON object.
+
+**Upload all 4 keys to GitHub:**
+
+```powershell
+# Run from repo root
+Get-Content tuf_keys/root -Raw | gh secret set TUF_KEY_ROOT --repo dishanagalawatta/SkillManager
+Get-Content tuf_keys/snapshot -Raw | gh secret set TUF_KEY_SNAPSHOT --repo dishanagalawatta/SkillManager
+Get-Content tuf_keys/targets -Raw | gh secret set TUF_KEY_TARGETS --repo dishanagalawatta/SkillManager
+Get-Content tuf_keys/timestamp -Raw | gh secret set TUF_KEY_TIMESTAMP --repo dishanagalawatta/SkillManager
+```
+
+Or set them via the GitHub UI: Settings → Secrets and variables → Actions → New repository secret.
+
+**To regenerate locally** (emergency only — you'll need to re-upload):
+
+```bash
+python scripts/publish_tuf_release.py --init
+```
+
+**If secrets are missing**, the TUF Publish job will fail with:
+
+```
+ERROR:__main__:Environment variable TUF_KEY_ROOT is not set
+```
 
 ---
 
