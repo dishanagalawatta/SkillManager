@@ -8,10 +8,15 @@ This script handles:
 
 Usage:
     python scripts/publish_tuf_release.py --version 1.0.1 --bundle dist/SkillManager
+
+    # CI mode: reads keys from environment variables (TUF_KEY_ROOT, TUF_KEY_SNAPSHOT, etc.)
+    python scripts/publish_tuf_release.py --version 1.0.1 --bundle dist/SkillManager --ci
 """
 
 import argparse
+import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -21,7 +26,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 REPO_DIR = Path("tuf_repo")
-KEYS_DIR = Path("tuf_keys")  # IMPORTANT: Keep these safe and DO NOT commit them!
+KEYS_DIR = Path("tuf_keys")
+
+KEY_NAMES = ["root", "snapshot", "targets", "timestamp"]
+
+
+def write_keys_from_env(target_dir: Path) -> None:
+    """Write TUF signing keys from environment variables to files."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    for key_name in KEY_NAMES:
+        env_var = f"TUF_KEY_{key_name.upper()}"
+        key_content = os.environ.get(env_var)
+
+        if not key_content:
+            logger.error(f"Environment variable {env_var} is not set")
+            sys.exit(1)
+
+        key_path = target_dir / key_name
+        try:
+            parsed = json.loads(key_content)
+            key_path.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+        except json.JSONDecodeError:
+            key_path.write_text(key_content, encoding="utf-8")
+
+        logger.info(f"Wrote {key_name} key from {env_var}")
 
 
 def main():
@@ -35,6 +64,11 @@ def main():
         action="store_true",
         help="Initialize the repository and keys if they don't exist.",
     )
+    parser.add_argument(
+        "--ci",
+        action="store_true",
+        help="CI mode: read signing keys from environment variables.",
+    )
 
     args = parser.parse_args()
     version = args.version
@@ -44,12 +78,17 @@ def main():
         logger.error(f"Bundle path does not exist: {bundle_path}")
         sys.exit(1)
 
-    # Ensure repo and keys directories exist
+    # Ensure repo directory exists
     REPO_DIR.mkdir(exist_ok=True)
-    KEYS_DIR.mkdir(exist_ok=True)
+
+    # Handle keys: CI reads from env vars, local reads from tuf_keys/
+    if args.ci:
+        logger.info("CI mode: reading TUF keys from environment variables")
+        write_keys_from_env(KEYS_DIR)
+    else:
+        KEYS_DIR.mkdir(exist_ok=True)
 
     # Initialize Repository object
-    # In a real environment, you would load your private keys here securely
     repo = Repository(
         repo_dir=str(REPO_DIR),
         keys_dir=str(KEYS_DIR),
@@ -62,11 +101,8 @@ def main():
         logger.warning(f"KEYS GENERATED IN {KEYS_DIR}. KEEP THEM SECRET AND BACKED UP!")
 
     # Create the release
-    # tufup expects a compressed archive of the app bundle
     logger.info(f"Adding release {version} from {bundle_path}...")
 
-    # tufup handles archiving and patching automatically when we call add_bundle
-    # It will create a .tar.gz in the targets directory
     try:
         repo.add_bundle(new_version=version, new_bundle_dir=str(bundle_path))
         logger.info("Release bundle added successfully.")

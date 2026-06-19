@@ -6,13 +6,13 @@ This document explains the full release lifecycle — from writing a commit to u
 
 ## Overview
 
-SkillManager uses [release-please](https://github.com/googleapis/release-please-action) to automate releases. The pipeline is fully automated:
+SkillManager uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in release tokens. The pipeline is fully automated:
 
-1. You write a commit following [Conventional Commits](https://www.conventionalcommits.org/)
-2. Release-please opens/updates a Release PR
-3. A maintainer merges the Release PR → creates a git tag + GitHub Release
+1. You write a commit with an opt-in token (`[patch]`, `[minor]`, `[major]`, `[dev]`)
+2. Push to `main` → CI runs → Release workflow triggers
+3. python-semantic-release bumps version, creates tag + GitHub Release
 4. CI builds Windows artifacts and attaches them to the release
-5. Users receive the update via TUF (manual post-release step)
+5. TUF publish deploys the update to gh-pages → users auto-update
 
 **Never push a version tag manually.**
 
@@ -20,63 +20,53 @@ SkillManager uses [release-please](https://github.com/googleapis/release-please-
 
 ## How It Works (Step by Step)
 
-### 1. Write Conventional Commits
+### 1. Write a Commit with an Opt-In Token
 
-Every commit to `main` or `develop` must follow [Conventional Commits](https://www.conventionalcommits.org/):
+Every commit to `main` must include exactly one release token in the commit subject:
 
-| Prefix | Type | Bump | Example |
-|---|---|---|---|
-| `feat:` | New feature | Minor | `feat: add new view` |
-| `fix:` | Bug fix | Patch | `fix: ui alignment` |
-| `perf:` | Performance | Patch | `perf: optimize search` |
-| `feat!:` | Breaking change | Major | `feat!: redesign API` |
-| `docs:`, `test:`, `chore:`, `ci:` | Maintenance | None | `docs: update README` |
-
-### 2. Release-please Creates a Release PR
-
-After you push to `main`, release-please automatically:
-- Analyzes your commits since the last release
-- Determines the next version based on commit types
-- Opens (or updates) a Release PR with:
-  - Updated version in `pyproject.toml` and `__init__.py`
-  - Auto-generated `CHANGELOG.md` entries
-  - A new git tag reference
-
-The Release PR is titled: `chore: release v<version>`
-
-### 3. Merge the Release PR
-
-When a maintainer merges the Release PR:
-- A git tag `v<version>` is created
-- A GitHub Release is published with the auto-generated changelog
-- The CI build pipeline is triggered
-
-### 4. CI Builds Artifacts
-
-The [release workflow](../.github/workflows/release.yml) runs the [build job](../.github/workflows/_build-pyinstaller.yml) on Windows:
-
-| OS | Artifact | Built By |
+| Token | Bump | Example |
 |---|---|---|
-| Windows | `SkillManager-Setup-{version}.exe` | Inno Setup |
+| `[patch]` | Patch (`x.y.z` → `x.y.(z+1)`) | `fix: ui alignment [patch]` |
+| `[minor]` | Minor (`x.y.z` → `x.(y+1).0`) | `feat: add new view [minor]` |
+| `[major]` | Major (`x.y.z` → `(x+1).0.0`) | `feat!: redesign API [major]` |
+| `[dev]` | Pre-release (`x.y.z-dev.N`) | `fix: experimental change [dev]` |
 
-Artifacts are automatically attached to the GitHub Release.
+Commits **without** a token are ignored by the release system. This prevents accidental version bumps from `docs:`, `chore:`, `ci:`, etc.
 
-### 5. Publish TUF Update (Manual)
+### 2. CI Runs
 
-After the release is published, you must manually publish the TUF update so users receive it via the auto-update mechanism:
+After you push to `main`, the [CI workflow](../.github/workflows/ci.yml) runs:
+1. **Lint** — `ruff check` + `ruff format --check`
+2. **Test** — `{windows}` × `{3.12, 3.13}`
+3. **Security** — `pip-audit` (non-blocking)
+4. **CI Gate** — All checks pass
 
-```bash
-# Build the update bundle
-uv run python scripts/build_app.py
+### 3. Release Workflow Triggers
 
-# Publish to TUF repository
-uv run python scripts/publish_tuf_release.py --version <version> --bundle dist/SkillManager
+When CI passes, the [Release workflow](../.github/workflows/release.yml) triggers automatically:
 
-# Deploy to GitHub Pages
-# (push tuf_repo/metadata and tuf_repo/targets to gh-pages branch)
-```
+1. **Semantic Release** job:
+   - Analyzes commits since the last release
+   - Detects opt-in tokens (`[patch]`, `[minor]`, `[major]`, `[dev]`)
+   - If `[dev]` is found in the latest commit → creates a pre-release (`x.y.z-dev.N`)
+   - Bumps version in `pyproject.toml` and `__init__.py`
+   - Generates `CHANGELOG.md`
+   - Commits `chore(release): X.Y.Z [skip ci]` to `main`
+   - Creates git tag `vX.Y.Z`
+   - Creates GitHub Release with auto-generated changelog
 
-See [DEVELOPMENT.md](DEVELOPMENT.md#auto-update-releases-tufup) for detailed instructions.
+2. **Build** job:
+   - PyInstaller builds `SkillManager-Setup-{version}.exe` on Windows
+   - Artifacts uploaded to GitHub Release
+
+3. **TUF Publish** job:
+   - Builds TUF bundle from artifacts
+   - Signs and publishes TUF metadata
+   - Deploys to `gh-pages` branch
+
+### 4. Users Receive the Update
+
+The installed app polls `gh-pages` for TUF metadata, finds the new version, and auto-updates.
 
 ---
 
@@ -84,8 +74,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md#auto-update-releases-tufup) for detailed ins
 
 | Branch | Purpose | Release Type | Example |
 |---|---|---|---|
-| `main` | Stable releases | `v1.5.0` | Production-ready |
-| `develop` | Pre-releases | `v1.5.1-dev.1` | Testing/validation |
+| `main` | Stable releases | `vX.Y.Z` | Production-ready |
+| `main` + `[dev]` token | Pre-releases | `vX.Y.Z-dev.N` | Testing/validation |
 
 ---
 
@@ -101,19 +91,39 @@ Every PR triggers:
 
 ### Release Pipeline (`release.yml`)
 
-Triggered by merging a Release PR:
-1. **Build** — PyInstaller on Windows
-2. **Attach** — Artifacts uploaded to GitHub Release
+Triggered when CI passes on `main`:
+1. **Semantic Release** — Version bump + tag + GitHub Release
+2. **Build** — PyInstaller on Windows
+3. **Attach** — Artifacts uploaded to GitHub Release
+4. **TUF Publish** — Deploy update metadata to gh-pages
+
+---
+
+## Pre-Releases
+
+When you include `[dev]` in a commit subject, the release workflow creates a **pre-release** version:
+
+```
+fix: experiment with new UI [dev]
+```
+
+This produces: `v2.0.1-dev.1` (pre-release)
+
+Pre-release versions:
+- Have lower precedence than stable versions (`2.0.1-dev.1` < `2.0.1`)
+- Are marked as pre-release on GitHub
+- Are received by users who opted into dev updates
+- The pre-release counter increments automatically (`-dev.1`, `-dev.2`, etc.)
 
 ---
 
 ## Troubleshooting
 
-### Release-please didn't create a Release PR
+### Semantic Release didn't create a release
 
-- Check that commits follow Conventional Commits format
-- Check the [release-please-action logs](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
-- Verify `.github/release-please-config.json` is correct
+- Check that the commit subject contains `[patch]`, `[minor]`, `[major]`, or `[dev]`
+- Check that CI passed before the Release workflow triggered
+- Check the [Release workflow logs](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
 
 ### Build failed
 
@@ -122,8 +132,20 @@ Triggered by merging a Release PR:
 
 ### TUF update not reaching users
 
-- Verify `tuf_repo/metadata` and `tuf_repo/targets` are pushed to `gh-pages`
-- Check that the version in `.release-please-manifest.json` matches the release
+- Verify TUF metadata was pushed to `gh-pages`
+- Check that TUF signing keys are correctly configured as repository secrets
+
+---
+
+## Required Secrets
+
+| Secret | Purpose | Required |
+|---|---|---|
+| `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
+| `TUF_KEY_ROOT` | TUF root signing key (JSON) | Yes (for TUF publish) |
+| `TUF_KEY_SNAPSHOT` | TUF snapshot signing key (JSON) | Yes (for TUF publish) |
+| `TUF_KEY_TARGETS` | TUF targets signing key (JSON) | Yes (for TUF publish) |
+| `TUF_KEY_TIMESTAMP` | TUF timestamp signing key (JSON) | Yes (for TUF publish) |
 
 ---
 
@@ -131,9 +153,8 @@ Triggered by merging a Release PR:
 
 | File | Purpose |
 |---|---|
-| `.github/release-please-config.json` | Package config, changelog sections, extra files |
-| `.github/.release-please-manifest.json` | Current version tracking |
-| `.github/workflows/release.yml` | Release workflow (release-please + build) |
+| `pyproject.toml` `[tool.semantic_release]` | python-semantic-release config |
+| `src/skill_manager/commit_parser_optin.py` | Custom parser for `[patch]`/`[minor]`/`[major]`/`[dev]` tokens |
+| `.github/workflows/release.yml` | Release workflow (semantic-release + build + TUF) |
 | `.github/workflows/_build-pyinstaller.yml` | Reusable build job |
-| `scripts/build_app.py` | PyInstaller build script |
 | `scripts/publish_tuf_release.py` | TUF publish script |

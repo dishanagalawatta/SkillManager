@@ -9,39 +9,71 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  release-please:
-    name: Release Please
+  semantic-release:
+    name: Semantic Release
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      released: ${{ steps.release.outputs.released }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      - name: Run release-please
-        id: release
-        uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4.2.0
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          config-file: .github/release-please-config.json
-          manifest-file: .github/.release-please-manifest.json
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Check for [dev] token
+        id: check-dev
+        run: |
+          LATEST_MSG=$(git log -1 --pretty=%B)
+          if echo "$LATEST_MSG" | grep -q '\[dev\]'; then
+            echo "dev_flag=--as-prerelease" >> $GITHUB_OUTPUT
+            echo "Detected [dev] token — will create pre-release"
+          else
+            echo "dev_flag=" >> $GITHUB_OUTPUT
+            echo "No [dev] token — will create stable release"
+          fi
+
+      - name: Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10.5.3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          root_options: ${{ steps.check-dev.outputs.dev_flag }}
 
   build:
     name: Build
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    needs: semantic-release
+    if: needs.semantic-release.outputs.released == 'true'
     uses: ./.github/workflows/_build-pyinstaller.yml
     with:
-      ref: ${{ needs.release-please.outputs.tag_name }}
+      ref: v${{ needs.semantic-release.outputs.version }}
 
   attach-assets:
     name: Attach Assets
-    needs: [release-please, build]
-    if: needs.release-please.outputs.release_created == 'true'
+    needs: [semantic-release, build]
+    if: needs.semantic-release.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -59,15 +91,77 @@ jobs:
             echo "Warning: No build artifacts found"
           fi
 
-      - name: Update GitHub Release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: v${{ needs.semantic-release.outputs.version }}
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.zip
-          prerelease: ${{ contains(needs.release-please.outputs.version, '-') }}
+          prerelease: ${{ contains(needs.semantic-release.outputs.version, '-') }}
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tuf-publish:
+    name: TUF Publish
+    needs: [semantic-release, attach-assets]
+    if: needs.semantic-release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+
+      - name: Prepare TUF signing keys
+        env:
+          TUF_KEY_ROOT: ${{ secrets.TUF_KEY_ROOT }}
+          TUF_KEY_SNAPSHOT: ${{ secrets.TUF_KEY_SNAPSHOT }}
+          TUF_KEY_TARGETS: ${{ secrets.TUF_KEY_TARGETS }}
+          TUF_KEY_TIMESTAMP: ${{ secrets.TUF_KEY_TIMESTAMP }}
+        run: |
+          mkdir -p tuf_keys
+          echo "$TUF_KEY_ROOT" > tuf_keys/root
+          echo "$TUF_KEY_SNAPSHOT" > tuf_keys/snapshot
+          echo "$TUF_KEY_TARGETS" > tuf_keys/targets
+          echo "$TUF_KEY_TIMESTAMP" > tuf_keys/timestamp
+
+      - name: Publish TUF release
+        run: |
+          uv run python scripts/publish_tuf_release.py \
+            --version ${{ needs.semantic-release.outputs.version }} \
+            --bundle dist/artifacts-windows \
+            --ci
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./tuf_repo
+          publish_branch: gh-pages
+          keep_files: true
+          force_orphan: false

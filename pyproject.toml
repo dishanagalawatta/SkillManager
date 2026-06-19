@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.5.0"
+version = "2.0.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
@@ -107,6 +107,7 @@ dev = [
     "pytest-xdist",
     "pytest-sugar",
     "pip-audit",
+    "python-semantic-release>=10.5.3",
 ]
 
 
@@ -114,3 +115,22 @@ dev = [
 filterwarnings = [
     "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
 ]
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/skill_manager/__init__.py:__version__"]
+branch = "main"
+upload_to_pypi = false
+build_command = ""
+changelog_file = "CHANGELOG.md"
+
+commit_parser = "skill_manager.commit_parser_optin:OptInCommitParser"
+
+changelog.exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''Initial [Cc]ommit.*''',
+]
+
+tag_format = "v{version}"
