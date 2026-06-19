@@ -569,12 +569,6 @@ Item {
                                     Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
 
                                     ActionButton {
-                                        labelText: "View Releases"
-                                        role: "secondary"
-                                        onClicked: (mouse) => AppController.app_update_controller.openReleasesPage()
-                                    }
-
-                                    ActionButton {
                                         id: updateNowBtn
                                         visible: !AppController.app_update_controller.isCheckingForUpdates
                                         labelText: {
@@ -589,7 +583,11 @@ Item {
                                             return true
                                         }
                                         onClicked: (mouse) => {
-                                            AppController.app_update_controller.checkForUpdates(true)
+                                            if (AppController.app_update_controller.updateAvailable) {
+                                                AppController.app_update_controller.openReleasesPage()
+                                            } else {
+                                                AppController.app_update_controller.checkForUpdates(true)
+                                            }
                                         }
                                     }
                                 }

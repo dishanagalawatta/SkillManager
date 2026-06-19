@@ -6,6 +6,7 @@ on GitHub. No in-app download or install — opens the releases page.
 import logging
 import sys
 
+from packaging.version import InvalidVersion, Version
 from PySide6.QtCore import Property, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 
@@ -133,20 +134,42 @@ class AppUpdateController(BaseController):
             if manual:
                 self.app._set_status(f"Update check failed: {error}")
         elif new_version:
-            logger.info("Update available: %s", new_version)
             self._state.latest_version = new_version
-            self._state.update_available = True
-            self._diag.log_event(
-                "INFO",
-                CATEGORY_APP_UPDATE_AVAILABLE,
-                "Update available",
-                data={
-                    "latest_version": new_version,
-                    "current_version": self._state.current_version,
-                },
-            )
-            if manual:
-                self.app._set_status(f"Update available: v{new_version}")
+            try:
+                is_newer = Version(new_version) > Version(self._state.current_version)
+            except InvalidVersion:
+                logger.warning("Could not parse version strings for comparison: %s vs %s",
+                               new_version, self._state.current_version)
+                is_newer = False
+
+            if is_newer:
+                logger.info("Update available: %s", new_version)
+                self._state.update_available = True
+                self._diag.log_event(
+                    "INFO",
+                    CATEGORY_APP_UPDATE_AVAILABLE,
+                    "Update available",
+                    data={
+                        "latest_version": new_version,
+                        "current_version": self._state.current_version,
+                    },
+                )
+                if manual:
+                    self.app._set_status(f"Update available: v{new_version}")
+            else:
+                logger.info("SkillManager is up to date.")
+                self._state.update_available = False
+                self._diag.log_event(
+                    "INFO",
+                    CATEGORY_APP_UPDATE_UP_TO_DATE,
+                    "SkillManager is up to date",
+                    data={
+                        "latest_version": new_version,
+                        "current_version": self._state.current_version,
+                    },
+                )
+                if manual:
+                    self.app._set_status("SkillManager is up to date.")
         else:
             logger.info("SkillManager is up to date.")
             self._state.update_available = False
