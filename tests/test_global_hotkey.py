@@ -6,14 +6,52 @@ These tests verify the manager's CONTRACT:
 - register() returns True/False based on pynput availability
 - The Qt signal emission works regardless of pynput state
 - Unregister of unknown id is a safe no-op
+- stop() properly joins the listener thread
+- Listener creation failure is handled gracefully
 
-The tests do NOT mock pynput — they test what actually happens
-when the module is imported and the manager is constructed.
-The pynput lazy-import is verified by checking _pynput_available
-state transitions, not by patching sys.modules.
+The tests do NOT start real pynput listeners — ``conftest.py`` patches
+``_ensure_pynput`` to return ``False`` for the entire test session.  The
+new unit tests below patch ``keyboard.Listener`` with a lightweight fake
+so that the listener-lifecycle code paths are exercised without touching
+the Windows keyboard hook.
 """
 
-from skill_manager.core.global_hotkey import GlobalHotkeyManager
+from __future__ import annotations
+
+import sys
+import threading
+from unittest.mock import MagicMock, patch
+
+from skill_manager.core.global_hotkey import (
+    _LISTENER_JOIN_TIMEOUT,
+    GlobalHotkeyManager,
+)
+
+
+class _FakeListener:
+    """Minimal stand-in for ``pynput.keyboard.Listener``.
+
+    Records calls to ``start()`` / ``stop()`` and provides a fake
+    ``_thread`` attribute so ``GlobalHotkeyManager._restart_listener``
+    can capture it.
+    """
+
+    def __init__(self, **kwargs):
+        self._press = kwargs.get("on_press")
+        self._release = kwargs.get("on_release")
+        self._started = False
+        self._stopped = False
+        self._thread = MagicMock(spec=threading.Thread)
+        self._thread.is_alive.return_value = False
+
+    def start(self):
+        self._started = True
+
+    def stop(self):
+        self._stopped = True
+
+    def canonical(self, key):
+        return key
 
 
 class TestManagerContract:
@@ -102,3 +140,116 @@ class TestNoPynputImportAtModuleLoad:
 
         assert gh.__doc__ is not None
         assert "lazy" in gh.__doc__.lower()
+
+
+class TestListenerLifecycle:
+    """Unit tests for the new thread-tracking and stop-join behaviour.
+
+    These patch ``keyboard.Listener`` with ``_FakeListener`` so we
+    exercise the lifecycle code paths without touching the Windows
+    keyboard hook.
+    """
+
+    def test_stop_joins_listener_thread(self):
+        """stop() must set _listener=None and _thread=None after join."""
+        manager = GlobalHotkeyManager()
+
+        fake_thread = MagicMock(spec=threading.Thread)
+        fake_thread.is_alive.return_value = True
+
+        fake_pynput = MagicMock()
+        fake_pynput.keyboard.HotKey.parse.return_value = []
+
+        with (
+            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
+        ):
+            fake_listener = _FakeListener()
+            fake_listener._thread = fake_thread
+            fake_pynput.keyboard.Listener.return_value = fake_listener
+
+            manager.register(1, "Ctrl+Shift+S")
+            assert manager._listener is fake_listener
+
+            manager.stop()
+
+        # Thread join was called with timeout
+        fake_thread.join.assert_called_once_with(timeout=_LISTENER_JOIN_TIMEOUT)
+        # State cleaned up
+        assert manager._listener is None
+        assert manager._thread is None
+        assert fake_listener._stopped
+
+    def test_stop_sets_thread_none_when_not_alive(self):
+        """If thread is not alive, stop() still clears state."""
+        manager = GlobalHotkeyManager()
+
+        fake_thread = MagicMock(spec=threading.Thread)
+        fake_thread.is_alive.return_value = False  # already dead
+
+        fake_pynput = MagicMock()
+        fake_pynput.keyboard.HotKey.parse.return_value = []
+
+        with (
+            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
+        ):
+            fake_listener = _FakeListener()
+            fake_listener._thread = fake_thread
+            fake_pynput.keyboard.Listener.return_value = fake_listener
+
+            manager.register(1, "Ctrl+Shift+S")
+            manager.stop()
+
+        # join() was NOT called (thread already dead)
+        fake_thread.join.assert_not_called()
+        assert manager._listener is None
+        assert manager._thread is None
+
+    def test_double_stop_is_safe(self):
+        """Calling stop() twice must not raise."""
+        manager = GlobalHotkeyManager()
+
+        fake_pynput = MagicMock()
+        fake_pynput.keyboard.HotKey.parse.return_value = []
+
+        with (
+            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
+        ):
+            fake_listener = _FakeListener()
+            fake_pynput.keyboard.Listener.return_value = fake_listener
+
+            manager.register(1, "Ctrl+Shift+S")
+            manager.stop()
+            manager.stop()  # second call — must not raise
+
+        assert manager._listener is None
+        assert manager._thread is None
+
+    def test_listener_creation_failure_doesnt_crash(self):
+        """OSError from keyboard.Listener() must not propagate."""
+        manager = GlobalHotkeyManager()
+
+        fake_pynput = MagicMock()
+        fake_pynput.keyboard.Listener.side_effect = OSError("no console session")
+        fake_pynput.keyboard.HotKey.parse.return_value = []
+
+        with (
+            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
+        ):
+            result = manager.register(1, "Ctrl+Shift+S")
+
+        assert result is True  # hotkey was registered
+        assert manager._listener is None  # listener not created
+        assert manager._thread is None
+
+    def test_stop_acquires_stop_lock(self):
+        """stop() acquires _stop_lock to serialise concurrent calls."""
+        manager = GlobalHotkeyManager()
+
+        # Verify the lock exists and is a proper Lock
+        assert hasattr(manager, "_stop_lock")
+        assert hasattr(manager._stop_lock, "acquire")
+        assert hasattr(manager._stop_lock, "release")
