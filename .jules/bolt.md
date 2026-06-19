@@ -17,3 +17,7 @@
 ## 2024-05-22 - Optimize category lookup mappings
 **Learning:** In code traversing configuration or constant mappings (like `MAIN_CATEGORIES_MAPPING`), performing loops and list comprehensions (e.g. `[s.lower() for s in sub_cats]`) within a frequently accessed function creates significant O(N) overhead.
 **Action:** Pre-compute reverse mappings (e.g., lowercased subcategory to main category) at module load time to convert O(N) runtime iterations into fast O(1) dictionary lookups.
+
+## 2024-06-19 - Use rapidfuzz.process.extractOne instead of manual loops
+**Learning:** In the fuzzy search scoring loop, manually iterating over an array of text tokens and applying `fuzz.ratio` sequentially via Python loops is slow due to iteration and function call overhead.
+**Action:** Replace nested Python iteration loops with `rapidfuzz.process.extractOne(..., scorer=fuzz.ratio, score_cutoff=...)`. This delegates operations to highly optimized C extensions and skips excessive Python iterations, leading to massive speedups in hot paths.
