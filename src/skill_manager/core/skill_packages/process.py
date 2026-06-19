@@ -19,7 +19,7 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        text = re.sub(r"(echo password=).*", r"\1***", text)
+        text = re.sub(r"(echo password=)(?:'((?:\\.|[^'\\])*)'|\"((?:\\.|[^\"\\])*)\"|(?!['\"])([^;\r\n]+))", r"\1***", text)
     return text
 
 
@@ -76,8 +76,10 @@ def run_process(
         "encoding": "utf-8",
         "errors": "replace",
         "bufsize": 1,
-        "creationflags": subprocess.CREATE_NO_WINDOW,
     }
+
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     process = subprocess.Popen(command, **kwargs)
     last_emit_time = 0

@@ -32,3 +32,8 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+
+## 2024-05-27 - [Greedy Regex in Secret Redaction Causing Log Truncation / Leakage]
+**Vulnerability:** A regex designed to strip secrets from process output used `.*` (e.g., `re.sub(r"(echo password=).*", r"\1***", text)`). This greedy approach either truncates subsequent valid commands on the same line if no quotes are present, or fails to redact properly across lines.
+**Learning:** Using greedy matching without considering quote boundaries or command separators (like `;` or newlines) for structured strings is dangerous. It can lead to unintended log truncation (hiding other execution details) or incomplete redaction if the text spans multiple lines.
+**Prevention:** When matching values in structured shell commands, explicitly match quoted strings handling escapes, and unquoted strings halting at command delimiters (e.g., `re.sub(r"(echo password=)(?:'((?:\\.|[^'\\])*)'|\"((?:\\.|[^\"\\])*)\"|(?!['\"])([^;\r\n]+))", r"\1***", text)`).
