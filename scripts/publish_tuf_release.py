@@ -95,7 +95,10 @@ def main():
         app_name="SkillManager",
     )
 
-    if args.init:
+    # Auto-initialize if repo has no metadata (first run in CI)
+    metadata_dir = REPO_DIR / "metadata"
+    needs_init = args.init or not metadata_dir.exists() or not any(metadata_dir.iterdir())
+    if needs_init:
         logger.info("Initializing TUF repository and keys...")
         repo.initialize()
         logger.warning(f"KEYS GENERATED IN {KEYS_DIR}. KEEP THEM SECRET AND BACKED UP!")
