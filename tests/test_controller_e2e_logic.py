@@ -61,7 +61,12 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     # Force a refresh
     controller.refreshSkills()
 
-    return controller
+    yield controller
+
+    # Teardown: stop all timers, signal connections, and background tasks
+    # to prevent leaked QTimers from causing access violations when
+    # pytestqt._process_events processes events between tests.
+    controller.on_quit()
 
 
 def test_controller_navigation_workflow(app_controller):
