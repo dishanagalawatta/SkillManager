@@ -1,11 +1,28 @@
+"""File system watcher using watchdog (lazy-loaded).
+
+Architecture:
+- ``SkillFolderEventHandler`` inherits from watchdog's ``FileSystemEventHandler``
+  (required at class definition time for proper event dispatch)
+- ``Observer`` is lazy-imported in ``SkillFolderWatcher.__init__`` to defer
+  the native-extension load until the watcher is actually constructed
+- Graceful degradation: if watchdog is unavailable, the watcher silently
+  no-ops on ``start()`` instead of crashing the import chain
+"""
+
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+if TYPE_CHECKING:
+    from watchdog.events import FileSystemEvent
+
+logger = logging.getLogger(__name__)
 
 
 class SkillFolderEventHandler(FileSystemEventHandler):
@@ -58,11 +75,17 @@ class SkillFolderWatcher:
     def __init__(self, paths: list[str], callback: Callable[[str], None], debounce_ms: int = 300):
         self._paths = [Path(path).expanduser() for path in paths if path]
         self._handler = SkillFolderEventHandler(callback, debounce_ms=debounce_ms)
-        self._observer = Observer()
         self._started = False
+        self._observer = None  # type: ignore[assignment]
+        try:
+            from watchdog.observers import Observer
+
+            self._observer = Observer()
+        except (ImportError, OSError) as e:
+            logger.warning("watchdog unavailable: %s. Folder watching disabled.", e)
 
     def start(self) -> None:
-        if self._started:
+        if self._started or self._observer is None:
             return
         for path in self._paths:
             if path.is_dir():
@@ -71,7 +94,7 @@ class SkillFolderWatcher:
         self._started = True
 
     def stop(self) -> None:
-        if not self._started:
+        if not self._started or self._observer is None:
             return
         self._handler.cancel()
         self._observer.stop()
