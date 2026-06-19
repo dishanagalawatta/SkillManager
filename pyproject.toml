@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "2.0.0"
+version = "1.5.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
@@ -125,7 +125,7 @@ upload_to_pypi = false
 build_command = ""
 changelog_file = "CHANGELOG.md"
 
-commit_parser = "skill_manager.commit_parser_optin:OptInCommitParser"
+commit_parser = "src/skill_manager/commit_parser_optin.py:OptInCommitParser"
 
 changelog.exclude_commit_patterns = [
     '''chore(?:\([^)]*?\))?: .+''',
