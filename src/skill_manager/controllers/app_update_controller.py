@@ -138,8 +138,11 @@ class AppUpdateController(BaseController):
             try:
                 is_newer = Version(new_version) > Version(self._state.current_version)
             except InvalidVersion:
-                logger.warning("Could not parse version strings for comparison: %s vs %s",
-                               new_version, self._state.current_version)
+                logger.warning(
+                    "Could not parse version strings for comparison: %s vs %s",
+                    new_version,
+                    self._state.current_version,
+                )
                 is_newer = False
 
             if is_newer:
