@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // LSP servers. Disabled by default in opencode — must be enabled explicitly.
+  // All entries here are fully-explicit; no built-in auto-load.
+  "lsp": {
+    // pyright (Python language server).
+    // Uses the globally installed pyright-langserver on PATH.
+    // Reads .pyrightconfig.json automatically for type-check mode,
+    // includes/excludes, venv path, and Python 3.12 platform.
+    "pyright": {
+      "command": ["pyright-langserver", "--stdio"],
+      "extensions": [".py", ".pyi"]
+    },
+
+    // qmlls (Qt official QML language server).
+    // Shipped with PySide6 (already a project dep); no extra install needed.
+    // Path points into the project venv; venv is gitignored so path is stable locally.
+    "qmlls": {
+      "command": [".venv/Lib/site-packages/PySide6/qmlls.exe", "--stdio"],
+      "extensions": [".qml"]
+    }
+  }
+}
