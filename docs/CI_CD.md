@@ -9,7 +9,7 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 ```
 .github/workflows/
 ├── ci.yml                    # PR + main/develop push gate
-├── release.yml               # semantic-release + build + TUF publish
+├── release.yml               # semantic-release + build + attach assets
 ├── _lint.yml                 # Ruff check + format (reusable)
 ├── _test-python.yml          # Test on Windows (reusable)
 ├── _build-pyinstaller.yml    # PyInstaller build for Windows (reusable)
@@ -40,8 +40,7 @@ Push to main (with [patch]/[minor]/[major]/[dev] token)
               └─► Semantic Release (version bump + tag + GitHub Release)
                     └─► Build (PyInstaller on Windows)
                           └─► Attach Assets (upload to GitHub Release)
-                                └─► TUF Publish (deploy to gh-pages)
-                                      └─► Users auto-update
+                                └─► Users download from GitHub Releases
 ```
 
 The Release workflow is gated on CI success via `workflow_run` trigger.
@@ -91,10 +90,6 @@ Apply via GitHub UI or `gh api`:
 | Secret | Purpose | Required |
 |---|---|---|
 | `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
-| `TUF_KEY_ROOT` | TUF root signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_SNAPSHOT` | TUF snapshot signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_TARGETS` | TUF targets signing key (JSON) | Yes (for TUF publish) |
-| `TUF_KEY_TIMESTAMP` | TUF timestamp signing key (JSON) | Yes (for TUF publish) |
 
 ### Suppressed CVEs
 

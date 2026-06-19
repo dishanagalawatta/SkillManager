@@ -21,13 +21,4 @@ in this app's threat model** and are suppressed via `pip-audit --ignore-vuln`.
   The CVE does not materially increase the attack surface.
 - **Revisit when**: `diskcache` releases a version >= 5.6.4 with a fix.
 
-### GHSA-qp9x-wp8f-qgjj — `tuf 4.0.0` (case-insensitive path matching on Windows)
 
-- **Status**: Unfixed in our tree. Requires `tufup` upgrade, but `tufup==0.10.0`
-  is the latest on PyPI and pins `tuf==4.0.*`.
-- **Pre-condition**: TUF repo with case-colliding delegation patterns AND
-  attacker controls a delegated role AND client runs on Windows.
-- **Why suppressed**: SkillManager's TUF repo is configured by the developer,
-  not by external attackers. There are no case-colliding delegations in the
-  current configuration.
-- **Revisit when**: `tufup` releases a version compatible with `tuf>=7.0.0`.

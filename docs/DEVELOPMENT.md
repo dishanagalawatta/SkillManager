@@ -15,7 +15,7 @@ Welcome to the SkillManager development engine room. This guide covers environme
 - **CI/CD**: GitHub Actions with `release-please`
 - **Error Tracking**: Sentry
 - **Analytics**: PostHog
-- **Secure Updates**: TUF (The Update Framework)
+
 
 ---
 
@@ -118,27 +118,6 @@ To build locally for testing:
 3. **Windows Installer**:
    Compile `packaging/windows/installer.iss` using Inno Setup to generate `SkillManager_Setup.exe`.
 
-### Auto-Update Releases (Tufup)
-We use `tufup` (The Update Framework) for secure background updates.
-
-1. **Initialize Repository** (First time only):
-   ```bash
-   uv run python scripts/publish_tuf_release.py --version 1.0.0 --bundle dist/SkillManager --init
-   ```
-   **CRITICAL SECURITY:** This generates private keys in `tuf_keys/`.
-   - **DO NOT** commit these keys to Git (they are ignored by `.gitignore`).
-   - **BACKUP** this folder to a secure location. If lost, you cannot update your users.
-
-2. **Publish a New Version**:
-   ```bash
-   uv run python scripts/publish_tuf_release.py --version 1.0.1 --bundle dist/SkillManager
-   ```
-
-3. **Deploy to GitHub Pages**:
-   - Updates are served via the `gh-pages` branch.
-   - Push `tuf_repo/metadata` to `gh-pages:/metadata/`.
-   - Push `tuf_repo/targets` to `gh-pages:/targets/`.
-
 ---
 
 ## Release & CI/CD Strategy
@@ -181,4 +160,4 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 | `uv run ruff format src` | Format code |
 | `uv run pytest` | Run unit tests |
 | `uv run python scripts/build_app.py` | Build executable locally |
-| `uv run python scripts/publish_tuf_release.py` | Publish TUF update |
+

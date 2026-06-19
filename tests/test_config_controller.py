@@ -148,15 +148,6 @@ def test_config_controller_properties_setters(config_controller, mock_app):
     config_controller.compactMenu = True
     mock_app._config.set.assert_any_call("compact_menu", True)
 
-    config_controller.autoCheckUpdates = False
-    mock_app._config.set.assert_any_call("auto_check_updates", False)
-
-    config_controller.autoDownloadUpdates = True
-    mock_app._config.set.assert_any_call("auto_download_updates", True)
-
-    config_controller.updateCheckIntervalHours = 48
-    mock_app._config.set.assert_any_call("update_check_interval_hours", 48)
-
     config_controller.skillPackageAutoUpdate = False
     mock_app._config.set.assert_any_call("skill_package_auto_update", False)
 
