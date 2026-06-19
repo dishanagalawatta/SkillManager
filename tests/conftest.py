@@ -7,6 +7,19 @@ import uuid
 from pathlib import Path
 from unittest.mock import MagicMock
 
+# Pre-inject a mock pynput module so the real C extension never loads.
+# Pynput's Windows keyboard hook thread can cause access violations
+# when the process exits while the thread is still iterating the
+# message queue.  By intercepting the import at the module level,
+# we guarantee no real keyboard hook is ever created during testing.
+if "pynput" not in sys.modules:
+    _mock_pynput = MagicMock()
+    _mock_pynput.keyboard = MagicMock()
+    _mock_pynput.keyboard.HotKey = MagicMock()
+    _mock_pynput.keyboard.Listener = MagicMock()
+    sys.modules["pynput"] = _mock_pynput
+    sys.modules["pynput.keyboard"] = _mock_pynput.keyboard
+
 # Force QML style before ANY Qt imports to prevent initialization errors
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 # Use offscreen platform for headless environments by default in tests

@@ -161,7 +161,9 @@ class TestListenerLifecycle:
         fake_pynput.keyboard.HotKey.parse.return_value = []
 
         with (
-            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.dict(
+                sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}
+            ),
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             fake_listener = _FakeListener()
@@ -191,7 +193,9 @@ class TestListenerLifecycle:
         fake_pynput.keyboard.HotKey.parse.return_value = []
 
         with (
-            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.dict(
+                sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}
+            ),
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             fake_listener = _FakeListener()
@@ -214,7 +218,9 @@ class TestListenerLifecycle:
         fake_pynput.keyboard.HotKey.parse.return_value = []
 
         with (
-            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.dict(
+                sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}
+            ),
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             fake_listener = _FakeListener()
@@ -236,7 +242,9 @@ class TestListenerLifecycle:
         fake_pynput.keyboard.HotKey.parse.return_value = []
 
         with (
-            patch.dict(sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}),
+            patch.dict(
+                sys.modules, {"pynput": fake_pynput, "pynput.keyboard": fake_pynput.keyboard}
+            ),
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             result = manager.register(1, "Ctrl+Shift+S")
