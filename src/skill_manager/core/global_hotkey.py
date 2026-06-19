@@ -14,6 +14,7 @@ hotkey sets that can change at runtime is ``HotKey`` + ``Listener``
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -27,12 +28,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_LISTENER_JOIN_TIMEOUT = 2.0
+
 
 class GlobalHotkeyManager(QObject):
     """Manages system-wide hotkeys via pynput's HotKey + Listener pattern.
 
     When a hotkey is pressed, the ``hotkeyPressed`` signal is emitted
     on the main thread via Qt's signal/slot mechanism.
+
+    The underlying pynput ``Listener`` thread is tracked explicitly so
+    that ``stop()`` can ``join()`` it with a timeout, preventing
+    access-violation crashes when Python's GC runs finalizers before
+    the listener thread has exited.
     """
 
     hotkeyPressed = Signal(int)  # noqa: N815 — emits hotkey ID when pressed
@@ -41,8 +49,14 @@ class GlobalHotkeyManager(QObject):
         super().__init__(parent)
         self._hotkeys: dict[int, tuple[str, str]] = {}  # id -> (pynput_seq, original)
         self._listener = None
+        self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._stop_lock = threading.Lock()
         self._pynput_available: bool | None = None  # None = unchecked
+
+    def __del__(self) -> None:
+        with contextlib.suppress(Exception):
+            self.stop()
 
     def _ensure_pynput(self) -> bool:
         """Lazy-import pynput. Returns True if usable, False if not."""
@@ -63,9 +77,8 @@ class GlobalHotkeyManager(QObject):
             return
         from pynput import keyboard
 
-        if self._listener is not None:
-            self._listener.stop()
-            self._listener = None
+        self._stop_active_listener()
+
         if not self._hotkeys:
             return
 
@@ -79,20 +92,58 @@ class GlobalHotkeyManager(QObject):
         ]
 
         def on_press(key):
-            canonical = self._listener.canonical(key)  # type: ignore[union-attr]
+            listener = self._listener
+            if listener is None:
+                return
+            canonical = listener.canonical(key)
             for hk in hotkey_objs:
                 hk.press(canonical)
 
         def on_release(key):
-            canonical = self._listener.canonical(key)  # type: ignore[union-attr]
+            listener = self._listener
+            if listener is None:
+                return
+            canonical = listener.canonical(key)
             for hk in hotkey_objs:
                 hk.release(canonical)
 
         try:
             self._listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+            self._thread = getattr(self._listener, "_thread", None)
             self._listener.start()
-        except Exception as e:
+        except OSError as e:
             logger.error("Failed to start pynput listener: %s", e)
+            self._listener = None
+            self._thread = None
+
+    def _stop_active_listener(self) -> None:
+        """Stop the current listener and join its thread with a timeout.
+
+        Uses ``_stop_lock`` so concurrent calls are serialised.  If the
+        join times out the thread is left as a daemon and will be killed
+        when the interpreter exits — no crash, no hang.
+        """
+        with self._stop_lock:
+            listener = self._listener
+            thread = self._thread
+            self._listener = None
+            self._thread = None
+
+        if listener is None:
+            return
+
+        try:
+            listener.stop()
+        except Exception:  # noqa: BLE001 — defensive
+            logger.debug("Error stopping pynput listener", exc_info=True)
+
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=_LISTENER_JOIN_TIMEOUT)
+            if thread.is_alive():
+                logger.warning(
+                    "pynput listener thread did not exit within %ss; leaving as daemon",
+                    _LISTENER_JOIN_TIMEOUT,
+                )
 
     @Slot(int, str)
     def register(self, hotkey_id: int, sequence: str) -> bool:
@@ -141,9 +192,7 @@ class GlobalHotkeyManager(QObject):
         """Unregister all hotkeys and stop listener."""
         with self._lock:
             self._hotkeys.clear()
-            if self._listener is not None:
-                self._listener.stop()
-                self._listener = None
+        self._stop_active_listener()
         logger.info("Global hotkey manager stopped")
 
     def _on_hotkey_pressed(self, hotkey_id: int) -> None:

@@ -84,9 +84,7 @@ class TestCheckForUpdates:
     def test_manual_check_sets_status_message(self, mock_app_mock_runner):
         """Manual check calls _set_status."""
         controller = AppUpdateController(mock_app_mock_runner)
-        with patch(
-            "skill_manager.controllers.app_update_controller.check_latest_release"
-        ):
+        with patch("skill_manager.controllers.app_update_controller.check_latest_release"):
             controller.checkForUpdates(manual=True)
             mock_app_mock_runner._set_status.assert_called_with("Checking for app updates...")
 
@@ -110,9 +108,7 @@ class TestCheckForUpdates:
         """When sys.frozen is True, auto-check still submits."""
         with patch.object(sys, "frozen", True, create=True):
             controller = AppUpdateController(mock_app_mock_runner)
-            with patch(
-                "skill_manager.controllers.app_update_controller.check_latest_release"
-            ):
+            with patch("skill_manager.controllers.app_update_controller.check_latest_release"):
                 controller.checkForUpdates(manual=False)
                 mock_app_mock_runner.task_runner.submit.assert_called_once()
 

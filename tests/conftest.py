@@ -69,6 +69,27 @@ def setup_qml_style(qapp):
     yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def block_real_pynput(request):
+    """Prevent any test from starting a real pynput keyboard listener.
+
+    Pynput's Windows listener thread can crash with an access violation
+    when the process exits before the thread finishes iterating the
+    message queue.  By forcing ``_ensure_pynput`` to return ``False``
+    for the entire session, we guarantee no real keyboard hook is
+    ever created during testing.
+
+    Tests decorated with ``@pytest.mark.allow_pynput`` skip this
+    block so their own mock keyboard module is used instead.
+    """
+    from skill_manager.core.global_hotkey import GlobalHotkeyManager
+
+    original = GlobalHotkeyManager._ensure_pynput
+    GlobalHotkeyManager._ensure_pynput = staticmethod(lambda: False)
+    yield
+    GlobalHotkeyManager._ensure_pynput = original
+
+
 @pytest.fixture
 def temp_dir():
     """Provides a temporary directory that is automatically cleaned up."""
