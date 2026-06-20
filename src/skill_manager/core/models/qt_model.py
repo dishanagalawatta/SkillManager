@@ -509,22 +509,22 @@ class SkillModel(QAbstractListModel):
         matcher = difflib.SequenceMatcher(None, old_keys, new_keys)
 
         for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
-            if tag == 'replace':
+            if tag == "replace":
                 self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
                 del self._filtered_skills[i1:i2]
                 self.endRemoveRows()
                 self.beginInsertRows(QModelIndex(), i1, i1 + (j2 - j1) - 1)
                 self._filtered_skills[i1:i1] = new_list[j1:j2]
                 self.endInsertRows()
-            elif tag == 'delete':
+            elif tag == "delete":
                 self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
                 del self._filtered_skills[i1:i2]
                 self.endRemoveRows()
-            elif tag == 'insert':
+            elif tag == "insert":
                 self.beginInsertRows(QModelIndex(), i1, i1 + (j2 - j1) - 1)
                 self._filtered_skills[i1:i1] = new_list[j1:j2]
                 self.endInsertRows()
-            elif tag == 'equal':
+            elif tag == "equal":
                 for idx in range(i1, i2):
                     self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
                 if i2 > i1:

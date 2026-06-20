@@ -660,3 +660,20 @@ def test_client_format_change_syncs_model_filters(qapp, controller):
 
     assert controller.quickCopyModel.clientFilter == "Antigravity"
     assert controller.libraryModel.clientFilter == "Antigravity"
+
+
+def test_copy_collection_to_clipboard_delegates_to_ops(controller):
+    controller._custom_collections = {
+        "TestColl": {
+            "paths": ["/skill/a"],
+            "projects": [],
+            "shortcut": "",
+            "shortcut_enabled": True,
+        }
+    }
+    controller._clipboard = MagicMock()
+    controller._client_format = "Gemini"
+
+    with patch.object(controller.ops, "copyCollectionToClipboard") as mock_ops:
+        controller.copyCollectionToClipboard("TestColl")
+        mock_ops.assert_called_once_with("TestColl")

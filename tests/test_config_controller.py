@@ -125,9 +125,9 @@ def test_config_controller_shortcuts(config_controller, mock_app):
 
 def test_config_controller_shortcut_enabled(config_controller, mock_app):
     """Test isShortcutEnabled returns True when action is not disabled."""
-    mock_app._config.get.side_effect = lambda key, default=None: {
-        "disabled_shortcuts": []
-    }.get(key, default)
+    mock_app._config.get.side_effect = lambda key, default=None: {"disabled_shortcuts": []}.get(
+        key, default
+    )
     assert config_controller.isShortcutEnabled("search") is True
 
     mock_app._config.get.side_effect = lambda key, default=None: {
@@ -143,9 +143,9 @@ def test_config_controller_shortcut_enabled(config_controller, mock_app):
 
 def test_config_controller_set_shortcut_enabled(config_controller, mock_app):
     """Test setShortcutEnabled toggles disabled_shortcuts list."""
-    mock_app._config.get.side_effect = lambda key, default=None: {
-        "disabled_shortcuts": []
-    }.get(key, default)
+    mock_app._config.get.side_effect = lambda key, default=None: {"disabled_shortcuts": []}.get(
+        key, default
+    )
 
     # Disable an action
     config_controller.setShortcutEnabled("search", False)
@@ -161,9 +161,9 @@ def test_config_controller_set_shortcut_enabled(config_controller, mock_app):
 
 def test_config_controller_set_shortcut_enabled_noop(config_controller, mock_app):
     """setShortcutEnabled is a no-op when state is already correct."""
-    mock_app._config.get.side_effect = lambda key, default=None: {
-        "disabled_shortcuts": []
-    }.get(key, default)
+    mock_app._config.get.side_effect = lambda key, default=None: {"disabled_shortcuts": []}.get(
+        key, default
+    )
 
     # Enable when already enabled → no set call
     mock_app._config.set.reset_mock()
@@ -332,9 +332,7 @@ def test_set_config_value_no_emit_when_unchanged(config_controller, mock_app):
     # same float value.
     mock_app._config.get.return_value = 1.0
     signal = MagicMock()
-    result = config_controller._set_config_value(
-        "scroll_speed_multiplier", 1.0, signal
-    )
+    result = config_controller._set_config_value("scroll_speed_multiplier", 1.0, signal)
     assert result is False
     signal.emit.assert_not_called()
 
@@ -387,7 +385,12 @@ def test_set_collection_shortcut_auto_claims_built_in(config_controller, mock_ap
 def test_set_collection_shortcut_auto_claims_other_collection(config_controller, mock_app):
     """Assigning a sequence used by another collection frees it."""
     mock_app._custom_collections = {
-        "CollA": {"paths": ["/a"], "projects": [], "shortcut": "Ctrl+Shift+Z", "shortcut_enabled": True},
+        "CollA": {
+            "paths": ["/a"],
+            "projects": [],
+            "shortcut": "Ctrl+Shift+Z",
+            "shortcut_enabled": True,
+        },
         "CollB": {"paths": ["/b"], "projects": [], "shortcut": "", "shortcut_enabled": True},
     }
     mock_app._config.get.return_value = {}
@@ -428,12 +431,19 @@ def test_reset_shortcuts_clears_collection_shortcuts(config_controller, mock_app
     """resetShortcuts must clear all collection shortcuts."""
     mock_app._custom_collections = {
         "CollA": {"paths": ["/a"], "projects": [], "shortcut": "Ctrl+K", "shortcut_enabled": True},
-        "CollB": {"paths": ["/b"], "projects": [], "shortcut": "Ctrl+Shift+L", "shortcut_enabled": False},
+        "CollB": {
+            "paths": ["/b"],
+            "projects": [],
+            "shortcut": "Ctrl+Shift+L",
+            "shortcut_enabled": False,
+        },
     }
     mock_app._config.get.return_value = {"disabled_shortcuts": []}
 
-    with patch("skill_manager.core.config.DEFAULT_SHORTCUTS", {"search": "Ctrl+F"}), \
-         patch("skill_manager.core.config.DEFAULT_DISABLED_SHORTCUTS", []):
+    with (
+        patch("skill_manager.core.config.DEFAULT_SHORTCUTS", {"search": "Ctrl+F"}),
+        patch("skill_manager.core.config.DEFAULT_DISABLED_SHORTCUTS", []),
+    ):
         config_controller.resetShortcuts()
 
     assert mock_app._custom_collections["CollA"]["shortcut"] == ""

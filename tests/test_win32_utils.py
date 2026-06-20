@@ -33,3 +33,21 @@ def test_window_placement_windows_set_success():
     ):
         windll.user32.SetWindowPlacement.return_value = 1
         assert win32.set_window_placement(123, placement_data) is True
+
+
+def test_send_paste_to_focused_window_success():
+    with patch("skill_manager.utils.win32.ctypes.windll", create=True) as windll:
+        windll.user32.keybd_event.return_value = None
+        assert win32.send_paste_to_focused_window() is True
+        assert windll.user32.keybd_event.call_count == 4
+        calls = windll.user32.keybd_event.call_args_list
+        assert calls[0].args == (0x11, 0, 0, 0)
+        assert calls[1].args == (0x56, 0, 0, 0)
+        assert calls[2].args == (0x56, 0, 0x0002, 0)
+        assert calls[3].args == (0x11, 0, 0x0002, 0)
+
+
+def test_send_paste_to_focused_window_failure():
+    with patch("skill_manager.utils.win32.ctypes.windll", create=True) as windll:
+        windll.user32.keybd_event.side_effect = OSError("access denied")
+        assert win32.send_paste_to_focused_window() is False

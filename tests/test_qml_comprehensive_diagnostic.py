@@ -239,7 +239,12 @@ def test_collection_shortcut_instantiator_creates_shortcuts(qtbot, app_controlle
 
     # Configure two collections: one with shortcut, one without
     app_controller._custom_collections = {
-        "Snippets": {"paths": ["/a"], "projects": [], "shortcut": "Ctrl+Shift+J", "shortcut_enabled": True},
+        "Snippets": {
+            "paths": ["/a"],
+            "projects": [],
+            "shortcut": "Ctrl+Shift+J",
+            "shortcut_enabled": True,
+        },
         "Drafts": {"paths": ["/b"], "projects": [], "shortcut": "", "shortcut_enabled": True},
     }
     app_controller.customCollectionsChanged.emit()
@@ -283,7 +288,12 @@ def test_collection_shortcut_fires_copy_collection_to_clipboard(qtbot, app_contr
 
     # Set up collection with shortcut
     app_controller._custom_collections = {
-        "Snippets": {"paths": ["/a"], "projects": [], "shortcut": "Ctrl+Shift+J", "shortcut_enabled": True},
+        "Snippets": {
+            "paths": ["/a"],
+            "projects": [],
+            "shortcut": "Ctrl+Shift+J",
+            "shortcut_enabled": True,
+        },
     }
     app_controller.customCollectionsChanged.emit()
     qtbot.wait(100)

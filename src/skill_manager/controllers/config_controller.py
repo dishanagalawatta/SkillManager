@@ -923,7 +923,11 @@ class ConfigController(BaseController):
         self.shortcutsChanged.emit()
         self.customCollectionsChanged.emit()
 
-        msg = f"Collection '{name}' bound to {seq}" if seq else f"Collection '{name}' shortcut cleared"
+        msg = (
+            f"Collection '{name}' bound to {seq}"
+            if seq
+            else f"Collection '{name}' shortcut cleared"
+        )
         if freed:
             msg += f" (reassigned from: {', '.join(freed)})"
         self.app._set_status(msg)
@@ -961,7 +965,9 @@ class ConfigController(BaseController):
         """Clears all collection shortcuts. Called by resetShortcuts."""
         changed = False
         for _name, entry in self.app._custom_collections.items():
-            if isinstance(entry, dict) and (entry.get("shortcut") or not entry.get("shortcut_enabled", True)):
+            if isinstance(entry, dict) and (
+                entry.get("shortcut") or not entry.get("shortcut_enabled", True)
+            ):
                 entry["shortcut"] = ""
                 entry["shortcut_enabled"] = True
                 changed = True
