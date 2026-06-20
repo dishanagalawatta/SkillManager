@@ -425,7 +425,9 @@ def test_replace_skill_references_in_command():
     assert result != "@test-skill"
 
     # Test Codex format
-    result = replace_skill_references_in_command("[$TestSkill](/path/to/SKILL.md)", "Codex", all_skills)
+    result = replace_skill_references_in_command(
+        "[$TestSkill](/path/to/SKILL.md)", "Codex", all_skills
+    )
     assert result != "[$TestSkill](/path/to/SKILL.md)"
 
     # Test empty content
