@@ -22,7 +22,7 @@ dependencies = [
     "platformdirs",
     "posthog>=7.14.2",
     "pydantic>=2",
-    "pydantic-settings",
+    "pydantic-settings>=2.14.2",
     "python-frontmatter",
     "python-dotenv>=1.2.2",
     "rapidfuzz",
@@ -36,6 +36,7 @@ dependencies = [
     "gitpython>=3.1.50",
     "apscheduler>=3.11.2",
     "pynput>=1.8.2",
+    "msgpack>=1.2.1",
 ]
 
 

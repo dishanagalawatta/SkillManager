@@ -508,9 +508,7 @@ class OpsController(BaseController):
 
         references = []
         for path in paths:
-            skill = next(
-                (s for s in self.app.skillModel._all_skills if s.local_path == path), None
-            )
+            skill = next((s for s in self.app.skillModel._all_skills if s.local_path == path), None)
             if skill:
                 references.append(
                     format_project_skill_reference(

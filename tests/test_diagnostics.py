@@ -369,4 +369,3 @@ def test_get_recent_events_human_time_truncated(diag_logger):
     rows = diag_logger.get_recent_events_human(1)
     # Time should be HH:MM:SS (8 chars)
     assert len(rows[0]["time"]) == 8
-

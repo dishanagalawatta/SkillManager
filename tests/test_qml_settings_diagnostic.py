@@ -190,7 +190,10 @@ def test_diagnostics_pane_actually_renders_when_expanded(qapp, app_controller):
     obj.setWidth(800)
     obj.setHeight(800)
     obj.setProperty("diagnosticLogPath", "/tmp/test.log")
-    obj.setProperty("recentEventsJson", '[{"ts":"2026-01-01T12:34:56Z","level":"INFO","category":"test","msg":"hello"}]')
+    obj.setProperty(
+        "recentEventsJson",
+        '[{"ts":"2026-01-01T12:34:56Z","level":"INFO","category":"test","msg":"hello"}]',
+    )
     obj.setProperty("errorCount", 1)
     obj.setProperty("warningCount", 2)
     obj.setProperty("infoCount", 3)
@@ -348,7 +351,10 @@ def test_diagnostics_pane_flickables_have_height(qapp, app_controller):
     obj.setProperty("expanded", True)
     obj.setWidth(800)
     obj.setHeight(800)
-    obj.setProperty("recentEventsJson", '[{"ts":"2026-01-01T12:00:00Z","level":"INFO","category":"test","msg":"hi"}]')
+    obj.setProperty(
+        "recentEventsJson",
+        '[{"ts":"2026-01-01T12:00:00Z","level":"INFO","category":"test","msg":"hi"}]',
+    )
     QApplication.processEvents()
 
     flickables = [

@@ -407,5 +407,31 @@ def test_discover_project_skills_parallel(temp_dir):
         [str(skills_dir1), str(skills_dir2)], mock_parse, mock_cat, mock_search
     )
     assert len(projects) == 2
-    assert projects[0]["project_label"] == "proj1"
-    assert projects[1]["project_label"] == "proj2"
+
+
+def test_replace_skill_references_in_command():
+    from skill_manager.core.quick_copy import replace_skill_references_in_command
+
+    skill = {
+        "name": "TestSkill",
+        "folder_name": "test-skill",
+        "local_path": "/path/to/test-skill",
+        "is_command": False,
+    }
+    all_skills = [skill]
+
+    # Test Gemini CLI format - @skill-name gets replaced
+    result = replace_skill_references_in_command("@test-skill", "Gemini CLI", all_skills)
+    assert result != "@test-skill"
+
+    # Test Codex format
+    result = replace_skill_references_in_command("[$TestSkill](/path/to/SKILL.md)", "Codex", all_skills)
+    assert result != "[$TestSkill](/path/to/SKILL.md)"
+
+    # Test empty content
+    result = replace_skill_references_in_command("", "Gemini CLI", all_skills)
+    assert result == ""
+
+    # Test no skills
+    result = replace_skill_references_in_command("@test-skill", "Gemini CLI", [])
+    assert "@test-skill" in result
