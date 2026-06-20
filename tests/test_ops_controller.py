@@ -631,7 +631,9 @@ def test_copy_collection_to_clipboard(mock_timer, ops_controller, mock_app):
     mock_app.config_controller.autoMinimizeOnQuickCopy = False
 
     with patch("skill_manager.core.quick_copy.format_project_skill_reference") as mock_fmt:
-        mock_fmt.side_effect = lambda s, fmt, all_skills: "ref:SkillA" if s.local_path == "/skill/a" else "ref:SkillB"
+        mock_fmt.side_effect = lambda s, fmt, all_skills: (
+            "ref:SkillA" if s.local_path == "/skill/a" else "ref:SkillB"
+        )
         ops_controller.copyCollectionToClipboard("MyCollection")
 
         assert mock_fmt.call_count == 2
