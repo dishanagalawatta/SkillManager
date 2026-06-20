@@ -140,6 +140,8 @@ DEFAULT_SHORTCUTS = {
     "screenshot": "Ctrl+Shift+S",
 }
 
+DEFAULT_DISABLED_SHORTCUTS: list[str] = []
+
 
 class ConfigManager:
     def __init__(self, filename: str = CONFIG_FILENAME):
@@ -184,11 +186,17 @@ class ConfigManager:
                     if changed:
                         self.save()
 
+                # Ensure disabled_shortcuts list is present
+                if "disabled_shortcuts" not in self.data:
+                    self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
+                    self.save()
+
             except Exception as e:
                 logger.warning("Error loading config: %s", e)
         else:
             # New config
             self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+            self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
             self.save()
 
         return self.data

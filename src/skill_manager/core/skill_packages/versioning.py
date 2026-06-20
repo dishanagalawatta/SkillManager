@@ -61,7 +61,7 @@ def run_version_command(command: str) -> str:
     return result.stdout.strip()
 
 
-def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
+def get_git_tag(path_or_url: str, is_remote: bool = False, token: str | None = None) -> str:
     """Fetches the latest semantic tag or fallback to commit hash using GitPython."""
     try:
         if is_remote:

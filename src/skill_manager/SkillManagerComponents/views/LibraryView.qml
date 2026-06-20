@@ -230,7 +230,7 @@ Item {
                                 }
                             }
                         }
-                        
+
                         ActionButton {
                             id: lv_tempCopyBtn
                             buttonHeight: 32
@@ -508,4 +508,5 @@ Item {
     ArchiveConfirmDialog {
         id: lv_archiveConfirmDialog
     }
+
 }

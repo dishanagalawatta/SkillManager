@@ -200,6 +200,208 @@ Item {
                                 }
                             }
 
+
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+                                ColumnLayout {
+                                    spacing: 2
+                                    Text {
+                                        text: "Scroll Speed"
+                                        font.family: Theme.fontFamily
+                                        color: Theme.label
+                                    }
+                                    Text {
+                                        text: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.secondaryLabel
+                                    }
+                                }
+                                Item { Layout.fillWidth: true }
+                                Slider {
+                                    Layout.preferredWidth: 150
+                                    from: 0.5
+                                    to: 5.0
+                                    stepSize: 0.1
+                                    value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
+                                    onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
+                                }
+                            }
+                        }
+                    }
+
+                    // Projects Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: projectsSettingsLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: projectsSettingsLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Projects"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            Text {
+                                text: "Top Bar Clients"
+                                font.family: Theme.fontFamily
+                                color: Theme.label
+                                font.pixelSize: Theme.sizeBody
+                                font.weight: Font.Medium
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                
+                                GlassDropdown {
+                                    Layout.fillWidth: true
+                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 0) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[0])) : 0
+                                    onActivated: (index) => {
+                                        if (AppController.config_controller) {
+                                            var arr = [];
+                                            var current = AppController.config_controller.topBarClients;
+                                            var available = AppController.config_controller.availableClientFormats;
+                                            for (var i = 0; i < 4; i++) {
+                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                            }
+                                            arr[0] = model[index];
+                                            AppController.config_controller.topBarClients = arr;
+                                        }
+                                    }
+                                }
+                                GlassDropdown {
+                                    Layout.fillWidth: true
+                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 1) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[1])) : 1
+                                    onActivated: (index) => {
+                                        if (AppController.config_controller) {
+                                            var arr = [];
+                                            var current = AppController.config_controller.topBarClients;
+                                            var available = AppController.config_controller.availableClientFormats;
+                                            for (var i = 0; i < 4; i++) {
+                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                            }
+                                            arr[1] = model[index];
+                                            AppController.config_controller.topBarClients = arr;
+                                        }
+                                    }
+                                }
+                                GlassDropdown {
+                                    Layout.fillWidth: true
+                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 2) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[2])) : 2
+                                    onActivated: (index) => {
+                                        if (AppController.config_controller) {
+                                            var arr = [];
+                                            var current = AppController.config_controller.topBarClients;
+                                            var available = AppController.config_controller.availableClientFormats;
+                                            for (var i = 0; i < 4; i++) {
+                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                            }
+                                            arr[2] = model[index];
+                                            AppController.config_controller.topBarClients = arr;
+                                        }
+                                    }
+                                }
+                                GlassDropdown {
+                                    Layout.fillWidth: true
+                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 3) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[3])) : 3
+                                    onActivated: (index) => {
+                                        if (AppController.config_controller) {
+                                            var arr = [];
+                                            var current = AppController.config_controller.topBarClients;
+                                            var available = AppController.config_controller.availableClientFormats;
+                                            for (var i = 0; i < 4; i++) {
+                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                            }
+                                            arr[3] = model[index];
+                                            AppController.config_controller.topBarClients = arr;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                spacing: 12
+                                Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    spacing: 2
+
+                                    Text {
+                                        text: "Project Order"
+                                        font.family: Theme.fontFamily
+                                        color: Theme.label
+                                    }
+
+                                    Text {
+                                        text: "Change the order projects appear in selectors"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.sizeCaption
+                                        color: Theme.secondaryLabel
+                                    }
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                ActionButton {
+                                    text: "Reorder..."
+                                    Layout.preferredWidth: 100
+                                    Layout.preferredHeight: 36
+                                    enabled: AppController.projects.length > 1
+                                    onClicked: sv_reorderDialog.open()
+
+                                    background: Rectangle {
+                                        radius: Theme.radiusButton
+                                        color: parent.hovered ? Theme.glassHover : "transparent"
+                                        border.color: Theme.glassBorder
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.sizeBody
+                                        font.weight: Font.Medium
+                                        color: Theme.label
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                            }
+
                             RowLayout {
                                 Text {
                                     text: "Auto-minimize on Screenshot"
@@ -239,193 +441,6 @@ Item {
                                 }
                             }
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            RowLayout {
-                                spacing: 12
-                                ColumnLayout {
-                                    spacing: 2
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: "Scroll Speed"
-                                        font.family: Theme.fontFamily
-                                        color: Theme.label
-                                    }
-                                    Text {
-                                        text: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        color: Theme.secondaryLabel
-                                    }
-                                }
-                                Slider {
-                                    Layout.preferredWidth: 150
-                                    from: 0.5
-                                    to: 5.0
-                                    stepSize: 0.1
-                                    value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
-                                    onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
-                                }
-                            }
-                        }
-                    }
-
-                    // Application Updates Section
-                    GlassPill {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: updatesSettingsLayout.implicitHeight + 32
-                        radius: Theme.radiusCard
-
-                        ColumnLayout {
-                            id: updatesSettingsLayout
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 12
-
-                            Text {
-                                text: "Application Updates"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.sizeSectionTitle
-                                font.weight: Font.Bold
-                                color: Theme.label
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            Text {
-                                text: "Skill Packages"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.weight: Font.Bold
-                                color: Theme.label
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Skill Package Auto Updates"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.skillPackageAutoUpdate : true
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdate = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Auto Update Mode"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassDropdown {
-                                    model: ["prompt", "silent"]
-                                    currentIndex: AppController.config_controller ? model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode) : 0
-                                    onActivated: {
-                                        if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = model[index]
-                                    }
-                                    Layout.preferredWidth: 100
-                                }
-                            }
-                        }
-                    }
-
-                    // Context Menu Section
-                    GlassPill {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: contextMenuLayout.implicitHeight + 32
-                        radius: Theme.radiusCard
-
-                        ColumnLayout {
-                            id: contextMenuLayout
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 12
-
-                            Text {
-                                text: "Context Menu"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.sizeSectionTitle
-                                font.weight: Font.Bold
-                                color: Theme.label
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Show Icons"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.showMenuIcons : true
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.showMenuIcons = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Compact Menu"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.compactMenu : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.compactMenu = checked
-                                }
-                            }
-                        }
-                    }
-
-                    // Daily Speed Section
-                    GlassPill {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: dailySpeedLayout.implicitHeight + 32
-                        radius: Theme.radiusCard
-
-                        ColumnLayout {
-                            id: dailySpeedLayout
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 12
-
-                            Text {
-                                text: "Daily Speed"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.sizeSectionTitle
-                                font.weight: Font.Bold
-                                color: Theme.label
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
                             RowLayout {
                                 Layout.fillWidth: true
                                 Text {
@@ -436,7 +451,7 @@ Item {
                                 }
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
-                                    model: ["Library", "QuickCopy", "Updates", "Settings"]
+                                    model: ["Last Selected", "Library", "QuickCopy", "Updates", "Settings"]
                                     currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.ui_controller.startupView)) : 0
                                     onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setStartupView(model[index]) }
                                 }
@@ -452,11 +467,18 @@ Item {
                                 }
                                 GlassDropdown {
                                     Layout.preferredWidth: 170
-                                    model: AppController.clientFormats ? AppController.clientFormats : []
-                                    currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.clientFormat)) : 0
-                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setClientFormat(model[index]) }
+                                    model: {
+                                        let fmts = ["Last Selected"];
+                                        if (AppController.clientFormats) {
+                                            fmts = fmts.concat(AppController.clientFormats);
+                                        }
+                                        return fmts;
+                                    }
+                                    currentIndex: AppController ? Math.max(0, model.indexOf(AppController.defaultClient)) : 0
+                                    onActivated: (index) => { if (AppController) AppController.setDefaultClient(model[index]) }
                                 }
                             }
+
 
                             RowLayout {
                                 Text {
@@ -494,6 +516,110 @@ Item {
                             }
                         }
                     }
+
+                    // Skill Packages Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: updatesSettingsLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: updatesSettingsLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Skill Packages"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                Text {
+                                    text: "Auto Update Mode"
+                                    font.family: Theme.fontFamily
+                                    color: Theme.label
+                                    Layout.fillWidth: true
+                                }
+                                GlassDropdown {
+                                    model: ["off", "prompt", "silent"]
+                                    currentIndex: AppController.config_controller ? Math.max(0, model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)) : 1
+                                    onActivated: {
+                                        if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = model[index]
+                                    }
+                                    Layout.preferredWidth: 100
+                                }
+                            }
+                        }
+                    }
+
+                    // Diagnostics Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: diagnosticsSettingsLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: diagnosticsSettingsLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Diagnostics"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.fillWidth: true
+
+                                    Text {
+                                        text: "Enable Diagnostic Logging"
+                                        font.family: Theme.fontFamily
+                                        color: Theme.label
+                                    }
+                                    Text {
+                                        text: "Records structured events to help troubleshoot issues.\nMay slightly impact performance when enabled."
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.secondaryLabel
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+                                }
+
+                                GlassSwitch {
+                                    checked: AppController.config_controller ? AppController.config_controller.diagnosticLogging : false
+                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.diagnosticLogging = checked
+                                }
+                            }
+                        }
+                    }
+
+
                 }
             }
             
@@ -643,10 +769,13 @@ Item {
                     // expanded body has room to render — see the
                     // test_diagnostics_pane_actually_renders_when_expanded
                     // regression test for the exact failure mode this prevents).
+                    // Hidden when diagnostic logging is disabled in General settings.
                     GlassPill {
                         id: diagnosticsGlassPill
+                        objectName: "diagnosticsGlassPill"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: diagnosticsPane.implicitHeight
+                        visible: AppController.config_controller ? AppController.config_controller.diagnosticLogging : false
+                        Layout.preferredHeight: visible ? diagnosticsPane.implicitHeight : 0
                         radius: Theme.radiusCard
 
                         DiagnosticsPane {
@@ -659,5 +788,9 @@ Item {
                 }
             }
         }
+    }
+
+    ProjectReorderDialog {
+        id: sv_reorderDialog
     }
 }

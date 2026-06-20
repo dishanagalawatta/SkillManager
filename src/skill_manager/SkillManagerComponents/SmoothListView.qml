@@ -58,4 +58,17 @@ ListView {
             scrollAnim.start()
         }
     }
+
+    add: Transition {
+        NumberAnimation { property: "opacity"; from: 0; to: 1.0; duration: 250; easing.type: Easing.OutCubic }
+    }
+    remove: Transition {
+        NumberAnimation { property: "opacity"; to: 0; duration: 250; easing.type: Easing.OutCubic }
+    }
+    move: Transition {
+        NumberAnimation { properties: "x,y"; duration: 250; easing.type: Easing.OutCubic }
+    }
+    displaced: Transition {
+        NumberAnimation { properties: "x,y"; duration: 250; easing.type: Easing.OutCubic }
+    }
 }

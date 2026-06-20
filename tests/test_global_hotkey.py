@@ -19,7 +19,6 @@ the Windows keyboard hook.
 from __future__ import annotations
 
 import sys
-import threading
 from unittest.mock import MagicMock, patch
 
 from skill_manager.core.global_hotkey import (
@@ -41,8 +40,8 @@ class _FakeListener:
         self._release = kwargs.get("on_release")
         self._started = False
         self._stopped = False
-        self._thread = MagicMock(spec=threading.Thread)
-        self._thread.is_alive.return_value = False
+        self.join = MagicMock()
+        self.is_alive = MagicMock(return_value=False)
 
     def start(self):
         self._started = True
@@ -151,11 +150,8 @@ class TestListenerLifecycle:
     """
 
     def test_stop_joins_listener_thread(self):
-        """stop() must set _listener=None and _thread=None after join."""
+        """stop() must set _listener=None after join."""
         manager = GlobalHotkeyManager()
-
-        fake_thread = MagicMock(spec=threading.Thread)
-        fake_thread.is_alive.return_value = True
 
         fake_pynput = MagicMock()
         fake_pynput.keyboard.HotKey.parse.return_value = []
@@ -167,7 +163,7 @@ class TestListenerLifecycle:
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             fake_listener = _FakeListener()
-            fake_listener._thread = fake_thread
+            fake_listener.is_alive.return_value = True
             fake_pynput.keyboard.Listener.return_value = fake_listener
 
             manager.register(1, "Ctrl+Shift+S")
@@ -176,18 +172,14 @@ class TestListenerLifecycle:
             manager.stop()
 
         # Thread join was called with timeout
-        fake_thread.join.assert_called_once_with(timeout=_LISTENER_JOIN_TIMEOUT)
+        fake_listener.join.assert_called_once_with(timeout=_LISTENER_JOIN_TIMEOUT)
         # State cleaned up
         assert manager._listener is None
-        assert manager._thread is None
         assert fake_listener._stopped
 
-    def test_stop_sets_thread_none_when_not_alive(self):
-        """If thread is not alive, stop() still clears state."""
+    def test_stop_does_not_join_when_not_alive(self):
+        """If listener is not alive, stop() still clears state but doesn't join."""
         manager = GlobalHotkeyManager()
-
-        fake_thread = MagicMock(spec=threading.Thread)
-        fake_thread.is_alive.return_value = False  # already dead
 
         fake_pynput = MagicMock()
         fake_pynput.keyboard.HotKey.parse.return_value = []
@@ -199,16 +191,15 @@ class TestListenerLifecycle:
             patch.object(GlobalHotkeyManager, "_ensure_pynput", return_value=True),
         ):
             fake_listener = _FakeListener()
-            fake_listener._thread = fake_thread
+            fake_listener.is_alive.return_value = False
             fake_pynput.keyboard.Listener.return_value = fake_listener
 
             manager.register(1, "Ctrl+Shift+S")
             manager.stop()
 
-        # join() was NOT called (thread already dead)
-        fake_thread.join.assert_not_called()
+        # join() was NOT called (listener already dead)
+        fake_listener.join.assert_not_called()
         assert manager._listener is None
-        assert manager._thread is None
 
     def test_double_stop_is_safe(self):
         """Calling stop() twice must not raise."""
@@ -231,7 +222,6 @@ class TestListenerLifecycle:
             manager.stop()  # second call — must not raise
 
         assert manager._listener is None
-        assert manager._thread is None
 
     def test_listener_creation_failure_doesnt_crash(self):
         """OSError from keyboard.Listener() must not propagate."""
@@ -251,7 +241,6 @@ class TestListenerLifecycle:
 
         assert result is True  # hotkey was registered
         assert manager._listener is None  # listener not created
-        assert manager._thread is None
 
     def test_stop_acquires_stop_lock(self):
         """stop() acquires _stop_lock to serialise concurrent calls."""

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQml
 import App 1.0
 
 Window {
@@ -134,24 +135,36 @@ Window {
         }
     }
 
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequences: ["Ctrl+A", "Meta+A"]; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
     
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutExpandAllEnabled; sequence: AppController.config_controller.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCollapseAllEnabled; sequence: AppController.config_controller.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutArchiveEnabled; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutDeleteEnabled; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutTopOfListEnabled; sequence: AppController.config_controller.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
 
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutScreenshot; context: Qt.ApplicationShortcut; onActivated: AppController.screenshot_controller.takeScreenshot() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutQuickCopyViewEnabled; sequence: AppController.config_controller.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutLibraryViewEnabled; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutUpdatesViewEnabled; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSettingsViewEnabled; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutScreenshotEnabled && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutScreenshot; context: Qt.ApplicationShortcut; onActivated: AppController.screenshot_controller.takeScreenshot() }
+
+    Instantiator {
+        model: AppController.customCollections || []
+        delegate: Shortcut {
+            enabled: !AppController.config_controller.isRecordingShortcut
+                  && AppController.config_controller.getCollectionShortcutEnabled(modelData)
+                  && AppController.config_controller.getCollectionShortcut(modelData) !== ""
+            sequence: AppController.config_controller.getCollectionShortcut(modelData)
+            context: Qt.ApplicationShortcut
+            onActivated: AppController.copyCollectionToClipboard(modelData)
+        }
+    }
 
     ScreenshotOverlay {
         id: screenshotOverlay

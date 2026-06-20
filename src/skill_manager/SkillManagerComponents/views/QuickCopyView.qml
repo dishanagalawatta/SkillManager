@@ -179,6 +179,7 @@ Item {
                                     implicitWidth: clientBtn.buttonSize
                                     implicitHeight: clientBtn.buttonSize
                                     Image {
+                                        id: clientImg
                                         anchors.centerIn: parent
                                         source: AppController.ui_controller.getLogoSource(modelData)
                                         width: 16
@@ -186,6 +187,14 @@ Item {
                                         sourceSize.width: 16
                                         sourceSize.height: 16
                                         fillMode: Image.PreserveAspectFit
+                                        opacity: clientBtn.isSelected ? 1.0 : 0.5
+                                        visible: modelData !== "OpenCode"
+                                    }
+                                    ColorOverlay {
+                                        anchors.fill: clientImg
+                                        source: clientImg
+                                        color: Theme.label
+                                        visible: modelData === "OpenCode"
                                         opacity: clientBtn.isSelected ? 1.0 : 0.5
                                     }
                                 }

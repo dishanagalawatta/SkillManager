@@ -101,7 +101,6 @@ class TestUpdateControllerSDET:
     def test_scan_for_updates_silent_auto_trigger(self, mock_service_class, controller, mock_app):
         mock_service = mock_service_class.return_value
         mock_app._config.get.side_effect = lambda k, default=None: {
-            "skill_package_auto_update": True,
             "skill_package_auto_update_mode": "silent",
         }.get(k, default)
 

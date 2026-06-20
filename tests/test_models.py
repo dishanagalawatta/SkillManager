@@ -760,3 +760,24 @@ def test_skill_model_set_data(qapp, skill_list):
     # Verify that setData still returns False for now (unimplemented)
     res = model.setData(model.index(0), False, SkillModel.IsSelectedRole)
     assert res is False
+
+
+def test_selection_click_order_preserved(qapp, skill_list):
+    """Click order determines clipboard output order: first-clicked = first."""
+    model = SkillModel()
+    model.setSkills(skill_list)
+    # Filtered list is sorted by category: [Skill B (/b, Core), Skill A (/a, Dev)]
+    # Click in reverse display order: row 1 first, row 0 second
+    model.toggleSelection(1)  # Skill A (/a)
+    model.toggleSelection(0)  # Skill B (/b)
+    # /a was clicked first so it should be first in output
+    assert model.getSelectedPaths() == ["/a", "/b"]
+
+
+def test_collection_select_by_paths_order_preserved(qapp, skill_list):
+    """selectByPaths preserves the order of the incoming list (collection use case)."""
+    model = SkillModel()
+    model.setSkills(skill_list)
+    # selectByPaths with reverse order
+    model.selectByPaths(["/b", "/a"])
+    assert model.getSelectedPaths() == ["/b", "/a"]

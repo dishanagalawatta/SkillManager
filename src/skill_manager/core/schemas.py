@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -123,6 +123,8 @@ class CollectionConfig(BaseModel):
 
     paths: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
+    shortcut: str = ""
+    shortcut_enabled: bool = True
 
 
 class AppConfig(BaseSettings):
@@ -133,13 +135,14 @@ class AppConfig(BaseSettings):
     project_aliases: dict[str, str] = Field(default_factory=dict)
     shortcuts: dict[str, str] = Field(default_factory=dict)
     scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-    show_menu_icons: bool = True
-    compact_menu: bool = False
-    skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
     auto_minimize_on_quick_copy: bool = False
     temporary_screenshots: bool = False
+    diagnostic_logging: bool = False
+    top_bar_clients: list[str] = Field(
+        default_factory=lambda: ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+    )
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod
@@ -149,7 +152,7 @@ class AppConfig(BaseSettings):
     @field_validator("skill_package_auto_update_mode")
     @classmethod
     def _validate_update_mode(cls, value: str) -> str:
-        allowed = {"prompt", "auto", "notify"}
+        allowed = {"off", "prompt", "silent"}
         if value not in allowed:
             return "prompt"
         return value
@@ -228,7 +231,6 @@ class AnnotationPoint(BaseModel):
 
 class BaseAnnotation(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    type: str
     color: str = "#FF0000"
     strokeWidth: int = 3
 
@@ -302,8 +304,18 @@ class HighlightAnnotation(BaseAnnotation):
     color: str = "#FFFF00"
 
 
-# Union type for validation
-Annotation = (
+# Discriminated union for validation.
+#
+# The ``type`` field is the discriminator — it lives on each
+# annotation subclass as a ``Literal[...]`` (e.g. ``"rect"``,
+# ``"arrow"``) and is intentionally *not* declared on the
+# ``BaseAnnotation`` base class. This keeps each subclass' ``type``
+# field independent (no mutable-class-attribute override), so pyright
+# no longer rejects the discriminator narrowing with
+# ``reportIncompatibleVariableOverride``. ``Field(discriminator=...)``
+# tells Pydantic to validate by inspecting the discriminator value
+# first, avoiding a left-to-right trial of every union member.
+Annotation = Annotated[
     RectAnnotation
     | ArrowAnnotation
     | FilledRectAnnotation
@@ -311,8 +323,9 @@ Annotation = (
     | TextAnnotation
     | HighlightAnnotation
     | EllipseAnnotation
-    | FilledEllipseAnnotation
-)
+    | FilledEllipseAnnotation,
+    Field(discriminator="type"),
+]
 
 
 class AppUpdateState(BaseModel):

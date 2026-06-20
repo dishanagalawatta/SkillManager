@@ -134,6 +134,8 @@ def logo_asset_for_client(fmt: str) -> str:
     fmt_lower = str(fmt or "").lower()
     if "antigravity" in fmt_lower:
         return "clients/antigravity.svg"
+    if "opencode" in fmt_lower:
+        return "clients/opencode.svg"
     if "gemini" in fmt_lower:
         return "clients/gemini-cli.svg"
     if "codex" in fmt_lower:

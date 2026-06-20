@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Signal, SignalInstance, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -37,19 +37,17 @@ class ConfigController(BaseController):
     clientFormatsChanged = Signal()
     customCollectionsChanged = Signal()
     scrollSpeedMultiplierChanged = Signal()
-    showMenuIconsChanged = Signal()
-    compactMenuChanged = Signal()
-    skillPackageAutoUpdateChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
     autoMinimizeOnScreenshotChanged = Signal()
     autoMinimizeOnQuickCopyChanged = Signal()
     temporaryScreenshotsChanged = Signal()
+    diagnosticLoggingChanged = Signal()
 
     # Cached property values (invalidated via _invalidate_project_cache)
     _cached_update_projects: list[dict] | None = None
     _cached_project_labels: list[str] | None = None
 
-    def _set_config_value(self, key: str, value: Any, signal: Signal = None):
+    def _set_config_value(self, key: str, value: Any, signal: SignalInstance | None = None):
         """Unified setter that validates against AppConfig before persisting."""
         try:
             # Create a partial config to validate this specific key
@@ -72,32 +70,6 @@ class ConfigController(BaseController):
     @scrollSpeedMultiplier.setter
     def scrollSpeedMultiplier(self, value):
         self._set_config_value("scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged)
-
-    @Property(bool, notify=showMenuIconsChanged)
-    def showMenuIcons(self):
-        return self.config.get("show_menu_icons", True)
-
-    @showMenuIcons.setter
-    def showMenuIcons(self, value):
-        self._set_config_value("show_menu_icons", value, self.showMenuIconsChanged)
-
-    @Property(bool, notify=compactMenuChanged)
-    def compactMenu(self):
-        return self.config.get("compact_menu", False)
-
-    @compactMenu.setter
-    def compactMenu(self, value):
-        self._set_config_value("compact_menu", value, self.compactMenuChanged)
-
-    @Property(bool, notify=skillPackageAutoUpdateChanged)
-    def skillPackageAutoUpdate(self):
-        return self.config.get("skill_package_auto_update", True)
-
-    @skillPackageAutoUpdate.setter
-    def skillPackageAutoUpdate(self, value):
-        self._set_config_value(
-            "skill_package_auto_update", value, self.skillPackageAutoUpdateChanged
-        )
 
     @Property(str, notify=skillPackageAutoUpdateModeChanged)
     def skillPackageAutoUpdateMode(self):
@@ -136,6 +108,16 @@ class ConfigController(BaseController):
     @temporaryScreenshots.setter
     def temporaryScreenshots(self, value):
         self._set_config_value("temporary_screenshots", value, self.temporaryScreenshotsChanged)
+
+    @Property(bool, notify=diagnosticLoggingChanged)
+    def diagnosticLogging(self):
+        return self.config.get("diagnostic_logging", False)
+
+    @diagnosticLogging.setter
+    def diagnosticLogging(self, value):
+        if self._set_config_value("diagnostic_logging", value, self.diagnosticLoggingChanged):
+            # Apply immediately at runtime — no restart required
+            get_diagnostic_logger().set_enabled(value)
 
     @Property(dict, notify=updateProjectsChanged)
     def project_aliases(self):
@@ -200,6 +182,68 @@ class ConfigController(BaseController):
     @Property(str, notify=shortcutsChanged)
     def shortcutScreenshot(self):
         return self.get_shortcut("screenshot")
+
+    # --- Per-shortcut enabled state (read-only properties) ---
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutSearchEnabled(self):
+        return self.isShortcutEnabled("search")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutCopyEnabled(self):
+        return self.isShortcutEnabled("copy")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutArchiveEnabled(self):
+        return self.isShortcutEnabled("archive")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutDeleteEnabled(self):
+        return self.isShortcutEnabled("delete")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutRefreshEnabled(self):
+        return self.isShortcutEnabled("refresh")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutExpandAllEnabled(self):
+        return self.isShortcutEnabled("expand_all")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutCollapseAllEnabled(self):
+        return self.isShortcutEnabled("collapse_all")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutTopOfListEnabled(self):
+        return self.isShortcutEnabled("top_of_list")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutClearSelectionEnabled(self):
+        return self.isShortcutEnabled("clear_selection")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutThemeToggleEnabled(self):
+        return self.isShortcutEnabled("theme_toggle")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutQuickCopyViewEnabled(self):
+        return self.isShortcutEnabled("quick_copy_view")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutLibraryViewEnabled(self):
+        return self.isShortcutEnabled("library_view")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutUpdatesViewEnabled(self):
+        return self.isShortcutEnabled("updates_view")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutSettingsViewEnabled(self):
+        return self.isShortcutEnabled("settings_view")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutScreenshotEnabled(self):
+        return self.isShortcutEnabled("screenshot")
 
     @Property(bool, notify=isRecordingShortcutChanged)
     def isRecordingShortcut(self):
@@ -309,6 +353,25 @@ class ConfigController(BaseController):
             self._emit_projects_changed()
             self.app._set_status(f"Removed project: {path}")
 
+    @Slot(int, int)
+    def reorderProjects(self, from_index: int, to_index: int):
+        """Moves a project from one position to another in the list."""
+        projects = self.app._projects
+        if (
+            not projects
+            or from_index == to_index
+            or from_index < 0
+            or from_index >= len(projects)
+            or to_index < 0
+            or to_index >= len(projects)
+        ):
+            return
+
+        project = projects.pop(from_index)
+        projects.insert(to_index, project)
+        self.config.set("projects", projects)
+        self._emit_projects_changed()
+
     @Slot(int)
     def removeUpdateProject(self, index: int):
         """Removes a project by its index in the updates view."""
@@ -316,8 +379,22 @@ class ConfigController(BaseController):
             self.removeProject(self.app._projects[index])
 
     @Property(list, notify=clientFormatsChanged)
+    def topBarClients(self):
+        return self.config.get(
+            "top_bar_clients", ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        )
+
+    @topBarClients.setter
+    def topBarClients(self, value):
+        self._set_config_value("top_bar_clients", value, self.clientFormatsChanged)
+
+    @Property(list, notify=clientFormatsChanged)
+    def availableClientFormats(self):
+        return ["Plain Text", "Gemini CLI", "Antigravity", "Codex", "OpenCode"]
+
+    @Property(list, notify=clientFormatsChanged)
     def clientFormats(self):
-        return ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        return self.topBarClients
 
     @Property(list, notify=customCollectionsChanged)
     def customCollections(self):
@@ -457,7 +534,7 @@ class ConfigController(BaseController):
         self.app._set_status(f"Renamed project to: {alias or 'Default'}")
 
     @Slot(str, str, result=str)
-    def verifyGitPackage(self, url: str, token: str = None) -> str:
+    def verifyGitPackage(self, url: str, token: str | None = None) -> str:
         """Verifies a git repository and returns its latest tag."""
         if not url:
             return ""
@@ -487,12 +564,36 @@ class ConfigController(BaseController):
 
     @Slot()
     def resetShortcuts(self):
-        """Resets all shortcuts to defaults."""
-        from skill_manager.core.config import DEFAULT_SHORTCUTS
+        """Resets all shortcuts to defaults (enabled with default sequences)."""
+        from skill_manager.core.config import DEFAULT_DISABLED_SHORTCUTS, DEFAULT_SHORTCUTS
 
         self.config.set("shortcuts", DEFAULT_SHORTCUTS.copy())
+        self.config.set("disabled_shortcuts", DEFAULT_DISABLED_SHORTCUTS.copy())
+        self.clearAllCollectionShortcuts()
         self.shortcutsChanged.emit()
         self.app._set_status("All shortcuts reset to defaults")
+
+    @Slot(str, result=bool)
+    def isShortcutEnabled(self, action: str) -> bool:
+        """Returns True if the given shortcut action is enabled."""
+        disabled: list[str] = self.config.get("disabled_shortcuts", [])
+        return action not in disabled
+
+    @Slot(str, bool)
+    def setShortcutEnabled(self, action: str, enabled: bool) -> None:
+        """Enable or disable a shortcut action. Emits shortcutsChanged."""
+        disabled: list[str] = list(self.config.get("disabled_shortcuts", []))
+        was_disabled = action in disabled
+        if enabled and was_disabled:
+            disabled.remove(action)
+            self.config.set("disabled_shortcuts", disabled)
+            self.shortcutsChanged.emit()
+            self.app._set_status(f"Shortcut '{action}' enabled")
+        elif not enabled and not was_disabled:
+            disabled.append(action)
+            self.config.set("disabled_shortcuts", disabled)
+            self.shortcutsChanged.emit()
+            self.app._set_status(f"Shortcut '{action}' disabled")
 
     @Slot(str)
     def setStatus(self, msg: str):
@@ -504,10 +605,8 @@ class ConfigController(BaseController):
         """Saves a collection with paths and projects."""
         if not name:
             return
-        # Commands live in .agents/commands/ — they're per-project, not installable across projects.
-        # Exclude them so checkMissingSkills doesn't report false positives.
         if isinstance(paths, list):
-            paths = [p for p in paths if not _is_command_path(p)]
+            paths = list(paths)
         config = CollectionConfig(paths=paths, projects=projects)
         self.app._custom_collections[name] = config.model_dump()
         self.config.set("custom_collections", self.app._custom_collections)
@@ -561,7 +660,7 @@ class ConfigController(BaseController):
 
     @Slot(str, result=str)
     def checkMissingSkills(self, name: str) -> str:
-        """Checks if collection skills exist in selected projects. Returns JSON of missing skills."""
+        """Checks if collection skills/commands exist in selected projects. Returns JSON of missing items."""
         import json
 
         entry = self.app._custom_collections.get(name, {})
@@ -576,7 +675,7 @@ class ConfigController(BaseController):
         if not projects:
             return json.dumps({})
 
-        from skill_manager.core.copier import get_skills_dir
+        from skill_manager.core.copier import get_commands_dir, get_skills_dir
 
         missing = {}
         projects_checked = []
@@ -591,38 +690,63 @@ class ConfigController(BaseController):
                 continue
 
             skills_dir = get_skills_dir(project_path)
+            commands_dir = get_commands_dir(project_path)
             skills_dir_exists = skills_dir.exists() if skills_dir else False
             projects_checked.append(project_label)
 
             missing_in_project = []
-            for skill_path in paths:
-                if not isinstance(skill_path, str):
+            for item_path in paths:
+                if not isinstance(item_path, str):
                     continue
-                if _is_command_path(skill_path):
-                    continue  # Commands are not installable across projects
-                skill_folder = Path(skill_path).name
-                target_full = skills_dir / skill_folder if skill_folder else None
-                exists = target_full.exists() if target_full else False
-                total_checked += 1
 
-                # DEBUG: per-skill trace (high volume, dev only)
-                get_diagnostic_logger().log_event(
-                    "DEBUG",
-                    "missing_skills_per_skill",
-                    f"{'exists' if exists else 'MISSING'}: {skill_folder} in {project_label}",
-                    data={
-                        "collection": name,
-                        "label": project_label,
-                        "skill_path": skill_path,
-                        "skill_folder": skill_folder,
-                        "target_full_path": str(target_full) if target_full else "",
-                        "exists": exists,
-                        "is_missing": not exists,
-                    },
-                )
+                if _is_command_path(item_path):
+                    cmd_filename = Path(item_path).name
+                    cmd_target = commands_dir / cmd_filename
+                    exists = cmd_target.exists()
+                    total_checked += 1
 
-                if skill_folder and not exists:
-                    missing_in_project.append(skill_path)
+                    get_diagnostic_logger().log_event(
+                        "DEBUG",
+                        "missing_skills_per_skill",
+                        f"{'exists' if exists else 'MISSING'}: {cmd_filename} in {project_label}",
+                        data={
+                            "collection": name,
+                            "label": project_label,
+                            "skill_path": item_path,
+                            "skill_folder": cmd_filename,
+                            "target_full_path": str(cmd_target),
+                            "exists": exists,
+                            "is_missing": not exists,
+                            "is_command": True,
+                        },
+                    )
+
+                    if not exists:
+                        missing_in_project.append(item_path)
+                else:
+                    skill_folder = Path(item_path).name
+                    target_full = skills_dir / skill_folder if skill_folder else None
+                    exists = target_full.exists() if target_full else False
+                    total_checked += 1
+
+                    get_diagnostic_logger().log_event(
+                        "DEBUG",
+                        "missing_skills_per_skill",
+                        f"{'exists' if exists else 'MISSING'}: {skill_folder} in {project_label}",
+                        data={
+                            "collection": name,
+                            "label": project_label,
+                            "skill_path": item_path,
+                            "skill_folder": skill_folder,
+                            "target_full_path": str(target_full) if target_full else "",
+                            "exists": exists,
+                            "is_missing": not exists,
+                            "is_command": False,
+                        },
+                    )
+
+                    if skill_folder and not exists:
+                        missing_in_project.append(item_path)
 
             # INFO: per-project summary (low volume, production-visible)
             missing_count = len(missing_in_project)
@@ -658,7 +782,7 @@ class ConfigController(BaseController):
             "INFO",
             "missing_skills_result",
             f"Collection '{name}': {total_missing} missing across {len(projects_with_missing)}/{len(projects_checked)} projects "
-            f"({total_checked} skills checked)",
+            f"({total_checked} items checked)",
             data={
                 "collection": name,
                 "total_projects": len(projects_checked),
@@ -672,14 +796,21 @@ class ConfigController(BaseController):
 
     @Slot(str, list)
     def copyMissingSkills(self, name: str, project_labels: list):
-        """Copies missing skills to specified projects."""
+        """Copies missing skills and commands to specified projects."""
         entry = self.app._custom_collections.get(name, {})
         if not isinstance(entry, dict) or "paths" not in entry:
             return
 
         paths = entry["paths"]
 
-        from skill_manager.core.copier import copy_skill_folders_to_projects, get_skills_dir
+        from skill_manager.core.copier import (
+            copy_command_files_to_projects,
+            copy_skill_folders_to_projects,
+            get_skills_dir,
+        )
+
+        skill_paths = [p for p in paths if isinstance(p, str) and not _is_command_path(p)]
+        command_paths = [p for p in paths if isinstance(p, str) and _is_command_path(p)]
 
         for project_label in project_labels:
             project_path = self.getProjectPath(project_label)
@@ -687,28 +818,156 @@ class ConfigController(BaseController):
                 continue
 
             target_dir = get_skills_dir(project_path)
-            skills_to_copy = []
-            for skill_path in paths:
-                skill_folder = Path(skill_path).name
-                skills_to_copy.append({"local_path": skill_path, "name": skill_folder})
 
-            result = copy_skill_folders_to_projects(skills_to_copy, [project_path])
+            if skill_paths:
+                skills_to_copy = []
+                for skill_path in skill_paths:
+                    skill_folder = Path(skill_path).name
+                    skills_to_copy.append({"local_path": skill_path, "name": skill_folder})
 
-            get_diagnostic_logger().log_event(
-                "INFO",
-                "missing_skills_copy",
-                f"Copied to '{project_label}': {result['copied']} copied, {result['failed']} failed",
-                data={
-                    "collection": name,
-                    "label": project_label,
-                    "project_path": project_path,
-                    "target_dir": str(target_dir),
-                    "copied": result["copied"],
-                    "merged": result["merged"],
-                    "failed": result["failed"],
-                    "skills_copied": len(skills_to_copy),
-                },
-            )
+                result = copy_skill_folders_to_projects(skills_to_copy, [project_path])
+
+                get_diagnostic_logger().log_event(
+                    "INFO",
+                    "missing_skills_copy",
+                    f"Copied to '{project_label}': {result['copied']} copied, {result['failed']} failed",
+                    data={
+                        "collection": name,
+                        "label": project_label,
+                        "project_path": project_path,
+                        "target_dir": str(target_dir),
+                        "copied": result["copied"],
+                        "merged": result.get("merged", 0),
+                        "failed": result["failed"],
+                        "skills_copied": len(skills_to_copy),
+                    },
+                )
+
+            if command_paths:
+                commands_to_copy = []
+                for cmd_path in command_paths:
+                    cmd_name = Path(cmd_path).name
+                    commands_to_copy.append({"local_path": cmd_path, "name": cmd_name})
+
+                result = copy_command_files_to_projects(commands_to_copy, [project_path])
+
+                get_diagnostic_logger().log_event(
+                    "INFO",
+                    "missing_commands_copy",
+                    f"Copied commands to '{project_label}': {result['copied']} copied, {result['failed']} failed",
+                    data={
+                        "collection": name,
+                        "label": project_label,
+                        "project_path": project_path,
+                        "target_dir": str(get_skills_dir(project_path)),
+                        "copied": result["copied"],
+                        "failed": result["failed"],
+                        "commands_copied": len(commands_to_copy),
+                    },
+                )
+
+    # --- Per-collection shortcuts ---
+
+    def _claim_sequence(self, seq: str, owner_name: str) -> list[str]:
+        """Forcibly clears `seq` from any built-in action and any other collection.
+
+        Returns a human-readable list of entities that were freed so the
+        caller can include them in a status message.
+        """
+        if not seq:
+            return []
+
+        freed: list[str] = []
+
+        # 1. Free from built-in shortcuts
+        shortcuts = self.config.get("shortcuts", {})
+        for action, bound_seq in list(shortcuts.items()):
+            if bound_seq == seq:
+                shortcuts[action] = ""
+                freed.append(action)
+
+        if freed:
+            self.config.set("shortcuts", shortcuts)
+
+        # 2. Free from other collections
+        for name, entry in self.app._custom_collections.items():
+            if name == owner_name:
+                continue
+            if isinstance(entry, dict) and entry.get("shortcut") == seq:
+                entry["shortcut"] = ""
+                freed.append(name)
+
+        if freed:
+            self.config.set("custom_collections", self.app._custom_collections)
+            self.shortcutsChanged.emit()
+            self.customCollectionsChanged.emit()
+
+        return freed
+
+    @Slot(str, str)
+    def setCollectionShortcut(self, name: str, seq: str):
+        """Sets a shortcut sequence for a collection with auto-claim semantics."""
+        entry = self.app._custom_collections.get(name)
+        if entry is None:
+            return
+        if not isinstance(entry, dict):
+            return
+        old = entry.get("shortcut", "")
+        if old == seq:
+            return
+
+        freed = self._claim_sequence(seq, name)
+
+        entry["shortcut"] = seq
+        self.config.set("custom_collections", self.app._custom_collections)
+        self.shortcutsChanged.emit()
+        self.customCollectionsChanged.emit()
+
+        msg = f"Collection '{name}' bound to {seq}" if seq else f"Collection '{name}' shortcut cleared"
+        if freed:
+            msg += f" (reassigned from: {', '.join(freed)})"
+        self.app._set_status(msg)
+
+    @Slot(str, bool)
+    def setCollectionShortcutEnabled(self, name: str, enabled: bool):
+        """Enable or disable the shortcut for a collection without losing the sequence."""
+        entry = self.app._custom_collections.get(name)
+        if entry is None or not isinstance(entry, dict):
+            return
+        old = entry.get("shortcut_enabled", True)
+        if old == enabled:
+            return
+        entry["shortcut_enabled"] = enabled
+        self.config.set("custom_collections", self.app._custom_collections)
+        self.customCollectionsChanged.emit()
+
+    @Slot(str, result=str)
+    def getCollectionShortcut(self, name: str) -> str:
+        """Returns the shortcut sequence for a named collection."""
+        entry = self.app._custom_collections.get(name, {})
+        if isinstance(entry, dict):
+            return entry.get("shortcut", "")
+        return ""
+
+    @Slot(str, result=bool)
+    def getCollectionShortcutEnabled(self, name: str) -> bool:
+        """Returns whether the shortcut is enabled for a named collection."""
+        entry = self.app._custom_collections.get(name, {})
+        if isinstance(entry, dict):
+            return entry.get("shortcut_enabled", True)
+        return True
+
+    def clearAllCollectionShortcuts(self):
+        """Clears all collection shortcuts. Called by resetShortcuts."""
+        changed = False
+        for _name, entry in self.app._custom_collections.items():
+            if isinstance(entry, dict) and (entry.get("shortcut") or not entry.get("shortcut_enabled", True)):
+                entry["shortcut"] = ""
+                entry["shortcut_enabled"] = True
+                changed = True
+        if changed:
+            self.config.set("custom_collections", self.app._custom_collections)
+            self.customCollectionsChanged.emit()
 
     @Slot(result=str)
     def getCollectionsDiagnostic(self) -> str:
@@ -819,3 +1078,23 @@ class ConfigController(BaseController):
         """Clear all diagnostic log files and ring buffer."""
         get_diagnostic_logger().clear_logs()
         self.app._set_status("Diagnostic logs cleared")
+
+    @Slot(result=str)
+    def getDiagnosticCounts(self) -> str:
+        """Returns JSON dict of diagnostic event counts by level."""
+        import json
+
+        return json.dumps(get_diagnostic_logger().get_diagnostic_counts())
+
+    @Slot(result=str)
+    def getDiagnosticHealthStatus(self) -> str:
+        """Returns 'green', 'yellow', or 'red' health status."""
+        return get_diagnostic_logger().get_health_status()
+
+    @Slot(int, result=str)
+    def getRecentEventsHuman(self, count: int = 20) -> str:
+        """Returns JSON array of recent events in human-readable format."""
+        import json
+
+        events = get_diagnostic_logger().get_recent_events_human(count)
+        return json.dumps(events, ensure_ascii=False)

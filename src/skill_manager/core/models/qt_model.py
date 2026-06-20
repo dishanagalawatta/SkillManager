@@ -63,7 +63,7 @@ class SkillModel(QAbstractListModel):
         self._filtered_skills: list[Skill] = []
         self._config = config
         self._search_engine = None
-        self._selected_ids: set[str] = set()
+        self._selected_ids: dict[str, None] = {}
         self._engine = FilterEngine()
         self._state = FilterState()
         self._suppress_layout = False
@@ -93,7 +93,7 @@ class SkillModel(QAbstractListModel):
                 self._selections_by_project = {k: list(v) for k, v in raw.items()}
             initial_project = self._state.project_filter
             if initial_project and initial_project in self._selections_by_project:
-                self._selected_ids = set(self._selections_by_project[initial_project])
+                self._selected_ids = dict.fromkeys(self._selections_by_project[initial_project])
 
     def rowCount(self, _parent=QModelIndex()):
         return len(self._filtered_skills)
@@ -248,7 +248,7 @@ class SkillModel(QAbstractListModel):
                 self._selections_by_project[old_project] = list(self._selected_ids)
             self._state.project_filter = value
             if value in self._selections_by_project:
-                self._selected_ids = set(self._selections_by_project[value])
+                self._selected_ids = dict.fromkeys(self._selections_by_project[value])
             else:
                 self._selected_ids.clear()
             self._apply_filter()
@@ -362,9 +362,9 @@ class SkillModel(QAbstractListModel):
             if not path or self._is_main_collapsed(skill) or self._is_sub_collapsed(skill):
                 return
             if path in self._selected_ids:
-                self._selected_ids.remove(path)
+                self._selected_ids.pop(path, None)
             else:
-                self._selected_ids.add(path)
+                self._selected_ids[path] = None
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()
@@ -383,7 +383,7 @@ class SkillModel(QAbstractListModel):
     def selectAll(self):
         for skill in self._all_filtered_skills:
             if skill.local_path:
-                self._selected_ids.add(skill.local_path)
+                self._selected_ids[skill.local_path] = None
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
@@ -403,7 +403,7 @@ class SkillModel(QAbstractListModel):
     def selectByPaths(self, paths):
         for path in paths:
             if path:
-                self._selected_ids.add(path)
+                self._selected_ids[path] = None
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
@@ -412,7 +412,8 @@ class SkillModel(QAbstractListModel):
     def removeSkillsByPath(self, paths: list):
         path_set = set(paths)
         self._all_skills = [s for s in self._all_skills if s.local_path not in path_set]
-        self._selected_ids -= path_set
+        for path in path_set:
+            self._selected_ids.pop(path, None)
 
         if self._search_engine:
             self._search_engine.remove_from_index(list(path_set))
@@ -438,6 +439,10 @@ class SkillModel(QAbstractListModel):
 
         if not changed:
             return False
+
+        if key == "is_starred":
+            self._apply_filter_with_diff()
+            return True
 
         # If it's in the currently filtered list, emit dataChanged
         for i, skill in enumerate(self._filtered_skills):
@@ -482,6 +487,52 @@ class SkillModel(QAbstractListModel):
             self._update_selection_counts()
             self.selectionStateChanged.emit()
             self.totalSelectableCountChanged.emit()
+
+    def _apply_filter_with_diff(self):
+        """Applies filters but uses list diffing to emit correct Qt signals for sleek animations."""
+        old_list = list(self._filtered_skills)
+        try:
+            skills = self._execute_filter_logic()
+            self._all_filtered_skills = self._engine.prepare_rows(skills)
+            new_list = self._engine.build_visible_rows(
+                self._all_filtered_skills, self._state.collapsed_categories
+            )
+        except Exception as e:
+            logger.error("Error applying filter for diff: %s", e)
+            return
+
+        import difflib
+
+        old_keys = [s.local_path if s.local_path else str(id(s)) for s in old_list]
+        new_keys = [s.local_path if s.local_path else str(id(s)) for s in new_list]
+
+        matcher = difflib.SequenceMatcher(None, old_keys, new_keys)
+
+        for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
+            if tag == 'replace':
+                self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
+                del self._filtered_skills[i1:i2]
+                self.endRemoveRows()
+                self.beginInsertRows(QModelIndex(), i1, i1 + (j2 - j1) - 1)
+                self._filtered_skills[i1:i1] = new_list[j1:j2]
+                self.endInsertRows()
+            elif tag == 'delete':
+                self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
+                del self._filtered_skills[i1:i2]
+                self.endRemoveRows()
+            elif tag == 'insert':
+                self.beginInsertRows(QModelIndex(), i1, i1 + (j2 - j1) - 1)
+                self._filtered_skills[i1:i1] = new_list[j1:j2]
+                self.endInsertRows()
+            elif tag == 'equal':
+                for idx in range(i1, i2):
+                    self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
+                if i2 > i1:
+                    self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+
+        self._update_selection_counts()
+        self.selectionStateChanged.emit()
+        self.totalSelectableCountChanged.emit()
 
     def _begin_batch(self):
         """Suppress layout signals and filter work until _end_batch()."""
@@ -572,9 +623,9 @@ class SkillModel(QAbstractListModel):
             if not path:
                 return
             if selected:
-                self._selected_ids.add(path)
+                self._selected_ids[path] = None
             else:
-                self._selected_ids.discard(path)
+                self._selected_ids.pop(path, None)
             idx = self.index(row, 0)
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()

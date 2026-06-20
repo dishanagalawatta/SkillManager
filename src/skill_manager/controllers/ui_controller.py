@@ -50,8 +50,12 @@ class UIController(BaseController):
             self._state = UIStateRecord()
 
         # Normalize view names in the record
-        self._state.startup_view = self._normalizeViewName(self._state.startup_view)
-        self._state.current_view = self._state.startup_view
+        if self._state.startup_view == "Last Selected":
+            # If "Last Selected", we don't normalize it, and we keep current_view as is
+            self._state.current_view = self._normalizeViewName(self._state.current_view)
+        else:
+            self._state.startup_view = self._normalizeViewName(self._state.startup_view)
+            self._state.current_view = self._state.startup_view
 
         # Debounce timer for UI state saves
         self._save_timer = QTimer()
@@ -221,6 +225,7 @@ class UIController(BaseController):
             self.app._client_format = f
             self.app.clientFormatChanged.emit()
             self.currentViewChanged.emit()  # Logo depends on it
+            self.config.set("client_format", f)
             self.triggerSave()
 
     @Slot(str)
@@ -279,6 +284,7 @@ class UIController(BaseController):
             "library": "Library",
             "updates": "Updates",
             "settings": "Settings",
+            "lastselected": "Last Selected",
         }
         return view_map.get(view.lower(), "Library")
 
@@ -286,7 +292,11 @@ class UIController(BaseController):
     def getAssetUri(self, path: str) -> str:
         """Returns the absolute URI for an asset path."""
         if getattr(sys, "frozen", False):
-            base = Path(sys._MEIPASS) / "assets"
+            # PyInstaller sets ``sys._MEIPASS`` at runtime; the type-checker
+            # stub doesn't know about it, so guard the attribute access the
+            # same way we guard ``sys.frozen`` above.
+            meipass = getattr(sys, "_MEIPASS", "")
+            base = Path(meipass) / "assets"
         else:
             base = Path(__file__).resolve().parent.parent.parent.parent / "assets"
 

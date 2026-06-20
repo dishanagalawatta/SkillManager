@@ -85,6 +85,7 @@ class AppController(QObject):
     clientFormatChanged = Signal()
     categoriesChanged = Signal()
     clientFormatsChanged = Signal()
+    defaultClientChanged = Signal()
     customCollectionsChanged = Signal()
     updateResultsChanged = Signal()
     updatePackagesChanged = Signal()
@@ -128,7 +129,14 @@ class AppController(QObject):
         self._clipboard = QGuiApplication.clipboard()
         self._is_recording_shortcut = False
 
-        self._client_format = self._config.get("client_format", "Antigravity")
+        default_client = self._config.get("default_client", "Last Selected")
+        if default_client == "Last Selected":
+            self._client_format = self._config.get("client_format", "Antigravity")
+        else:
+            self._client_format = default_client
+            # Also sync the currently saved client format to match the default
+            self._config.set("client_format", self._client_format)
+
         self._sources = self._config.get("sources", [])
         self._projects = self._config.get("projects", [])
         self._project_aliases = self._config.get("project_aliases", {})
@@ -156,16 +164,20 @@ class AppController(QObject):
         self._syncing_projects = []
 
         # 3. Initialize Sub-Controllers
-        self.ui = UIController(self)
-        self.config_mgr = ConfigController(self)
-        self.ops = OpsController(self)
+        # The type: ignore comments on each `SubController(self)` call work around a
+        # pyright strict-mode quirk: ``Self@AppController`` is not structurally
+        # assignable to ``AppController`` even though they are the same class.
+        # Runtime is unaffected — these are not local re-bindings, just construction.
+        self.ui = UIController(self)  # type: ignore[arg-type]
+        self.config_mgr = ConfigController(self)  # type: ignore[arg-type]
+        self.ops = OpsController(self)  # type: ignore[arg-type]
         self.screenshot_provider = ScreenshotImageProvider()
-        self.screenshot = ScreenshotController(self)
-        self.image_inspector = ImageInspectorController(self)
-        self.updates = UpdateController(self)
-        self.discovery = DiscoveryController(self)
-        self.app_updater = AppUpdateController(self)
-        self.global_hotkey = GlobalHotkeyManager(self)
+        self.screenshot = ScreenshotController(self)  # type: ignore[arg-type]
+        self.image_inspector = ImageInspectorController(self)  # type: ignore[arg-type]
+        self.updates = UpdateController(self)  # type: ignore[arg-type]
+        self.discovery = DiscoveryController(self)  # type: ignore[arg-type]
+        self.app_updater = AppUpdateController(self)  # type: ignore[arg-type]
+        self.global_hotkey = GlobalHotkeyManager(self)  # type: ignore[arg-type]
 
         # 4. Connect Sub-Controller signals to Proxy Signals
         self.ui.currentViewChanged.connect(self.currentViewChanged.emit)
@@ -246,10 +258,11 @@ class AppController(QObject):
             self._scheduler.start()
 
             # Initial Startup Check
-            if self._config.get("skill_package_auto_update", True):
+            if self._config.get("skill_package_auto_update_mode", "prompt") != "off":
                 QTimer.singleShot(2000, self._run_startup_package_scan)
-
-            self.config_mgr.skillPackageAutoUpdateChanged.connect(self._update_package_scheduler)
+            self.config_mgr.skillPackageAutoUpdateModeChanged.connect(
+                self._update_package_scheduler
+            )
 
     def _run_startup_package_scan(self):
         """Runs the initial scan for skill package updates."""
@@ -357,6 +370,16 @@ class AppController(QObject):
     @Property(str, notify=clientFormatChanged)
     def clientFormat(self):
         return self._client_format
+
+    @Property(str, notify=defaultClientChanged)
+    def defaultClient(self):
+        return self._config.get("default_client", "Last Selected")
+
+    @Slot(str)
+    def setDefaultClient(self, f):
+        if self.defaultClient != f:
+            self._config.set("default_client", f)
+            self.defaultClientChanged.emit()
 
     @Property(list, notify=categoriesChanged)
     def categories(self):
@@ -643,6 +666,10 @@ class AppController(QObject):
     def removeProject(self, p):
         self.config_mgr.removeProject(p)
 
+    @Slot(int, int)
+    def reorderProjects(self, from_index, to_index):
+        self.config_mgr.reorderProjects(from_index, to_index)
+
     @Slot(int)
     def removeUpdateProject(self, i):
         self.config_mgr.removeUpdateProject(i)
@@ -718,6 +745,10 @@ class AppController(QObject):
     @Slot(dict, str)
     def copySkillReference(self, s, a=""):
         self.ops.copySkillReference(s, a)
+
+    @Slot(str)
+    def copyCollectionToClipboard(self, n):
+        self.ops.copyCollectionToClipboard(n)
 
     @Slot(str)
     def deleteSkill(self, p):
@@ -861,9 +892,9 @@ class AppController(QObject):
             self._on_global_hotkey, Qt.ConnectionType.QueuedConnection
         )
 
-        # Register screenshot hotkey at startup
+        # Register screenshot hotkey at startup (only if enabled)
         screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq:
+        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
             self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
 
         # Re-register when shortcuts change
@@ -881,8 +912,10 @@ class AppController(QObject):
     def _on_shortcuts_changed(self):
         """Re-register global hotkeys when shortcuts are updated."""
         screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq:
+        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
             self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
+        else:
+            self.global_hotkey.unregister(self._hotkey_id_screenshot)
 
     def on_quit(self):
         """Ensures all pending state is saved before exit."""

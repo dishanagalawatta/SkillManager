@@ -74,11 +74,16 @@ def main():
     setup_logging()
 
     # Initialize diagnostic logger
+    from skill_manager.core.config import ConfigManager
     from skill_manager.core.diagnostics import get_diagnostic_logger
 
     diag = get_diagnostic_logger()
     log_level = "DEBUG" if _is_dev_mode() else "INFO"
     diag.initialize(log_level=log_level)
+
+    # Enable only if the user has opted in via Settings > General
+    _cfg = ConfigManager()
+    diag.set_enabled(_cfg.get("diagnostic_logging", False))
     diag.log_startup()
 
     app_main()

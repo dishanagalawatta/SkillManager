@@ -106,6 +106,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test_category", "test message")
 
         log_file = tmp_path / "diagnostic.log"
@@ -119,6 +120,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "msg", data={"key": "val"})
 
         log_file = tmp_path / "diagnostic.log"
@@ -131,6 +133,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         # Simulate file write failure by making log file a directory
         logger._log_file.mkdir()
         logger.log_event("INFO", "test", "should not crash")
@@ -173,6 +176,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "msg")
         logger.clear_logs()
         assert len(logger._ring) == 0
@@ -183,6 +187,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "test event")
 
         bundle_path = logger.export_bundle()
