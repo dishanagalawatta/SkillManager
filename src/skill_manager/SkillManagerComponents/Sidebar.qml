@@ -38,11 +38,24 @@ Rectangle {
             Layout.preferredHeight: 50
             spacing: 12
             
-            Image {
-                source: AppController.ui_controller.logoSource
+            Item {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
-                fillMode: Image.PreserveAspectFit
+
+                Image {
+                    id: sidebarLogoImg
+                    anchors.fill: parent
+                    source: AppController.ui_controller.logoSource
+                    fillMode: Image.PreserveAspectFit
+                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+                }
+                
+                ColorOverlay {
+                    anchors.fill: sidebarLogoImg
+                    source: sidebarLogoImg
+                    color: Theme.label
+                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                }
                 
                 MouseArea {
                     id: logoMouseArea

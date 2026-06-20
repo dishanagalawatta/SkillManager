@@ -36,13 +36,27 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
-        Image {
-            source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
+        Item {
             Layout.preferredWidth: 18
             Layout.preferredHeight: 18
-            fillMode: Image.PreserveAspectFit
-            opacity: 0.9
             Layout.alignment: Qt.AlignVCenter
+            
+            Image {
+                id: titleLogoImg
+                anchors.fill: parent
+                source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.9
+                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+            }
+
+            ColorOverlay {
+                anchors.fill: titleLogoImg
+                source: titleLogoImg
+                color: Theme.label
+                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                opacity: 0.9
+            }
         }
 
         Text {

@@ -4,6 +4,7 @@ Usage: Accessed via AppController.ops
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,7 @@ class OpsController(BaseController):
             logger.debug("Updated property '%s' to %s for path: %s", key, value, path)
 
     def _toggle_skill_boolean(
-        self, attr_name: str, path_list: list[str], persist_fn: callable, event_name: str
+        self, attr_name: str, path_list: list[str], persist_fn: Callable[..., Any], event_name: str
     ):
         """Generic helper to toggle a boolean property on a skill."""
         skill = self.app._selected_skill
@@ -491,6 +492,53 @@ class OpsController(BaseController):
         self.app._set_status(f"Copied reference: {ref}")
         self._maybeMinimizeOnCopy()
 
+    @Slot(str)
+    def copyCollectionToClipboard(self, name: str):
+        """Copies a collection's skill references to clipboard and auto-pastes."""
+        from skill_manager.core.quick_copy import format_project_skill_reference
+
+        entry = self.app._custom_collections.get(name, {})
+        if not isinstance(entry, dict):
+            return
+
+        paths = entry.get("paths", [])
+        if not paths:
+            self.app._set_status(f"Collection '{name}' has no skills")
+            return
+
+        references = []
+        for path in paths:
+            skill = next(
+                (s for s in self.app.skillModel._all_skills if s.local_path == path), None
+            )
+            if skill:
+                references.append(
+                    format_project_skill_reference(
+                        skill,
+                        self.app._client_format,
+                        all_skills=self.app.skillModel._all_skills,
+                    )
+                )
+            else:
+                references.append(path)
+
+        content = " ".join(references)
+        self.app._clipboard.setText(content)
+        self.app._set_status(f"Copied collection '{name}' ({len(references)} skills)")
+
+        # Auto-paste after a short delay to allow focus to settle
+        delay = 120 if self.app.config_controller.autoMinimizeOnQuickCopy else 50
+        if self.app.config_controller.autoMinimizeOnQuickCopy:
+            self.minimizeAppRequested.emit()
+        QTimer.singleShot(delay, self._send_paste_to_focused_window)
+
+    def _send_paste_to_focused_window(self):
+        """Helper that calls the Win32 paste function."""
+        from skill_manager.utils.win32 import send_paste_to_focused_window
+
+        if not send_paste_to_focused_window():
+            self.app._set_status("Copied, but could not paste automatically")
+
     @Slot(str, str, str, str)
     def createCustomCommand(self, name: str, body: str, project_label: str, category: str):
         """Creates a Custom Command .md file."""
@@ -578,14 +626,19 @@ class OpsController(BaseController):
         """Internal helper to persist starred state."""
         save_starred(self.app._starred_paths)
 
-    def _merge_discovered_skills(self, discovered_skills):
-        """Internal helper to merge newly discovered skills into both models."""
-        self.app._library_model.addOrUpdateSkills(discovered_skills)
-        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+    def _merge_discovered_skills(self, discovered: list):
+        """Internal helper to merge newly discovered skills into both models.
+
+        Parameter name matches :py:meth:`BaseController._merge_discovered_skills`
+        so subclasses with the same method override without an incompatible
+        signature warning.
+        """
+        self.app._library_model.addOrUpdateSkills(discovered)
+        self.app._quick_copy_model.addOrUpdateSkills(discovered)
 
         # Update categories if new ones appeared
         new_cats = False
-        for s in discovered_skills:
+        for s in discovered:
             cat = s.get("category")
             if cat and cat not in self.app._categories:
                 self.app._categories.append(cat)

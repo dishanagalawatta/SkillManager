@@ -126,6 +126,7 @@ class DiagnosticLogger:
         self._initialized = False
         self._log_level = "INFO"
         self._context: dict[str, Any] = {}
+        self._enabled: bool = False
 
     def initialize(
         self,
@@ -145,10 +146,23 @@ class DiagnosticLogger:
 
         try:
             self._log_dir.mkdir(parents=True, exist_ok=True)
+
             self._initialized = True
         except OSError as exc:
             logger.warning("Could not create diagnostic log directory: %s", exc)
             self._initialized = False
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable diagnostic logging at runtime.
+
+        When disabled, log_event() returns immediately — no ring buffer,
+        no file I/O, no JSON serialization.
+        """
+        self._enabled = bool(enabled)
+
+    def is_enabled(self) -> bool:
+        """Return True if diagnostic logging is currently enabled."""
+        return self._enabled
 
     def _rotate_if_needed(self) -> None:
         """Rotate log file if it exceeds max size."""
@@ -190,6 +204,9 @@ class DiagnosticLogger:
             msg: Human-readable message.
             data: Optional additional structured data.
         """
+        if not self._enabled:
+            return
+
         if level.upper() == "DEBUG" and self._log_level != "DEBUG":
             return
 
@@ -238,6 +255,57 @@ class DiagnosticLogger:
         with self._lock:
             items = list(self._ring)
         return items[-count:]
+
+    def get_diagnostic_counts(self) -> dict[str, int]:
+        """Return aggregate level counts from the ring buffer."""
+        counts = {"errors": 0, "warnings": 0, "info": 0, "debug": 0, "total": 0}
+        with self._lock:
+            for event in self._ring:
+                level = event.get("level", "")
+                if level == "ERROR":
+                    counts["errors"] += 1
+                elif level == "WARNING":
+                    counts["warnings"] += 1
+                elif level == "INFO":
+                    counts["info"] += 1
+                elif level == "DEBUG":
+                    counts["debug"] += 1
+                counts["total"] += 1
+        return counts
+
+    def get_health_status(self) -> str:
+        """Return health status: 'green', 'yellow', or 'red'."""
+        counts = self.get_diagnostic_counts()
+        if counts["errors"] > 0:
+            return "red"
+        if counts["warnings"] > 0:
+            return "yellow"
+        return "green"
+
+    def get_recent_events_human(self, count: int = 20) -> list[dict[str, str]]:
+        """Return the most recent events in a human-readable format.
+
+        Each entry has: time, level, category, message.
+        """
+        with self._lock:
+            items = list(self._ring)
+        rows: list[dict[str, str]] = []
+        for event in items[-count:]:
+            ts = event.get("ts", "")
+            # Strip timezone offset and truncate for display
+            try:
+                display_time = ts[11:19]  # HH:MM:SS
+            except (IndexError, TypeError):
+                display_time = ts
+            rows.append(
+                {
+                    "time": display_time,
+                    "level": event.get("level", ""),
+                    "category": event.get("category", ""),
+                    "message": event.get("msg", ""),
+                }
+            )
+        return rows
 
     def get_log_path(self) -> str:
         """Return the path to the current diagnostic log file."""

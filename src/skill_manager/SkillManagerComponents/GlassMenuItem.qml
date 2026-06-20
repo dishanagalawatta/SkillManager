@@ -1,19 +1,17 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import App 1.0
-
 MenuItem {
     id: control
 
     property string iconText: ""
     property string iconSource: ""
     property string shortcut: ""
-    property bool showIcon: AppController.config_controller ? AppController.config_controller.showMenuIcons : true
-    property bool isCompact: AppController.config_controller ? AppController.config_controller.compactMenu : false
+    property bool showIcon: true
+    property bool isCompact: false
 
     implicitWidth: 200
-    implicitHeight: isCompact ? 32 : 40
+    implicitHeight: 40
 
     contentItem: RowLayout {
         spacing: 12

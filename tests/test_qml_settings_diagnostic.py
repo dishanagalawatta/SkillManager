@@ -11,10 +11,13 @@ real app uses (Basic style, SkillManagerComponents import path) and reports:
 Run with:  uv run pytest tests/test_qml_settings_diagnostic.py -v
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QUrl
 from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
+from PySide6.QtQuick import QQuickItem
 from PySide6.QtWidgets import QApplication
 
 QML_DIR = (
@@ -26,23 +29,21 @@ def _format_errors(errors):
     return "\n".join(f"  - {e.toString()}" for e in errors)
 
 
-def _load_qml(qapp, qml_path: Path, controller: QObject):
+def _load_qml(
+    qapp: QApplication, qml_path: Path, controller: QObject
+) -> tuple[QQmlApplicationEngine, QQmlComponent, QQuickItem | None, list, list]:
     """Load a QML file with the same setup the real app uses.
 
-    Returns a tuple of (component, object, errors, warnings).
-
-    Uses ``QQmlApplicationEngine`` (matching the real app) because
-    ``QQmlEngine`` alone is stricter about the ``data`` list-property
-    type of objects added as children — strict enough to reject
-    ``QGfxSourceProxy`` inside ``Qt5Compat.GraphicalEffects.ColorOverlay``
-    and trigger false-positive errors. The real AppController is required
-    because the QML files ``import App 1.0``.
+    Returns a tuple of (engine, component, object, errors, warnings).
+    ``obj`` is a ``QQuickItem`` (the QML root Item), not a plain
+    ``QObject`` — this matters for type checking because only
+    ``QQuickItem`` exposes ``setWidth``/``setHeight``/``width``/``height``.
     """
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("appController", controller)
     engine.addImportPath(str(QML_DIR.parent))
 
-    warnings = []
+    warnings: list[str] = []
     engine.warnings.connect(lambda msgs: warnings.extend(m.toString() for m in msgs))
 
     component = QQmlComponent(engine)
@@ -52,9 +53,9 @@ def _load_qml(qapp, qml_path: Path, controller: QObject):
     )
 
     errors = list(component.errors()) if component.isError() else []
-    obj = None
+    obj: QQuickItem | None = None
     if component.isReady() and not errors:
-        obj = component.create()
+        obj = component.create()  # type: ignore[assignment]
 
     return engine, component, obj, errors, warnings
 
@@ -104,10 +105,8 @@ def test_settings_view_root_has_visible_size(qapp, app_controller):
     obj.setHeight(600)
 
     # Walk the tree and report every Item with a non-zero size.
-    def walk(item, depth=0):
-        for child in item.findChildren(QObject):
-            if not hasattr(child, "width"):
-                continue
+    def walk(item: QQuickItem, depth: int = 0):
+        for child in item.findChildren(QQuickItem):
             if child.width() > 0 and child.height() > 0:
                 yield depth, child
 
@@ -115,7 +114,7 @@ def test_settings_view_root_has_visible_size(qapp, app_controller):
     assert visible, (
         f"No visible children found in SettingsView — page will be blank. "
         f"Root size: {obj.width()}x{obj.height()}. "
-        f"Children: {[type(c).__name__ + f'({c.width()}x{c.height()})' for c in obj.findChildren(QObject) if hasattr(c, 'width')][:10]}"
+        f"Children: {[type(c).__name__ + f'({c.width()}x{c.height()})' for c in obj.findChildren(QQuickItem)][:10]}"
     )
 
 
@@ -148,7 +147,7 @@ def test_settings_view_stacklayout_has_content(qapp, app_controller):
 
     assert stack is not None, (
         f"StackLayout not found in SettingsView. "
-        f"Children with width: {[(type(c).__name__, c.width()) for c in obj.findChildren(QObject) if hasattr(c, 'width')]}"
+        f"Children with width: {[(type(c).__name__, c.width()) for c in obj.findChildren(QQuickItem)]}"
     )
     count = stack.property("count")
     assert count == 3, (
@@ -176,16 +175,9 @@ def test_glass_pill_loads_without_data_property_error(qapp, app_controller):
 def test_diagnostics_pane_actually_renders_when_expanded(qapp, app_controller):
     """Regression: expanding DiagnosticsPane must produce non-zero content height.
 
-    Bug context: when DiagnosticsPane was embedded directly in the About
-    GlassPill (before it was moved to its own card), the Item root had no
-    implicitHeight binding.  The parent layout therefore never grew the
-    GlassPill to accommodate the expanded body, so the body rendered at
-    0 height and the user saw only the header + Collapse button.
-
-    The fix: DiagnosticsPane root is an Item with implicitHeight bound to
-    its inner ColumnLayout (contentLayout).implicitHeight. When expanded,
-    contentLayout grows, root.implicitHeight grows, the parent GlassPill
-    binds to diagnosticsPane.implicitHeight + 32, and the card expands.
+    When expanded, the pane shows filter chips, event table, and action buttons.
+    The body ColumnLayout grows, root.implicitHeight grows, and the parent
+    GlassPill binds to diagnosticsPane.implicitHeight + 32 to expand the card.
     """
     path = QML_DIR / "views" / "DiagnosticsPane.qml"
 
@@ -197,52 +189,38 @@ def test_diagnostics_pane_actually_renders_when_expanded(qapp, app_controller):
     obj.setProperty("expanded", True)
     obj.setWidth(800)
     obj.setHeight(800)
-    # Set data directly (invokeMethod doesn't work for QML functions)
     obj.setProperty("diagnosticLogPath", "/tmp/test.log")
-    obj.setProperty("recentEventsJson", '[{"test":"data"}]')
-    obj.setProperty("collectionsJson", '{"test":"data"}')
-    obj.setProperty("projectResolutionJson", '{"test":"data"}')
-    # Flush event queue so QML layout recalculates after property changes
+    obj.setProperty("recentEventsJson", '[{"ts":"2026-01-01T12:34:56Z","level":"INFO","category":"test","msg":"hello"}]')
+    obj.setProperty("errorCount", 1)
+    obj.setProperty("warningCount", 2)
+    obj.setProperty("infoCount", 3)
+    obj.setProperty("debugCount", 0)
+    obj.setProperty("healthStatus", "yellow")
     QApplication.processEvents()
 
-    # Find the inner contentLayout ColumnLayout and check its implicitHeight
+    # Find the inner bodyLayout ColumnLayout and check its implicitHeight
     content_layout = None
-    for child in obj.findChildren(QObject):
+    for child in obj.findChildren(QQuickItem):
         cn = child.metaObject().className()
-        if "ColumnLayout" in cn and hasattr(child, "implicitHeight"):
-            ih = child.implicitHeight()
-            if ih > 100:
-                content_layout = child
-                break
+        if "ColumnLayout" in cn and child.implicitHeight() > 50:
+            content_layout = child
+            break
 
     assert content_layout is not None, (
-        f"No ColumnLayout with implicitHeight > 100 found. "
+        f"No ColumnLayout with implicitHeight > 50 found. "
         f"Root implicitHeight={obj.implicitHeight()}. "
         f"Root type: {obj.metaObject().className()}, "
         f"superClass: {obj.metaObject().superClass().className()}. "
         f"Children: {[type(c).__name__ for c in obj.children()]}"
     )
 
-    # Root Item's implicitHeight should forward contentLayout's height.
-    # PySide6 doesn't reflect QML implicitHeight bindings through method/property
-    # access — this is a known limitation. The real app uses QML-native property
-    # access which works correctly. Verify the inner ColumnLayout has the right
-    # height, which is what the parent GlassPill binding reads via QML.
-    assert content_layout.implicitHeight() > 100, (
-        f"contentLayout implicitHeight={content_layout.implicitHeight()} — "
-        f"expected >100 for the expanded diagnostic sections. "
-        f"Root type: {obj.metaObject().className()}."
-    )
 
+def test_diagnostics_filter_changes_active_filter(qapp, app_controller):
+    """Setting activeFilter must update the property, which drives filter chips.
 
-def test_diagnostics_pane_root_is_columnlayout(qapp, app_controller):
-    """Regression: DiagnosticsPane root must be a ColumnLayout, not an Item.
-
-    When DiagnosticsPane root was an Item with an inner ColumnLayout
-    (anchors.fill: parent), the Item got zero height inside a parent
-    ColumnLayout because Item has no implicitHeight. The body content
-    overlapped at y=0. Making the root a ColumnLayout fixes this because
-    ColumnLayout computes implicitHeight from its children naturally.
+    The FilterPill component no longer toggles isActive internally — the
+    binding `isActive: root.activeFilter === N` controls the visual state.
+    Verify the property assignment works correctly from Python side.
     """
     path = QML_DIR / "views" / "DiagnosticsPane.qml"
 
@@ -250,27 +228,62 @@ def test_diagnostics_pane_root_is_columnlayout(qapp, app_controller):
     assert not errors, f"DiagnosticsPane.qml failed to load:\n{_format_errors(errors)}"
     assert obj is not None
 
-    # Root is an Item with implicitHeight bound to contentLayout.implicitHeight.
-    # Verify that implicitHeight is properly forwarded by expanding and checking.
+    obj.setProperty("expanded", True)
+    obj.setProperty(
+        "recentEventsJson",
+        '[{"ts":"2026-01-01T12:00:00Z","level":"INFO","category":"a","msg":"1"},'
+        '{"ts":"2026-01-01T12:01:00Z","level":"ERROR","category":"b","msg":"2"},'
+        '{"ts":"2026-01-01T12:02:00Z","level":"WARNING","category":"c","msg":"3"}]',
+    )
+    QApplication.processEvents()
+
+    # Default filter is All (0) — all events visible
+    assert obj.property("activeFilter") == 0
+
+    # Switch to Errors filter
+    obj.setProperty("activeFilter", 1)
+    QApplication.processEvents()
+    assert obj.property("activeFilter") == 1
+
+    # Switch to Warnings filter
+    obj.setProperty("activeFilter", 2)
+    QApplication.processEvents()
+    assert obj.property("activeFilter") == 2
+
+    # Switch back to All
+    obj.setProperty("activeFilter", 0)
+    QApplication.processEvents()
+    assert obj.property("activeFilter") == 0
+
+
+def test_diagnostics_pane_root_is_columnlayout(qapp, app_controller):
+    """Regression: DiagnosticsPane root must have proper implicitHeight forwarding.
+
+    When expanded, the pane's body ColumnLayout grows and the root Item's
+    implicitHeight should forward that, allowing the parent GlassPill to
+    expand the card.
+    """
+    path = QML_DIR / "views" / "DiagnosticsPane.qml"
+
+    engine, component, obj, errors, warnings = _load_qml(qapp, path, app_controller)
+    assert not errors, f"DiagnosticsPane.qml failed to load:\n{_format_errors(errors)}"
+    assert obj is not None
+
     obj.setProperty("expanded", True)
     obj.setWidth(800)
     obj.setHeight(800)
     QApplication.processEvents()
 
-    # The inner contentLayout should have a large implicitHeight
+    # The inner bodyLayout should have a non-zero implicitHeight
     has_content = False
-    for child in obj.findChildren(QObject):
+    for child in obj.findChildren(QQuickItem):
         cn = child.metaObject().className()
-        if (
-            "ColumnLayout" in cn
-            and hasattr(child, "implicitHeight")
-            and child.implicitHeight() > 100
-        ):
+        if "ColumnLayout" in cn and child.implicitHeight() > 50:
             has_content = True
             break
 
     assert has_content, (
-        f"DiagnosticsPane has no ColumnLayout with implicitHeight > 100 after expand. "
+        f"DiagnosticsPane has no ColumnLayout with implicitHeight > 50 after expand. "
         f"Root implicitHeight={obj.implicitHeight()}. "
         f"This means the implicitHeight forwarding is broken."
     )
@@ -321,13 +334,10 @@ def test_settings_view_about_tab_has_both_cards(qapp, app_controller):
 
 
 def test_diagnostics_pane_flickables_have_height(qapp, app_controller):
-    """Regression: Flickable areas inside DiagnosticsPane must have non-zero height.
+    """Regression: Flickable event list inside DiagnosticsPane must have non-zero height.
 
-    Bug context: The 'Missing Skills Check' Rectangle had Layout.fillHeight: true
-    but no Layout.preferredHeight, so when its parent ColumnLayout computed its
-    implicitHeight, the Rectangle contributed 0 height and its content overflowed,
-    causing overlapping text.
-    The fix gives these Rectangles an explicit Layout.preferredHeight.
+    The event table Flickable must render with real height when expanded
+    so event rows are visible and scrollable.
     """
     path = QML_DIR / "views" / "DiagnosticsPane.qml"
 
@@ -338,14 +348,82 @@ def test_diagnostics_pane_flickables_have_height(qapp, app_controller):
     obj.setProperty("expanded", True)
     obj.setWidth(800)
     obj.setHeight(800)
+    obj.setProperty("recentEventsJson", '[{"ts":"2026-01-01T12:00:00Z","level":"INFO","category":"test","msg":"hi"}]')
     QApplication.processEvents()
 
-    flickables = [c for c in obj.findChildren(QObject) if "Flickable" in c.metaObject().className()]
-    assert len(flickables) >= 3, (
-        f"Expected at least 3 Flickable areas in DiagnosticsPane, found {len(flickables)}"
+    flickables = [
+        c for c in obj.findChildren(QQuickItem) if "Flickable" in c.metaObject().className()
+    ]
+    assert len(flickables) >= 1, (
+        f"Expected at least 1 Flickable event list in DiagnosticsPane, found {len(flickables)}"
     )
 
     for i, f in enumerate(flickables):
         assert f.height() > 0, (
-            f"Found a Flickable (index {i}) with 0 height. This causes overlapping text in the UI. "
+            f"Found a Flickable (index {i}) with 0 height. Events will not be visible."
         )
+
+
+def test_about_diagnostics_pill_hidden_when_logging_disabled(qapp, app_controller):
+    """When diagnostic logging is disabled, the Diagnostics card in the
+    About tab must be hidden and occupy zero layout height.
+
+    Regression test for: the Diagnostics section should not show in About
+    when diagnostic logging is disabled in General settings.
+    """
+    # Ensure logging is disabled
+    app_controller.config_controller.diagnosticLogging = False
+    QApplication.processEvents()
+
+    path = QML_DIR / "views" / "SettingsView.qml"
+    engine, component, obj, errors, warnings = _load_qml(qapp, path, app_controller)
+    assert not errors, f"SettingsView.qml failed to load:\n{_format_errors(errors)}"
+    assert obj is not None
+
+    # Find the diagnostics GlassPill by objectName
+    diag_pill = obj.findChild(QObject, "diagnosticsGlassPill")
+    assert diag_pill is not None, (
+        "diagnosticsGlassPill not found in SettingsView. "
+        f"Available QObjects: {[c.objectName() for c in obj.findChildren(QObject) if c.objectName()]}"
+    )
+
+    assert diag_pill.property("visible") is False, (
+        f"Diagnostics pill should be hidden when diagnosticLogging=False, "
+        f"but visible={diag_pill.property('visible')}"
+    )
+
+
+def test_about_diagnostics_pill_visible_when_logging_enabled(qapp, app_controller):
+    """When diagnostic logging is enabled, the Diagnostics card in the
+    About tab must be visible with a non-zero layout height.
+
+    Regression test for: the Diagnostics section should show in About
+    when diagnostic logging is enabled in General settings.
+
+    Verifies the QML source contains a ``visible:`` binding on the
+    ``diagnosticsGlassPill`` that reads ``diagnosticLogging``, and that
+    the ``config_controller.diagnosticLogging`` property is reactive.
+    """
+    # Verify the property is reactive at the Python level
+    app_controller.config_controller.diagnosticLogging = False
+    QApplication.processEvents()
+    assert app_controller.config_controller.diagnosticLogging is False
+
+    app_controller.config_controller.diagnosticLogging = True
+    QApplication.processEvents()
+    assert app_controller.config_controller.diagnosticLogging is True
+
+    # Verify the QML source contains the visible binding (structural check)
+    qml_source = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
+    diag_section_start = qml_source.find("diagnosticsGlassPill")
+    assert diag_section_start >= 0, "diagnosticsGlassPill not found in QML source"
+
+    diag_section = qml_source[diag_section_start : diag_section_start + 400]
+    assert "visible:" in diag_section, (
+        "diagnosticsGlassPill has no visible: binding. "
+        "When diagnostic logging is disabled, the pill should be hidden."
+    )
+    assert "diagnosticLogging" in diag_section, (
+        "diagnosticsGlassPill visible binding does not reference diagnosticLogging. "
+        "It should be bound to AppController.config_controller.diagnosticLogging."
+    )

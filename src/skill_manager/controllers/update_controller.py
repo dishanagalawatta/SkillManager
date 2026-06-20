@@ -129,8 +129,7 @@ class UpdateController(BaseController):
 
                 # Handle Silent Auto-Update
                 if (
-                    self.config.get("skill_package_auto_update", True)
-                    and self.config.get("skill_package_auto_update_mode") == "silent"
+                    self.config.get("skill_package_auto_update_mode") == "silent"
                     and self.app._stats_outdated > 0
                 ):
                     logger.info("Silent auto-update triggered for outdated skill packages.")

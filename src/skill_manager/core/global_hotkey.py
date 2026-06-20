@@ -49,7 +49,6 @@ class GlobalHotkeyManager(QObject):
         super().__init__(parent)
         self._hotkeys: dict[int, tuple[str, str]] = {}  # id -> (pynput_seq, original)
         self._listener = None
-        self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._stop_lock = threading.Lock()
         self._pynput_available: bool | None = None  # None = unchecked
@@ -109,12 +108,10 @@ class GlobalHotkeyManager(QObject):
 
         try:
             self._listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-            self._thread = getattr(self._listener, "_thread", None)
             self._listener.start()
         except OSError as e:
             logger.error("Failed to start pynput listener: %s", e)
             self._listener = None
-            self._thread = None
 
     def _stop_active_listener(self) -> None:
         """Stop the current listener and join its thread with a timeout.
@@ -125,9 +122,7 @@ class GlobalHotkeyManager(QObject):
         """
         with self._stop_lock:
             listener = self._listener
-            thread = self._thread
             self._listener = None
-            self._thread = None
 
         if listener is None:
             return
@@ -137,9 +132,13 @@ class GlobalHotkeyManager(QObject):
         except Exception:  # noqa: BLE001 — defensive
             logger.debug("Error stopping pynput listener", exc_info=True)
 
-        if thread is not None and thread.is_alive():
-            thread.join(timeout=_LISTENER_JOIN_TIMEOUT)
-            if thread.is_alive():
+        if listener.is_alive():
+            try:
+                listener.join(timeout=_LISTENER_JOIN_TIMEOUT)
+            except Exception as e:
+                logger.debug("Exception during pynput listener join: %s", e)
+
+            if listener.is_alive():
                 logger.warning(
                     "pynput listener thread did not exit within %ss; leaving as daemon",
                     _LISTENER_JOIN_TIMEOUT,

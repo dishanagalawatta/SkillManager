@@ -62,7 +62,7 @@ Configure how SkillManager integrates with your system.
 - **Project Projects**: Configure project root directories. SkillManager manages the `.agents/skills/` folder in these locations.
 - **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex, Plain Text). This updates the application's logo and reference syntax.
 - **Appearance**: Toggle Dark/Light mode, enable Mica/Acrylic effects (Windows only), reduced motion, compact list rows.
-- **Shortcuts**: Customize keyboard shortcuts for all major operations (search, copy, archive, delete, refresh, navigation, theme toggle).
+- **Shortcuts**: Customize keyboard shortcuts for all major operations (search, copy, archive, delete, refresh, navigation, theme toggle) and per-collection shortcuts for one-keystroke copy+paste.
 - **Updates**: Control auto-update checking, auto-download, and update check interval.
 - **Skill Packages**: Toggle automatic skill package updates and choose update mode.
 
@@ -91,6 +91,7 @@ SkillManager includes a powerful screenshots and redaction feature.
 | `Enter` | Open selected skill |
 | `Ctrl+W` | Close detail view |
 | *Customizable* | All shortcuts can be remapped in Settings |
+| *Per-collection* | Each collection can have its own shortcut; pressing it copies the collection's skill references and pastes them into the focused field |
 
 ---
 

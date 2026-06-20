@@ -10,7 +10,7 @@ import pathspec
 
 logger = logging.getLogger(__name__)
 
-CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text"}
+CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
 
 
 def replace_skill_references_in_command(content: str, client_format: str, all_skills: list) -> str:
@@ -447,7 +447,7 @@ def format_project_skill_reference(skill, client_format, all_skills=None):
         return relative_path
 
     relative_path = project_skill_relative_path(skill)
-    if client_format == "Antigravity":
+    if client_format in ("Antigravity", "OpenCode"):
         name = skill.get("name") or local_path.name
         return f"/{name}"
     if client_format == "Gemini CLI":

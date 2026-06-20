@@ -45,8 +45,8 @@ class TestConfigControllerSDET:
 
     def test_update_mode_validation(self, controller, mock_app):
         # Valid
-        controller.skillPackageAutoUpdateMode = "auto"
-        mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "auto")
+        controller.skillPackageAutoUpdateMode = "silent"
+        mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "silent")
 
         # Invalid -> fallback to "prompt" via validator
         mock_app._config.reset_mock()
@@ -91,10 +91,19 @@ class TestConfigControllerSDET:
 
         controller.resetShortcuts()
         mock_app._config.set.assert_called()
-        # Verify it uses DEFAULT_SHORTCUTS
-        args = mock_app._config.set.call_args[0]
-        assert args[0] == "shortcuts"
-        assert "search" in args[1]
+        # Verify it writes the defaults (DEFAULT_SHORTCUTS) under the
+        # ``shortcuts`` key. ``resetShortcuts`` also writes
+        # ``disabled_shortcuts`` afterwards, so we have to scan the
+        # call list for the ``shortcuts`` write — not just look at the
+        # last call (which would be the ``disabled_shortcuts`` write).
+        shortcut_calls = [
+            call_args
+            for call_args in mock_app._config.set.call_args_list
+            if call_args[0][0] == "shortcuts"
+        ]
+        assert shortcut_calls, "resetShortcuts did not write the 'shortcuts' key"
+        args = shortcut_calls[0]
+        assert "search" in args[0][1]
         mock_signal.assert_called_once()
 
     def test_add_source_empty(self, controller, mock_app):
