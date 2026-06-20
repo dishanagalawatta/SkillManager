@@ -9,7 +9,7 @@ Rectangle {
     Layout.preferredWidth: width
     Layout.fillHeight: true
     color: Theme.sidebarBackground
-    
+
     // Outer defining border
     border.width: 1
     border.color: Theme.glassOuterBorder
@@ -18,11 +18,11 @@ Rectangle {
     Item {
         anchors.fill: parent
     }
-    
+
     Behavior on width {
         NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
     }
-    
+
     signal navigationChanged(string view)
     property string currentView: "QuickCopy"
     property bool isCollapsed: false
@@ -37,19 +37,10 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 50
             spacing: 12
-            
+
             Item {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
-
-                activeFocusOnTab: true
-
-                Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
-                        root.isCollapsed = !root.isCollapsed
-                        event.accepted = true
-                    }
-                }
 
                 Image {
                     id: sidebarLogoImg
@@ -58,14 +49,14 @@ Rectangle {
                     fillMode: Image.PreserveAspectFit
                     visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
                 }
-                
+
                 ColorOverlay {
                     anchors.fill: sidebarLogoImg
                     source: sidebarLogoImg
                     color: Theme.label
                     visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
                 }
-                
+
                 MouseArea {
                     id: logoMouseArea
                     anchors.fill: parent
@@ -81,18 +72,8 @@ Rectangle {
                     Accessible.name: ToolTip.text
                     Accessible.description: ToolTip.text
                 }
-
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    color: "transparent"
-                    border.color: Theme.accent
-                    border.width: 2
-                    radius: 4
-                    visible: parent.activeFocus
-                }
             }
-            
+
             Text {
                 text: "Skill Manager"
                 font.family: Theme.fontFamily
@@ -111,10 +92,10 @@ Rectangle {
             labelText: "Quick Copy"
             collapsed: root.isCollapsed
             active: root.currentView === "Quick Copy"
-            onClicked: (mouse) => { 
+            onClicked: (mouse) => {
                 console.log("Sidebar: Quick Copy clicked")
-                root.currentView = "Quick Copy"; 
-                root.navigationChanged("Quick Copy") 
+                root.currentView = "Quick Copy";
+                root.navigationChanged("Quick Copy")
             }
         }
 
@@ -123,9 +104,9 @@ Rectangle {
             labelText: "Library"
             collapsed: root.isCollapsed
             active: root.currentView === "Library"
-            onClicked: (mouse) => { 
+            onClicked: (mouse) => {
                 root.currentView = "Library"
-                root.navigationChanged("Library") 
+                root.navigationChanged("Library")
             }
         }
 
