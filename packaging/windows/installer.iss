@@ -1,7 +1,7 @@
 #define MyAppName "SkillManager"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "YourName"
-#define MyAppURL "https://github.com/yourusername/SkillManager"
+#define MyAppVersion "1.7.0"
+#define MyAppPublisher "dishanagalawatta"
+#define MyAppURL "https://github.com/dishanagalawatta/SkillManager"
 #define MyAppExeName "SkillManager.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".skill"
@@ -22,6 +22,7 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
+SignTool=sign-wrapper
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)

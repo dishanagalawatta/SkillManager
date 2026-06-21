@@ -44,6 +44,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+packaging/windows/certs/
 
 # TUF legacy artefacts
 tuf_keys/
