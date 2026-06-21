@@ -244,7 +244,12 @@ def app_controller(session_mock_config, session_temp_dir):
         # This registration is process-wide. PySide6 6.11.0's stub claims
         # ``qml_name`` must be bytes but the runtime requires str.
         qmlRegisterSingletonType(
-            AppController, "App", 1, 0, "AppController", controller_factory  # type: ignore[arg-type]
+            AppController,
+            "App",
+            1,
+            0,
+            "AppController",
+            controller_factory,  # type: ignore[arg-type]
         )
 
     yield controller
