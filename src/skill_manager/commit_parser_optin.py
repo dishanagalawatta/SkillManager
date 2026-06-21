@@ -17,12 +17,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pydantic.dataclasses import dataclass
-from semantic_release.commit_parser._base import CommitParser, ParserOptions
-from semantic_release.commit_parser.token import ParsedCommit, ParseError
-from semantic_release.enums import LevelBump
+from semantic_release.commit_parser._base import (  # type: ignore[reportMissingImports]
+    CommitParser,
+    ParserOptions,
+)
+from semantic_release.commit_parser.token import (  # type: ignore[reportMissingImports]
+    ParsedCommit,
+    ParseError,
+)
+from semantic_release.enums import LevelBump  # type: ignore[reportMissingImports]
 
 if TYPE_CHECKING:
-    from git.objects.commit import Commit
+    from git.objects.commit import Commit  # type: ignore[reportMissingImports]
 
 
 @dataclass
@@ -55,7 +61,14 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
     parser_options = OptInParserOptions
 
     def parse(self, commit: Commit) -> ParsedCommit | ParseError:
-        subject = commit.message.split("\n", 1)[0].strip()
+        # ``Commit.message`` is ``bytes | str`` depending on the GitPython
+        # version. Decode here so downstream string operations type-check.
+        message = (
+            commit.message.decode("utf-8", errors="replace")
+            if isinstance(commit.message, bytes)
+            else commit.message
+        )
+        subject = message.split("\n", 1)[0].strip()
 
         # Check for [major] → highest priority
         if f"[{self.options.major_token}]" in subject:
@@ -63,7 +76,7 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
                 bump=LevelBump.MAJOR,
                 type="major",
                 scope="",
-                descriptions=[commit.message],
+                descriptions=[message],
                 breaking_descriptions=[f"[{self.options.major_token}] token in commit message"],
                 commit=commit,
             )
@@ -74,7 +87,7 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
                 bump=LevelBump.MINOR,
                 type="minor",
                 scope="",
-                descriptions=[commit.message],
+                descriptions=[message],
                 breaking_descriptions=[],
                 commit=commit,
             )
@@ -85,7 +98,7 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
                 bump=LevelBump.PATCH,
                 type="patch",
                 scope="",
-                descriptions=[commit.message],
+                descriptions=[message],
                 breaking_descriptions=[],
                 commit=commit,
             )
@@ -96,7 +109,7 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
                 bump=LevelBump.PATCH,
                 type="dev",
                 scope="",
-                descriptions=[commit.message],
+                descriptions=[message],
                 breaking_descriptions=[],
                 commit=commit,
             )

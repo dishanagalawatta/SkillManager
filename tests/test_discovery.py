@@ -8,9 +8,9 @@ from diskcache import Cache
 
 from skill_manager.core.discovery import (
     DiscoveryService,
-    _compute_dir_fingerprint,
+    compute_dir_fingerprint,
 )
-from skill_manager.core.quick_copy import _resolve_resilient_path
+from skill_manager.core.quick_copy import resolve_resilient_path
 from skill_manager.core.schemas import CacheState, SkillRecord
 
 
@@ -41,7 +41,7 @@ def service():
 
 def test_compute_dir_fingerprint(temp_dir):
     # 1. Empty dir
-    fp1 = _compute_dir_fingerprint(temp_dir)
+    fp1 = compute_dir_fingerprint(temp_dir)
     assert fp1 != ""
 
     # 2. Add a skill folder
@@ -52,7 +52,7 @@ def test_compute_dir_fingerprint(temp_dir):
     # Wait to ensure mtime change
     time.sleep(0.1)
 
-    fp2 = _compute_dir_fingerprint(temp_dir)
+    fp2 = compute_dir_fingerprint(temp_dir)
     assert fp2 != fp1
 
     # 3. Modify internal file and touch subdir
@@ -60,7 +60,7 @@ def test_compute_dir_fingerprint(temp_dir):
     (skill_dir / "SKILL.md").write_text("updated")
     os.utime(skill_dir, None)  # Important for fingerprint to pick up change
 
-    fp3 = _compute_dir_fingerprint(temp_dir)
+    fp3 = compute_dir_fingerprint(temp_dir)
     assert fp3 != fp2
 
 
@@ -109,13 +109,13 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
         return {"main_category": "Cat", "sub_category": "Sub"}
 
     # 1. Initial scan
-    skills = service._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+    skills = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
     assert len(skills) == 1
     assert skills[0]["name"] == "Skill One"
 
     # Verify cache was populated
     # Use resolved path to match production code's normalization (resolves 8.3 short names on Windows)
-    resolved = _resolve_resilient_path(str(source_lib))
+    resolved = resolve_resilient_path(str(source_lib))
     fp_key = f"dir_fp:{os.path.normcase(str(resolved))}"
     assert disk_cache.get(fp_key) is not None
     assert disk_cache.get(f"pkg_skills:{fp_key}") == skills
@@ -227,7 +227,7 @@ def test_discovery_permission_error_handling(temp_dir, disk_cache, service):
         service.sources = [str(source_lib)]
 
         # Should not crash
-        skills = service._discover_packages_incremental(disk_cache, MagicMock(), MagicMock())
+        skills = service.discover_packages_incremental(disk_cache, MagicMock(), MagicMock())
         assert skills == []
 
 

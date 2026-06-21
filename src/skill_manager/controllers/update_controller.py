@@ -125,7 +125,9 @@ class UpdateController(BaseController):
                 self.app._is_loading = False
                 self.app.isLoadingChanged.emit()
                 self.app.updatePackagesChanged.emit()
-                self.app._set_status(f"Scan complete: {len(results)} skills processed")
+                self.app._set_status(
+                    f"Update scan complete: {len(results)} package skills processed"
+                )
 
                 # Handle Silent Auto-Update
                 if (
@@ -356,7 +358,7 @@ class UpdateController(BaseController):
                         QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
 
                     inventory = load_package_skill_inventory()
-                    previous_inventory = inventory.get(source.get("package_id"), {})
+                    previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
                     if source.get("storage_mode") == "grouped":
                         promote_result = promote_package_storage(source, previous_inventory)
                         if promote_result.get("skipped"):

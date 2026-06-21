@@ -36,7 +36,7 @@ def extract_markdown_description(content: str) -> str:
     return ""
 
 
-def split_frontmatter(content: str) -> tuple[dict[str, Any], str]:
+def split_frontmatter(content: str | None) -> tuple[dict[str, Any], str]:
     """Return parsed metadata and body content using python-frontmatter."""
     if not content:
         return {}, ""

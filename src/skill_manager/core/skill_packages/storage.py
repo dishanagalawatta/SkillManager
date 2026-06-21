@@ -135,7 +135,7 @@ def scan_package_inventory(package: dict[str, Any]) -> dict[str, Any]:
                 "folder_name": child.name,
                 "local_path": str(child.resolve()),
                 "skill_md_path": str(skill_md.resolve()),
-                "fingerprint": _skill_fingerprint(child),
+                "fingerprint": skill_fingerprint(child),
                 "mtime": stat.st_mtime,
             }
     else:
@@ -211,7 +211,7 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
     return {"moved": moved, "skipped": 0}
 
 
-def _skill_fingerprint(path: Path) -> str:
+def skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name)."""
     parts = []
     try:

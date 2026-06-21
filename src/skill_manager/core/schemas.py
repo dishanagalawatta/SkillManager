@@ -102,20 +102,28 @@ class SkillRecord(BaseModel):
 class ShortcutConfig(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
+    # Find & Select
     search: str = "Ctrl+F"
+    select_all: str = "Ctrl+A"
+    clear_selection: str = "Esc"
+    # Clipboard
     copy_: str = Field(default="Ctrl+C", alias="copy")
+    # Skill Ops
+    refresh: str = "F5"
     archive: str = "Ctrl+Shift+X"
     delete: str = "Delete"
-    refresh: str = "F5"
+    # Tree View
     expand_all: str = "Ctrl+E"
     collapse_all: str = "Ctrl+Shift+E"
     top_of_list: str = "Home"
-    clear_selection: str = "Esc"
-    theme_toggle: str = "Ctrl+T"
+    # Navigate
     quick_copy_view: str = "Alt+1"
     library_view: str = "Alt+2"
     updates_view: str = "Alt+3"
     settings_view: str = "Alt+4"
+    # Tools
+    theme_toggle: str = "Ctrl+T"
+    screenshot: str = "Ctrl+Shift+S"
 
 
 class CollectionConfig(BaseModel):

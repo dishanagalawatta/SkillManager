@@ -100,7 +100,7 @@ class SkillModel(QAbstractListModel):
     _search_engine: SearchEngine | None
     _selected_ids: dict[str, None]
     _engine: FilterEngine
-    _state: FilterState
+    state: FilterState
     _suppress_layout: bool
     _batch_apply_needed: bool
     _selections_by_project: dict[str, list[str]]

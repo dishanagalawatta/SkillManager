@@ -423,7 +423,7 @@ class OpsController(BaseController):
             (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
         )
         if skill:
-            self.copySkillReference(skill)
+            self.copySkillReference(skill)  # type: ignore[arg-type]
         else:
             self.copyTextToClipboard(path)
 

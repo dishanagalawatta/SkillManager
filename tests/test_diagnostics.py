@@ -14,9 +14,9 @@ import pytest
 
 from skill_manager.core.diagnostics import (
     DiagnosticLogger,
-    _is_dev_mode,
-    _log_dir,
     get_diagnostic_logger,
+    is_dev_mode,
+    log_dir,
 )
 
 
@@ -38,7 +38,7 @@ def diag_logger_info(tmp_path):
     return logger
 
 
-# --- _log_dir ---
+# --- log_dir ---
 
 
 def test_log_dir_windows(tmp_path):
@@ -46,7 +46,7 @@ def test_log_dir_windows(tmp_path):
         patch.dict(os.environ, {"LOCALAPPDATA": str(tmp_path)}, clear=False),
         patch.object(sys, "platform", "win32"),
     ):
-        result = _log_dir()
+        result = log_dir()
         assert result == tmp_path / "SkillManager" / "logs"
 
 
@@ -55,7 +55,7 @@ def test_log_dir_linux(tmp_path):
         patch.dict(os.environ, {"XDG_DATA_HOME": str(tmp_path)}, clear=False),
         patch.object(sys, "platform", "linux"),
     ):
-        result = _log_dir()
+        result = log_dir()
         assert result == tmp_path / "SkillManager" / "logs"
 
 
@@ -213,19 +213,19 @@ def test_get_diagnostic_logger_returns_singleton():
     assert logger1 is logger2
 
 
-# --- _is_dev_mode ---
+# --- is_dev_mode ---
 
 
 def test_is_dev_mode_env_var():
     with patch.dict(os.environ, {"SKILL_MANAGER_DEV_MODE": "1"}):
-        assert _is_dev_mode() is True
+        assert is_dev_mode() is True
 
 
 def test_is_dev_mode_frozen():
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop("SKILL_MANAGER_DEV_MODE", None)
         with patch.object(sys, "frozen", True, create=True):
-            assert _is_dev_mode() is False
+            assert is_dev_mode() is False
 
 
 def test_is_dev_mode_uv_run():
@@ -238,7 +238,7 @@ def test_is_dev_mode_uv_run():
                 # We need the parent.parent to be "src" and parent.parent.parent to have pyproject.toml
                 # Test the actual logic: src_dir.name == "src" and pyproject.toml exists
                 # We'll just verify it doesn't crash
-                result = _is_dev_mode()
+                result = is_dev_mode()
                 assert isinstance(result, bool)
 
 

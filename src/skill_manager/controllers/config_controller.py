@@ -64,7 +64,7 @@ class ConfigController(BaseController):
         return False
 
     @Property(float, notify=scrollSpeedMultiplierChanged)
-    def scrollSpeedMultiplier(self):
+    def scrollSpeedMultiplier(self):  # type: ignore[reportRedeclaration]
         return self.config.get("scroll_speed_multiplier", 1.0)
 
     @scrollSpeedMultiplier.setter
@@ -72,7 +72,7 @@ class ConfigController(BaseController):
         self._set_config_value("scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged)
 
     @Property(str, notify=skillPackageAutoUpdateModeChanged)
-    def skillPackageAutoUpdateMode(self):
+    def skillPackageAutoUpdateMode(self):  # type: ignore[reportRedeclaration]
         return self.config.get("skill_package_auto_update_mode", "prompt")
 
     @skillPackageAutoUpdateMode.setter
@@ -82,7 +82,7 @@ class ConfigController(BaseController):
         )
 
     @Property(bool, notify=autoMinimizeOnScreenshotChanged)
-    def autoMinimizeOnScreenshot(self):
+    def autoMinimizeOnScreenshot(self):  # type: ignore[reportRedeclaration]
         return self.config.get("auto_minimize_on_screenshot", False)
 
     @autoMinimizeOnScreenshot.setter
@@ -92,7 +92,7 @@ class ConfigController(BaseController):
         )
 
     @Property(bool, notify=autoMinimizeOnQuickCopyChanged)
-    def autoMinimizeOnQuickCopy(self):
+    def autoMinimizeOnQuickCopy(self):  # type: ignore[reportRedeclaration]
         return self.config.get("auto_minimize_on_quick_copy", False)
 
     @autoMinimizeOnQuickCopy.setter
@@ -102,7 +102,7 @@ class ConfigController(BaseController):
         )
 
     @Property(bool, notify=temporaryScreenshotsChanged)
-    def temporaryScreenshots(self):
+    def temporaryScreenshots(self):  # type: ignore[reportRedeclaration]
         return self.config.get("temporary_screenshots", False)
 
     @temporaryScreenshots.setter
@@ -110,7 +110,7 @@ class ConfigController(BaseController):
         self._set_config_value("temporary_screenshots", value, self.temporaryScreenshotsChanged)
 
     @Property(bool, notify=diagnosticLoggingChanged)
-    def diagnosticLogging(self):
+    def diagnosticLogging(self):  # type: ignore[reportRedeclaration]
         return self.config.get("diagnostic_logging", False)
 
     @diagnosticLogging.setter
@@ -128,8 +128,20 @@ class ConfigController(BaseController):
         return self.get_shortcut("search")
 
     @Property(str, notify=shortcutsChanged)
+    def shortcutSelectAll(self):
+        return self.get_shortcut("select_all")
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutClearSelection(self):
+        return self.get_shortcut("clear_selection")
+
+    @Property(str, notify=shortcutsChanged)
     def shortcutCopy(self):
         return self.get_shortcut("copy")
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutRefresh(self):
+        return self.get_shortcut("refresh")
 
     @Property(str, notify=shortcutsChanged)
     def shortcutArchive(self):
@@ -138,10 +150,6 @@ class ConfigController(BaseController):
     @Property(str, notify=shortcutsChanged)
     def shortcutDelete(self):
         return self.get_shortcut("delete")
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutRefresh(self):
-        return self.get_shortcut("refresh")
 
     @Property(str, notify=shortcutsChanged)
     def shortcutExpandAll(self):
@@ -154,14 +162,6 @@ class ConfigController(BaseController):
     @Property(str, notify=shortcutsChanged)
     def shortcutTopOfList(self):
         return self.get_shortcut("top_of_list")
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutClearSelection(self):
-        return self.get_shortcut("clear_selection")
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutThemeToggle(self):
-        return self.get_shortcut("theme_toggle")
 
     @Property(str, notify=shortcutsChanged)
     def shortcutQuickCopyView(self):
@@ -180,6 +180,10 @@ class ConfigController(BaseController):
         return self.get_shortcut("settings_view")
 
     @Property(str, notify=shortcutsChanged)
+    def shortcutThemeToggle(self):
+        return self.get_shortcut("theme_toggle")
+
+    @Property(str, notify=shortcutsChanged)
     def shortcutScreenshot(self):
         return self.get_shortcut("screenshot")
 
@@ -190,8 +194,20 @@ class ConfigController(BaseController):
         return self.isShortcutEnabled("search")
 
     @Property(bool, notify=shortcutsChanged)
+    def shortcutSelectAllEnabled(self):
+        return self.isShortcutEnabled("select_all")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutClearSelectionEnabled(self):
+        return self.isShortcutEnabled("clear_selection")
+
+    @Property(bool, notify=shortcutsChanged)
     def shortcutCopyEnabled(self):
         return self.isShortcutEnabled("copy")
+
+    @Property(bool, notify=shortcutsChanged)
+    def shortcutRefreshEnabled(self):
+        return self.isShortcutEnabled("refresh")
 
     @Property(bool, notify=shortcutsChanged)
     def shortcutArchiveEnabled(self):
@@ -200,10 +216,6 @@ class ConfigController(BaseController):
     @Property(bool, notify=shortcutsChanged)
     def shortcutDeleteEnabled(self):
         return self.isShortcutEnabled("delete")
-
-    @Property(bool, notify=shortcutsChanged)
-    def shortcutRefreshEnabled(self):
-        return self.isShortcutEnabled("refresh")
 
     @Property(bool, notify=shortcutsChanged)
     def shortcutExpandAllEnabled(self):
@@ -216,14 +228,6 @@ class ConfigController(BaseController):
     @Property(bool, notify=shortcutsChanged)
     def shortcutTopOfListEnabled(self):
         return self.isShortcutEnabled("top_of_list")
-
-    @Property(bool, notify=shortcutsChanged)
-    def shortcutClearSelectionEnabled(self):
-        return self.isShortcutEnabled("clear_selection")
-
-    @Property(bool, notify=shortcutsChanged)
-    def shortcutThemeToggleEnabled(self):
-        return self.isShortcutEnabled("theme_toggle")
 
     @Property(bool, notify=shortcutsChanged)
     def shortcutQuickCopyViewEnabled(self):
@@ -242,11 +246,15 @@ class ConfigController(BaseController):
         return self.isShortcutEnabled("settings_view")
 
     @Property(bool, notify=shortcutsChanged)
+    def shortcutThemeToggleEnabled(self):
+        return self.isShortcutEnabled("theme_toggle")
+
+    @Property(bool, notify=shortcutsChanged)
     def shortcutScreenshotEnabled(self):
         return self.isShortcutEnabled("screenshot")
 
     @Property(bool, notify=isRecordingShortcutChanged)
-    def isRecordingShortcut(self):
+    def isRecordingShortcut(self):  # type: ignore[reportRedeclaration]
         return self.app._is_recording_shortcut
 
     @isRecordingShortcut.setter
@@ -255,7 +263,7 @@ class ConfigController(BaseController):
             self.app._is_recording_shortcut = value
             self.isRecordingShortcutChanged.emit()
 
-    def _normalize_path(self, raw_url: str) -> str:
+    def normalize_path(self, raw_url: str) -> str:
         """Helper to convert file URLs or raw strings to absolute local paths."""
         if not raw_url:
             return ""
@@ -273,7 +281,7 @@ class ConfigController(BaseController):
     @Slot(str)
     def addSource(self, url: str):
         """Adds a local skill source directory."""
-        resolved_path = self._normalize_path(url)
+        resolved_path = self.normalize_path(url)
         if not resolved_path:
             return
 
@@ -319,7 +327,7 @@ class ConfigController(BaseController):
         resolved_path, error = normalize_project_skills_path(path_str)
         if error:
             # Fallback to standard absolute path
-            resolved_path = self._normalize_path(url)
+            resolved_path = self.normalize_path(url)
 
         if resolved_path and resolved_path not in self.app._projects:
             self.app._projects.append(resolved_path)
@@ -379,7 +387,7 @@ class ConfigController(BaseController):
             self.removeProject(self.app._projects[index])
 
     @Property(list, notify=clientFormatsChanged)
-    def topBarClients(self):
+    def topBarClients(self):  # type: ignore[reportRedeclaration]
         return self.config.get(
             "top_bar_clients", ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
         )
@@ -639,7 +647,7 @@ class ConfigController(BaseController):
             entry = self.app._custom_collections[name]
             paths = entry["paths"] if isinstance(entry, dict) and "paths" in entry else entry
             self.app.skillModel.clearSelection()
-            self.app.skillModel.selectByPaths(paths)
+            self.app.skillModel.selectByPaths(paths)  # type: ignore[arg-type]
             self.app._set_status(f"Applied collection: {name}")
 
     @Slot(str, result=list)

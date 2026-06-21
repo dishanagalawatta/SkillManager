@@ -42,6 +42,8 @@ def apply_native_style(window, style_name: str) -> None:
         window: The tkinter window object (Tk or Toplevel).
         style_name: The name of the style to apply.
     """
+    if pywinstyles is None:
+        return
     try:
         # Update the window to ensure HWND is available
         window.update()

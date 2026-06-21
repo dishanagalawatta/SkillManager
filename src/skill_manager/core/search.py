@@ -98,7 +98,7 @@ class SearchEngine:
         self._indexed_data = list(self._skills_map.values())
 
     def query(
-        self, query_text: str, threshold: float = 30.0, valid_paths: set = None
+        self, query_text: str, threshold: float = 30.0, valid_paths: set | None = None
     ) -> list[tuple[dict[str, Any], float]]:
         """
         Search for skills matching the query.

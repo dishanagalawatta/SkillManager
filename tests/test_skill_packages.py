@@ -4,26 +4,26 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.core.skill_packages.config import (
-    _detect_command_type,
-    _parse_npx_command,
-    _split_args,
+    detect_command_type,
     detect_package_config,
     normalize_skill_package_config,
+    parse_npx_command,
+    split_args,
 )
 from skill_manager.core.skill_packages.process import (
-    _resolve_process_command,
+    resolve_process_command,
     run_process as _run_process,
     sanitize_token,
 )
 from skill_manager.core.skill_packages.relocator import (
-    _merge_and_move_lockfile,
-    _relocate_path_internal,
+    merge_and_move_lockfile,
     relocate_packages as _relocate_packages,
+    relocate_path_internal,
 )
 from skill_manager.core.skill_packages.updater import (
-    _intercept_cross_platform_command,
-    _run_git_package_update,
-    _run_npx_update,
+    intercept_cross_platform_command,
+    run_git_package_update,
+    run_npx_update,
     run_skill_package_update,
 )
 from skill_manager.core.skill_packages.versioning import (
@@ -220,7 +220,7 @@ def test_get_git_tag_local(mock_repo_class, temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.cmd.Git")
-def test_run_git_package_update_clone(mock_git_class, temp_dir):
+def testrun_git_package_update_clone(mock_git_class, temp_dir):
     clone_path = temp_dir / "repo"
     source = {
         "repository_url": "https://github.com/repo.git",
@@ -229,7 +229,7 @@ def test_run_git_package_update_clone(mock_git_class, temp_dir):
     }
 
     mock_git = mock_git_class.return_value
-    _run_git_package_update(source, None)
+    run_git_package_update(source, None)
 
     # Should call clone since path is empty/doesn't exist
     mock_git.execute.assert_called()
@@ -237,9 +237,9 @@ def test_run_git_package_update_clone(mock_git_class, temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_npx_update(mock_run):
+def testrun_npx_update(mock_run):
     source = {"package_name": "my-pkg", "package_args": "--dev"}
-    _run_npx_update(source, None)
+    run_npx_update(source, None)
 
     mock_run.assert_called_once()
     assert mock_run.call_args[0][0] == ["npx", "--yes", "--", "my-pkg", "--dev"]
@@ -258,11 +258,11 @@ def test_run_process_error(mock_popen, mock_which):
         _run_process(["test"], None)
 
 
-def test_resolve_process_command_not_found():
+def testresolve_process_command_not_found():
     with patch("shutil.which") as mock_which:
         mock_which.return_value = None
         with pytest.raises(FileNotFoundError):
-            _resolve_process_command(["no-such-exec"])
+            resolve_process_command(["no-such-exec"])
 
 
 def test_detect_package_config_auto_npx():
@@ -285,8 +285,8 @@ def test_detect_package_config_custom_and_verify_command(temp_dir):
 
 
 def test_parse_npx_and_apply_package_args():
-    assert _parse_npx_command("npx --yes package-name --foo") == ("package-name", "--foo")
-    assert _parse_npx_command("python script.py") == ("", "")
+    assert parse_npx_command("npx --yes package-name --foo") == ("package-name", "--foo")
+    assert parse_npx_command("python script.py") == ("", "")
 
     detected = detect_package_config({"source_type": "npx", "package_name": "npx --yes pkg --dev"})
     assert detected["package_name"] == "pkg"
@@ -313,7 +313,7 @@ def test_relocate_lock_files(temp_dir):
     assert (project_path.parent / ".test-repo-skill-lock.json").exists()
 
 
-def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
+def testmerge_and_move_lockfile_merges_existing_json(tmp_path):
     source_lock = tmp_path / "source" / ".skill-lock.json"
     dest_lock = tmp_path / "dest" / ".skill-lock.json"
     source_lock.parent.mkdir()
@@ -322,7 +322,7 @@ def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
     dest_lock.write_text('{"skills": {"b": 2}}')
     messages = []
 
-    _merge_and_move_lockfile(source_lock, dest_lock, messages.append)
+    merge_and_move_lockfile(source_lock, dest_lock, messages.append)
 
     merged = dest_lock.read_text()
     assert '"a": 1' in merged
@@ -330,7 +330,7 @@ def test_merge_and_move_lockfile_merges_existing_json(tmp_path):
     assert '"version": "2"' in merged
 
 
-def test_relocate_path_internal_cleanup(temp_dir):
+def testrelocate_path_internal_cleanup(temp_dir):
     dest_base = temp_dir / "dest"
     dest_base.mkdir()
 
@@ -340,7 +340,7 @@ def test_relocate_path_internal_cleanup(temp_dir):
     (dest_base / "src").mkdir()
     (dest_base / "src" / "old.txt").write_text("old")
 
-    _relocate_path_internal(src, dest_base, None)
+    relocate_path_internal(src, dest_base, None)
     assert (dest_base / "src").is_dir()
     assert not (dest_base / "src" / "old.txt").exists()
 
@@ -349,18 +349,18 @@ def test_relocate_path_internal_cleanup(temp_dir):
     src2.mkdir()
     (dest_base / "src2").write_text("blocking file")
 
-    _relocate_path_internal(src2, dest_base, None)
+    relocate_path_internal(src2, dest_base, None)
     assert (dest_base / "src2").is_dir()
 
 
-def test_split_args():
-    assert _split_args("  a   b  c  ") == ["a", "b", "c"]
-    assert _split_args(None) == []
+def testsplit_args():
+    assert split_args("  a   b  c  ") == ["a", "b", "c"]
+    assert split_args(None) == []
 
 
 def test_intercept_cross_platform_success(temp_dir):
     # test -d should succeed for existing dir
-    assert _intercept_cross_platform_command(f"test -d {temp_dir}", None)
+    assert intercept_cross_platform_command(f"test -d {temp_dir}", None)
 
 
 def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
@@ -374,7 +374,7 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
 
     messages = []
     # This should succeed without raising a Verification failed exception
-    assert _intercept_cross_platform_command(
+    assert intercept_cross_platform_command(
         f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}', messages.append
     )
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
@@ -388,22 +388,22 @@ def test_intercept_cross_platform_echo_and_tilde_typo(temp_dir, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
     messages = []
 
-    assert _intercept_cross_platform_command('test -d "~.agents" && echo "ok"', messages.append)
+    assert intercept_cross_platform_command('test -d "~.agents" && echo "ok"', messages.append)
     assert messages[-1] == "ok"
 
 
 def test_intercept_cross_platform_unsupported_test_command():
-    assert _intercept_cross_platform_command("test -f file.txt", None) is False
+    assert intercept_cross_platform_command("test -f file.txt", None) is False
 
 
 def test_intercept_cross_platform_fail():
     with pytest.raises(RuntimeError):
-        _intercept_cross_platform_command("test -d /non_existent_dir_random_path_123", None)
+        intercept_cross_platform_command("test -d /non_existent_dir_random_path_123", None)
 
 
 def test_intercept_cross_platform_invalid():
     # Command not starting with test
-    assert _intercept_cross_platform_command("echo hi", None) is False
+    assert intercept_cross_platform_command("echo hi", None) is False
 
 
 @patch("subprocess.run")
@@ -463,7 +463,7 @@ def test_get_git_tag_local_falls_back_to_hash(mock_repo_class, temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.Repo")
-def test_run_git_package_update_pull(mock_repo_class, temp_dir):
+def testrun_git_package_update_pull(mock_repo_class, temp_dir):
     clone_path = temp_dir / "existing-repo"
     clone_path.mkdir()
     (clone_path / ".git").mkdir()
@@ -475,7 +475,7 @@ def test_run_git_package_update_pull(mock_repo_class, temp_dir):
     }
 
     mock_repo = mock_repo_class.return_value
-    _run_git_package_update(source, None)
+    run_git_package_update(source, None)
 
     # Should call execute on repo.git
     mock_repo.git.execute.assert_called()
@@ -485,7 +485,7 @@ def test_run_git_package_update_pull(mock_repo_class, temp_dir):
 
 
 @patch("skill_manager.core.skill_packages.updater.Repo")
-def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, temp_dir):
+def testrun_git_package_update_conflict_and_network_failures(mock_repo_class, temp_dir):
     clone_path = temp_dir / "existing-repo"
     clone_path.mkdir()
     (clone_path / ".git").mkdir()
@@ -499,7 +499,7 @@ def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, t
     mock_repo = mock_repo_class.return_value
     mock_repo.git.execute.side_effect = RuntimeError("Conflict or network error")
     with pytest.raises(RuntimeError):
-        _run_git_package_update(source, None)
+        run_git_package_update(source, None)
 
     new_clone_path = temp_dir / "new-repo"
     source_new = {
@@ -511,13 +511,13 @@ def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, t
         mock_git = mock_git_class.return_value
         mock_git.execute.side_effect = RuntimeError("Could not resolve host")
         with pytest.raises(RuntimeError):
-            _run_git_package_update(source_new, None)
+            run_git_package_update(source_new, None)
 
 
 def test_run_process_timeout_handling():
     with (
         patch(
-            "skill_manager.core.skill_packages.process._resolve_process_command",
+            "skill_manager.core.skill_packages.process.resolve_process_command",
             return_value=["some-cmd"],
         ),
         patch("subprocess.Popen") as mock_popen,
@@ -527,10 +527,10 @@ def test_run_process_timeout_handling():
             _run_process(["some-cmd"], None)
 
 
-def test_detect_command_type_edge_cases():
-    assert _detect_command_type("npx --yes my-pkg") == "npx"
-    assert _detect_command_type("git clone ...") == "custom"
-    assert _detect_command_type("copy file ...") == "custom"
+def testdetect_command_type_edge_cases():
+    assert detect_command_type("npx --yes my-pkg") == "npx"
+    assert detect_command_type("git clone ...") == "custom"
+    assert detect_command_type("copy file ...") == "custom"
 
 
 @patch("shutil.which")

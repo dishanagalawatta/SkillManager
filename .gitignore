@@ -1,15 +1,28 @@
+# Bytecode & caches
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.qmlcache/
+.qmltypes/
+*.qmlc
+*.jsc
+.cache
 
-# Distribution / packaging
+# Distribution & packaging
 build/
 dist/
 data/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
+artifacts/
+wheelhouse/
+*.spec
+*.manifest
 
 # Virtual environments
 .venv/
@@ -17,58 +30,45 @@ venv/
 env/
 ENV/
 
-# Temporary scratch
-tmp*/
-scratch/
+# OS & editor
+.DS_Store
+Thumbs.db
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
-
-# Local task tracking (managed externally)
-TODO.md
-conductor/
-.agents/
-.agent/
-.claude/
-_references/
+.idea/
+.vscode/
+*.code-workspace
 
 # Secrets
 .env
 .env.*
 !.env.example
 
-# TUF Auto-Updater
+# TUF legacy artefacts
 tuf_keys/
 tuf_repo/
 .tufup-repo-config
 
-# Testing / coverage
-.pytest_cache/
+# Coverage
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
-.tox/
-.cache
-.mypy_cache/
-.ruff_cache/
+coverage.json
 
-# Build / packaging
-*.spec
-*.manifest
-artifacts/
-wheelhouse/
-
-# PySide6 / QML
-.qmlcache/
-.qmltypes/
-*.qmlc
-*.jsc
+# PySide6 / Qt build artefacts
 *.pyd
 designer/
 moc_*.cpp
 qrc_*.cpp
 ui_*.h
 build-*/
+
+# Work-planner (locally managed, not shipped)
+conductor/
+.agents/
+.agent/
+.claude/
+_references/
+TODO.md

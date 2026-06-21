@@ -140,7 +140,7 @@ def test_ui_controller_inspector_width_reset(ui_controller):
 
 def test_ui_controller_set_inspector_width_slot(ui_controller):
     ui_controller.setInspectorWidth(450)
-    assert ui_controller._state.inspector_width == 450
+    assert ui_controller.state.inspector_width == 450
 
 
 def test_ui_controller_window_geometry_properties(ui_controller):

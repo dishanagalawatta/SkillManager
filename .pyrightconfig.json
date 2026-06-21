@@ -7,7 +7,6 @@
         "**/node_modules",
         "**/__pycache__",
         "**/venv",
-        "**/.venv",
         "**/dist",
         "**/build",
         "**/*.pyi"
@@ -15,6 +14,8 @@
     "typeCheckingMode": "basic",
     "pythonVersion": "3.12",
     "pythonPlatform": "Windows",
+    "venvPath": ".",
+    "venv": ".venv",
     "reportMissingImports": true,
     "reportMissingTypeStubs": false,
     "reportGeneralTypeIssues": "warning",
@@ -22,7 +23,6 @@
     "reportUntypedFunctionDecorator": "none",
     "reportUntypedClassDecorator": "none",
     "reportPrivateImportUsage": "warning",
-    "autoSearchPaths": true,
     "extraPaths": [
         "src"
     ],

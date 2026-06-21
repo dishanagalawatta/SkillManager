@@ -13,6 +13,53 @@ Item {
     // which leaves currentIndex at -1 and hides every StackLayout child.
     property int settingsTab: 0
 
+    component SettingsRow: RowLayout {
+        id: sr
+        property string titleText
+        property string descriptionText: ""
+        default property alias controlContent: controlContainer.data
+        
+        Layout.fillWidth: true
+        spacing: 16
+        
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+            
+            Text {
+                text: sr.titleText
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeBody
+                color: Theme.label
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                visible: sr.descriptionText !== ""
+                text: sr.descriptionText
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeCaption
+                color: Theme.secondaryLabel
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
+        }
+        
+        Item {
+            id: controlContainer
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            implicitWidth: childrenRect.width
+            implicitHeight: childrenRect.height
+        }
+    }
+    
+    component Separator: Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: Theme.separator
+        opacity: 0.5
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 20
@@ -114,16 +161,12 @@ Item {
             }
         }
 
-        // Settings sub-tab content. currentIndex is driven by the
-        // sv_root.settingsTab property (set by the TabButton onClicked
-        // handlers above) — not a hidden TabBar, which may not allocate
-        // its TabButton children when height/visible are zero.
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: settingsTab
 
-            // Settings Content
+            // Settings Content (General)
             SmoothScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -161,78 +204,45 @@ Item {
                                 color: Theme.separator
                             }
 
-                            RowLayout {
-                                Text {
-                                    text: "Dark Mode"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.ui_controller ? AppController.ui_controller.darkMode : false
-                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.darkMode = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Reduced Motion"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.ui_controller ? AppController.ui_controller.reducedMotion : false
-                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setReducedMotion(checked)
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Compact List Rows"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
-                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
-                                }
-                            }
-
-
-
-                            Rectangle {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            RowLayout {
                                 spacing: 12
-                                Layout.fillWidth: true
-                                ColumnLayout {
-                                    spacing: 2
-                                    Text {
-                                        text: "Scroll Speed"
-                                        font.family: Theme.fontFamily
-                                        color: Theme.label
-                                    }
-                                    Text {
-                                        text: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        color: Theme.secondaryLabel
+
+                                SettingsRow {
+                                    titleText: "Dark Mode"
+                                    GlassSwitch {
+                                        checked: AppController.ui_controller ? AppController.ui_controller.darkMode : false
+                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.darkMode = checked
                                     }
                                 }
-                                Item { Layout.fillWidth: true }
-                                Slider {
-                                    Layout.preferredWidth: 150
-                                    from: 0.5
-                                    to: 5.0
-                                    stepSize: 0.1
-                                    value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
-                                    onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Reduced Motion"
+                                    GlassSwitch {
+                                        checked: AppController.ui_controller ? AppController.ui_controller.reducedMotion : false
+                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setReducedMotion(checked)
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Compact List Rows"
+                                    GlassSwitch {
+                                        checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
+                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Scroll Speed"
+                                    descriptionText: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
+                                    Slider {
+                                        width: 150
+                                        from: 0.5
+                                        to: 5.0
+                                        stepSize: 0.1
+                                        value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
+                                        onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
+                                    }
                                 }
                             }
                         }
@@ -264,254 +274,206 @@ Item {
                                 color: Theme.separator
                             }
 
-                            Text {
-                                text: "Top Bar Clients"
-                                font.family: Theme.fontFamily
-                                color: Theme.label
-                                font.pixelSize: Theme.sizeBody
-                                font.weight: Font.Medium
-                            }
-
-                            RowLayout {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 8
-                                
-                                GlassDropdown {
-                                    Layout.fillWidth: true
-                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 0) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[0])) : 0
-                                    onActivated: (index) => {
-                                        if (AppController.config_controller) {
-                                            var arr = [];
-                                            var current = AppController.config_controller.topBarClients;
-                                            var available = AppController.config_controller.availableClientFormats;
-                                            for (var i = 0; i < 4; i++) {
-                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                            }
-                                            arr[0] = model[index];
-                                            AppController.config_controller.topBarClients = arr;
-                                        }
-                                    }
-                                }
-                                GlassDropdown {
-                                    Layout.fillWidth: true
-                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 1) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[1])) : 1
-                                    onActivated: (index) => {
-                                        if (AppController.config_controller) {
-                                            var arr = [];
-                                            var current = AppController.config_controller.topBarClients;
-                                            var available = AppController.config_controller.availableClientFormats;
-                                            for (var i = 0; i < 4; i++) {
-                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                            }
-                                            arr[1] = model[index];
-                                            AppController.config_controller.topBarClients = arr;
-                                        }
-                                    }
-                                }
-                                GlassDropdown {
-                                    Layout.fillWidth: true
-                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 2) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[2])) : 2
-                                    onActivated: (index) => {
-                                        if (AppController.config_controller) {
-                                            var arr = [];
-                                            var current = AppController.config_controller.topBarClients;
-                                            var available = AppController.config_controller.availableClientFormats;
-                                            for (var i = 0; i < 4; i++) {
-                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                            }
-                                            arr[2] = model[index];
-                                            AppController.config_controller.topBarClients = arr;
-                                        }
-                                    }
-                                }
-                                GlassDropdown {
-                                    Layout.fillWidth: true
-                                    model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                    currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 3) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[3])) : 3
-                                    onActivated: (index) => {
-                                        if (AppController.config_controller) {
-                                            var arr = [];
-                                            var current = AppController.config_controller.topBarClients;
-                                            var available = AppController.config_controller.availableClientFormats;
-                                            for (var i = 0; i < 4; i++) {
-                                                arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                            }
-                                            arr[3] = model[index];
-                                            AppController.config_controller.topBarClients = arr;
-                                        }
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 1
-                                color: Theme.separator
-                            }
-
-                            RowLayout {
                                 spacing: 12
-                                Layout.fillWidth: true
 
                                 ColumnLayout {
-                                    spacing: 2
-
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    
                                     Text {
-                                        text: "Project Order"
+                                        text: "Top Bar Clients"
                                         font.family: Theme.fontFamily
                                         color: Theme.label
+                                        font.pixelSize: Theme.sizeBody
                                     }
 
-                                    Text {
-                                        text: "Change the order projects appear in selectors"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeCaption
-                                        color: Theme.secondaryLabel
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+                                        
+                                        GlassDropdown {
+                                            Layout.fillWidth: true
+                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 0) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[0])) : 0
+                                            onActivated: (index) => {
+                                                if (AppController.config_controller) {
+                                                    var arr = [];
+                                                    var current = AppController.config_controller.topBarClients;
+                                                    var available = AppController.config_controller.availableClientFormats;
+                                                    for (var i = 0; i < 4; i++) {
+                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                                    }
+                                                    arr[0] = model[index];
+                                                    AppController.config_controller.topBarClients = arr;
+                                                }
+                                            }
+                                        }
+                                        GlassDropdown {
+                                            Layout.fillWidth: true
+                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 1) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[1])) : 1
+                                            onActivated: (index) => {
+                                                if (AppController.config_controller) {
+                                                    var arr = [];
+                                                    var current = AppController.config_controller.topBarClients;
+                                                    var available = AppController.config_controller.availableClientFormats;
+                                                    for (var i = 0; i < 4; i++) {
+                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                                    }
+                                                    arr[1] = model[index];
+                                                    AppController.config_controller.topBarClients = arr;
+                                                }
+                                            }
+                                        }
+                                        GlassDropdown {
+                                            Layout.fillWidth: true
+                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 2) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[2])) : 2
+                                            onActivated: (index) => {
+                                                if (AppController.config_controller) {
+                                                    var arr = [];
+                                                    var current = AppController.config_controller.topBarClients;
+                                                    var available = AppController.config_controller.availableClientFormats;
+                                                    for (var i = 0; i < 4; i++) {
+                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                                    }
+                                                    arr[2] = model[index];
+                                                    AppController.config_controller.topBarClients = arr;
+                                                }
+                                            }
+                                        }
+                                        GlassDropdown {
+                                            Layout.fillWidth: true
+                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
+                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 3) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[3])) : 3
+                                            onActivated: (index) => {
+                                                if (AppController.config_controller) {
+                                                    var arr = [];
+                                                    var current = AppController.config_controller.topBarClients;
+                                                    var available = AppController.config_controller.availableClientFormats;
+                                                    for (var i = 0; i < 4; i++) {
+                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
+                                                    }
+                                                    arr[3] = model[index];
+                                                    AppController.config_controller.topBarClients = arr;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
-                                Item {
-                                    Layout.fillWidth: true
+                                Separator {}
+
+                                SettingsRow {
+                                    titleText: "Project Order"
+                                    descriptionText: "Change the order projects appear in selectors"
+                                    ActionButton {
+                                        text: "Reorder..."
+                                        width: 100
+                                        height: 36
+                                        enabled: AppController.projects.length > 1
+                                        onClicked: sv_reorderDialog.open()
+
+                                        background: Rectangle {
+                                            radius: Theme.radiusButton
+                                            color: parent.hovered ? Theme.glassHover : "transparent"
+                                            border.color: Theme.glassBorder
+                                        }
+
+                                        contentItem: Text {
+                                            text: parent.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.sizeBody
+                                            font.weight: Font.Medium
+                                            color: Theme.label
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
                                 }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Auto-minimize on Screenshot"
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnScreenshot : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnScreenshot = checked
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Auto-minimize on Quick Copy"
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnQuickCopy : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnQuickCopy = checked
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Temporary Screenshots"
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.temporaryScreenshots : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.temporaryScreenshots = checked
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Startup View"
+                                    GlassDropdown {
+                                        width: 170
+                                        model: ["Last Selected", "Library", "QuickCopy", "Updates", "Settings"]
+                                        currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.ui_controller.startupView)) : 0
+                                        onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setStartupView(model[index]) }
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Default Client"
+                                    GlassDropdown {
+                                        width: 170
+                                        model: {
+                                            let fmts = ["Last Selected"];
+                                            if (AppController.clientFormats) {
+                                                fmts = fmts.concat(AppController.clientFormats);
+                                            }
+                                            return fmts;
+                                        }
+                                        currentIndex: AppController ? Math.max(0, model.indexOf(AppController.defaultClient)) : 0
+                                        onActivated: (index) => { if (AppController) AppController.setDefaultClient(model[index]) }
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Remember Filters"
+                                    GlassSwitch {
+                                        checked: AppController.ui_controller ? AppController.ui_controller.rememberFilters : true
+                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setRememberFilters(checked)
+                                    }
+                                }
+                                
+                                Item { Layout.preferredHeight: 4 }
 
                                 ActionButton {
-                                    text: "Reorder..."
-                                    Layout.preferredWidth: 100
                                     Layout.preferredHeight: 36
-                                    enabled: AppController.projects.length > 1
-                                    onClicked: sv_reorderDialog.open()
-
+                                    Layout.fillWidth: true
+                                    text: "Reset UI State"
+                                    onClicked: (mouse) => { if (AppController.ui_controller) AppController.ui_controller.resetUiState() }
                                     background: Rectangle {
                                         radius: Theme.radiusButton
                                         color: parent.hovered ? Theme.glassHover : "transparent"
                                         border.color: Theme.glassBorder
+                                        border.width: 1
                                     }
-
                                     contentItem: Text {
                                         text: parent.text
+                                        color: Theme.accent
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeBody
-                                        font.weight: Font.Medium
-                                        color: Theme.label
+                                        font.pixelSize: Theme.sizeCaption
+                                        font.weight: Font.Bold
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignVCenter
                                     }
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Auto-minimize on Screenshot"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnScreenshot : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnScreenshot = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Auto-minimize on Quick Copy"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnQuickCopy : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnQuickCopy = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Text {
-                                    text: "Temporary Screenshots"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.temporaryScreenshots : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.temporaryScreenshots = checked
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "Startup View"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassDropdown {
-                                    Layout.preferredWidth: 170
-                                    model: ["Last Selected", "Library", "QuickCopy", "Updates", "Settings"]
-                                    currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.ui_controller.startupView)) : 0
-                                    onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setStartupView(model[index]) }
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "Default Client"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassDropdown {
-                                    Layout.preferredWidth: 170
-                                    model: {
-                                        let fmts = ["Last Selected"];
-                                        if (AppController.clientFormats) {
-                                            fmts = fmts.concat(AppController.clientFormats);
-                                        }
-                                        return fmts;
-                                    }
-                                    currentIndex: AppController ? Math.max(0, model.indexOf(AppController.defaultClient)) : 0
-                                    onActivated: (index) => { if (AppController) AppController.setDefaultClient(model[index]) }
-                                }
-                            }
-
-
-                            RowLayout {
-                                Text {
-                                    text: "Remember Filters"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassSwitch {
-                                    checked: AppController.ui_controller ? AppController.ui_controller.rememberFilters : true
-                                    onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setRememberFilters(checked)
-                                }
-                            }
-
-                            ActionButton {
-                                Layout.preferredHeight: 36
-                                Layout.fillWidth: true
-                                text: "Reset UI State"
-                                onClicked: (mouse) => { if (AppController.ui_controller) AppController.ui_controller.resetUiState() }
-                                background: Rectangle {
-                                    radius: Theme.radiusButton
-                                    color: parent.hovered ? Theme.glassHover : "transparent"
-                                    border.color: Theme.glassBorder
-                                    border.width: 1
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.sizeCaption
-                                    font.weight: Font.Bold
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
                                 }
                             }
                         }
@@ -543,20 +505,21 @@ Item {
                                 color: Theme.separator
                             }
 
-                            RowLayout {
-                                Text {
-                                    text: "Auto Update Mode"
-                                    font.family: Theme.fontFamily
-                                    color: Theme.label
-                                    Layout.fillWidth: true
-                                }
-                                GlassDropdown {
-                                    model: ["off", "prompt", "silent"]
-                                    currentIndex: AppController.config_controller ? Math.max(0, model.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)) : 1
-                                    onActivated: {
-                                        if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = model[index]
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+
+                                SettingsRow {
+                                    titleText: "Auto Update Mode"
+                                    GlassDropdown {
+                                        width: 100
+                                        property var internalValues: ["off", "prompt", "silent"]
+                                        model: ["Off", "Prompt", "Silent"]
+                                        currentIndex: AppController.config_controller ? Math.max(0, internalValues.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)) : 1
+                                        onActivated: {
+                                            if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = internalValues[index]
+                                        }
                                     }
-                                    Layout.preferredWidth: 100
                                 }
                             }
                         }
@@ -588,32 +551,17 @@ Item {
                                 color: Theme.separator
                             }
 
-                            RowLayout {
+                            ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 12
 
-                                ColumnLayout {
-                                    spacing: 2
-                                    Layout.fillWidth: true
-
-                                    Text {
-                                        text: "Enable Diagnostic Logging"
-                                        font.family: Theme.fontFamily
-                                        color: Theme.label
+                                SettingsRow {
+                                    titleText: "Enable Diagnostic Logging"
+                                    descriptionText: "Records structured events to help troubleshoot issues.\nMay slightly impact performance when enabled."
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.diagnosticLogging : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.diagnosticLogging = checked
                                     }
-                                    Text {
-                                        text: "Records structured events to help troubleshoot issues.\nMay slightly impact performance when enabled."
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        color: Theme.secondaryLabel
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                    }
-                                }
-
-                                GlassSwitch {
-                                    checked: AppController.config_controller ? AppController.config_controller.diagnosticLogging : false
-                                    onCheckedChanged: if (AppController.config_controller) AppController.config_controller.diagnosticLogging = checked
                                 }
                             }
                         }

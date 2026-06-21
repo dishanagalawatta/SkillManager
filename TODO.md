@@ -29,19 +29,12 @@
 
 ## In Progress
 
-- [ ] **[High Severity]** Investigate and fix the update process validation
 - [ ] **[High Severity]** fix failing github actions
 
 ---
 
 # 4. Bug Tracker
 
-* [ ] check
-
 ---
 
 # 5. Icebox / Backlog
-
-- [ ] Drop any file to quick copy
-
----

@@ -44,18 +44,18 @@ class UIController(BaseController):
             if "current_view" in raw_state and "startup_view" not in raw_state:
                 raw_state["startup_view"] = raw_state["current_view"]
 
-            self._state = UIStateRecord.model_validate(raw_state)
+            self.state = UIStateRecord.model_validate(raw_state)
         except Exception as e:
             logger.warning("Invalid UI state in config, using defaults. Error: %s", e)
-            self._state = UIStateRecord()
+            self.state = UIStateRecord()
 
         # Normalize view names in the record
-        if self._state.startup_view == "Last Selected":
+        if self.state.startup_view == "Last Selected":
             # If "Last Selected", we don't normalize it, and we keep current_view as is
-            self._state.current_view = self._normalizeViewName(self._state.current_view)
+            self.state.current_view = self._normalizeViewName(self.state.current_view)
         else:
-            self._state.startup_view = self._normalizeViewName(self._state.startup_view)
-            self._state.current_view = self._state.startup_view
+            self.state.startup_view = self._normalizeViewName(self.state.startup_view)
+            self.state.current_view = self.state.startup_view
 
         # Debounce timer for UI state saves
         self._save_timer = QTimer()
@@ -63,145 +63,145 @@ class UIController(BaseController):
         self._save_timer.timeout.connect(self.saveUiState)
 
     @Property(str, notify=currentViewChanged)
-    def currentView(self):
-        return self._state.current_view
+    def currentView(self):  # type: ignore[reportRedeclaration]
+        return self.state.current_view
 
     @currentView.setter
     def currentView(self, value):
         normalized = self._normalizeViewName(value)
-        if self._state.current_view != normalized:
-            self._state.current_view = normalized
+        if self.state.current_view != normalized:
+            self.state.current_view = normalized
             self.saveUiState()
             self.currentViewChanged.emit()
             self.app.skillModelChanged.emit()
 
     @Property(int, notify=windowWidthChanged)
-    def windowWidth(self):
-        return self._state.window_width
+    def windowWidth(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_width
 
     @windowWidth.setter
     def windowWidth(self, value):
-        if self._state.window_width != value:
+        if self.state.window_width != value:
             # Pydantic validation will handle bounds in a real setter,
             # but here we update the record and let it validate.
             try:
                 # We create a temporary copy to validate the single field update
-                update = self._state.model_dump()
+                update = self.state.model_dump()
                 update["window_width"] = value
-                self._state = UIStateRecord.model_validate(update)
+                self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.windowWidthChanged.emit()
             except Exception:
                 pass
 
     @Property(int, notify=windowHeightChanged)
-    def windowHeight(self):
-        return self._state.window_height
+    def windowHeight(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_height
 
     @windowHeight.setter
     def windowHeight(self, value):
-        if self._state.window_height != value:
+        if self.state.window_height != value:
             try:
-                update = self._state.model_dump()
+                update = self.state.model_dump()
                 update["window_height"] = value
-                self._state = UIStateRecord.model_validate(update)
+                self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.windowHeightChanged.emit()
             except Exception:
                 pass
 
     @Property(int, notify=windowXChanged)
-    def windowX(self):
-        return self._state.window_x
+    def windowX(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_x
 
     @windowX.setter
     def windowX(self, value):
-        if self._state.window_x != value:
-            self._state.window_x = value
+        if self.state.window_x != value:
+            self.state.window_x = value
             self.triggerSave()
             self.windowXChanged.emit()
 
     @Property(int, notify=windowYChanged)
-    def windowY(self):
-        return self._state.window_y
+    def windowY(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_y
 
     @windowY.setter
     def windowY(self, value):
-        if self._state.window_y != value:
-            self._state.window_y = value
+        if self.state.window_y != value:
+            self.state.window_y = value
             self.triggerSave()
             self.windowYChanged.emit()
 
     @Property(bool, notify=darkModeChanged)
-    def darkMode(self):
-        return self._state.dark_mode
+    def darkMode(self):  # type: ignore[reportRedeclaration]
+        return self.state.dark_mode
 
     @darkMode.setter
     def darkMode(self, value):
-        if self._state.dark_mode != value:
-            self._state.dark_mode = value
+        if self.state.dark_mode != value:
+            self.state.dark_mode = value
             self.triggerSave()
             self.darkModeChanged.emit()
 
     @Property(str, notify=startupViewChanged)
-    def startupView(self):
-        return self._state.startup_view
+    def startupView(self):  # type: ignore[reportRedeclaration]
+        return self.state.startup_view
 
     @startupView.setter
     def startupView(self, value):
         normalized = self._normalizeViewName(value)
-        if self._state.startup_view != normalized:
-            self._state.startup_view = normalized
+        if self.state.startup_view != normalized:
+            self.state.startup_view = normalized
             self.triggerSave()
             self.startupViewChanged.emit()
 
     @Property(bool, notify=rememberFiltersChanged)
-    def rememberFilters(self):
-        return self._state.remember_filters
+    def rememberFilters(self):  # type: ignore[reportRedeclaration]
+        return self.state.remember_filters
 
     @rememberFilters.setter
     def rememberFilters(self, value):
-        if self._state.remember_filters != value:
-            self._state.remember_filters = value
+        if self.state.remember_filters != value:
+            self.state.remember_filters = value
             if not value:
                 self.clearViewFilters()
             self.triggerSave()
             self.rememberFiltersChanged.emit()
 
     @Property(bool, notify=reducedMotionChanged)
-    def reducedMotion(self):
-        return self._state.reduced_motion
+    def reducedMotion(self):  # type: ignore[reportRedeclaration]
+        return self.state.reduced_motion
 
     @reducedMotion.setter
     def reducedMotion(self, value):
-        if self._state.reduced_motion != value:
-            self._state.reduced_motion = value
+        if self.state.reduced_motion != value:
+            self.state.reduced_motion = value
             self.triggerSave()
             self.reducedMotionChanged.emit()
 
     @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):
-        return self._state.compact_list_rows
+    def compactListRows(self):  # type: ignore[reportRedeclaration]
+        return self.state.compact_list_rows
 
     @compactListRows.setter
     def compactListRows(self, value):
-        if self._state.compact_list_rows != value:
-            self._state.compact_list_rows = value
+        if self.state.compact_list_rows != value:
+            self.state.compact_list_rows = value
             self.triggerSave()
             self.compactListRowsChanged.emit()
 
     @Property(int, notify=inspectorWidthChanged)
-    def inspectorWidth(self):
-        return self._state.inspector_width
+    def inspectorWidth(self):  # type: ignore[reportRedeclaration]
+        return self.state.inspector_width
 
     @inspectorWidth.setter
     def inspectorWidth(self, value):
         value = int(value)
-        if self._state.inspector_width != value:
+        if self.state.inspector_width != value:
             try:
-                update = self._state.model_dump()
+                update = self.state.model_dump()
                 update["inspector_width"] = value
-                self._state = UIStateRecord.model_validate(update)
+                self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.inspectorWidthChanged.emit()
             except Exception:
@@ -252,14 +252,14 @@ class UIController(BaseController):
 
     def saveUiState(self):
         """Saves current window geometry and UI preferences to config."""
-        self.config.set("ui_state", self._state.model_dump())
+        self.config.set("ui_state", self.state.model_dump())
 
     @Slot()
     def resetUiState(self):
         """Restores UI preferences and geometry to stable defaults."""
         self.blockSignals(True)
         try:
-            self._state = UIStateRecord()
+            self.state = UIStateRecord()
             self._clearAllViewFilters()
             self.saveUiState()
         finally:
@@ -370,7 +370,7 @@ class UIController(BaseController):
 
     def _setViewFilterForModel(self, model, filter_type: str, value: str):
         """Core filtering logic shared across views."""
-        if not self._state.remember_filters:
+        if not self.state.remember_filters:
             model.filterText = ""
 
         if filter_type == "category":

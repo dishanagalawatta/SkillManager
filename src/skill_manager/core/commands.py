@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from skill_manager.core.quick_copy import _project_root_for_project, project_label
+from skill_manager.core.quick_copy import project_label, project_root_for_project
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ def create_custom_command_file(
         )
 
     filename = build_command_filename(name)
-    project_root = _project_root_for_project(project_path)
+    project_root = project_root_for_project(project_path)
     commands_dir = project_root / ".agents" / "commands"
     file_path = commands_dir / filename
     if file_path.exists():

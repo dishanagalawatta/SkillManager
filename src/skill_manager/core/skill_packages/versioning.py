@@ -14,7 +14,7 @@ from .config import normalize_skill_package_config
 logger = logging.getLogger(__name__)
 
 
-def detect_git_remote(package_path: str) -> str:
+def detect_git_remote(package_path: str | None) -> str:
     if not package_path:
         return ""
 
@@ -85,13 +85,17 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str | None = N
             # Fetch tags
             try:
                 # Use raw git command via GitPython to have full control over arguments
-                output = g.execute(
+                output = g.execute(  # type: ignore[arg-type]
                     ["git"]
                     + config_args
                     + ["ls-remote", "--tags", "--sort=-v:refname", "--", path_or_url]
                 )
                 if output:
-                    lines = output.strip().split("\n")
+                    # ``Git.execute`` returns ``Tuple[int, bytes, str]`` (subprocess
+                    # result) when called via subprocess; the git Python API exposes
+                    # only the bytes body. Cast through ``str`` for parsing.
+                    output_str = output.decode() if isinstance(output, bytes) else str(output)
+                    lines = output_str.strip().split("\n")
                     for line in lines:
                         if "^{}" in line:
                             continue
@@ -104,9 +108,10 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str | None = N
 
             # Fallback to HEAD hash
             try:
-                output = g.execute(["git"] + config_args + ["ls-remote", "--", path_or_url, "HEAD"])
+                output = g.execute(["git"] + config_args + ["ls-remote", "--", path_or_url, "HEAD"])  # type: ignore[arg-type]
                 if output:
-                    return output.split("\t")[0][:7]
+                    output_str = output.decode() if isinstance(output, bytes) else str(output)
+                    return output_str.split("\t")[0][:7]  # type: ignore[return-value]
             except Exception as e:
                 logger.warning("Remote HEAD fetch failed: %s", e)
         else:
@@ -152,12 +157,16 @@ def check_skill_package_versions(
         return v
 
     if source.get("current_version_command"):
-        detected_current = run_version_command(source.get("current_version_command"))
+        detected_current = run_version_command(
+            source.get("current_version_command")  # type: ignore[arg-type]
+        )
         if detected_current:
             current_version = clean_v(detected_current)
 
     if source.get("latest_version_command"):
-        detected_latest = run_version_command(source.get("latest_version_command"))
+        detected_latest = run_version_command(
+            source.get("latest_version_command")  # type: ignore[arg-type]
+        )
         if detected_latest:
             latest_version = clean_v(detected_latest)
 

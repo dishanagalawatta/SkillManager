@@ -57,6 +57,7 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "No tag_name" in error
 
     @patch("skill_manager.core.release_check_service.httpx.get")
@@ -79,6 +80,7 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "timed out" in error
 
     @patch("skill_manager.core.release_check_service.httpx.get")
@@ -93,6 +95,7 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "404" in error
 
     @patch("skill_manager.core.release_check_service.httpx.get")
@@ -107,6 +110,7 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "500" in error
 
     @patch("skill_manager.core.release_check_service.httpx.get")
@@ -116,6 +120,7 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "Connection refused" in error
 
     @patch("skill_manager.core.release_check_service.httpx.get")
@@ -129,4 +134,5 @@ class TestCheckLatestRelease:
         version, error = check_latest_release()
 
         assert version is None
+        assert error is not None
         assert "Invalid JSON" in error

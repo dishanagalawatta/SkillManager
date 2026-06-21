@@ -58,6 +58,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     """Verify navigation, search filtering, and quick copy flow in a single sequence."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     # Force a known starting view
@@ -135,6 +136,7 @@ def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_dat
     """Verify navigation to Updates view and interaction with scan/lists."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     nav_updates = root.findChild(QQuickItem, "navUpdates")

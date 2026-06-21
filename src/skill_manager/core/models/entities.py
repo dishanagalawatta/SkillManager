@@ -31,11 +31,11 @@ class Skill:
     main_category: str = "⚙️ System & Workflow"
     tags: list[str] = field(default_factory=list)
 
-    # Internal UI/Sorting flags
-    _section_name: str | None = None
-    _main_category_name: str | None = None
-    _sub_category_name: str | None = None
-    _is_first_in_subcategory: bool = False
+    # UI/Sorting flags (consumed by the model layer's sort/group logic)
+    section_name: str | None = None
+    main_category_name: str | None = None
+    sub_category_name: str | None = None
+    is_first_in_subcategory: bool = False
 
     def get(self, key: str, default: Any = None) -> Any:
         """Compatibility method for dictionary-like access."""

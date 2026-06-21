@@ -226,14 +226,14 @@ def app_controller(session_mock_config, session_temp_dir):
     controller = AppController(skip_initial_load=True, config=session_mock_config)
     controller.task_runner = SynchronousTaskRunner()
 
-    skill_manager.app.current_test_controller = controller
+    skill_manager.app.current_test_controller = controller  # type: ignore[attr-defined]
 
     def controller_factory(qml_engine):
         from PySide6.QtQml import QQmlEngine
 
-        ctrl = skill_manager.app.current_test_controller
+        ctrl = skill_manager.app.current_test_controller  # type: ignore[attr-defined]
         if ctrl:
-            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
+            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)  # type: ignore[attr-defined]
         return ctrl
 
     from contextlib import suppress
@@ -241,8 +241,11 @@ def app_controller(session_mock_config, session_temp_dir):
     with suppress(Exception):
         from PySide6.QtQml import qmlRegisterSingletonType
 
-        # This registration is process-wide
-        qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
+        # This registration is process-wide. PySide6 6.11.0's stub claims
+        # ``qml_name`` must be bytes but the runtime requires str.
+        qmlRegisterSingletonType(
+            AppController, "App", 1, 0, "AppController", controller_factory  # type: ignore[arg-type]
+        )
 
     yield controller
     controller.on_quit()
