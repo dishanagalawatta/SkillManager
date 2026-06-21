@@ -16,16 +16,6 @@ from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
 
-try:
-    from sentry_sdk.integrations.pyside6 import (  # type: ignore[reportMissingImports]
-        PySide6Integration,
-    )
-
-    HAS_SENTRY_PYSIDE6 = True
-except ImportError:
-    pywinstyles = None  # type: ignore[assignment]
-    HAS_SENTRY_PYSIDE6 = False
-
 import skill_manager
 
 # Try to import pywinstyles for Mica/Acrylic
@@ -74,6 +64,7 @@ from skill_manager.utils.task_runner import BackgroundTaskRunner
 
 logger = logging.getLogger(__name__)
 
+
 def _handle_qml_warning(msg):
     """Filter benign QML warnings, such as component destruction during incubation."""
     msg_str = msg.toString() if hasattr(msg, "toString") else str(msg)
@@ -81,7 +72,6 @@ def _handle_qml_warning(msg):
         logger.debug(f"QML Warning (suppressed): {msg_str}")
     else:
         logger.warning(f"QML Warning: {msg_str}")
-
 
 
 class AppController(QObject):
@@ -979,11 +969,11 @@ def main():  # pragma: no cover
     # Initialize Sentry as early as possible
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN", ""),  # Placeholder for user's DSN
-        integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],  # type: ignore[name-defined]
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
         environment="production" if getattr(sys, "frozen", False) else "development",
         release=f"skill-manager@{skill_manager.__version__}",
+        default_integrations=False,
     )
 
     # Acquire mutex so Inno Setup installer can cleanly close the app

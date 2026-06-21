@@ -255,7 +255,6 @@ class AppController(QObject):
 
 # Module-level constants and entry point
 _app_mutex: Any
-HAS_SENTRY_PYSIDE6: bool
 HAS_PYWINSTYLES: bool
 logger: Any
 
