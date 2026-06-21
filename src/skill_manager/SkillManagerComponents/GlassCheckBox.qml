@@ -12,8 +12,16 @@ Item {
 
     signal toggled()
 
+    activeFocusOnTab: true
     width: buttonSize
     height: buttonSize
+
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            control.toggled()
+            event.accepted = true
+        }
+    }
 
     Rectangle {
         id: bgRect
@@ -29,12 +37,13 @@ Item {
         }
         
         border.color: {
+            if (control.activeFocus) return Theme.accent
             if (control.checkState === Qt.Checked || control.checkState === Qt.PartiallyChecked) {
                 return "transparent"
             }
             return mouseArea.containsMouse ? Theme.accent : Theme.alpha(Theme.label, 0.15)
         }
-        border.width: 1
+        border.width: control.activeFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }

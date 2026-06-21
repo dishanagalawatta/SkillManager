@@ -12,16 +12,24 @@ Item {
     property bool checked: false
     property alias text: label.text
 
+    activeFocusOnTab: true
     implicitWidth: 44
     implicitHeight: 24
+
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            control.checked = !control.checked
+            event.accepted = true
+        }
+    }
 
     Rectangle {
         id: track
         anchors.fill: parent
         radius: height / 2
         color: control.checked ? Theme.accent : Theme.glassHover
-        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
-        border.width: control.visualFocus ? 2 : 1
+        border.color: control.activeFocus ? Theme.accent : Theme.glassBorder
+        border.width: control.activeFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
