@@ -254,7 +254,13 @@ Item {
                                         // Update Button / Status
                                         ActionButton {
                                             id: uv_itemUpdateBtn
-                                            property bool isLatest: Boolean(!modelData.latest_version || modelData.latest_version === modelData.current_version)
+                                            // Up-to-date only when a real latest_version is known
+                                            // and matches current. Empty / missing = version unknown,
+                                            // so the button stays enabled.
+                                            property bool isLatest: Boolean(
+                                                modelData.latest_version && modelData.latest_version !== "" &&
+                                                modelData.latest_version === modelData.current_version
+                                            )
                                             labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
                                             role: isLatest ? "secondary" : "primary"
                                             buttonHeight: 26

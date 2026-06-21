@@ -35,6 +35,8 @@
 
 # 4. Bug Tracker
 
+* [x] Package update not working.
+
 ---
 
 # 5. Icebox / Backlog
