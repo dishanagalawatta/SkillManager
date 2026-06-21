@@ -23,15 +23,25 @@ python run_tests.py
 
 ## End-User Install
 
-Download `SkillManager_Setup.exe` from
+**winget** (recommended — no SmartScreen warning):
+
+```powershell
+winget install --id dishanagalawatta.SkillManager -e
+```
+
+**Direct download**: grab `SkillManager_Setup.exe` from
 [Releases](https://github.com/dishanagalawatta/SkillManager/releases).
+Click **More info → Run anyway** if SmartScreen appears.
 No Python required.
+
+See [docs/INSTALL.md](docs/INSTALL.md) for full details.
 
 ## Documentation
 
 | Audience | Document | Purpose |
 |----------|----------|---------|
 | Everyone | [README.md](README.md) | This file. |
+| User | [docs/INSTALL.md](docs/INSTALL.md) | Installation guide (winget, direct download). |
 | User | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | End-user manual. |
 | Engineer | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map, lifecycle. |
 | Engineer | [docs/API.md](docs/API.md) | `AppController` surface. |
