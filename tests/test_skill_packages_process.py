@@ -25,7 +25,10 @@ def test_sanitize_token():
 
     # Inline multiple statements
     assert sanitize_token("echo password=secret; echo next") == "echo password=***; echo next"
-    assert sanitize_token("echo password='secret\nmore'; echo next") == "echo password='***'; echo next"
+    assert (
+        sanitize_token("echo password='secret\nmore'; echo next")
+        == "echo password='***'; echo next"
+    )
 
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
