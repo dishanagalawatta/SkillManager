@@ -19,7 +19,7 @@ def _load_env() -> None:
 _load_env()
 
 
-def _get_or_create_device_id() -> str:
+def get_or_create_device_id() -> str:
     """Return a persistent device ID stored in the app data directory."""
     from skill_manager.core.config import DATA_DIR
 
@@ -39,7 +39,7 @@ def _get_or_create_device_id() -> str:
     return device_id
 
 
-def _init_posthog():
+def init_posthog():
     # Safeguard: Never initialize a real client during tests.
     # This prevents background threads from hanging pytest on exit.
     if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SKILL_MANAGER_TESTING") == "1":
@@ -63,14 +63,14 @@ def _init_posthog():
         return None
 
 
-_posthog = _init_posthog()
+_posthog = init_posthog()
 _device_id: str | None = None
 
 
 def get_device_id() -> str:
     global _device_id
     if _device_id is None:
-        _device_id = _get_or_create_device_id()
+        _device_id = get_or_create_device_id()
     return _device_id
 
 

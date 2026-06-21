@@ -21,14 +21,14 @@ def copy_skill_folders_to_projects(skills, projects, update_only=False):
 
     for skill in skills:
         source_path, folder_name, error = _normalize_skill_package(skill)
-        if error:
+        if error or source_path is None:
             result["skipped"] += max(1, len(normalized_projects))
             result["details"].append(
                 {
                     "skill": skill.get("name") or skill.get("folder_name") or "Unknown",
                     "project": "",
                     "status": "skipped",
-                    "message": error,
+                    "message": error or "Skill source path unavailable.",
                 }
             )
             continue
@@ -140,9 +140,9 @@ def get_commands_dir(project_path: str | Path) -> Path:
 
     Mirrors ``get_skills_dir`` but for ``.agents/commands/``.
     """
-    from skill_manager.core.quick_copy import _project_root_for_project
+    from skill_manager.core.quick_copy import project_root_for_project
 
-    root = _project_root_for_project(Path(project_path))
+    root = project_root_for_project(Path(project_path))
     return root / ".agents" / "commands"
 
 

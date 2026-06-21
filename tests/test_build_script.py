@@ -99,7 +99,7 @@ def test_spec_logging_filter_logic():
     filter_class = module_namespace["PyInstallerQtQmlLogFilter"]
 
     # Test the filter logic
-    log_filter = filter_class()
+    log_filter = filter_class()  # type: ignore[call-arg]
 
     # Test case: malformed log with single tuple argument
     logger = logging.getLogger("test_spec_filter")

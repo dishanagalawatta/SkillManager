@@ -1,8 +1,24 @@
 import logging
 from typing import Any
 
-from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, Signal, Slot
+from PySide6.QtCore import (
+    Property,
+    QAbstractListModel,
+    QByteArray,
+    QModelIndex,
+    QPersistentModelIndex,
+    Qt,
+    Signal,
+    Slot,
+)
 
+# PySide6 6.11.0's type stub nests ``Checked`` / ``Unchecked`` /
+# ``PartiallyChecked`` under ``Qt.CheckState`` rather than exposing them
+# as flat ``Qt.Checked`` etc. The runtime does expose the flat aliases
+# (PySide6 has compatibility constants) but the type-checker doesn't
+# model that — so the runtime works while pyright rejects the flat
+# access. Use the typed nested form so both the runtime and the
+# static checker agree.
 from skill_manager.core.models.entities import FilterState, Skill
 from skill_manager.core.models.filter_engine import FilterEngine
 from skill_manager.core.search import SearchEngine
@@ -15,32 +31,32 @@ class SkillModel(QAbstractListModel):
     Qt List Model for skills, delegating logic to FilterEngine.
     """
 
-    NameRole = Qt.UserRole + 1
-    CategoryRole = Qt.UserRole + 2
-    DescriptionRole = Qt.UserRole + 3
-    PathRole = Qt.UserRole + 4
-    ProjectRole = Qt.UserRole + 5
-    IsStarredRole = Qt.UserRole + 6
-    IsSelectedRole = Qt.UserRole + 7
-    SearchTextRole = Qt.UserRole + 8
-    IsArchivedRole = Qt.UserRole + 9
-    IsCollectionRole = Qt.UserRole + 10
-    SectionRole = Qt.UserRole + 11
-    RawContentRole = Qt.UserRole + 12
-    BodyContentRole = Qt.UserRole + 13
-    RiskRole = Qt.UserRole + 14
-    SourceRole = Qt.UserRole + 15
-    DateRole = Qt.UserRole + 16
-    IsCollapsedRole = Qt.UserRole + 17
-    IsCommandRole = Qt.UserRole + 18
-    ClientRole = Qt.UserRole + 19
-    MainCategoryNameRole = Qt.UserRole + 20
-    IsFirstInSubcategoryRole = Qt.UserRole + 21
-    IsMainCollapsedRole = Qt.UserRole + 22
-    IsSubCollapsedRole = Qt.UserRole + 23
-    SubCategoryNameRole = Qt.UserRole + 24
-    IsPackageRole = Qt.UserRole + 25
-    IsScreenshotRole = Qt.UserRole + 26
+    NameRole = Qt.ItemDataRole.UserRole + 1
+    CategoryRole = Qt.ItemDataRole.UserRole + 2
+    DescriptionRole = Qt.ItemDataRole.UserRole + 3
+    PathRole = Qt.ItemDataRole.UserRole + 4
+    ProjectRole = Qt.ItemDataRole.UserRole + 5
+    IsStarredRole = Qt.ItemDataRole.UserRole + 6
+    IsSelectedRole = Qt.ItemDataRole.UserRole + 7
+    SearchTextRole = Qt.ItemDataRole.UserRole + 8
+    IsArchivedRole = Qt.ItemDataRole.UserRole + 9
+    IsCollectionRole = Qt.ItemDataRole.UserRole + 10
+    SectionRole = Qt.ItemDataRole.UserRole + 11
+    RawContentRole = Qt.ItemDataRole.UserRole + 12
+    BodyContentRole = Qt.ItemDataRole.UserRole + 13
+    RiskRole = Qt.ItemDataRole.UserRole + 14
+    SourceRole = Qt.ItemDataRole.UserRole + 15
+    DateRole = Qt.ItemDataRole.UserRole + 16
+    IsCollapsedRole = Qt.ItemDataRole.UserRole + 17
+    IsCommandRole = Qt.ItemDataRole.UserRole + 18
+    ClientRole = Qt.ItemDataRole.UserRole + 19
+    MainCategoryNameRole = Qt.ItemDataRole.UserRole + 20
+    IsFirstInSubcategoryRole = Qt.ItemDataRole.UserRole + 21
+    IsMainCollapsedRole = Qt.ItemDataRole.UserRole + 22
+    IsSubCollapsedRole = Qt.ItemDataRole.UserRole + 23
+    SubCategoryNameRole = Qt.ItemDataRole.UserRole + 24
+    IsPackageRole = Qt.ItemDataRole.UserRole + 25
+    IsScreenshotRole = Qt.ItemDataRole.UserRole + 26
 
     filterChanged = Signal()
     showArchivedChanged = Signal()
@@ -65,7 +81,7 @@ class SkillModel(QAbstractListModel):
         self._search_engine = None
         self._selected_ids: dict[str, None] = {}
         self._engine = FilterEngine()
-        self._state = FilterState()
+        self.state = FilterState()
         self._suppress_layout = False
         self._batch_apply_needed = False
         self._selections_by_project: dict[str, list[str]] = {}
@@ -77,28 +93,32 @@ class SkillModel(QAbstractListModel):
         self._cached_total_selectable = 0
 
         if self._config:
-            self._state.collapsed_categories = set(self._config.get("collapsed_categories", []))
-            self._state.show_archived = self._config.get("show_archived", False)
-            self._state.category_filter = self._config.get("category_filter", "")
-            self._state.collection_filter = self._config.get("collection_filter", False)
-            self._state.project_filter = self._config.get("project_filter", "")
-            self._state.client_filter = self._config.get("client_format", "")
-            self._state.show_commands = self._config.get("show_commands", True)
-            self._state.show_starred = self._config.get("show_starred", True)
-            self._state.is_package_only = self._config.get(
+            self.state.collapsed_categories = set(self._config.get("collapsed_categories", []))
+            self.state.show_archived = self._config.get("show_archived", False)
+            self.state.category_filter = self._config.get("category_filter", "")
+            self.state.collection_filter = self._config.get("collection_filter", False)
+            self.state.project_filter = self._config.get("project_filter", "")
+            self.state.client_filter = self._config.get("client_format", "")
+            self.state.show_commands = self._config.get("show_commands", True)
+            self.state.show_starred = self._config.get("show_starred", True)
+            self.state.is_package_only = self._config.get(
                 "is_package_only", self._config.get("is_source_only", None)
             )
             raw = self._config.get("project_selections", {})
             if raw:
                 self._selections_by_project = {k: list(v) for k, v in raw.items()}
-            initial_project = self._state.project_filter
+            initial_project = self.state.project_filter
             if initial_project and initial_project in self._selections_by_project:
                 self._selected_ids = dict.fromkeys(self._selections_by_project[initial_project])
 
-    def rowCount(self, _parent=QModelIndex()):
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # noqa: ARG002
         return len(self._filtered_skills)
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if not index.isValid() or index.row() >= len(self._filtered_skills):
             return None
 
@@ -124,9 +144,9 @@ class SkillModel(QAbstractListModel):
         if role == self.IsCollectionRole:
             return skill.is_bundle
         if role == self.SectionRole:
-            return skill._section_name or self._engine.get_section(skill)
+            return skill.section_name or self._engine.get_section(skill)
         if role == self.MainCategoryNameRole:
-            return skill._main_category_name or self._engine.get_main_category(skill)
+            return skill.main_category_name or self._engine.get_main_category(skill)
         if role == self.RawContentRole:
             return skill.raw_content
         if role == self.BodyContentRole:
@@ -144,13 +164,13 @@ class SkillModel(QAbstractListModel):
         if role == self.ClientRole:
             return skill.client
         if role == self.IsFirstInSubcategoryRole:
-            return skill._is_first_in_subcategory
+            return skill.is_first_in_subcategory
         if role == self.IsMainCollapsedRole:
             return self._is_main_collapsed(skill)
         if role == self.IsSubCollapsedRole:
             return self._is_sub_collapsed(skill)
         if role == self.SubCategoryNameRole:
-            return skill._sub_category_name or self._engine.get_sub_category(skill)
+            return skill.sub_category_name or self._engine.get_sub_category(skill)
         if role == self.IsPackageRole:
             return skill.is_package
         if role == self.IsScreenshotRole:
@@ -158,95 +178,95 @@ class SkillModel(QAbstractListModel):
 
         return None
 
-    def roleNames(self) -> dict[int, bytes]:
+    def roleNames(self) -> dict[int, QByteArray]:
         return {
-            self.NameRole: b"name",
-            self.CategoryRole: b"category",
-            self.DescriptionRole: b"description",
-            self.PathRole: b"path",
-            self.ProjectRole: b"project",
-            self.IsStarredRole: b"isStarred",
-            self.IsSelectedRole: b"isSelected",
-            self.SearchTextRole: b"searchText",
-            self.IsArchivedRole: b"isArchived",
-            self.IsCollectionRole: b"isCollection",
-            self.SectionRole: b"sectionName",
-            self.RawContentRole: b"rawContent",
-            self.BodyContentRole: b"bodyContent",
-            self.RiskRole: b"risk",
-            self.SourceRole: b"source",
-            self.MainCategoryNameRole: b"mainCategoryName",
-            self.DateRole: b"date",
-            self.IsCollapsedRole: b"isCollapsed",
-            self.IsCommandRole: b"isCommand",
-            self.ClientRole: b"client",
-            self.IsFirstInSubcategoryRole: b"isFirstInSubcategory",
-            self.IsMainCollapsedRole: b"isMainCollapsed",
-            self.IsSubCollapsedRole: b"isSubCollapsed",
-            self.SubCategoryNameRole: b"subCategoryName",
-            self.IsPackageRole: b"isPackage",
-            self.IsScreenshotRole: b"isScreenshot",
+            self.NameRole: QByteArray(b"name"),
+            self.CategoryRole: QByteArray(b"category"),
+            self.DescriptionRole: QByteArray(b"description"),
+            self.PathRole: QByteArray(b"path"),
+            self.ProjectRole: QByteArray(b"project"),
+            self.IsStarredRole: QByteArray(b"isStarred"),
+            self.IsSelectedRole: QByteArray(b"isSelected"),
+            self.SearchTextRole: QByteArray(b"searchText"),
+            self.IsArchivedRole: QByteArray(b"isArchived"),
+            self.IsCollectionRole: QByteArray(b"isCollection"),
+            self.SectionRole: QByteArray(b"sectionName"),
+            self.RawContentRole: QByteArray(b"rawContent"),
+            self.BodyContentRole: QByteArray(b"bodyContent"),
+            self.RiskRole: QByteArray(b"risk"),
+            self.SourceRole: QByteArray(b"source"),
+            self.MainCategoryNameRole: QByteArray(b"mainCategoryName"),
+            self.DateRole: QByteArray(b"date"),
+            self.IsCollapsedRole: QByteArray(b"isCollapsed"),
+            self.IsCommandRole: QByteArray(b"isCommand"),
+            self.ClientRole: QByteArray(b"client"),
+            self.IsFirstInSubcategoryRole: QByteArray(b"isFirstInSubcategory"),
+            self.IsMainCollapsedRole: QByteArray(b"isMainCollapsed"),
+            self.IsSubCollapsedRole: QByteArray(b"isSubCollapsed"),
+            self.SubCategoryNameRole: QByteArray(b"subCategoryName"),
+            self.IsPackageRole: QByteArray(b"isPackage"),
+            self.IsScreenshotRole: QByteArray(b"isScreenshot"),
         }
 
     # Properties
     @Property(str, notify=filterChanged)
-    def filterText(self):
-        return self._state.filter_text
+    def filterText(self):  # type: ignore[reportRedeclaration]
+        return self.state.filter_text
 
     @filterText.setter
     def filterText(self, value):
-        if self._state.filter_text != value:
-            self._state.filter_text = value
+        if self.state.filter_text != value:
+            self.state.filter_text = value
             self._apply_filter()
             self.filterChanged.emit()
 
     @Property(bool, notify=showArchivedChanged)
-    def showArchived(self):
-        return self._state.show_archived
+    def showArchived(self):  # type: ignore[reportRedeclaration]
+        return self.state.show_archived
 
     @showArchived.setter
     def showArchived(self, value):
-        if self._state.show_archived != value:
-            self._state.show_archived = value
+        if self.state.show_archived != value:
+            self.state.show_archived = value
             self._apply_filter()
             self._save_filters()
             self.showArchivedChanged.emit()
 
     @Property(str, notify=categoryFilterChanged)
-    def categoryFilter(self):
-        return self._state.category_filter
+    def categoryFilter(self):  # type: ignore[reportRedeclaration]
+        return self.state.category_filter
 
     @categoryFilter.setter
     def categoryFilter(self, value):
-        if self._state.category_filter != value:
-            self._state.category_filter = value
+        if self.state.category_filter != value:
+            self.state.category_filter = value
             self._apply_filter()
             self._save_filters()
             self.categoryFilterChanged.emit()
 
     @Property(bool, notify=collectionFilterChanged)
-    def collectionFilter(self):
-        return self._state.collection_filter
+    def collectionFilter(self):  # type: ignore[reportRedeclaration]
+        return self.state.collection_filter
 
     @collectionFilter.setter
     def collectionFilter(self, value):
-        if self._state.collection_filter != value:
-            self._state.collection_filter = value
+        if self.state.collection_filter != value:
+            self.state.collection_filter = value
             self._apply_filter()
             self._save_filters()
             self.collectionFilterChanged.emit()
 
     @Property(str, notify=projectFilterChanged)
-    def projectFilter(self):
-        return self._state.project_filter
+    def projectFilter(self):  # type: ignore[reportRedeclaration]
+        return self.state.project_filter
 
     @projectFilter.setter
     def projectFilter(self, value):
-        if self._state.project_filter != value:
-            old_project = self._state.project_filter
+        if self.state.project_filter != value:
+            old_project = self.state.project_filter
             if old_project:
                 self._selections_by_project[old_project] = list(self._selected_ids)
-            self._state.project_filter = value
+            self.state.project_filter = value
             if value in self._selections_by_project:
                 self._selected_ids = dict.fromkeys(self._selections_by_project[value])
             else:
@@ -257,69 +277,69 @@ class SkillModel(QAbstractListModel):
             self.projectFilterChanged.emit()
 
     @Property(str, notify=clientFilterChanged)
-    def clientFilter(self):
-        return self._state.client_filter
+    def clientFilter(self):  # type: ignore[reportRedeclaration]
+        return self.state.client_filter
 
     @clientFilter.setter
     def clientFilter(self, value):
-        if self._state.client_filter != value:
-            self._state.client_filter = value
+        if self.state.client_filter != value:
+            self.state.client_filter = value
 
-            if self._state.filter_by_client:
+            if self.state.filter_by_client:
                 self._apply_filter()
             self._save_filters()
             self.clientFilterChanged.emit()
 
     @Property(bool, notify=filterByClientChanged)
-    def filterByClient(self):
-        return self._state.filter_by_client
+    def filterByClient(self):  # type: ignore[reportRedeclaration]
+        return self.state.filter_by_client
 
     @filterByClient.setter
     def filterByClient(self, value):
-        if self._state.filter_by_client != value:
-            self._state.filter_by_client = value
+        if self.state.filter_by_client != value:
+            self.state.filter_by_client = value
             self._apply_filter()
             self.filterByClientChanged.emit()
 
     @Property(bool, notify=showCommandsChanged)
-    def showCommands(self):
-        return self._state.show_commands
+    def showCommands(self):  # type: ignore[reportRedeclaration]
+        return self.state.show_commands
 
     @showCommands.setter
     def showCommands(self, value):
-        if self._state.show_commands != value:
-            self._state.show_commands = value
+        if self.state.show_commands != value:
+            self.state.show_commands = value
             self._apply_filter()
             self._save_filters()
             self.showCommandsChanged.emit()
 
     @Property(bool, notify=showStarredChanged)
-    def showStarred(self):
-        return self._state.show_starred
+    def showStarred(self):  # type: ignore[reportRedeclaration]
+        return self.state.show_starred
 
     @showStarred.setter
     def showStarred(self, value):
-        if self._state.show_starred != value:
-            self._state.show_starred = value
+        if self.state.show_starred != value:
+            self.state.show_starred = value
             self._apply_filter()
             self._save_filters()
             self.showStarredChanged.emit()
 
     @Property(Qt.CheckState, notify=isPackageOnlyChanged)
-    def isPackageOnly(self):
-        if self._state.is_package_only is None:
-            return Qt.PartiallyChecked
-        return Qt.Checked if self._state.is_package_only else Qt.Unchecked
+    def isPackageOnly(self):  # type: ignore[reportRedeclaration]
+        if self.state.is_package_only is None:
+            return Qt.CheckState.PartiallyChecked
+        return Qt.CheckState.Checked if self.state.is_package_only else Qt.CheckState.Unchecked
 
     @isPackageOnly.setter
     def isPackageOnly(self, value):
         new_val = None
-        if value == Qt.Checked or value is True:
+        if value == Qt.CheckState.Checked or value is True:
             new_val = True
-        elif value == Qt.Unchecked or value is False:
+        elif value == Qt.CheckState.Unchecked or value is False:
             new_val = False
-        if self._state.is_package_only != new_val:
-            self._state.is_package_only = new_val
+        if self.state.is_package_only != new_val:
+            self.state.is_package_only = new_val
             self._apply_filter()
             self._save_filters()
             self.isPackageOnlyChanged.emit()
@@ -475,7 +495,7 @@ class SkillModel(QAbstractListModel):
             skills = self._execute_filter_logic()
             self._all_filtered_skills = self._engine.prepare_rows(skills)
             self._filtered_skills = self._engine.build_visible_rows(
-                self._all_filtered_skills, self._state.collapsed_categories
+                self._all_filtered_skills, self.state.collapsed_categories
             )
         except Exception as e:
             logger.error("Error applying filter: %s", e)
@@ -495,7 +515,7 @@ class SkillModel(QAbstractListModel):
             skills = self._execute_filter_logic()
             self._all_filtered_skills = self._engine.prepare_rows(skills)
             new_list = self._engine.build_visible_rows(
-                self._all_filtered_skills, self._state.collapsed_categories
+                self._all_filtered_skills, self.state.collapsed_categories
             )
         except Exception as e:
             logger.error("Error applying filter for diff: %s", e)
@@ -548,29 +568,29 @@ class SkillModel(QAbstractListModel):
 
     def _execute_filter_logic(self) -> list[Skill]:
         """Internal synchronous logic for filtering and searching."""
-        if self._state.filter_text and self._search_engine:
+        if self.state.filter_text and self._search_engine:
             valid_paths = {
-                s.local_path for s in self._engine.filter_skills(self._all_skills, self._state)
+                s.local_path for s in self._engine.filter_skills(self._all_skills, self.state)
             }
-            results = self._search_engine.query(self._state.filter_text, valid_paths=valid_paths)
+            results = self._search_engine.query(self.state.filter_text, valid_paths=valid_paths)
             path_to_skill = {s.local_path: s for s in self._all_skills}
             return [
                 path_to_skill.get(r[0].get("local_path", ""), Skill.from_dict(r[0]))
                 for r in results
             ]
-        skills = self._engine.filter_skills(self._all_skills, self._state)
+        skills = self._engine.filter_skills(self._all_skills, self.state)
         skills.sort(key=self._engine.sort_key)
         return skills
 
     def _is_main_collapsed(self, skill: Skill):
         return (
-            skill._main_category_name or self._engine.get_main_category(skill)
-        ) in self._state.collapsed_categories
+            skill.main_category_name or self._engine.get_main_category(skill)
+        ) in self.state.collapsed_categories
 
     def _is_sub_collapsed(self, skill: Skill):
         return (
-            skill._section_name or self._engine.get_section(skill)
-        ) in self._state.collapsed_categories
+            skill.section_name or self._engine.get_section(skill)
+        ) in self.state.collapsed_categories
 
     def _emit_selection_data_changed(self):
         if not self._filtered_skills:
@@ -634,11 +654,11 @@ class SkillModel(QAbstractListModel):
 
     @Property(list, notify=collapsedCategoriesChanged)
     def collapsedCategories(self):
-        return list(self._state.collapsed_categories)
+        return list(self.state.collapsed_categories)
 
     @Property(bool, notify=collapsedCategoriesChanged)
     def isAllExpanded(self):
-        return len(self._state.collapsed_categories) == 0
+        return len(self.state.collapsed_categories) == 0
 
     @Slot()
     def toggleAll(self):
@@ -646,17 +666,17 @@ class SkillModel(QAbstractListModel):
 
     @Slot(str)
     def toggleCategory(self, name):
-        if name in self._state.collapsed_categories:
-            self._state.collapsed_categories.remove(name)
+        if name in self.state.collapsed_categories:
+            self.state.collapsed_categories.remove(name)
         else:
-            self._state.collapsed_categories.add(name)
+            self.state.collapsed_categories.add(name)
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()
         self._rebuild_visible_rows()
 
     @Slot()
     def expandAll(self):
-        self._state.collapsed_categories.clear()
+        self.state.collapsed_categories.clear()
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()
         self._rebuild_visible_rows()
@@ -664,10 +684,10 @@ class SkillModel(QAbstractListModel):
     @Slot()
     def collapseAll(self):
         sections = {
-            (s._main_category_name or self._engine.get_main_category(s))
+            (s.main_category_name or self._engine.get_main_category(s))
             for s in self._all_filtered_skills
         }
-        self._state.collapsed_categories.update(sections)
+        self.state.collapsed_categories.update(sections)
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()
         self._rebuild_visible_rows()
@@ -675,7 +695,7 @@ class SkillModel(QAbstractListModel):
     def _rebuild_visible_rows(self):
         self.layoutAboutToBeChanged.emit()
         self._filtered_skills = self._engine.build_visible_rows(
-            self._all_filtered_skills, self._state.collapsed_categories
+            self._all_filtered_skills, self.state.collapsed_categories
         )
         self.layoutChanged.emit()
         self._update_selection_counts()
@@ -683,7 +703,7 @@ class SkillModel(QAbstractListModel):
 
     @Slot(str, result=bool)
     def isCategoryCollapsed(self, name):
-        return name in self._state.collapsed_categories
+        return name in self.state.collapsed_categories
 
     def _save_collapsed(self):
         if not self._config:
@@ -698,7 +718,8 @@ class SkillModel(QAbstractListModel):
         self._collapse_save_timer.start()
 
     def _do_save_collapsed(self):
-        self._config.set("collapsed_categories", list(self._state.collapsed_categories))
+        if self._config is not None:
+            self._config.set("collapsed_categories", list(self.state.collapsed_categories))
 
     def _save_project_selections(self):
         if not self._config:
@@ -713,21 +734,22 @@ class SkillModel(QAbstractListModel):
         self._project_selections_save_timer.start()
 
     def _do_save_project_selections(self):
-        self._config.set("project_selections", self._selections_by_project)
+        if self._config is not None:
+            self._config.set("project_selections", self._selections_by_project)
 
     def _save_filters(self):
         if not self._config:
             return
         self._config.set_many(
             {
-                "show_archived": self._state.show_archived,
-                "category_filter": self._state.category_filter,
-                "collection_filter": self._state.collection_filter,
-                "project_filter": self._state.project_filter,
-                "client_format": self._state.client_filter,
-                "show_commands": self._state.show_commands,
-                "show_starred": self._state.show_starred,
-                "is_package_only": self._state.is_package_only,
-                "is_source_only": self._state.is_package_only,
+                "show_archived": self.state.show_archived,
+                "category_filter": self.state.category_filter,
+                "collection_filter": self.state.collection_filter,
+                "project_filter": self.state.project_filter,
+                "client_format": self.state.client_filter,
+                "show_commands": self.state.show_commands,
+                "show_starred": self.state.show_starred,
+                "is_package_only": self.state.is_package_only,
+                "is_source_only": self.state.is_package_only,
             }
         )

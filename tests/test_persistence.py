@@ -87,6 +87,7 @@ def test_cache_persistence(temp_files):
     with patch_config(temp_files):
         save_cache(data)
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert loaded["skills"][0]["name"] == "S1"
         assert loaded["skills"][0]["raw_content"] == ""
 
@@ -145,6 +146,7 @@ def test_patch_cache_remove(temp_files):
         removed_count = patch_cache_remove(["/p1"])
         assert removed_count == 1
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert len(loaded["skills"]) == 1
         assert loaded["skills"][0]["local_path"] == "/p2"
 
@@ -192,6 +194,7 @@ def test_patch_cache_add(temp_files):
         added_count = patch_cache_add(new_skills, projects_state)
         assert added_count == 2
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert len(loaded["skills"]) == 2
         # Check update
         s1 = next(s for s in loaded["skills"] if s["local_path"] == "/p1")

@@ -7,19 +7,23 @@ import ctypes
 import logging
 import os
 import sys
+from typing import Any
 
 import sentry_sdk
-from apscheduler.schedulers.qt import QtScheduler
+from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
 
 try:
-    from sentry_sdk.integrations.pyside6 import PySide6Integration
+    from sentry_sdk.integrations.pyside6 import (  # type: ignore[reportMissingImports]
+        PySide6Integration,
+    )
 
     HAS_SENTRY_PYSIDE6 = True
 except ImportError:
+    pywinstyles = None  # type: ignore[assignment]
     HAS_SENTRY_PYSIDE6 = False
 
 import skill_manager
@@ -30,6 +34,7 @@ try:
 
     HAS_PYWINSTYLES = True
 except ImportError:
+    pywinstyles = None  # type: ignore[assignment]
     HAS_PYWINSTYLES = False
 
 
@@ -68,6 +73,15 @@ from skill_manager.core.schemas import UpdatePackageRecord
 from skill_manager.utils.task_runner import BackgroundTaskRunner
 
 logger = logging.getLogger(__name__)
+
+def _handle_qml_warning(msg):
+    """Filter benign QML warnings, such as component destruction during incubation."""
+    msg_str = msg.toString() if hasattr(msg, "toString") else str(msg)
+    if "Object or context destroyed during incubation" in msg_str:
+        logger.debug(f"QML Warning (suppressed): {msg_str}")
+    else:
+        logger.warning(f"QML Warning: {msg_str}")
+
 
 
 class AppController(QObject):
@@ -212,12 +226,15 @@ class AppController(QObject):
 
         # 4. Initial Model Configuration
         self._library_model.showCommands = False
-        self._library_model.isPackageOnly = True
+        # PySide6's ``isPackageOnly`` setter accepts ``Qt.CheckState | bool``;
+        # pyright's stub only exposes ``Qt.CheckState``, so the ``True``/
+        # ``False`` literals are flagged.
+        self._library_model.isPackageOnly = True  # type: ignore[arg-type]
         self._library_model.showStarred = True
         self._library_model.filterByClient = True
 
         self._quick_copy_model.showCommands = True
-        self._quick_copy_model.isPackageOnly = False
+        self._quick_copy_model.isPackageOnly = False  # type: ignore[arg-type]
         self._quick_copy_model.showStarred = True
         self._quick_copy_model.filterByClient = True
 
@@ -313,7 +330,7 @@ class AppController(QObject):
         return self.image_inspector
 
     @Property(str, notify=currentProjectChanged)
-    def currentProject(self):
+    def currentProject(self):  # type: ignore[reportRedeclaration]
         return self._current_project_label
 
     @currentProject.setter
@@ -417,7 +434,7 @@ class AppController(QObject):
     # These will be removed once QML is updated to use controller namespaces.
 
     @Property(str, notify=currentViewChanged)
-    def currentView(self):
+    def currentView(self):  # type: ignore[reportRedeclaration]
         return self.ui.currentView
 
     @currentView.setter
@@ -425,7 +442,7 @@ class AppController(QObject):
         self.ui.currentView = v
 
     @Property(int, notify=windowWidthChanged)
-    def windowWidth(self):
+    def windowWidth(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowWidth
 
     @windowWidth.setter
@@ -433,7 +450,7 @@ class AppController(QObject):
         self.ui.windowWidth = v
 
     @Property(int, notify=windowHeightChanged)
-    def windowHeight(self):
+    def windowHeight(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowHeight
 
     @windowHeight.setter
@@ -441,7 +458,7 @@ class AppController(QObject):
         self.ui.windowHeight = v
 
     @Property(int, notify=windowXChanged)
-    def windowX(self):
+    def windowX(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowX
 
     @windowX.setter
@@ -449,7 +466,7 @@ class AppController(QObject):
         self.ui.windowX = v
 
     @Property(int, notify=windowYChanged)
-    def windowY(self):
+    def windowY(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowY
 
     @windowY.setter
@@ -457,7 +474,7 @@ class AppController(QObject):
         self.ui.windowY = v
 
     @Property(bool, notify=darkModeChanged)
-    def darkMode(self):
+    def darkMode(self):  # type: ignore[reportRedeclaration]
         return self.ui.darkMode
 
     @darkMode.setter
@@ -465,7 +482,7 @@ class AppController(QObject):
         self.ui.darkMode = v
 
     @Property(str, notify=startupViewChanged)
-    def startupView(self):
+    def startupView(self):  # type: ignore[reportRedeclaration]
         return self.ui.startupView
 
     @startupView.setter
@@ -473,7 +490,7 @@ class AppController(QObject):
         self.ui.startupView = v
 
     @Property(bool, notify=rememberFiltersChanged)
-    def rememberFilters(self):
+    def rememberFilters(self):  # type: ignore[reportRedeclaration]
         return self.ui.rememberFilters
 
     @rememberFilters.setter
@@ -481,7 +498,7 @@ class AppController(QObject):
         self.ui.rememberFilters = v
 
     @Property(bool, notify=reducedMotionChanged)
-    def reducedMotion(self):
+    def reducedMotion(self):  # type: ignore[reportRedeclaration]
         return self.ui.reducedMotion
 
     @reducedMotion.setter
@@ -489,7 +506,7 @@ class AppController(QObject):
         self.ui.reducedMotion = v
 
     @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):
+    def compactListRows(self):  # type: ignore[reportRedeclaration]
         return self.ui.compactListRows
 
     @compactListRows.setter
@@ -501,8 +518,20 @@ class AppController(QObject):
         return self.config_mgr.shortcutSearch
 
     @Property(str, notify=shortcutsChanged)
+    def shortcutSelectAll(self):
+        return self.config_mgr.shortcutSelectAll
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutClearSelection(self):
+        return self.config_mgr.shortcutClearSelection
+
+    @Property(str, notify=shortcutsChanged)
     def shortcutCopy(self):
         return self.config_mgr.shortcutCopy
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutRefresh(self):
+        return self.config_mgr.shortcutRefresh
 
     @Property(str, notify=shortcutsChanged)
     def shortcutArchive(self):
@@ -511,10 +540,6 @@ class AppController(QObject):
     @Property(str, notify=shortcutsChanged)
     def shortcutDelete(self):
         return self.config_mgr.shortcutDelete
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutRefresh(self):
-        return self.config_mgr.shortcutRefresh
 
     @Property(str, notify=shortcutsChanged)
     def shortcutExpandAll(self):
@@ -527,14 +552,6 @@ class AppController(QObject):
     @Property(str, notify=shortcutsChanged)
     def shortcutTopOfList(self):
         return self.config_mgr.shortcutTopOfList
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutClearSelection(self):
-        return self.config_mgr.shortcutClearSelection
-
-    @Property(str, notify=shortcutsChanged)
-    def shortcutThemeToggle(self):
-        return self.config_mgr.shortcutThemeToggle
 
     @Property(str, notify=shortcutsChanged)
     def shortcutQuickCopyView(self):
@@ -551,6 +568,14 @@ class AppController(QObject):
     @Property(str, notify=shortcutsChanged)
     def shortcutSettingsView(self):
         return self.config_mgr.shortcutSettingsView
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutThemeToggle(self):
+        return self.config_mgr.shortcutThemeToggle
+
+    @Property(str, notify=shortcutsChanged)
+    def shortcutScreenshot(self):
+        return self.config_mgr.shortcutScreenshot
 
     @Property(str, notify=currentViewChanged)
     def logoSource(self):
@@ -829,7 +854,7 @@ class AppController(QObject):
     # --- Slots ---
 
     @Property(Qt.CheckState, notify=isPackageOnlyChanged)
-    def isPackageOnly(self):
+    def isPackageOnly(self):  # type: ignore[reportRedeclaration]
         return self._library_model.isPackageOnly
 
     @isPackageOnly.setter
@@ -869,6 +894,8 @@ class AppController(QObject):
             self.currentProjectChanged.emit()
 
     def _set_status(self, msg):
+        if getattr(self, "_status_message", "") == msg:
+            return
         self._status_message = msg
         self.statusMessageChanged.emit()
         logger.info(f"Status: {msg}")
@@ -952,7 +979,7 @@ def main():  # pragma: no cover
     # Initialize Sentry as early as possible
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN", ""),  # Placeholder for user's DSN
-        integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],
+        integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],  # type: ignore[name-defined]
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
         environment="production" if getattr(sys, "frozen", False) else "development",
@@ -1024,12 +1051,24 @@ def main():  # pragma: no cover
         # Check if PNG is even supported
         from PySide6.QtGui import QImageReader
 
-        formats = [f.data().decode() for f in QImageReader.supportedImageFormats()]
+        formats = [f.data().decode() for f in QImageReader.supportedImageFormats()]  # type: ignore[attr-defined]
         logger.info(f"Supported image formats: {formats}")
         if "png" not in formats:
             logger.error("PNG format is NOT supported by this PySide6 installation!")
     controller = AppController()
-    qmlRegisterSingletonInstance(AppController, "App", 1, 0, "AppController", controller)
+    # PySide6 6.11.0's type stub claims ``qml_name`` is ``bytes | bytearray |
+    # memoryview[int]`` but the runtime actually requires ``str`` (which it
+    # auto-encodes internally) and raises ``TypeError`` on ``bytes``. The
+    # stub-vs-runtime mismatch is a known PySide6 limitation; suppress it
+    # per-call so the running app keeps working.
+    qmlRegisterSingletonInstance(
+        AppController,
+        "App",
+        1,
+        0,
+        "AppController",
+        controller,  # type: ignore[arg-type]
+    )
     app.aboutToQuit.connect(controller.on_quit)
 
     # Register FontDatabaseBridge BEFORE the QQmlApplicationEngine is created.
@@ -1039,13 +1078,13 @@ def main():  # pragma: no cover
     # "Cannot assign object of type X to list property 'data'; expected 'QObject'"
     # during Main.qml load.
     font_bridge = FontDatabaseBridge()
-    qmlRegisterSingletonInstance(FontDatabaseBridge, "App", 1, 0, "FontDB", font_bridge)
+    qmlRegisterSingletonInstance(FontDatabaseBridge, "App", 1, 0, "FontDB", font_bridge)  # type: ignore[arg-type]
 
     engine = QQmlApplicationEngine()
     engine.addImageProvider("screenshot", controller.screenshot_provider)
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("fontDB", font_bridge)
-    engine.warnings.connect(lambda msg: logger.warning(f"QML Warning: {msg}"))
+    engine.warnings.connect(_handle_qml_warning)
 
     qml_dir = qml_components_dir(package_file=__file__)
     engine.addImportPath(str(qml_dir.parent))
@@ -1060,15 +1099,20 @@ def main():  # pragma: no cover
     # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
     if not app_icon.isNull():
         for root in engine.rootObjects():
-            root.setIcon(app_icon)
+            # ``engine.rootObjects()`` returns ``list[QObject]`` per the stub,
+            # but QML roots are actually ``QWindow``/``QQuickWindow`` which
+            # expose ``setIcon``/``show``/``winId``. Cast through ``Any`` so
+            # pyright agrees with the runtime.
+            root_any: Any = root
+            root_any.setIcon(app_icon)
             if hasattr(root, "show"):
-                root.show()
+                root_any.show()
 
     def apply_native_styles():
         for root in engine.rootObjects():
             try:
-                hwnd = int(root.winId())
-                if HAS_PYWINSTYLES:
+                hwnd = int(root.winId())  # type: ignore[attr-defined]
+                if HAS_PYWINSTYLES and pywinstyles is not None:
                     pywinstyles.apply_style(hwnd, "mica")
                     ctypes.windll.dwmapi.DwmSetWindowAttribute(
                         hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4

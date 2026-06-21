@@ -2,7 +2,6 @@ import hashlib
 from unittest.mock import patch
 
 from skill_manager.core.skill_packages.storage import (
-    _skill_fingerprint,
     diff_package_inventory,
     inventory_removals_verified,
     normalize_storage_key,
@@ -11,6 +10,7 @@ from skill_manager.core.skill_packages.storage import (
     resolve_package_storage,
     safe_package_folder_name,
     scan_package_inventory,
+    skill_fingerprint,
 )
 
 
@@ -189,29 +189,29 @@ def test_promote_package_storage_skip(tmp_path):
     assert promote_package_storage(package, None) == {"moved": 0, "skipped": 1}
 
 
-def test_skill_fingerprint(tmp_path):
+def testskill_fingerprint(tmp_path):
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir()
     f1 = skill_dir / "SKILL.md"
     f1.write_text("abc")
 
-    fp1 = _skill_fingerprint(skill_dir)
+    fp1 = skill_fingerprint(skill_dir)
     assert isinstance(fp1, str)
     assert len(fp1) > 0
 
     f1.write_text("abcdef")
-    fp2 = _skill_fingerprint(skill_dir)
+    fp2 = skill_fingerprint(skill_dir)
     assert fp1 != fp2
 
 
-def test_skill_fingerprint_oserror(tmp_path):
+def testskill_fingerprint_oserror(tmp_path):
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir()
     f1 = skill_dir / "SKILL.md"
     f1.write_text("abc")
 
     with patch("pathlib.Path.rglob", side_effect=OSError("Permission denied")):
-        fp = _skill_fingerprint(skill_dir)
+        fp = skill_fingerprint(skill_dir)
 
     assert fp == hashlib.sha1().hexdigest()
 

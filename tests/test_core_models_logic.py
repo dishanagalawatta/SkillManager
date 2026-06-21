@@ -119,5 +119,5 @@ def test_filter_engine_build_visible_rows_collapsed(engine):
 
     # Should show one entry for Cat A (representing the collapsed header) and S3
     assert len(visible) == 2
-    assert visible[0]._main_category_name == "Cat A"
+    assert visible[0].main_category_name == "Cat A"
     assert visible[1].name == "S3"

@@ -17,7 +17,9 @@ def test_update_projects_success(temp_dir):
     (project_skill_a / "SKILL.md").write_text("v1 content")
 
     # Update
-    updated, skipped = update_projects([str(target_dir)], [str(source_dir)])
+    result = update_projects([str(target_dir)], [str(source_dir)])
+    assert result is not None
+    updated, skipped = result
 
     assert updated == 1
     assert skipped == 0
@@ -56,6 +58,8 @@ def test_update_projects_skip(temp_dir):
     target_dir.mkdir()
     (target_dir / "unknown-skill").mkdir()
 
-    updated, skipped = update_projects([str(target_dir)], [str(source_dir)])
+    result = update_projects([str(target_dir)], [str(source_dir)])
+    assert result is not None
+    updated, skipped = result
     assert updated == 0
     assert skipped == 1

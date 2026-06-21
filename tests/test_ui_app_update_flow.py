@@ -100,7 +100,7 @@ class TestCheckForUpdates:
     def test_already_checking_returns_early(self, mock_app_mock_runner):
         """If is_checking is True, a second call is a no-op."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._state.is_checking = True
+        controller.state.is_checking = True
         controller.checkForUpdates(manual=True)
         mock_app_mock_runner.task_runner.submit.assert_not_called()
 
@@ -123,59 +123,59 @@ class TestCheckForUpdates:
         controller = AppUpdateController(mock_app_sync_runner)
         with patch(
             "skill_manager.controllers.app_update_controller.check_latest_release",
-            return_value=("1.7.0", None),
+            return_value=("2.0.0", None),
         ):
             controller.checkForUpdates(manual=True)
 
         assert controller.updateAvailable is True
-        assert controller.latestVersion == "1.7.0"
+        assert controller.latestVersion == "2.0.0"
         assert controller.hasCheckedForUpdates is True
         mock_app_sync_runner._set_status.assert_any_call("Checking for app updates...")
-        mock_app_sync_runner._set_status.assert_any_call("Update available: v1.7.0")
+        mock_app_sync_runner._set_status.assert_any_call("Update available: v2.0.0")
 
 
-# --- _on_updates_checked callback branches ---
+# --- on_updates_checked callback branches ---
 
 
 class TestOnUpdatesChecked:
     def test_error_sets_state(self, mock_app_mock_runner):
         """Error branch: sets update_available=False, has_checked=True, error stored."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version=None, manual=True, error="timeout")
+        controller.on_updates_checked(new_version=None, manual=True, error="timeout")
 
         assert controller.hasCheckedForUpdates is True
         assert controller.isCheckingForUpdates is False
         assert controller.updateAvailable is False
-        assert controller._state.error == "timeout"
+        assert controller.state.error == "timeout"
         mock_app_mock_runner._set_status.assert_called_with("Update check failed: timeout")
 
     def test_error_non_manual_no_status(self, mock_app_mock_runner):
         """Error branch (non-manual): does not call _set_status."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version=None, manual=False, error="timeout")
+        controller.on_updates_checked(new_version=None, manual=False, error="timeout")
         mock_app_mock_runner._set_status.assert_not_called()
 
     def test_update_available_sets_version(self, mock_app_mock_runner):
         """Update available branch: sets latest_version and update_available=True."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version="1.7.0", manual=True, error=None)
+        controller.on_updates_checked(new_version="2.0.0", manual=True, error=None)
 
         assert controller.updateAvailable is True
-        assert controller.latestVersion == "1.7.0"
+        assert controller.latestVersion == "2.0.0"
         assert controller.hasCheckedForUpdates is True
-        assert controller._state.error is None
-        mock_app_mock_runner._set_status.assert_called_with("Update available: v1.7.0")
+        assert controller.state.error is None
+        mock_app_mock_runner._set_status.assert_called_with("Update available: v2.0.0")
 
     def test_update_available_non_manual_no_status(self, mock_app_mock_runner):
         """Update available branch (non-manual): does not call _set_status."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version="1.7.0", manual=False, error=None)
+        controller.on_updates_checked(new_version="1.7.0", manual=False, error=None)
         mock_app_mock_runner._set_status.assert_not_called()
 
     def test_up_to_date(self, mock_app_mock_runner):
         """No update: update_available=False."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version=None, manual=True, error=None)
+        controller.on_updates_checked(new_version=None, manual=True, error=None)
 
         assert controller.updateAvailable is False
         assert controller.hasCheckedForUpdates is True
@@ -184,7 +184,7 @@ class TestOnUpdatesChecked:
     def test_up_to_date_non_manual_no_status(self, mock_app_mock_runner):
         """No update (non-manual): does not call _set_status."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version=None, manual=False, error=None)
+        controller.on_updates_checked(new_version=None, manual=False, error=None)
         mock_app_mock_runner._set_status.assert_not_called()
 
     def test_same_version_not_an_update(self, mock_app_mock_runner):
@@ -193,7 +193,7 @@ class TestOnUpdatesChecked:
 
         controller = AppUpdateController(mock_app_mock_runner)
         same_version = skill_manager.__version__
-        controller._on_updates_checked(new_version=same_version, manual=True, error=None)
+        controller.on_updates_checked(new_version=same_version, manual=True, error=None)
 
         assert controller.updateAvailable is False
         assert controller.latestVersion == same_version
@@ -204,8 +204,8 @@ class TestOnUpdatesChecked:
         """GitHub returning a version older than current must NOT set updateAvailable."""
         controller = AppUpdateController(mock_app_mock_runner)
         # Force current_version to something higher so we can craft an older remote
-        controller._state.current_version = "2.0.0"
-        controller._on_updates_checked(new_version="1.0.0", manual=True, error=None)
+        controller.state.current_version = "2.0.0"
+        controller.on_updates_checked(new_version="1.0.0", manual=True, error=None)
 
         assert controller.updateAvailable is False
         assert controller.latestVersion == "1.0.0"
@@ -214,7 +214,7 @@ class TestOnUpdatesChecked:
     def test_invalid_version_string_not_an_update(self, mock_app_mock_runner):
         """An unparseable version string from GitHub must not crash or show update."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller._on_updates_checked(new_version="not-a-version", manual=True, error=None)
+        controller.on_updates_checked(new_version="not-a-version", manual=True, error=None)
 
         assert controller.updateAvailable is False
 

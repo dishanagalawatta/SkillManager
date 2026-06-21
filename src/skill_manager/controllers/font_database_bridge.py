@@ -83,7 +83,7 @@ class FontDatabaseBridge(QObject):
     def weight(self, family: str, style: str) -> int:
         """Return the numeric weight for a family/style combination."""
         if not family or not style:
-            return QFont.Normal
+            return QFont.Style.Normal.value  # type: ignore[attr-defined]
         return QFontDatabase.weight(family, style)
 
     @Slot(str, str, result=bool)

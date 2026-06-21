@@ -56,13 +56,15 @@ def get_app_data_dir() -> Path:
     return app_dir
 
 
-def migrate_legacy_data_files(data_dir: Path = None, legacy_dir: Path = None) -> None:
+def migrate_legacy_data_files(data_dir: Path | None = None, legacy_dir: Path | None = None) -> None:
     """Copies old root-level JSON data into the app-data folder when missing."""
     for filename in DATA_FILENAMES:
         resolve_data_file(filename, data_dir, legacy_dir)
 
 
-def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = None) -> Path:
+def resolve_data_file(
+    filename: str, data_dir: Path | None = None, legacy_dir: Path | None = None
+) -> Path:
     """Returns the app-data path, falling back to a legacy root file if migration is blocked."""
     target_dir = data_dir or get_app_data_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -123,20 +125,27 @@ TEMP_SCREENSHOTS_FILE = resolve_data_file(TEMP_SCREENSHOTS_FILENAME)
 SKILL_LIBRARY_CACHE_VERSION = 8
 
 DEFAULT_SHORTCUTS = {
+    # Find & Select
     "search": "Ctrl+F",
+    "select_all": "Ctrl+A",
+    "clear_selection": "Esc",
+    # Clipboard
     "copy": "Ctrl+C",
+    # Skill Ops
+    "refresh": "F5",
     "archive": "Ctrl+Shift+X",
     "delete": "Delete",
-    "refresh": "F5",
+    # Tree View
     "expand_all": "Ctrl+E",
     "collapse_all": "Ctrl+Shift+E",
     "top_of_list": "Home",
-    "clear_selection": "Esc",
-    "theme_toggle": "Ctrl+T",
+    # Navigate
     "quick_copy_view": "Alt+1",
     "library_view": "Alt+2",
     "updates_view": "Alt+3",
     "settings_view": "Alt+4",
+    # Tools
+    "theme_toggle": "Ctrl+T",
     "screenshot": "Ctrl+Shift+S",
 }
 

@@ -75,7 +75,7 @@ class SkillFolderWatcher:
     def __init__(self, paths: list[str], callback: Callable[[str], None], debounce_ms: int = 300):
         self._paths = [Path(path).expanduser() for path in paths if path]
         self._handler = SkillFolderEventHandler(callback, debounce_ms=debounce_ms)
-        self._started = False
+        self.started = False
         self._observer = None  # type: ignore[assignment]
         try:
             from watchdog.observers import Observer
@@ -85,18 +85,18 @@ class SkillFolderWatcher:
             logger.warning("watchdog unavailable: %s. Folder watching disabled.", e)
 
     def start(self) -> None:
-        if self._started or self._observer is None:
+        if self.started or self._observer is None:
             return
         for path in self._paths:
             if path.is_dir():
                 self._observer.schedule(self._handler, str(path), recursive=True)
         self._observer.start()
-        self._started = True
+        self.started = True
 
     def stop(self) -> None:
-        if not self._started or self._observer is None:
+        if not self.started or self._observer is None:
             return
         self._handler.cancel()
         self._observer.stop()
         self._observer.join(timeout=2)
-        self._started = False
+        self.started = False

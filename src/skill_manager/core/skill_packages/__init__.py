@@ -1,16 +1,15 @@
 from .config import (
-    _detect_command_type,
-    _parse_npx_command,
-    _split_args,
+    detect_command_type,
     detect_package_config,
     normalize_skill_package_config,
+    parse_npx_command,
+    split_args,
 )
-from .process import _resolve_process_command, run_process as _run_process, sanitize_token
+from .process import resolve_process_command, run_process, sanitize_token
 from .relocator import (
-    _merge_and_move_lockfile,
-    _relocate_path_internal,
+    merge_and_move_lockfile,
     relocate_packages,
-    relocate_packages as _relocate_packages,
+    relocate_path_internal,
 )
 from .storage import (
     diff_package_inventory,
@@ -21,10 +20,10 @@ from .storage import (
     scan_package_inventory,
 )
 from .updater import (
-    _intercept_cross_platform_command,
-    _run_git_package_update,
-    _run_npx_update,
-    _run_shell_command,
+    intercept_cross_platform_command,
+    run_git_package_update,
+    run_npx_update,
+    run_shell_command,
     run_skill_package_update,
 )
 from .versioning import (
@@ -35,32 +34,29 @@ from .versioning import (
 )
 
 __all__ = [
-    "normalize_skill_package_config",
-    "detect_package_config",
-    "run_skill_package_update",
     "check_skill_package_versions",
+    "detect_command_type",
+    "detect_git_remote",
+    "detect_package_config",
+    "diff_package_inventory",
     "get_git_tag",
+    "intercept_cross_platform_command",
+    "inventory_removals_verified",
+    "merge_and_move_lockfile",
+    "normalize_skill_package_config",
+    "package_project_path_conflicts",
+    "parse_npx_command",
+    "promote_package_storage",
+    "relocate_packages",
+    "relocate_path_internal",
+    "resolve_package_storage",
+    "resolve_process_command",
+    "run_git_package_update",
+    "run_npx_update",
+    "run_shell_command",
+    "run_skill_package_update",
     "run_version_command",
     "sanitize_token",
-    "relocate_packages",
-    "detect_git_remote",
-    "resolve_package_storage",
     "scan_package_inventory",
-    "diff_package_inventory",
-    "inventory_removals_verified",
-    "promote_package_storage",
-    "package_project_path_conflicts",
-    # Legacy / Internal exports for tests
-    "_detect_command_type",
-    "_parse_npx_command",
-    "_split_args",
-    "_intercept_cross_platform_command",
-    "_run_git_package_update",
-    "_run_npx_update",
-    "_run_shell_command",
-    "_run_process",
-    "_resolve_process_command",
-    "_relocate_packages",
-    "_merge_and_move_lockfile",
-    "_relocate_path_internal",
+    "split_args",
 ]

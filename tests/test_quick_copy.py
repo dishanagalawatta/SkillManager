@@ -3,19 +3,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 from skill_manager.core.quick_copy import (
-    _classification_text,
-    _looks_like_explicit_reference,
-    _normalize_path,
-    _project_root_for_project,
-    _resolve_resilient_path,
+    classification_text,
     delete_project_skill_folders,
     discover_package_skills,
     discover_project_skills,
     format_project_skill_reference,
+    looks_like_explicit_reference,
     merge_command_references,
     normalize_command_reference,
     normalize_command_references,
+    normalize_path,
     project_label,
+    project_root_for_project,
+    resolve_resilient_path,
 )
 
 
@@ -43,10 +43,10 @@ def test_merge_command_references():
 
 def test_normalize_path():
     if sys.platform == "win32":
-        assert _normalize_path("C:\\Path\\To/File") == "c:/path/to/file"
+        assert normalize_path("C:\\Path\\To/File") == "c:/path/to/file"
     else:
-        assert _normalize_path("C:\\Path\\To/File") == "C:/Path/To/File"
-    assert _normalize_path("") == ""
+        assert normalize_path("C:\\Path\\To/File") == "C:/Path/To/File"
+    assert normalize_path("") == ""
 
 
 def test_discover_project_skills_success(temp_dir):
@@ -84,7 +84,7 @@ def test_resolve_resilient_path_does_not_support_singular_agent(temp_dir):
     agent_dir = temp_dir / ".agent"
     agent_dir.mkdir()
 
-    res = _resolve_resilient_path(temp_dir / ".agents")
+    res = resolve_resilient_path(temp_dir / ".agents")
     assert res.name == ".agents"
     assert not res.exists()
 
@@ -120,14 +120,14 @@ def test_format_project_skill_reference_returns_body_for_commands():
 def test_skill_base_relative_error():
     # Test ValueError in relative_to
     path = Path("/some/path")
-    # _project_root_for_project returns /some (parent)
+    # project_root_for_project returns /some (parent)
     # relative_to(/some) succeeds normally.
     # To force error, we need a root that is not a parent.
-    with patch("skill_manager.core.quick_copy._project_root_for_project") as mock_root:
+    with patch("skill_manager.core.quick_copy.project_root_for_project") as mock_root:
         mock_root.return_value = Path("/different/root")
-        from skill_manager.core.quick_copy import _skill_base_relative
+        from skill_manager.core.quick_copy import skill_base_relative
 
-        assert _skill_base_relative(path) == "path"
+        assert skill_base_relative(path) == "path"
 
 
 def test_discover_package_skills_duplicates(temp_dir):
@@ -146,8 +146,8 @@ def test_discover_package_skills_duplicates(temp_dir):
 
 
 def test_resolve_resilient_path_none():
-    assert str(_resolve_resilient_path(None)) == "."
-    assert str(_resolve_resilient_path("")) == "."
+    assert str(resolve_resilient_path(None)) == "."
+    assert str(resolve_resilient_path("")) == "."
 
 
 def test_project_label_complex(temp_dir):
@@ -174,24 +174,24 @@ def test_format_project_skill_reference_command_fallback_empty_body():
 
 
 def test_looks_like_explicit_reference():
-    assert _looks_like_explicit_reference("@test") is True
-    assert _looks_like_explicit_reference("[link](path)") is True
-    assert _looks_like_explicit_reference("./relative") is True
-    assert _looks_like_explicit_reference("file.md") is True
-    assert _looks_like_explicit_reference("path/file") is True
-    assert _looks_like_explicit_reference("C:\\path") is True
-    assert _looks_like_explicit_reference("type:name") is True
-    assert _looks_like_explicit_reference("plain") is False
+    assert looks_like_explicit_reference("@test") is True
+    assert looks_like_explicit_reference("[link](path)") is True
+    assert looks_like_explicit_reference("./relative") is True
+    assert looks_like_explicit_reference("file.md") is True
+    assert looks_like_explicit_reference("path/file") is True
+    assert looks_like_explicit_reference("C:\\path") is True
+    assert looks_like_explicit_reference("type:name") is True
+    assert looks_like_explicit_reference("plain") is False
 
 
 def test_project_root_for_project_markers(temp_dir):
-    assert _project_root_for_project(temp_dir / "p" / ".codex" / "skills").name == "p"
-    assert _project_root_for_project(temp_dir / "p" / ".gemini" / "skills").name == "p"
+    assert project_root_for_project(temp_dir / "p" / ".codex" / "skills").name == "p"
+    assert project_root_for_project(temp_dir / "p" / ".gemini" / "skills").name == "p"
 
 
 def test_classification_text():
     data = {"description": "Desc", "metadata": {"tags": ["t1", "t2"], "use_cases": "U"}}
-    text = _classification_text(data)
+    text = classification_text(data)
     assert "Desc" in text
     assert "t1" in text
     assert "U" in text
@@ -201,7 +201,7 @@ def test_resolve_resilient_path_keeps_explicit_singular_agent(temp_dir):
     agents_dir = temp_dir / ".agents"
     agents_dir.mkdir()
 
-    res = _resolve_resilient_path(temp_dir / ".agent")
+    res = resolve_resilient_path(temp_dir / ".agent")
     assert res.name == ".agent"
     assert not res.exists()
 
@@ -210,7 +210,7 @@ def test_resolve_resilient_path_nested_does_not_swap_to_singular(temp_dir):
     agent_dir = temp_dir / ".agent" / "skills"
     agent_dir.mkdir(parents=True)
 
-    res = _resolve_resilient_path(str(temp_dir / ".agents" / "skills"))
+    res = resolve_resilient_path(str(temp_dir / ".agents" / "skills"))
     assert ".agents" in str(res)
 
 

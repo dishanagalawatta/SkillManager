@@ -22,7 +22,7 @@ import sys
 from unittest.mock import MagicMock, patch
 
 from skill_manager.core.global_hotkey import (
-    _LISTENER_JOIN_TIMEOUT,
+    LISTENER_JOIN_TIMEOUT,  # type: ignore[attr-defined]
     GlobalHotkeyManager,
 )
 
@@ -38,16 +38,16 @@ class _FakeListener:
     def __init__(self, **kwargs):
         self._press = kwargs.get("on_press")
         self._release = kwargs.get("on_release")
-        self._started = False
-        self._stopped = False
+        self.started = False
+        self.stopped = False
         self.join = MagicMock()
         self.is_alive = MagicMock(return_value=False)
 
     def start(self):
-        self._started = True
+        self.started = True
 
     def stop(self):
-        self._stopped = True
+        self.stopped = True
 
     def canonical(self, key):
         return key
@@ -172,10 +172,10 @@ class TestListenerLifecycle:
             manager.stop()
 
         # Thread join was called with timeout
-        fake_listener.join.assert_called_once_with(timeout=_LISTENER_JOIN_TIMEOUT)
+        fake_listener.join.assert_called_once_with(timeout=LISTENER_JOIN_TIMEOUT)
         # State cleaned up
         assert manager._listener is None
-        assert fake_listener._stopped
+        assert fake_listener.stopped
 
     def test_stop_does_not_join_when_not_alive(self):
         """If listener is not alive, stop() still clears state but doesn't join."""

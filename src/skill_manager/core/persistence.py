@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
 
 
-def _atomic_write_json(file_path: str, data: Any, indent: bool = True) -> bool:
+def _atomic_write_json(file_path: str | Path, data: Any, indent: bool = True) -> bool:
     """Writes JSON to a temporary file then renames it for atomicity using orjson."""
     file_path = str(file_path)
     temp_path = f"{file_path}.tmp"
@@ -192,7 +192,7 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
 
 
 def patch_cache_add(
-    new_skills: list[dict[str, Any]], projects_state: list[dict[str, Any]] = None
+    new_skills: list[dict[str, Any]], projects_state: list[dict[str, Any]] | None = None
 ) -> int:
     """Surgically adds or updates entries in the on-disk cache without full rescan.
     Returns the number of added or updated entries.

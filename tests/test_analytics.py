@@ -21,14 +21,14 @@ def temp_data_dir(tmp_path, monkeypatch):
 
 def test_get_or_create_device_id(temp_data_dir):
     # Test creation
-    device_id = analytics._get_or_create_device_id()
+    device_id = analytics.get_or_create_device_id()
     assert device_id.startswith("device_")
 
     device_file = temp_data_dir / "device_id.json"
     assert device_file.exists()
 
     # Test persistence
-    second_id = analytics._get_or_create_device_id()
+    second_id = analytics.get_or_create_device_id()
     assert second_id == device_id
 
 
@@ -70,7 +70,7 @@ def test_get_or_create_device_id_corrupted(temp_data_dir):
     device_file = temp_data_dir / "device_id.json"
     device_file.write_text("invalid json")
 
-    device_id = analytics._get_or_create_device_id()
+    device_id = analytics.get_or_create_device_id()
     assert device_id.startswith("device_")
     assert "device_id" in json.loads(device_file.read_text())
 
@@ -85,7 +85,7 @@ def test_init_posthog_missing_env():
             "PYTEST_CURRENT_TEST": "",
         },
     ):
-        assert analytics._init_posthog() is None
+        assert analytics.init_posthog() is None
 
 
 def test_init_posthog_success(mock_posthog):
@@ -98,6 +98,6 @@ def test_init_posthog_success(mock_posthog):
             "PYTEST_CURRENT_TEST": "",
         },
     ):
-        client = analytics._init_posthog()
+        client = analytics.init_posthog()
         assert client is not None
         mock_posthog.assert_called_once()

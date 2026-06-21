@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.core.skill_packages.process import (
-    _emit,
-    _resolve_process_command,
+    emit,
+    resolve_process_command,
     run_process,
     sanitize_token,
 )
@@ -18,38 +18,38 @@ def test_sanitize_token():
     assert sanitize_token(None) is None
 
 
-def test_emit():
+def testemit():
     messages = []
 
     # Debug shouldn't go to callback
-    _emit(messages.append, "[DEBUG] some msg")
+    emit(messages.append, "[DEBUG] some msg")
     assert not messages
 
     # Error should go to callback
-    _emit(messages.append, "[ERROR] failed")
+    emit(messages.append, "[ERROR] failed")
     assert messages[-1] == "[ERROR] failed"
 
     # Relocating should be filtered
-    _emit(messages.append, "Relocating folder...")
+    emit(messages.append, "Relocating folder...")
     assert messages[-1] == "[ERROR] failed"  # no change
 
     # Success
-    _emit(messages.append, "Success! Moved everything")
+    emit(messages.append, "Success! Moved everything")
     assert "Success!" in messages[-1]
 
 
-def test_resolve_process_command():
-    assert _resolve_process_command("echo hello", shell=True) == "echo hello"
-    assert _resolve_process_command(["/usr/bin/echo", "hello"], shell=False) == [
+def testresolve_process_command():
+    assert resolve_process_command("echo hello", shell=True) == "echo hello"
+    assert resolve_process_command(["/usr/bin/echo", "hello"], shell=False) == [
         "/usr/bin/echo",
         "hello",
     ]
 
     with patch("shutil.which", return_value="/bin/ls"):
-        assert _resolve_process_command(["ls", "-la"]) == ["/bin/ls", "-la"]
+        assert resolve_process_command(["ls", "-la"]) == ["/bin/ls", "-la"]
 
     with patch("shutil.which", return_value=None), pytest.raises(FileNotFoundError):
-        _resolve_process_command(["not_exist", "arg"])
+        resolve_process_command(["not_exist", "arg"])
 
 
 @patch("subprocess.Popen")

@@ -11,7 +11,7 @@ class ScreenshotImageProvider(QQuickImageProvider):
     """Provides the captured screenshot to QML via image://screenshot/current."""
 
     def __init__(self):
-        super().__init__(QQuickImageProvider.Pixmap)
+        super().__init__(QQuickImageProvider.ImageType.Pixmap)  # type: ignore[attr-defined]
         self._pixmap = QPixmap()
         self._lock = threading.Lock()
 
@@ -28,7 +28,7 @@ class ScreenshotImageProvider(QQuickImageProvider):
     def requestPixmap(self, _id: str, _size, _requested_size) -> QPixmap:  # noqa: N802
         with self._lock:
             if self._pixmap.isNull():
-                logger.warning("Image provider: pixmap is null, returning 1x1 transparent")
+                logger.debug("Image provider: pixmap is null, returning 1x1 transparent")
                 dummy = QPixmap(1, 1)
                 dummy.fill("transparent")
                 return dummy

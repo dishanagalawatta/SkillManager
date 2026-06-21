@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_LISTENER_JOIN_TIMEOUT = 2.0
+LISTENER_JOIN_TIMEOUT = 2.0
 
 
 class GlobalHotkeyManager(QObject):
@@ -134,14 +134,14 @@ class GlobalHotkeyManager(QObject):
 
         if listener.is_alive():
             try:
-                listener.join(timeout=_LISTENER_JOIN_TIMEOUT)
+                listener.join(timeout=LISTENER_JOIN_TIMEOUT)
             except Exception as e:
                 logger.debug("Exception during pynput listener join: %s", e)
 
             if listener.is_alive():
                 logger.warning(
                     "pynput listener thread did not exit within %ss; leaving as daemon",
-                    _LISTENER_JOIN_TIMEOUT,
+                    LISTENER_JOIN_TIMEOUT,
                 )
 
     @Slot(int, str)
@@ -194,7 +194,7 @@ class GlobalHotkeyManager(QObject):
         self._stop_active_listener()
         logger.info("Global hotkey manager stopped")
 
-    def _on_hotkey_pressed(self, hotkey_id: int) -> None:
+    def on_hotkey_pressed(self, hotkey_id: int) -> None:
         """Callback executed by the pynput library when a hotkey triggers.
 
         This executes on a background thread. Emitting a Qt Signal from here
@@ -205,13 +205,13 @@ class GlobalHotkeyManager(QObject):
 
 
 def _make_callback(manager: GlobalHotkeyManager, hotkey_id: int):
-    """Build a closure that calls ``_on_hotkey_pressed`` on the manager.
+    """Build a closure that calls ``on_hotkey_pressed`` on the manager.
 
     Pynput invokes the registered callable with no arguments; we use
     a closure factory to bind the hotkey_id at registration time.
     """
 
     def callback():
-        manager._on_hotkey_pressed(hotkey_id)
+        manager.on_hotkey_pressed(hotkey_id)
 
     return callback

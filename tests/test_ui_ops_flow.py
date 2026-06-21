@@ -32,7 +32,7 @@ class TestUIOpsFlow:
         model.filterText = ""
         model.showCommands = True
         model.showStarred = True
-        model._state.is_package_only = None  # Show both source and packages
+        model.state.is_package_only = None  # Show both source and packages
 
         # 3. Set skills and verify
         model.setSkills([skill_data])
@@ -75,7 +75,7 @@ class TestUIOpsFlow:
         model.projectFilter = ""
         model.categoryFilter = ""
         model.showStarred = True
-        model._state.is_package_only = None
+        model.state.is_package_only = None
 
         model.setSkills([skill_data])
         qtbot.waitUntil(lambda: model.rowCount() == 1, timeout=3000)

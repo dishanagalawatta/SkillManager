@@ -37,7 +37,7 @@ class AppUpdateController(BaseController):
     def __init__(self, app):
         super().__init__(app)
         self._diag = get_diagnostic_logger()
-        self._state = AppUpdateState(
+        self.state = AppUpdateState(
             current_version=skill_manager.__version__,
             latest_version=skill_manager.__version__,
         )
@@ -46,15 +46,15 @@ class AppUpdateController(BaseController):
 
     @Property(bool, notify=updateAvailableChanged)
     def updateAvailable(self):
-        return self._state.update_available
+        return self.state.update_available
 
     @Property(str, notify=latestVersionChanged)
     def latestVersion(self):
-        return self._state.latest_version
+        return self.state.latest_version
 
     @Property(str, constant=True)
     def currentVersion(self):
-        return self._state.current_version
+        return self.state.current_version
 
     @Property(str, constant=True)
     def releaseUrl(self):
@@ -62,11 +62,11 @@ class AppUpdateController(BaseController):
 
     @Property(bool, notify=isCheckingForUpdatesChanged)
     def isCheckingForUpdates(self):
-        return self._state.is_checking
+        return self.state.is_checking
 
     @Property(bool, notify=updateStateChanged)
     def hasCheckedForUpdates(self):
-        return self._state.has_checked
+        return self.state.has_checked
 
     # --- Slots ---
 
@@ -74,21 +74,21 @@ class AppUpdateController(BaseController):
     @Slot(bool)
     def checkForUpdates(self, manual=False):
         """Checks for updates via GitHub Releases API."""
-        if self._state.is_checking:
+        if self.state.is_checking:
             return
 
         if not getattr(sys, "frozen", False) and not manual:
-            self._state.has_checked = True
+            self.state.has_checked = True
             self._diag.log_event(
                 "INFO",
                 CATEGORY_APP_UPDATE_SKIPPED_DEV,
                 "Update check skipped in dev mode",
-                data={"current_version": self._state.current_version},
+                data={"current_version": self.state.current_version},
             )
             self.updateStateChanged.emit()
             return
 
-        self._state.is_checking = True
+        self.state.is_checking = True
         self.isCheckingForUpdatesChanged.emit()
 
         self._diag.log_event(
@@ -97,7 +97,7 @@ class AppUpdateController(BaseController):
             "Update check initiated",
             data={
                 "manual": manual,
-                "current_version": self._state.current_version,
+                "current_version": self.state.current_version,
                 "frozen": getattr(sys, "frozen", False),
             },
         )
@@ -109,78 +109,78 @@ class AppUpdateController(BaseController):
 
             def on_checked(result):
                 new_version, error = result
-                self._on_updates_checked(new_version, manual, error)
+                self.on_updates_checked(new_version, manual, error)
 
             self.app.task_runner.submit(check_latest_release, on_checked)
         else:
             logger.warning("No task_runner found to check for updates.")
-            self._state.is_checking = False
+            self.state.is_checking = False
             self.isCheckingForUpdatesChanged.emit()
 
-    def _on_updates_checked(self, new_version, manual=False, error=None):
-        self._state.is_checking = False
-        self._state.has_checked = True
-        self._state.error = error
+    def on_updates_checked(self, new_version, manual=False, error=None):
+        self.state.is_checking = False
+        self.state.has_checked = True
+        self.state.error = error
 
         if error:
             logger.info("Update check failed: %s", error)
-            self._state.update_available = False
+            self.state.update_available = False
             self._diag.log_event(
                 "ERROR",
                 CATEGORY_APP_UPDATE_FAILED,
                 "Update check failed",
-                data={"error": error, "current_version": self._state.current_version},
+                data={"error": error, "current_version": self.state.current_version},
             )
             if manual:
                 self.app._set_status(f"Update check failed: {error}")
         elif new_version:
-            self._state.latest_version = new_version
+            self.state.latest_version = new_version
             try:
-                is_newer = Version(new_version) > Version(self._state.current_version)
+                is_newer = Version(new_version) > Version(self.state.current_version)
             except InvalidVersion:
                 logger.warning(
                     "Could not parse version strings for comparison: %s vs %s",
                     new_version,
-                    self._state.current_version,
+                    self.state.current_version,
                 )
                 is_newer = False
 
             if is_newer:
                 logger.info("Update available: %s", new_version)
-                self._state.update_available = True
+                self.state.update_available = True
                 self._diag.log_event(
                     "INFO",
                     CATEGORY_APP_UPDATE_AVAILABLE,
                     "Update available",
                     data={
                         "latest_version": new_version,
-                        "current_version": self._state.current_version,
+                        "current_version": self.state.current_version,
                     },
                 )
                 if manual:
                     self.app._set_status(f"Update available: v{new_version}")
             else:
                 logger.info("SkillManager is up to date.")
-                self._state.update_available = False
+                self.state.update_available = False
                 self._diag.log_event(
                     "INFO",
                     CATEGORY_APP_UPDATE_UP_TO_DATE,
                     "SkillManager is up to date",
                     data={
                         "latest_version": new_version,
-                        "current_version": self._state.current_version,
+                        "current_version": self.state.current_version,
                     },
                 )
                 if manual:
                     self.app._set_status("SkillManager is up to date.")
         else:
             logger.info("SkillManager is up to date.")
-            self._state.update_available = False
+            self.state.update_available = False
             self._diag.log_event(
                 "INFO",
                 CATEGORY_APP_UPDATE_UP_TO_DATE,
                 "SkillManager is up to date",
-                data={"current_version": self._state.current_version},
+                data={"current_version": self.state.current_version},
             )
             if manual:
                 self.app._set_status("SkillManager is up to date.")

@@ -54,7 +54,7 @@ def test_controller_set_current_view(controller):
     controller.currentView = "QuickCopy"
     assert controller.currentView == "QuickCopy"
     # Library defaults to isPackageOnly=True in __init__
-    assert controller.isPackageOnly == Qt.Checked
+    assert controller.isPackageOnly == Qt.CheckState.Checked
 
 
 def test_controller_add_remove_source(controller):
@@ -174,8 +174,8 @@ def test_controller_setters(controller):
 
 
 def test_controller_toggle_package_only(controller):
-    controller.isPackageOnly = Qt.Unchecked
-    assert controller.isPackageOnly == Qt.Unchecked
+    controller.isPackageOnly = Qt.CheckState.Unchecked
+    assert controller.isPackageOnly == Qt.CheckState.Unchecked
 
 
 def test_controller_logo_and_category_delegate(controller):
@@ -579,7 +579,7 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
         if method is None and callable(receiver)
         else method()
         if callable(method)
-        else method.call()
+        else method.call()  # type: ignore[union-attr]
     )
 
     controller.loadInitialData = MagicMock()

@@ -70,7 +70,9 @@ def test_scan_for_updates(mock_service_class, update_controller, mock_app):
 
         assert mock_app._is_loading is False
         mock_app.isLoadingChanged.emit.assert_called()
-        mock_app._set_status.assert_any_call("Scan complete: 1 skills processed")
+        mock_app._set_status.assert_any_call(
+            "Update scan complete: 1 package skills processed"
+        )
 
 
 def test_update_skill_in_project_success(update_controller, mock_app):

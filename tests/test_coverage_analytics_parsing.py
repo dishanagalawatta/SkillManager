@@ -1,10 +1,10 @@
 from unittest.mock import patch
 
 from skill_manager.core.analytics import (
-    _get_or_create_device_id,
     capture_event,
     capture_exception,
     get_device_id,
+    get_or_create_device_id,
     shutdown,
 )
 from skill_manager.core.parsing.command import parse_command_md
@@ -17,12 +17,12 @@ def test_get_or_create_device_id_handles_errors(tmp_path):
 
         # Test case: corrupt JSON
         device_id_file.write_text("corrupt{", encoding="utf-8")
-        id1 = _get_or_create_device_id()
+        id1 = get_or_create_device_id()
         assert id1.startswith("device_")
 
         # Test case: file write error (should still return a new ID)
         with patch.object(device_id_file.__class__, "write_text", side_effect=OSError("Disk full")):
-            id2 = _get_or_create_device_id()
+            id2 = get_or_create_device_id()
             assert id2.startswith("device_")
 
 
@@ -35,7 +35,7 @@ def test_analytics_calls_with_no_client():
 
 def test_get_device_id_lazy_init():
     with (
-        patch("skill_manager.core.analytics._get_or_create_device_id", return_value="mock_id"),
+        patch("skill_manager.core.analytics.get_or_create_device_id", return_value="mock_id"),
         patch("skill_manager.core.analytics._device_id", None),
     ):
         assert get_device_id() == "mock_id"

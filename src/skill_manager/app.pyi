@@ -110,19 +110,20 @@ class AppController(QObject):
     reducedMotion: bool
     compactListRows: bool
     shortcutSearch: str
+    shortcutSelectAll: str
+    shortcutClearSelection: str
     shortcutCopy: str
+    shortcutRefresh: str
     shortcutArchive: str
     shortcutDelete: str
-    shortcutRefresh: str
     shortcutExpandAll: str
     shortcutCollapseAll: str
     shortcutTopOfList: str
-    shortcutClearSelection: str
-    shortcutThemeToggle: str
     shortcutQuickCopyView: str
     shortcutLibraryView: str
     shortcutUpdatesView: str
     shortcutSettingsView: str
+    shortcutThemeToggle: str
     shortcutScreenshot: str
     isRecordingShortcut: bool
     logoSource: str

@@ -152,17 +152,17 @@ def test_skill_model_is_package_only(qapp, skill_list):
     model.setSkills(skill_list)
 
     # Check initial state (default None/PartiallyChecked)
-    assert model.isPackageOnly == Qt.PartiallyChecked
+    assert model.isPackageOnly == Qt.CheckState.PartiallyChecked
 
     # Filter to Packages
-    model.isPackageOnly = Qt.Checked
-    assert model.isPackageOnly == Qt.Checked
+    model.isPackageOnly = Qt.CheckState.Checked
+    assert model.isPackageOnly == Qt.CheckState.Checked
     assert model.rowCount() == 1
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "Skill A"
 
     # Filter to Projects
-    model.isPackageOnly = Qt.Unchecked
-    assert model.isPackageOnly == Qt.Unchecked
+    model.isPackageOnly = Qt.CheckState.Unchecked
+    assert model.isPackageOnly == Qt.CheckState.Unchecked
     # In Quick Copy mode (isPackageOnly=False), only project skills are shown.
     assert model.rowCount() == 1
     assert model.data(model.index(0, 0), SkillModel.NameRole) == "Skill B"
@@ -198,7 +198,7 @@ def test_skill_model_project_mode_never_leaks_starred_packages(qapp):
         ]
     )
 
-    model.isPackageOnly = Qt.Unchecked
+    model.isPackageOnly = Qt.CheckState.Unchecked
     model.projectFilter = "Project A"
     assert [
         model.data(model.index(i, 0), SkillModel.NameRole) for i in range(model.rowCount())
@@ -672,9 +672,9 @@ def test_skill_model_invalid_data_role(qapp, skill_list):
     model.setSkills(skill_list)
     idx = model.index(0)
     # Testing a non-existent role
-    assert model.data(idx, Qt.UserRole + 999) is None
+    assert model.data(idx, Qt.ItemDataRole.UserRole + 999) is None
     # Testing an invalid index
-    assert model.data(model.index(-1), Qt.DisplayRole) is None
+    assert model.data(model.index(-1), Qt.ItemDataRole.DisplayRole) is None
 
 
 def test_skill_model_flags(qapp, skill_list):
@@ -682,8 +682,8 @@ def test_skill_model_flags(qapp, skill_list):
     model.setSkills(skill_list)
     idx = model.index(0)
     flags = model.flags(idx)
-    assert flags & Qt.ItemIsSelectable
-    assert flags & Qt.ItemIsEnabled
+    assert flags & Qt.ItemFlag.ItemIsSelectable
+    assert flags & Qt.ItemFlag.ItemIsEnabled
 
 
 def test_skill_model_selection_persists_across_client_change_default(qapp):

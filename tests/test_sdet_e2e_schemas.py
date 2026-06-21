@@ -26,7 +26,7 @@ category: SDET Test
 
     app_controller.config_mgr.addSource(str(lib_dir))
     app_controller.refreshSkills()
-    QApplication.instance().processEvents()
+    QApplication.instance().processEvents()  # type: ignore[union-attr]
 
 
 def test_ui_displays_coerced_schema_data(qtbot, qml_engine, app_controller, sdet_setup_data):
@@ -36,7 +36,8 @@ def test_ui_displays_coerced_schema_data(qtbot, qml_engine, app_controller, sdet
 
     # Switch to Library view
     app_controller.ui.currentView = "Library"
-    qapp.processEvents()
+    assert qapp is not None
+    qapp.processEvents()  # type: ignore[union-attr]
     qtbot.wait(200)
 
     # Find the skill in the model

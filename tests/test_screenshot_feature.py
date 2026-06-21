@@ -82,7 +82,7 @@ def test_save_screenshot_gemini_cli(controller, mock_app, tmp_path):
     with patch("skill_manager.core.quick_copy.project_label", return_value="MockProject"):
         full_pixmap = QPixmap(100, 100)
         full_pixmap.fill("white")
-        controller._current_full_pixmap = full_pixmap
+        controller.current_full_pixmap = full_pixmap
 
         crop_rect = QRect(10, 10, 50, 50)
 
@@ -109,7 +109,7 @@ def test_save_screenshot_standard(controller, mock_app, tmp_path):
 
     full_pixmap = QPixmap(100, 100)
     full_pixmap.fill("white")
-    controller._current_full_pixmap = full_pixmap
+    controller.current_full_pixmap = full_pixmap
 
     crop_rect = QRect(10, 10, 50, 50)
 
@@ -161,7 +161,7 @@ def test_take_screenshot_no_screen(controller, mock_app):
 
 
 def test_save_screenshot_no_pixmap(controller, mock_app):
-    controller._current_full_pixmap = None
+    controller.current_full_pixmap = None
     controller.saveScreenshot(QRect(0, 0, 10, 10), [])
     mock_app._set_status.assert_not_called()
 
@@ -175,7 +175,7 @@ def test_save_screenshot_emits_categories_changed(controller, mock_app, tmp_path
 
     with patch("skill_manager.core.quick_copy.project_label", return_value="MockProject"):
         full_pixmap = QPixmap(100, 100)
-        controller._current_full_pixmap = full_pixmap
+        controller.current_full_pixmap = full_pixmap
 
         controller.saveScreenshot(QRect(0, 0, 10, 10), [])
 
@@ -194,7 +194,7 @@ def test_save_screenshot_skips_categories_changed_when_already_present(
 
     with patch("skill_manager.core.quick_copy.project_label", return_value="MockProject"):
         full_pixmap = QPixmap(100, 100)
-        controller._current_full_pixmap = full_pixmap
+        controller.current_full_pixmap = full_pixmap
 
         controller.saveScreenshot(QRect(0, 0, 10, 10), [])
 
@@ -205,7 +205,7 @@ def test_save_screenshot_no_project(controller, mock_app):
     mock_app.quickCopyModel.projectFilter = ""
     mock_app.projects = []
     full_pixmap = QPixmap(100, 100)
-    controller._current_full_pixmap = full_pixmap
+    controller.current_full_pixmap = full_pixmap
 
     controller.saveScreenshot(QRect(0, 0, 10, 10), [])
     mock_app._set_status.assert_called_with("No project selected to save screenshot.")
@@ -328,13 +328,13 @@ def test_cancel_capture_emits_signal(controller):
         called = True
 
     controller.captureCancelled.connect(on_cancel)
-    controller._current_full_pixmap = QPixmap(50, 50)
-    assert not controller._current_full_pixmap.isNull()
+    controller.current_full_pixmap = QPixmap(50, 50)
+    assert not controller.current_full_pixmap.isNull()
 
     controller.cancelCapture()
 
     assert called
-    assert controller._current_full_pixmap is None
+    assert controller.current_full_pixmap is None
 
 
 def test_cancel_capture_no_pixmap(controller):
@@ -346,9 +346,9 @@ def test_cancel_capture_no_pixmap(controller):
         called = True
 
     controller.captureCancelled.connect(on_cancel)
-    controller._current_full_pixmap = None
+    controller.current_full_pixmap = None
 
     controller.cancelCapture()
 
     assert called
-    assert controller._current_full_pixmap is None
+    assert controller.current_full_pixmap is None

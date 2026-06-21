@@ -48,8 +48,8 @@ def test_create_custom_command_file_success(tmp_path):
         project_paths=[str(project_path)],
         created_on=date(2026, 2, 27),
     )
-
     assert result.ok
+    assert result.path is not None
     assert result.path == commands_dir / "Start.md"
     assert result.path.exists()
     assert result.path.name == "Start.md"
@@ -162,6 +162,7 @@ def test_update_custom_command_file_rename(tmp_path):
         body="echo hello",
     )
     assert result.ok
+    assert result.path is not None
     assert result.path.name == "new_name.md"
     assert result.path.exists()
     assert not cmd_file.exists()

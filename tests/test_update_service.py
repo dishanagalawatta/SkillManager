@@ -148,7 +148,7 @@ def test_cleanup_removed_project_skills_deletes_matches(mock_proj, service):
         }
     ]
     status_cb = MagicMock()
-    ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
+    ownership = {UpdateService.ownership_project_key("/project"): {"old": "pkg_1"}}
     with (
         patch(
             "skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership
@@ -188,7 +188,7 @@ def test_cleanup_removed_project_skills_requires_verified_removal(mock_proj, ser
     mock_proj.return_value = [
         {"project_label": "P", "skills": [{"folder_name": "old", "project_path": "/project"}]}
     ]
-    ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
+    ownership = {UpdateService.ownership_project_key("/project"): {"old": "pkg_1"}}
     with (
         patch(
             "skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership
@@ -221,7 +221,7 @@ def test_cleanup_removed_project_skills_skips_package_storage_path(mock_proj, se
             "skills": [{"folder_name": "old", "project_path": str(package_path)}],
         }
     ]
-    ownership = {UpdateService._ownership_project_key(str(package_path)): {"old": "pkg_1"}}
+    ownership = {UpdateService.ownership_project_key(str(package_path)): {"old": "pkg_1"}}
 
     with (
         patch(
@@ -346,7 +346,7 @@ def test_run_global_update_skips_cleanup_and_sync_for_project_root_conflict(
         }
     ]
     mock_load_ownership.return_value = {
-        UpdateService._ownership_project_key(str(package_path)): {"old": "skills"}
+        UpdateService.ownership_project_key(str(package_path)): {"old": "skills"}
     }
     mock_discover_sources.return_value = [{"folder_name": "new", "name": "New"}]
 
@@ -421,10 +421,10 @@ def test_record_project_skill_ownership_for_merged_results():
         patch("skill_manager.core.update_service.load_project_skill_ownership", return_value={}),
         patch("skill_manager.core.update_service.save_project_skill_ownership") as save_ownership,
     ):
-        UpdateService._record_project_skill_ownership(source_skills, copy_result)
+        UpdateService.record_project_skill_ownership(source_skills, copy_result)
 
     saved = save_ownership.call_args.args[0]
-    assert saved[UpdateService._ownership_project_key("/project/.agents/skills")]["alpha"] == (
+    assert saved[UpdateService.ownership_project_key("/project/.agents/skills")]["alpha"] == (
         "pkg_alpha"
     )
 
