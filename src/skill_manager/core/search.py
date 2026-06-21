@@ -149,21 +149,25 @@ class SearchEngine:
             all_doc_tokens = index_data.get("all_doc_tokens", [])
 
             if all_doc_tokens:
+                # OPTIMIZATION: Check for exact token membership first (fast path)
+                # Fast path: substring matching in Python is implemented in C and very fast.
                 max_token_match = 0
                 for qt in query_tokens:
-                    # Exact substring match provides an immediate pass
                     if qt in index_data["full_text"]:
                         max_token_match = 100
                         break
 
-                    for dt in all_doc_tokens:
-                        score = fuzz.ratio(qt, dt)
-                        if score > max_token_match:
-                            max_token_match = score
+                # If no exact match found, fallback to slow fuzzy evaluation loop
+                if max_token_match < 100:
+                    for qt in query_tokens:
+                        for dt in all_doc_tokens:
+                            score = fuzz.ratio(qt, dt)
+                            if score > max_token_match:
+                                max_token_match = score
+                            if max_token_match > 70:
+                                break
                         if max_token_match > 70:
                             break
-                    if max_token_match > 70:
-                        break
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:

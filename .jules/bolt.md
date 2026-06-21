@@ -1,0 +1,3 @@
+## 2025-02-12 - Reordered Search Loop for Fast Path Evaluation
+**Learning:** In the `SearchEngine` scoring loop, the logic originally checked for an exact match (`qt in full_text`) but then immediately continued to the expensive `fuzz.ratio` loops *even if an exact match was already found* or in the same nested block without an explicit skip for the rest of the query tokens.
+**Action:** By separating the fast-path exact match check (`if qt in full_text: max_token_match = 100`) into a dedicated loop that short-circuits early, and only falling back to the `fuzz.ratio` loops `if max_token_match < 100`, we bypass the expensive fuzzy matching logic completely for any exact matches.
