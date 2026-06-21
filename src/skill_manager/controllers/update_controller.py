@@ -21,7 +21,12 @@ class UpdateController(BaseController):
     """Controller for skill updates and synchronization."""
 
     def _resolvePackageStorageState(self):
-        """Internal helper to refresh package state from config."""
+        """Internal helper to refresh package state from config.
+
+        Mutates ``app._update_packages`` in place so that every reference
+        captured by QML delegates (``modelData``) or background workers
+        stays valid.  Emits ``updatePackagesChanged`` once at the end.
+        """
         from skill_manager.core.persistence import load_package_skill_inventory
         from skill_manager.core.skill_packages import (
             normalize_skill_package_config,
@@ -38,10 +43,22 @@ class UpdateController(BaseController):
             except Exception as e:
                 logger.error("Failed to normalize package during storage resolution: %s", e)
 
-        self.app._update_packages = resolve_package_storage(
-            packages, load_package_skill_inventory()
-        )
+        refreshed = resolve_package_storage(packages, load_package_skill_inventory())
+
+        # Update each dict in place so that every captured reference (QML
+        # modelData, background workers) keeps pointing at the same object.
+        for i, item in enumerate(refreshed):
+            if i < len(self.app._update_packages):
+                self.app._update_packages[i].clear()
+                self.app._update_packages[i].update(item)
+            else:
+                self.app._update_packages.append(item)
+
+        # Remove excess entries when the resolved list is shorter.
+        del self.app._update_packages[len(refreshed) :]
+
         self.config.set("skills", self.app._update_packages)
+        self.app.updatePackagesChanged.emit()
 
     @Slot()
     def updateNow(self):
@@ -254,7 +271,6 @@ class UpdateController(BaseController):
             # 3. Commit to state
             self.app._update_packages.append(final_record.model_dump())
             self._resolvePackageStorageState()
-            self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Added skill package: {final_record.name}")
             capture_event("skill_package_added", {"source_type": final_record.source_type})
         except Exception as e:
@@ -284,7 +300,6 @@ class UpdateController(BaseController):
 
                 self.app._update_packages[index] = final_record.model_dump()
                 self._resolvePackageStorageState()
-                self.app.updatePackagesChanged.emit()
                 self.app._set_status(f"Updated skill package: {final_record.name}")
             except Exception as e:
                 logger.error("Failed to update skill package: %s", e)
@@ -296,7 +311,6 @@ class UpdateController(BaseController):
         if 0 <= index < len(self.app._update_packages):
             source = self.app._update_packages.pop(index)
             self._resolvePackageStorageState()
-            self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Removed update package: {source.get('name')}")
             capture_event(
                 "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
