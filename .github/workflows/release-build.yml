@@ -45,7 +45,12 @@ jobs:
 
       - name: Build installer
         shell: pwsh
-        run: .\packaging\windows\build.ps1 -SkipSign:${{ env.WIN_PFX_B64 == '' }}
+        run: |
+          if ("${{ secrets.WIN_PFX_B64 }}" -ne "") {
+            .\packaging\windows\build.ps1
+          } else {
+            .\packaging\windows\build.ps1 -SkipSign
+          }
         env:
           WIN_PFX_PASS: ${{ secrets.WIN_PFX_PASS }}
 
