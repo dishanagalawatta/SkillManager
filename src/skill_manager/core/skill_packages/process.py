@@ -22,7 +22,7 @@ def sanitize_token(text: str) -> str:
     if "echo password=" in text:
         text = re.sub(r'(echo password=)"((?:\\.|[^"])*)"', r'\1"***"', text)
         text = re.sub(r"(echo password=)'((?:\\.|[^'])*)'", r"\1'***'", text)
-        text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
+        text = re.sub(r"(echo password=)(?!['\"])([^;\r\n }]+)", r"\1***", text)
 
     # Match common GitHub token formats explicitly
     if "ghp_" in text:
