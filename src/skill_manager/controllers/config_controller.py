@@ -21,33 +21,60 @@ class ConfigController(BaseController):
     customCollectionsChanged = Signal()
 
     @Property(str, notify=shortcutsChanged)
-    def shortcutSearch(self): return self.get_shortcut("search")
+    def shortcutSearch(self):
+        return self.get_shortcut("search")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutCopy(self): return self.get_shortcut("copy")
+    def shortcutCopy(self):
+        return self.get_shortcut("copy")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutArchive(self): return self.get_shortcut("archive")
+    def shortcutArchive(self):
+        return self.get_shortcut("archive")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutDelete(self): return self.get_shortcut("delete")
+    def shortcutDelete(self):
+        return self.get_shortcut("delete")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutRefresh(self): return self.get_shortcut("refresh")
+    def shortcutRefresh(self):
+        return self.get_shortcut("refresh")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutExpandAll(self): return self.get_shortcut("expand_all")
+    def shortcutExpandAll(self):
+        return self.get_shortcut("expand_all")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutCollapseAll(self): return self.get_shortcut("collapse_all")
+    def shortcutCollapseAll(self):
+        return self.get_shortcut("collapse_all")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutTopOfList(self): return self.get_shortcut("top_of_list")
+    def shortcutTopOfList(self):
+        return self.get_shortcut("top_of_list")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutClearSelection(self): return self.get_shortcut("clear_selection")
+    def shortcutClearSelection(self):
+        return self.get_shortcut("clear_selection")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutThemeToggle(self): return self.get_shortcut("theme_toggle")
+    def shortcutThemeToggle(self):
+        return self.get_shortcut("theme_toggle")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutQuickCopyView(self): return self.get_shortcut("quick_copy_view")
+    def shortcutQuickCopyView(self):
+        return self.get_shortcut("quick_copy_view")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutLibraryView(self): return self.get_shortcut("library_view")
+    def shortcutLibraryView(self):
+        return self.get_shortcut("library_view")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutUpdatesView(self): return self.get_shortcut("updates_view")
+    def shortcutUpdatesView(self):
+        return self.get_shortcut("updates_view")
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutSettingsView(self): return self.get_shortcut("settings_view")
+    def shortcutSettingsView(self):
+        return self.get_shortcut("settings_view")
 
     @Property(bool, notify=isRecordingShortcutChanged)
     def isRecordingShortcut(self):
@@ -147,12 +174,14 @@ class ConfigController(BaseController):
     def save_cache(self, data: dict):
         """Saves discovered skills to cache."""
         from skill_manager.core.persistence import save_cache
+
         save_cache(data)
 
     @Slot(result=dict)
     def load_cache(self):
         """Loads discovered skills from cache."""
         from skill_manager.core.persistence import load_cache
+
         return load_cache()
 
     @Slot(str, result=str)
@@ -177,6 +206,7 @@ class ConfigController(BaseController):
         """Returns a list of project info with skill counts and sync status for the UI."""
         results = []
         from pathlib import Path
+
         for p in self.app._projects:
             count = 0
             try:
@@ -191,15 +221,23 @@ class ConfigController(BaseController):
                         resolved_path = resolved_path / ".agents" / "skills"
                 scan_path = str(resolved_path)
                 if os.path.exists(scan_path):
-                    count = len([d for d in os.listdir(scan_path) if os.path.isdir(os.path.join(scan_path, d))])
+                    count = len(
+                        [
+                            d
+                            for d in os.listdir(scan_path)
+                            if os.path.isdir(os.path.join(scan_path, d))
+                        ]
+                    )
             except Exception:
                 pass
-            results.append({
-                "name": self.getProjectLabel(p),
-                "path": p,
-                "skill_count": count,
-                "is_updating": p in self.app._syncing_projects,
-            })
+            results.append(
+                {
+                    "name": self.getProjectLabel(p),
+                    "path": p,
+                    "skill_count": count,
+                    "is_updating": p in self.app._syncing_projects,
+                }
+            )
         return results
 
     @Property(list, notify=updateProjectsChanged)
@@ -230,6 +268,7 @@ class ConfigController(BaseController):
         if not url:
             return ""
         from skill_manager.core.skill_packages import get_git_tag
+
         self.app._set_status(f"Verifying repository: {url}")
         tag = get_git_tag(url, is_remote=True, token=token)
         if tag:
@@ -256,6 +295,7 @@ class ConfigController(BaseController):
     def resetShortcuts(self):
         """Resets all shortcuts to defaults."""
         from skill_manager.core.config import DEFAULT_SHORTCUTS
+
         self.config.set("shortcuts", DEFAULT_SHORTCUTS.copy())
         self.shortcutsChanged.emit()
         self.app._set_status("All shortcuts reset to defaults")

@@ -15,12 +15,15 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        text = re.sub(r"(echo password=)(?:'[^']*'|\"(?:[^\"\\]|\\.)*\"|[^\s;])+", r"\1***", text)
+        text = re.sub(r"(echo password=)'([^']+)'", r"\1'***'", text)
+        text = re.sub(r'(echo password=)"([^"]+)"', r'\1"***"', text)
+        text = re.sub(r"(echo password=)([^\s;'\"]+)", r"\1***", text)
     if "ghp_" in text:
         text = re.sub(r"ghp_[a-zA-Z0-9]{36}", "***", text)
     if "github_pat_" in text:
         text = re.sub(r"github_pat_[a-zA-Z0-9_]{82}", "***", text)
     return text
+
 
 def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))
@@ -34,6 +37,7 @@ def _emit(output_callback: None | Callable[[str], None], message: str):
         print(message)
     if output_callback:
         output_callback(message)
+
 
 def _resolve_process_command(command: str | list[str], shell: bool = False) -> str | list[str]:
     if shell or not isinstance(command, list) or not command:
@@ -49,6 +53,7 @@ def _resolve_process_command(command: str | list[str], shell: bool = False) -> s
             f"Executable '{executable}' was not found on PATH while running: {' '.join(command)}"
         )
     return [resolved, *command[1:]]
+
 
 def run_process(
     command: str | list[str],

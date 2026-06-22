@@ -3,7 +3,6 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 
-
 from PySide6.QtCore import QTimer, Slot
 
 from skill_manager.controllers.base import BaseController
@@ -304,7 +303,9 @@ class UpdateController(BaseController):
                     if not pkg_path and self.app._sources:
                         potential_path = self.app._sources[0]
                         if Path(potential_path).resolve() == Path.cwd().resolve():
-                            source["package_path"] = str(Path(potential_path) / ".agents" / "skills")
+                            source["package_path"] = str(
+                                Path(potential_path) / ".agents" / "skills"
+                            )
                         else:
                             source["package_path"] = potential_path
                     else:
@@ -314,8 +315,7 @@ class UpdateController(BaseController):
                     if conflicts:
                         conflict_path = conflicts[0]
                         raise RuntimeError(
-                            "Package storage path overlaps a project skills path: "
-                            f"{conflict_path}"
+                            f"Package storage path overlaps a project skills path: {conflict_path}"
                         )
 
                     def log_callback(msg):
@@ -351,13 +351,20 @@ class UpdateController(BaseController):
                     save_package_skill_inventory(inventory)
                     source.update(updated_source)
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    capture_event("skill_package_updated", {"source_type": source.get("source_type", "unknown"), "success": True})
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": True},
+                    )
                 except Exception as e:
-                    capture_event("skill_package_updated", {"source_type": source.get("source_type", "unknown"), "success": False})
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": False},
+                    )
                     capture_exception(e)
                     err_msg = f"Update failed for {source.get('name')}: {e}"
                     QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
                 finally:
+
                     def finalize_ui():
                         source["is_updating"] = False
                         source["just_finished"] = True
@@ -366,6 +373,7 @@ class UpdateController(BaseController):
                         self.app._set_status(f"Update finished for {source.get('name')}")
                         self.app.loadInitialData()
                         self.config.set("skills", self.app._update_packages)
+
                     QTimer.singleShot(0, self.app, finalize_ui)
 
             self.app.task_runner.run(run)
@@ -398,6 +406,7 @@ class UpdateController(BaseController):
                 )
 
                 from skill_manager.core.copier import copy_skill_folders_to_projects
+
                 result = copy_skill_folders_to_projects(source_skills, [path], update_only=True)
 
                 msg = f"Update complete for {self.app.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"

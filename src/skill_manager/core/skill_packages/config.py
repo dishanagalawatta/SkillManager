@@ -17,6 +17,7 @@ def _stable_package_id(source: dict[str, Any]) -> str:
     digest = hashlib.sha1(str(identity).strip().lower().encode("utf-8")).hexdigest()[:12]
     return f"pkg_{digest}"
 
+
 def _fallback_package_name(source: dict[str, Any]) -> str:
     package_name = source.get("package_name")
     if package_name:
@@ -32,8 +33,10 @@ def _fallback_package_name(source: dict[str, Any]) -> str:
 
     return "Unnamed Package"
 
+
 def _split_args(value: Any) -> list[str]:
     return [part for part in str(value or "").split() if part]
+
 
 def _parse_npx_command(command: str) -> tuple[str, str]:
     command = command.strip()
@@ -44,10 +47,12 @@ def _parse_npx_command(command: str) -> tuple[str, str]:
     args = match.group("args").strip()
     return package_name, args
 
+
 def _detect_command_type(command: str) -> str:
     if _parse_npx_command(command)[0]:
         return "npm"
     return "custom"
+
 
 def _apply_npm_defaults(source: dict[str, Any]):
     package_name = str(source.get("package_name") or "").strip()
@@ -82,6 +87,7 @@ def _apply_npm_defaults(source: dict[str, Any]):
     args = str(source.get("package_args") or "").strip()
     source["update_command"] = f"npx --yes -- {package_name}" + (f" {args}" if args else "")
     source["latest_version_command"] = f"npm show -- {package_name} version"
+
 
 def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
     source = dict(data or {})
@@ -127,6 +133,7 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
         )
 
     return source
+
 
 def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
     detected = detect_package_config(data)

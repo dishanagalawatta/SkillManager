@@ -44,11 +44,19 @@ class OpsController(BaseController):
         if not skill:
             return
 
-        path = skill.get("local_path") if isinstance(skill, dict) else getattr(skill, "local_path", None)
+        path = (
+            skill.get("local_path")
+            if isinstance(skill, dict)
+            else getattr(skill, "local_path", None)
+        )
         if not path:
             return
 
-        is_archived = skill.get("is_archived", False) if isinstance(skill, dict) else getattr(skill, "is_archived", False)
+        is_archived = (
+            skill.get("is_archived", False)
+            if isinstance(skill, dict)
+            else getattr(skill, "is_archived", False)
+        )
         new_state = not is_archived
 
         if new_state:
@@ -84,11 +92,19 @@ class OpsController(BaseController):
         if not skill:
             return
 
-        path = skill.get("local_path") if isinstance(skill, dict) else getattr(skill, "local_path", None)
+        path = (
+            skill.get("local_path")
+            if isinstance(skill, dict)
+            else getattr(skill, "local_path", None)
+        )
         if not path:
             return
 
-        is_starred = skill.get("is_starred", False) if isinstance(skill, dict) else getattr(skill, "is_starred", False)
+        is_starred = (
+            skill.get("is_starred", False)
+            if isinstance(skill, dict)
+            else getattr(skill, "is_starred", False)
+        )
         new_state = not is_starred
 
         if new_state:
@@ -135,7 +151,9 @@ class OpsController(BaseController):
                 deleted += result["deleted"]
                 failed += result["failed"]
                 # Extract paths from details
-                paths_to_remove.extend([d["path"] for d in result["details"] if d["status"] == "deleted"])
+                paths_to_remove.extend(
+                    [d["path"] for d in result["details"] if d["status"] == "deleted"]
+                )
 
             # ── Step 2: Delete Commands (Direct FS unlink)
             for cmd in command_items:
@@ -163,7 +181,6 @@ class OpsController(BaseController):
             if deleted > 0:
                 QTimer.singleShot(0, self.app, self.app.refreshSkills)
 
-
         self.app.task_runner.run(_background_delete)
 
     @Slot(str)
@@ -171,7 +188,9 @@ class OpsController(BaseController):
         """Deletes a single skill by its local path."""
         if not path:
             return
-        skill = next((s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None)
+        skill = next(
+            (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+        )
         if skill:
             self.deleteSkills([skill])
 
@@ -179,7 +198,9 @@ class OpsController(BaseController):
     def deleteSelectedSkills(self):
         """Deletes all currently selected skills."""
         selected_paths = self.app.skillModel.getSelectedPaths()
-        selected = [s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths]
+        selected = [
+            s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths
+        ]
         if selected:
             self.deleteSkills(selected)
         else:
@@ -223,6 +244,7 @@ class OpsController(BaseController):
             return
 
         import shutil
+
         deleted_count = 0
         for path_str in temp_paths:
             p = Path(path_str)
@@ -318,7 +340,9 @@ class OpsController(BaseController):
                     patch_cache_add(discovered_skills)
 
                     def update_ui():
-                        new_cats = sorted({s["category"] for s in discovered_skills if s.get("category")})
+                        new_cats = sorted(
+                            {s["category"] for s in discovered_skills if s.get("category")}
+                        )
                         if new_cats:
                             current_cats = set(self.app._categories)
                             for cat in new_cats:
@@ -351,7 +375,9 @@ class OpsController(BaseController):
     @Slot(str)
     def copySkillToClipboard(self, path: str):
         """Finds skill by path and copies its reference to clipboard."""
-        skill = next((s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None)
+        skill = next(
+            (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+        )
         if skill:
             self.copySkillReference(skill)
         else:
@@ -376,6 +402,7 @@ class OpsController(BaseController):
     def copySelectedSkillsToClipboard(self):
         """Copies all selected skill references to clipboard."""
         from skill_manager.core.quick_copy import format_project_skill_reference
+
         paths = self.app.skillModel.getSelectedPaths()
         if not paths:
             self.app._set_status("No skills selected")
@@ -383,7 +410,9 @@ class OpsController(BaseController):
 
         references = []
         for path in paths:
-            skill = next((s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None)
+            skill = next(
+                (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+            )
             if skill:
                 references.append(format_project_skill_reference(skill, self.app._client_format))
             else:
@@ -403,6 +432,7 @@ class OpsController(BaseController):
     def copySkillReference(self, skill: dict, arg: str = ""):
         """Copies a formatted skill reference to clipboard."""
         from skill_manager.core.quick_copy import format_project_skill_reference
+
         ref = format_project_skill_reference(skill, self.app._client_format)
         if arg:
             ref += f"({arg})"
@@ -410,9 +440,12 @@ class OpsController(BaseController):
         self.app._set_status(f"Copied reference: {ref}")
 
     @Slot(str, str, str, str, str)
-    def createCustomCommand(self, name: str, client: str, body: str, project_label: str, category: str):
+    def createCustomCommand(
+        self, name: str, client: str, body: str, project_label: str, category: str
+    ):
         """Creates a new Custom Command .md file in the project's commands/ directory."""
         from skill_manager.core.commands import create_custom_command_file
+
         result = create_custom_command_file(
             name=name,
             client=client,

@@ -32,7 +32,9 @@ def test_shared_package_path_promotes_all_packages_to_children(tmp_path):
     resolved = resolve_package_storage(packages)
 
     assert {package["storage_mode"] for package in resolved} == {"grouped"}
-    assert all(Path(package["resolved_package_path"]).parent == shared.resolve() for package in resolved)
+    assert all(
+        Path(package["resolved_package_path"]).parent == shared.resolve() for package in resolved
+    )
     assert len({package["resolved_package_path"] for package in resolved}) == 2
 
 
@@ -120,9 +122,7 @@ def test_package_project_path_conflicts_detect_project_root(tmp_path):
     project_skills.mkdir(parents=True)
     packages = [{"resolved_package_path": str(project_skills)}]
 
-    assert package_project_path_conflicts(packages, [str(project_root)]) == [
-        str(project_skills)
-    ]
+    assert package_project_path_conflicts(packages, [str(project_root)]) == [str(project_skills)]
 
 
 def test_promote_package_storage_aborts_when_destination_not_empty(tmp_path):
