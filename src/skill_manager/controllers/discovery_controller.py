@@ -40,10 +40,13 @@ class DiscoveryController(BaseController):
 
         def run_discovery():
             try:
+
                 def cache_callback(cached_data):
                     nonlocal used_cache_preview
                     used_cache_preview = True
-                    print(f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache...")
+                    print(
+                        f"[CACHE] Loading {len(cached_data.get('skills', []))} skills from cache..."
+                    )
                     schedule_on_ui_thread(
                         self.app,
                         lambda: self._finalize_loading(
@@ -83,7 +86,9 @@ class DiscoveryController(BaseController):
 
         self.app.task_runner.run(run_discovery)
 
-    def _finalize_loading(self, all_skills, _projects_state, cats, proj_labels, status, is_final=True):
+    def _finalize_loading(
+        self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
+    ):
         """Updates model and UI state on the main thread after discovery completes."""
         del proj_labels
 

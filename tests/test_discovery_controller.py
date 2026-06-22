@@ -23,9 +23,11 @@ def mock_app():
     app.ui._default_project_filter = "all"
     return app
 
+
 @pytest.fixture
 def controller(mock_app):
     return DiscoveryController(mock_app)
+
 
 def test_load_initial_data_success(controller, mock_app):
     # Mock DiscoveryService.discover_all to return a valid result
@@ -34,17 +36,21 @@ def test_load_initial_data_success(controller, mock_app):
         "projects": ["/proj"],
         "categories": ["Dev"],
         "project_labels": ["Project"],
-        "status": "Ready"
+        "status": "Ready",
     }
 
-    with patch("skill_manager.controllers.discovery_controller.DiscoveryService") as mock_service, \
-         patch("skill_manager.controllers.discovery_controller.schedule_on_ui_thread") as mock_schedule:
-
+    with (
+        patch("skill_manager.controllers.discovery_controller.DiscoveryService") as mock_service,
+        patch(
+            "skill_manager.controllers.discovery_controller.schedule_on_ui_thread"
+        ) as mock_schedule,
+    ):
         service_instance = mock_service.return_value
         service_instance.discover_all.return_value = mock_result
 
         # Capture the background task
         background_task = None
+
         def mock_run(task):
             nonlocal background_task
             background_task = task
@@ -68,6 +74,7 @@ def test_load_initial_data_success(controller, mock_app):
 
         # Verify cache callback behavior if needed, but here we test the happy path
 
+
 def test_finalize_loading(controller, mock_app):
     skills = [{"name": "S1"}]
     cats = ["Cat1"]
@@ -80,6 +87,7 @@ def test_finalize_loading(controller, mock_app):
     mock_app._quick_copy_model.setSkills.assert_called_with(skills)
     assert mock_app._is_loading is False
     mock_app.isLoadingChanged.emit.assert_called()
+
 
 def test_handle_loading_error(controller, mock_app):
     controller._handle_loading_error("Error occurred")

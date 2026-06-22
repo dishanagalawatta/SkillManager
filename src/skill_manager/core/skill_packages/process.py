@@ -18,8 +18,9 @@ def sanitize_token(text: str) -> str:
         # Robustly redact multiline passwords within Git credential helpers.
         text = re.sub(r"(echo password=).*?(?=; \}; f)", r"\1***", text, flags=re.DOTALL)
         # Fail-safe fallback: redact the rest of the line for any unclosed or plain password logs.
-        text = re.sub(r"(echo password=).*", r"\1***", text, flags=re.DOTALL)
+        text = re.sub(r"(echo password=).*", r"\1***", text)
     return text
+
 
 def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))
@@ -33,6 +34,7 @@ def _emit(output_callback: None | Callable[[str], None], message: str):
         print(message)
     if output_callback:
         output_callback(message)
+
 
 def _resolve_process_command(command: str | list[str], shell: bool = False) -> str | list[str]:
     if shell or not isinstance(command, list) or not command:
@@ -48,6 +50,7 @@ def _resolve_process_command(command: str | list[str], shell: bool = False) -> s
             f"Executable '{executable}' was not found on PATH while running: {' '.join(command)}"
         )
     return [resolved, *command[1:]]
+
 
 def run_process(
     command: str | list[str],
