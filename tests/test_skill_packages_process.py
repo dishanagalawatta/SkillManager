@@ -15,7 +15,7 @@ def test_sanitize_token():
     assert sanitize_token("https://token@github.com") == "https://***@github.com"
     assert sanitize_token("echo password=secret") == "echo password=***"
     assert sanitize_token("echo password='my\nsecret'; other") == "echo password='***'; other"
-    assert sanitize_token("echo password=\"my\nsecret\"") == 'echo password="***"'
+    assert sanitize_token('echo password="my\nsecret"') == 'echo password="***"'
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token("echo ***") == "echo ***"
     assert sanitize_token(None) is None

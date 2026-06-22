@@ -24,7 +24,7 @@ def sanitize_token(text: str) -> str:
         # Single quotes
         text = re.sub(r"(echo password=)'(?:\\.|[^'\\])*'", r"\1'***'", text)
         # Unquoted (stop at space, semicolon, or newline)
-        text = re.sub(r'(echo password=)(?![\'"])([^;\r\n ]+)', r'\1***', text)
+        text = re.sub(r'(echo password=)(?![\'"])([^;\r\n ]+)', r"\1***", text)
     return text
 
 
