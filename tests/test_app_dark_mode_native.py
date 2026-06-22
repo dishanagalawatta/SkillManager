@@ -8,6 +8,8 @@ Covers:
 from __future__ import annotations
 
 import ctypes
+import sys
+from unittest.mock import patch, MagicMock
 from unittest.mock import patch
 
 from skill_manager.app import DWMWA_USE_IMMERSIVE_DARK_MODE, _apply_immersive_dark
@@ -19,7 +21,8 @@ from skill_manager.app import DWMWA_USE_IMMERSIVE_DARK_MODE, _apply_immersive_da
 
 class TestApplyImmersiveDark:
     def test_sets_attribute_on(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
+        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, True)
 
         mock_dwm.assert_called_once()
@@ -32,7 +35,8 @@ class TestApplyImmersiveDark:
         assert args[3] == 4  # sizeof(DWORD)
 
     def test_sets_attribute_off(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
+        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, False)
 
         args = mock_dwm.call_args[0]
@@ -40,6 +44,7 @@ class TestApplyImmersiveDark:
         assert val == 0  # light
 
     def test_dwm_failure_does_not_raise(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", side_effect=OSError("no DWM")):
+        if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
+        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", side_effect=OSError("no DWM"), create=True):
             # Must not raise
             _apply_immersive_dark(0x12345, True)

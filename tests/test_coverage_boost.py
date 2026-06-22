@@ -600,6 +600,8 @@ class TestFilterEngineCategorizer:
         assert "main_category" in result
 
     def test_win32_get_window_placement(self):
+        import ctypes
+        if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
         from skill_manager.utils.win32 import get_window_placement
 
         # Mock GetWindowPlacement to return True so we hit the return tuple path
@@ -619,7 +621,7 @@ class TestFilterEngineCategorizer:
             patch("skill_manager.utils.win32.WINDOWPLACEMENT", return_value=mock_placement),
             patch("skill_manager.utils.win32.ctypes.sizeof", return_value=44),
             patch(
-                "skill_manager.utils.win32.ctypes.windll.user32.GetWindowPlacement",
+                "skill_manager.utils.win32.ctypes.windll.user32.GetWindowPlacement", create=True,
                 return_value=True,
             ),
             patch("skill_manager.utils.win32.ctypes.byref", side_effect=lambda x: x),

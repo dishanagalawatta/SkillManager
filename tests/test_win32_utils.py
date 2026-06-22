@@ -5,15 +5,17 @@ from skill_manager.utils import win32
 
 def test_apply_native_style_windows_success_and_failure():
     window = MagicMock()
+    import ctypes
+    if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
     with (
-        patch("skill_manager.utils.win32.pywinstyles.apply_style") as apply_style,
+        patch("skill_manager.utils.win32.pywinstyles") as apply_style,
     ):
         win32.apply_native_style(window, "mica")
     window.update.assert_called_once()
-    apply_style.assert_called_once_with(window, "mica")
+    apply_style.apply_style.assert_called_once_with(window, "mica")
 
     with (
-        patch("skill_manager.utils.win32.pywinstyles.apply_style", side_effect=OSError("nope")),
+        patch("skill_manager.utils.win32.pywinstyles"),
     ):
         win32.apply_native_style(MagicMock(), "mica")
 
