@@ -18,7 +18,8 @@ def test_sanitize_token():
 
     # Credential helper tests
     assert sanitize_token("echo password=secret") == "echo password=***"
-    assert sanitize_token("echo password=secret; }; f") == "echo password=***; }; f"
+    assert sanitize_token("echo password=secret;not_leaked") == "echo password=***"
+    assert sanitize_token("echo password='secret;not_leaked'") == "echo password=***"
     assert sanitize_token("echo password='mysecret'; }; f") == "echo password='***'; }; f"
     assert sanitize_token('echo password="mysecret"; }; f') == 'echo password="***"; }; f'
 
