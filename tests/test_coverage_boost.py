@@ -621,6 +621,7 @@ class TestFilterEngineCategorizer:
             patch("skill_manager.utils.win32.ctypes", create=True) as mock_ctypes,
             patch("skill_manager.utils.win32.ctypes.byref", side_effect=lambda x: x),
         ):
+            mock_ctypes.windll.user32.GetWindowPlacement.return_value = True
             result = get_window_placement(12345)
             assert isinstance(result, tuple)
             assert len(result) == 5
