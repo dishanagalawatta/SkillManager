@@ -42,13 +42,13 @@ class AppUpdateController(BaseController):
 
     def _fetch_latest_release(self):
         url = "https://api.github.com/repos/dishanagalawatta/SkillManager/releases/latest"
-        req = urllib.request.Request(url, headers={'User-Agent': 'SkillManager-AppUpdateChecker'})
+        req = urllib.request.Request(url, headers={"User-Agent": "SkillManager-AppUpdateChecker"})
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode('utf-8'))
+                data = json.loads(response.read().decode("utf-8"))
                 return {
                     "version": data.get("tag_name", "").lstrip("v"),
-                    "url": data.get("html_url", "")
+                    "url": data.get("html_url", ""),
                 }
         except Exception as e:
             print(f"Failed to check for app updates: {e}")

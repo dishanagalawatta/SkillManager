@@ -370,6 +370,7 @@ def test_delete_project_skill_folders_failure(temp_dir):
 
 def test_discover_single_project(temp_dir):
     from skill_manager.core.quick_copy import discover_single_project
+
     project_dir = temp_dir / "my-project"
     skills_dir = project_dir / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
@@ -422,4 +423,3 @@ def test_discover_project_skills_parallel(temp_dir):
     assert len(projects) == 2
     assert projects[0]["project_label"] == "proj1"
     assert projects[1]["project_label"] == "proj2"
-

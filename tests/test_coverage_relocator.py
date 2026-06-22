@@ -18,12 +18,14 @@ def test_cleanup_empty_parents_oserror(tmp_path):
         _cleanup_empty_parents(test_dir / "dummy")
         assert test_dir.exists()
 
+
 def test_relocate_path_internal_same_path(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
     dest_base = tmp_path
     # src is already at dest_base / src.name
     assert _relocate_path_internal(src, dest_base, None) is False
+
 
 def test_relocate_path_internal_exception(tmp_path):
     src = tmp_path / "src"
@@ -34,11 +36,13 @@ def test_relocate_path_internal_exception(tmp_path):
         assert _relocate_path_internal(src, dest_base, messages.append) is False
         assert any("Relocation failed" in m for m in messages)
 
+
 def test_merge_and_move_lockfile_no_source(tmp_path):
     source_lock = tmp_path / "missing.json"
     target_lock = tmp_path / "target.json"
     _merge_and_move_lockfile(source_lock, target_lock, None)
     assert not target_lock.exists()
+
 
 def test_merge_and_move_lockfile_json_errors(tmp_path):
     source_lock = tmp_path / "source.json"
@@ -51,6 +55,7 @@ def test_merge_and_move_lockfile_json_errors(tmp_path):
     assert target_lock.exists()
     assert json.loads(target_lock.read_text()) == {}
 
+
 def test_merge_and_move_lockfile_malformed_target_skills(tmp_path):
     source_lock = tmp_path / "source.json"
     target_lock = tmp_path / "target.json"
@@ -60,15 +65,17 @@ def test_merge_and_move_lockfile_malformed_target_skills(tmp_path):
     data = json.loads(target_lock.read_text())
     assert data["skills"] == {"a": 1}
 
+
 def test_merge_and_move_lockfile_exception(tmp_path):
     source_lock = tmp_path / "source.json"
     source_lock.write_text("{}")
     target_lock = tmp_path / "target.json"
-    target_lock.write_text("{}") # Ensure target exists to trigger merge logic
+    target_lock.write_text("{}")  # Ensure target exists to trigger merge logic
     with patch("json.load", side_effect=RuntimeError("Load failed")):
         messages = []
         _merge_and_move_lockfile(source_lock, target_lock, messages.append)
         assert any("Failed to merge lockfile" in m for m in messages)
+
 
 def test_relocate_packages_fallback_regex(tmp_path):
     dest = tmp_path / "dest"
@@ -80,6 +87,7 @@ def test_relocate_packages_fallback_regex(tmp_path):
     result = relocate_packages_from_output(output, str(dest), None)
     assert "unusual_path" in result
     assert (dest / "unusual_path").exists()
+
 
 def test_relocate_packages_manifest_move(tmp_path):
     dest = tmp_path / "dest" / "skills"
@@ -98,12 +106,14 @@ def test_relocate_packages_manifest_move(tmp_path):
 
     assert (dest.parent / ".antigravity-install-manifest.json").exists()
 
+
 def test_relocate_packages_same_path_skips(tmp_path):
     dest = tmp_path / "dest"
     dest.mkdir()
     output = [f"at {dest}"]
     result = relocate_packages_from_output(output, str(dest), None)
     assert result == ["dest"]
+
 
 def test_relocate_packages_data_dir_fallback(tmp_path):
     # Trigger line 192: if target_root.resolve() == Path.cwd().resolve()
@@ -122,7 +132,9 @@ def test_relocate_packages_data_dir_fallback(tmp_path):
         patch("pathlib.Path.cwd", return_value=tmp_path),
         patch("skill_manager.core.config.DATA_DIR", mock_data_dir),
     ):
-        relocate_packages_from_output([f"at {source_root / 'skills' / 'pkg'}"], str(dest_base), None)
+        relocate_packages_from_output(
+            [f"at {source_root / 'skills' / 'pkg'}"], str(dest_base), None
+        )
 
     # Should have merged lockfile to mock_data_dir instead of tmp_path
     assert (mock_data_dir / "skills-lock.json").exists()
