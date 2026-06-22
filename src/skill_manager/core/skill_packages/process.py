@@ -19,12 +19,13 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        # Match double quoted passwords, handling escaped quotes and truncated strings
-        text = re.sub(r'(echo password=)"((?:\\.|[^"])*)(?:"|$)', r'\1"***"', text, flags=re.DOTALL)
-        # Match single quoted passwords, handling escaped quotes and truncated strings
-        text = re.sub(r"(echo password=)'((?:\\.|[^'])*)(?:'|$)", r"\1'***'", text, flags=re.DOTALL)
-        # Match unquoted passwords
-        text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
+        # Match the password as a single shell word/token (which can consist of multiple concatenated quoted and unquoted segments)
+        text = re.sub(
+            r"(echo password=)((?:'[^'\\]*(?:\\.[^'\\]*)*(?:'|$)|\"[^\"\\]*(?:\\.[\"\\]*)*(?:\"|$)|\\.|[^\s\"';&|()<>\\x60]+)+)",
+            r"\1***",
+            text,
+            flags=re.DOTALL,
+        )
     return text
 
 
