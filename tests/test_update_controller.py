@@ -1,4 +1,5 @@
-from unittest.mock import patch
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -70,9 +71,7 @@ def test_scan_for_updates(mock_service_class, update_controller, mock_app):
 
         assert mock_app._is_loading is False
         mock_app.isLoadingChanged.emit.assert_called()
-        mock_app._set_status.assert_any_call(
-            "Update scan complete: 1 package skills processed"
-        )
+        mock_app._set_status.assert_any_call("Update scan complete: 1 package skills processed")
 
 
 def test_update_skill_in_project_success(update_controller, mock_app):
@@ -377,3 +376,257 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
         mock_app._library_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
         mock_app._quick_copy_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
         mock_app.loadInitialData.assert_not_called()
+
+
+# --- addSkillPackage error-return + snap-to-latest tests ---
+
+
+def test_add_skill_package_returns_error_when_latest_undetectable(update_controller, mock_app):
+    """addSkillPackage returns a JSON error and does NOT append to state."""
+    mock_app._update_packages = []
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        return_value={
+            "name": "mystery-pkg",
+            "source_type": "custom",
+            "current_version": "",
+            "latest_version": "",
+            "current_version_command": "",
+            "latest_version_command": "",
+            "repository_url": "",
+        },
+    ):
+        result = json.loads(
+            update_controller.addSkillPackage(
+                {
+                    "name": "mystery-pkg",
+                    "source_type": "custom",
+                    "package_name": "",
+                    "repository_url": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                }
+            )
+        )
+
+    assert result["ok"] is False
+    assert "Could not detect latest version" in result["error"]
+    assert mock_app._update_packages == []
+
+
+def test_add_skill_package_snaps_current_to_latest(update_controller, mock_app):
+    """addSkillPackage returns ok=True and current_version == latest_version."""
+    mock_app._update_packages = []
+    mock_app._config = MagicMock()
+
+    detected = {
+        "name": "caveman",
+        "source_type": "npx",
+        "package_name": "caveman",
+        "current_version": "",
+        "latest_version": "1.9.0",
+        "current_version_command": "",
+    }
+    synced = {
+        **detected,
+        "current_version": "1.9.0",
+    }
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        side_effect=[detected, synced],
+    ):
+        result = json.loads(
+            update_controller.addSkillPackage(
+                {
+                    "name": "caveman",
+                    "source_type": "npx",
+                    "package_name": "caveman",
+                    "repository_url": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                }
+            )
+        )
+
+    assert result["ok"] is True
+    assert result["name"] == "caveman"
+    assert len(mock_app._update_packages) == 1
+    assert mock_app._update_packages[0]["current_version"] == "1.9.0"
+    assert mock_app._update_packages[0]["latest_version"] == "1.9.0"
+
+
+# --- updateUpdatePackage error-return + snap-to-latest tests ---
+
+
+def test_update_update_package_returns_error_when_latest_undetectable(update_controller, mock_app):
+    """updateUpdatePackage returns a JSON error and does NOT overwrite state."""
+    mock_app._update_packages = [{"name": "old-pkg", "package_id": "old1", "source_type": "custom"}]
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        return_value={
+            "name": "old-pkg",
+            "source_type": "custom",
+            "current_version": "",
+            "latest_version": "",
+            "current_version_command": "",
+            "latest_version_command": "",
+            "repository_url": "",
+        },
+    ):
+        result = json.loads(
+            update_controller.updateUpdatePackage(
+                0,
+                {
+                    "name": "old-pkg",
+                    "source_type": "custom",
+                    "package_name": "",
+                    "repository_url": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                },
+            )
+        )
+
+    assert result["ok"] is False
+    assert "Could not detect latest version" in result["error"]
+    assert mock_app._update_packages[0]["name"] == "old-pkg"
+
+
+def test_update_update_package_snaps_current_to_latest(update_controller, mock_app):
+    """updateUpdatePackage returns ok=True and current_version == latest_version."""
+    mock_app._update_packages = [{"name": "pkg-edit", "package_id": "pe1", "source_type": "npx"}]
+    mock_app._config = MagicMock()
+
+    detected = {
+        "name": "pkg-edit",
+        "source_type": "npx",
+        "package_name": "pkg-edit",
+        "current_version": "",
+        "latest_version": "3.2.1",
+        "current_version_command": "",
+    }
+    synced = {
+        **detected,
+        "current_version": "3.2.1",
+    }
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        side_effect=[detected, synced],
+    ):
+        result = json.loads(
+            update_controller.updateUpdatePackage(
+                0,
+                {
+                    "name": "pkg-edit",
+                    "source_type": "npx",
+                    "package_name": "pkg-edit",
+                    "repository_url": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                },
+            )
+        )
+
+    assert result["ok"] is True
+    assert result["name"] == "pkg-edit"
+    assert len(mock_app._update_packages) == 1
+    assert mock_app._update_packages[0]["current_version"] == "3.2.1"
+    assert mock_app._update_packages[0]["latest_version"] == "3.2.1"
+
+
+def test_update_update_package_preserves_internal_state(update_controller, mock_app):
+    """updateUpdatePackage preserves is_updating, just_finished, and last_updated."""
+    mock_app._update_packages = [
+        {
+            "name": "state-pkg",
+            "package_id": "sp1",
+            "source_type": "npx",
+            "is_updating": True,
+            "just_finished": True,
+            "last_updated": "2024-01-15",
+        }
+    ]
+    mock_app._config = MagicMock()
+
+    detected = {
+        "name": "state-pkg",
+        "source_type": "npx",
+        "current_version": "",
+        "latest_version": "2.0.0",
+        "current_version_command": "",
+    }
+    synced = {**detected, "current_version": "2.0.0"}
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        side_effect=[detected, synced],
+    ):
+        json.loads(
+            update_controller.updateUpdatePackage(
+                0,
+                {"name": "state-pkg", "source_type": "npx", "package_name": "state-pkg"},
+            )
+        )
+
+    pkg = mock_app._update_packages[0]
+    assert pkg["is_updating"] is True
+    assert pkg["just_finished"] is True
+    assert pkg["last_updated"] == "2024-01-15"
+
+
+def test_update_update_package_snaps_current_to_latest_git(update_controller, mock_app):
+    """updateUpdatePackage snaps current to latest for git source when local detection fails."""
+    mock_app._update_packages = [
+        {
+            "name": "git-pkg",
+            "package_id": "gp1",
+            "source_type": "git",
+            "repository_url": "https://github.com/test/repo.git",
+        }
+    ]
+    mock_app._config = MagicMock()
+
+    # Phase 1: detect — no local clone (empty current), valid latest
+    detected = {
+        "name": "git-pkg",
+        "source_type": "git",
+        "current_version": "",
+        "latest_version": "2.5.0",
+        "current_version_command": "",
+        "repository_url": "https://github.com/test/repo.git",
+    }
+    # Phase 2: snap — current still empty (no local clone), latest detected
+    synced = {**detected, "current_version": "2.5.0"}
+
+    with patch(
+        "skill_manager.core.skill_packages.check_skill_package_versions",
+        side_effect=[detected, synced],
+    ):
+        result = json.loads(
+            update_controller.updateUpdatePackage(
+                0,
+                {
+                    "name": "git-pkg",
+                    "source_type": "git",
+                    "repository_url": "https://github.com/test/repo.git",
+                    "package_name": "",
+                    "package_path": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                },
+            )
+        )
+
+    assert result["ok"] is True
+    assert result["name"] == "git-pkg"
+    assert mock_app._update_packages[0]["current_version"] == "2.5.0"
+    assert mock_app._update_packages[0]["latest_version"] == "2.5.0"

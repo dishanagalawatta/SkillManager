@@ -17,6 +17,7 @@ Dialog {
     
     property int editIndex: -1
     property bool isEdit: editIndex !== -1
+    property string saveError: ""
     
     x: Math.round((parent.width - width) / 2)
     y: Math.round(Math.max(10, (parent.height - height) / 2))
@@ -51,6 +52,7 @@ Dialog {
             cmdInput.text = ""
             tokenInput.text = ""
             verificationStatus.text = ""
+            root.saveError = ""
         }
     }
 
@@ -69,6 +71,7 @@ Dialog {
         currentVerCmdInput.text = data.current_version_command || ""
         latestVerCmdInput.text = data.latest_version_command || ""
         verificationStatus.text = ""
+        root.saveError = ""
     }
 
     contentItem: ColumnLayout {
@@ -629,7 +632,19 @@ Dialog {
                 anchors.margins: 16
                 spacing: 12
                 
-                Item { Layout.fillWidth: true }
+                Text {
+                    text: root.saveError
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    color: "#ff4d4d"
+                    visible: root.saveError !== ""
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    verticalAlignment: Text.AlignVCenter
+                }
+                
+                Item { Layout.fillWidth: true; visible: root.saveError === "" }
                 
                 ActionButton {
                     text: "Cancel"
@@ -673,11 +688,20 @@ Dialog {
                             "latest_version_command": latestVerCmdInput.text
                         }
                         if (root.isEdit) {
-                            AppController.updateUpdatePackage(root.editIndex, data)
+                            let editResult = JSON.parse(AppController.updateUpdatePackage(root.editIndex, data))
+                            if (editResult.ok) {
+                                root.accept()
+                            } else {
+                                root.saveError = editResult.error || "Unknown error occurred."
+                            }
                         } else {
-                            AppController.addSkillPackage(data)
+                            let result = JSON.parse(AppController.addSkillPackage(data))
+                            if (result.ok) {
+                                root.accept()
+                            } else {
+                                root.saveError = result.error || "Unknown error occurred."
+                            }
                         }
-                        root.accept()
                     }
                     
                     background: Rectangle {

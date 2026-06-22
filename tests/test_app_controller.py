@@ -346,11 +346,24 @@ def test_controller_config_and_update_source_slots(controller):
     with (
         patch(
             "skill_manager.core.skill_packages.normalize_skill_package_config",
-            return_value={"name": "Repo", "source_type": "git", "package_id": "repo"},
+            return_value={
+                "name": "Repo",
+                "source_type": "git",
+                "package_id": "repo",
+                "repository_url": "https://example.test/repo.git",
+                "github_token": "",
+                "package_args": "",
+                "update_command": "",
+                "current_version_command": "",
+                "latest_version_command": "",
+                "package_path": "",
+                "clone_path": "",
+                "package_name": "",
+            },
         ),
         patch(
             "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda source: {**source, "latest_version": "v1"},
+            side_effect=lambda source, **kw: {**source, "latest_version": "v1"},
         ),
         patch("skill_manager.controllers.update_controller.capture_event") as capture,
     ):
