@@ -21,7 +21,8 @@ def sanitize_token(text: str) -> str:
     if "echo password=" in text:
         text = re.sub(r"(echo password=)'((?:\\.|[^'\\])*)'", r"\1'***'", text)
         text = re.sub(r'(echo password=)"((?:\\.|[^"\\])*)"', r'\1"***"', text)
-        text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
+        # Use a robust pattern or parser to handle shell quoting and avoid partial leakage
+        text = redact_credentials(text)
     return text
 
 
