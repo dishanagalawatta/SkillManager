@@ -17,12 +17,9 @@ Item {
 
     activeFocusOnTab: true
 
-    Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            control.toggled();
-            event.accepted = true;
-        }
-    }
+    Keys.onSpacePressed: function(event) { control.toggled(); event.accepted = true; }
+    Keys.onReturnPressed: function(event) { control.toggled(); event.accepted = true; }
+    Keys.onEnterPressed: function(event) { control.toggled(); event.accepted = true; }
 
     Rectangle {
         id: bgRect
@@ -97,7 +94,10 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: control.toggled()
+        onClicked: {
+            control.forceActiveFocus();
+            control.toggled();
+        }
     }
 
     ToolTip.visible: mouseArea.containsMouse && tooltipText !== ""

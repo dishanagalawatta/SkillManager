@@ -17,12 +17,9 @@ Item {
 
     activeFocusOnTab: true
 
-    Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            control.checked = !control.checked;
-            event.accepted = true;
-        }
-    }
+    Keys.onSpacePressed: function(event) { control.checked = !control.checked; event.accepted = true; }
+    Keys.onReturnPressed: function(event) { control.checked = !control.checked; event.accepted = true; }
+    Keys.onEnterPressed: function(event) { control.checked = !control.checked; event.accepted = true; }
 
     Rectangle {
         id: track
@@ -68,7 +65,10 @@ Item {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: control.checked = !control.checked
+        onClicked: {
+            control.forceActiveFocus();
+            control.checked = !control.checked;
+        }
     }
 
     Accessible.role: Accessible.CheckBox
