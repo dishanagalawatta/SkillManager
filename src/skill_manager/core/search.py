@@ -56,9 +56,7 @@ class SkillIndexer:
         if category_lower:
             all_doc_tokens.append(category_lower)
 
-        tag_text = ""
-        if tags_lower or category_lower:
-            tag_text = f"{category_lower} {' '.join(tags_lower)}"
+        tag_text = " ".join(filter(None, [category_lower] + tags_lower))
 
         return {
             "name": name.lower(),
