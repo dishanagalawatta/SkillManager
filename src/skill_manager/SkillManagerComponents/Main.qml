@@ -40,7 +40,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Top"
-            Accessible.description: "Drag to resize the top edge of the window"
         }
         MouseArea { 
             height: 6; anchors { bottom: parent.bottom; left: parent.left; right: parent.right } 
@@ -48,7 +47,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Bottom"
-            Accessible.description: "Drag to resize the bottom edge of the window"
         }
         MouseArea { 
             width: 6; anchors { left: parent.left; top: parent.top; bottom: parent.bottom } 
@@ -56,7 +54,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.LeftEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Left"
-            Accessible.description: "Drag to resize the left edge of the window"
         }
         MouseArea { 
             width: 6; anchors { right: parent.right; top: parent.top; bottom: parent.bottom } 
@@ -64,7 +61,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.RightEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Right"
-            Accessible.description: "Drag to resize the right edge of the window"
         }
         
         // Corners
@@ -74,7 +70,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Top Left"
-            Accessible.description: "Drag to resize the top left corner of the window"
         }
         MouseArea { 
             width: 12; height: 12; anchors.top: parent.top; anchors.right: parent.right 
@@ -82,7 +77,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Top Right"
-            Accessible.description: "Drag to resize the top right corner of the window"
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.left: parent.left 
@@ -90,7 +84,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Bottom Left"
-            Accessible.description: "Drag to resize the bottom left corner of the window"
         }
         MouseArea { 
             width: 12; height: 12; anchors.bottom: parent.bottom; anchors.right: parent.right 
@@ -98,7 +91,6 @@ Window {
             onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
             Accessible.role: Accessible.Grip
             Accessible.name: "Resize Window Bottom Right"
-            Accessible.description: "Drag to resize the bottom right corner of the window"
         }
     }
 
