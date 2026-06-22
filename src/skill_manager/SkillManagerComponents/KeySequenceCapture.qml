@@ -62,7 +62,7 @@ Rectangle {
         }
     }
 
-    Keys.onPressed: (event) => {
+    Keys.onPressed: function(event) {
         if (!active) {
             if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
                 root.active = true

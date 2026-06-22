@@ -6,7 +6,7 @@ ComboBox {
     id: control
     property bool keyboardNavigated: false
     
-    Keys.onPressed: (event) => {
+    Keys.onPressed: function(event) {
         if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             keyboardNavigated = true
         }
@@ -114,7 +114,7 @@ ComboBox {
                 appController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentHeight changed: " + contentHeight)
             }
             
-            Keys.onPressed: (event) => {
+            Keys.onPressed: function(event) {
                 if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                     control.keyboardNavigated = true
                 }
