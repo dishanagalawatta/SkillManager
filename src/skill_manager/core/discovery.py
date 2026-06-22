@@ -13,6 +13,10 @@ from typing import Any
 from diskcache import Cache
 
 from skill_manager.core.config import DATA_DIR
+from skill_manager.core.diagnostics import (
+    CATEGORY_SOURCE_MISSING,
+    get_diagnostic_logger,
+)
 from skill_manager.core.parsing import (
     build_skill_search_text,
     categorize_skill,
@@ -85,6 +89,35 @@ class DiscoveryService:
         count) hasn't changed since the last scan are skipped, reusing the
         previously-discovered skills from the disk cache.
         """
+        diag = get_diagnostic_logger()
+
+        # Validate source paths early — missing sources cause zero-result
+        # discovery which triggers the safety net downstream
+        missing_sources: list[str] = []
+        for src in self.sources:
+            if not os.path.isdir(src):
+                missing_sources.append(src)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Source directory not found: {src}",
+                    data={"source_path": src},
+                )
+        for proj in self.projects:
+            if not os.path.isdir(proj):
+                missing_sources.append(proj)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Project directory not found: {proj}",
+                    data={"source_path": proj},
+                )
+        if missing_sources:
+            logger.warning(
+                "[DISCOVERY] %d source/project directories not found: %s",
+                len(missing_sources),
+                missing_sources,
+            )
 
         # 1. Try JSON index cache first for instant UI population
         if use_cache:

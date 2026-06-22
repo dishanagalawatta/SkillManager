@@ -677,3 +677,79 @@ def test_copy_collection_to_clipboard_delegates_to_ops(controller):
     with patch.object(controller.ops, "copyCollectionToClipboard") as mock_ops:
         controller.copyCollectionToClipboard("TestColl")
         mock_ops.assert_called_once_with("TestColl")
+
+
+# ---------------------------------------------------------------------------
+# Selection refresh integration
+# ---------------------------------------------------------------------------
+
+
+def test_update_custom_command_refreshes_selected_skill(controller, temp_dir):
+    """updateCustomCommandFull refreshes _selected_skill when the same command is selected."""
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True, exist_ok=True)
+
+    cmd_file = commands_dir / "Cmd.md"
+    cmd_file.write_text(
+        "---\nname: Cmd\ncategory: Dev\ntype: command\ndate: 2026-01-01\n---\n\nold body",
+        encoding="utf-8",
+    )
+
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
+    controller._projects = [str(project_path)]
+
+    model = controller.skillModel
+    model.showCommands = True
+    model.isPackageOnly = False
+
+    with (
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill"
+        ) as mock_discover,
+        patch("skill_manager.core.persistence.patch_cache_add"),
+    ):
+        mock_discover.return_value = {
+            "local_path": str(cmd_file),
+            "name": "Cmd",
+            "category": "Dev",
+            "body_content": "new body",
+        }
+        controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body")
+
+    assert controller._selected_skill.get("body_content") == "new body"
+
+
+def test_create_custom_command_refreshes_selected_skill(controller, temp_dir):
+    """createCustomCommand refreshes _selected_skill for the newly created command."""
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+
+    cmd_file = project_path / ".agents" / "commands" / "NewCmd.md"
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "NewCmd"}
+    controller._projects = [str(project_path)]
+
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    label = compute_project_label(project_path)
+
+    model = controller.skillModel
+    model.showCommands = True
+    model.isPackageOnly = False
+
+    with (
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single_skill"
+        ) as mock_discover,
+        patch("skill_manager.core.persistence.patch_cache_add"),
+    ):
+        mock_discover.return_value = {
+            "local_path": str(cmd_file),
+            "name": "NewCmd",
+            "category": "Commands",
+            "body_content": "echo hello",
+        }
+        controller.createCustomCommand("NewCmd", "echo hello", label, "Commands")
+
+    assert controller._selected_skill.get("body_content") == "echo hello"

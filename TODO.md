@@ -35,7 +35,12 @@
 
 # 4. Bug Tracker
 
-* [x] Package update not working.
+* [X] Package update not working.
+* [ ] updated command does not show in ui until app restart. ui (command inspector) need to update immediately after updating a command.
+* [ ] Selected items does not remeber on restart. it always select 3 items.
+* [ ] dark mode toggle does not update imediately when i press top bar icon to update mode.
+
+![1782113591547](image/TODO/1782113591547.png)
 
 ---
 

@@ -27,6 +27,7 @@ def _make_package(
     latest_version: str = "",
     is_updating: bool = False,
     just_finished: bool = False,
+    update_error: str = "",
     package_path: str = "/tmp/test",
     source_type: str = "npx",
     package_name: str = "@test/test",
@@ -42,6 +43,7 @@ def _make_package(
         "package_id": package_id,
         "is_updating": is_updating,
         "just_finished": just_finished,
+        "update_error": update_error,
         "last_updated": "Never",
         "storage_mode": "individual",
         "managed_folders": [],
@@ -377,3 +379,229 @@ class TestResolvePackageStorageStateInPlace:
         # The mutation must stick — dict identity is preserved
         assert pkg["is_updating"] is True
         assert mock_app._update_packages[0]["is_updating"] is True
+
+
+# ===========================================================================
+# 5.  Dict-replacement contract for runPackageUpdate
+# ===========================================================================
+
+
+class TestRunPackageUpdateDictReplacement:
+    """runPackageUpdate must replace the dict (not mutate in-place) so that
+    QML's QVariantMap snapshot is invalidated and delegate bindings re-evaluate.
+    """
+
+    @pytest.fixture
+    def ctrl(self, mock_app):
+        mock_app._sources = ["/src"]
+        mock_app._projects = ["/project"]
+        mock_app._update_packages = [
+            _make_package(current_version="1.0.0", latest_version="2.0.0"),
+        ]
+        mock_app._syncing_projects = []
+        mock_app._project_aliases = {}
+        mock_app._library_model._all_skills = []
+        return UpdateController(mock_app)
+
+    @patch("skill_manager.controllers.update_controller.QTimer")
+    @patch("skill_manager.controllers.update_controller.capture_event")
+    def test_dict_identity_replaced(self, _mock_event, _mock_timer, ctrl, mock_app):
+        """The dict at the target index must be a NEW object (different id)."""
+        original_id = id(mock_app._update_packages[0])
+
+        with patch.object(ctrl, "_resolvePackageStorageState"):
+            ctrl.runPackageUpdate(0)
+
+        new_id = id(mock_app._update_packages[0])
+        assert new_id != original_id
+
+    @patch("skill_manager.controllers.update_controller.QTimer")
+    @patch("skill_manager.controllers.update_controller.capture_event")
+    def test_other_indices_unaffected(self, _mock_event, _mock_timer, ctrl, mock_app):
+        """Only the target index dict is replaced; others keep identity."""
+        mock_app._update_packages.append(_make_package(name="Other"))
+        original_other_id = id(mock_app._update_packages[1])
+
+        with patch.object(ctrl, "_resolvePackageStorageState"):
+            ctrl.runPackageUpdate(0)
+
+        assert id(mock_app._update_packages[1]) == original_other_id
+        assert mock_app._update_packages[1]["is_updating"] is False
+
+
+# ===========================================================================
+# 6.  update_error tracking
+# ===========================================================================
+
+
+class TestUpdateErrorTracking:
+    """runPackageUpdate must clear update_error before running and set it on failure."""
+
+    @pytest.fixture
+    def ctrl(self, mock_app):
+        mock_app._sources = ["/src"]
+        mock_app._projects = ["/project"]
+        mock_app._update_packages = [
+            _make_package(current_version="1.0.0", latest_version="2.0.0"),
+        ]
+        mock_app._syncing_projects = []
+        mock_app._project_aliases = {}
+        mock_app._library_model._all_skills = []
+        return UpdateController(mock_app)
+
+    @patch("skill_manager.controllers.update_controller.QTimer")
+    @patch("skill_manager.controllers.update_controller.capture_event")
+    @patch("skill_manager.core.skill_packages.run_skill_package_update")
+    def test_update_error_cleared_on_click(
+        self, _mock_run_update, _mock_event, _mock_timer, ctrl, mock_app
+    ):
+        """A prior update_error must be cleared when the user clicks Update again."""
+        mock_app._update_packages[0]["update_error"] = "Previous failure"
+        _mock_run_update.return_value = {}
+
+        with patch.object(ctrl, "_resolvePackageStorageState"):
+            ctrl.runPackageUpdate(0)
+
+        assert mock_app._update_packages[0]["update_error"] == ""
+
+    def test_update_error_initially_empty(self, ctrl, mock_app):
+        """Packages start with empty update_error."""
+        assert mock_app._update_packages[0].get("update_error", "") == ""
+
+
+# ===========================================================================
+# 7.  QML Connections handler regression tests
+# ===========================================================================
+
+
+class TestQmlConnectionsHandler:
+    """The QML ListView with a plain list model does not detect item-level
+    mutations.  We add a Connections handler that resets the model on each
+    signal to force delegate rebuild.  These tests verify the handler exists.
+    """
+
+    @pytest.fixture
+    def qml_source(self):
+        from pathlib import Path
+
+        qml_path = (
+            Path(__file__).resolve().parent.parent
+            / "src"
+            / "skill_manager"
+            / "SkillManagerComponents"
+            / "views"
+            / "UpdatesView.qml"
+        )
+        return qml_path.read_text(encoding="utf-8")
+
+    def test_packages_list_connections_handler_exists(self, qml_source):
+        """UpdatesView must have a Connections handler that resets uv_packagesList.model."""
+        assert "uv_packagesList.model = null" in qml_source
+        assert "uv_packagesList.model = AppController.updatePackages" in qml_source
+
+    def test_projects_list_connections_handler_exists(self, qml_source):
+        """UpdatesView must have a Connections handler that resets uv_projectsList.model."""
+        assert "uv_projectsList.model = null" in qml_source
+        assert (
+            "uv_projectsList.model = AppController.config_controller.updateProjects" in qml_source
+        )
+
+    def test_connections_handler_uses_correct_signal(self, qml_source):
+        """The packages handler must listen to updatePackagesChanged."""
+        assert "function onUpdatePackagesChanged()" in qml_source
+
+    def test_projects_connections_handler_uses_correct_signal(self, qml_source):
+        """The projects handler must listen to projectsChanged."""
+        assert "function onProjectsChanged()" in qml_source
+
+
+# ===========================================================================
+# 8.  Package config field preservation (regression)
+# ===========================================================================
+
+
+class TestPackageConfigFieldPreservation:
+    """Ensure config fields like repository_url survive the
+    addSkillPackage → model_validate → model_dump round-trip."""
+
+    @pytest.fixture
+    def ctrl(self, mock_app):
+        mock_app._sources = ["/src"]
+        mock_app._projects = ["/project"]
+        mock_app._update_packages = []
+        mock_app._syncing_projects = []
+        mock_app._project_aliases = {}
+        mock_app._library_model._all_skills = []
+        return UpdateController(mock_app)
+
+    def test_add_skill_package_preserves_repository_url(self, ctrl, mock_app):
+        """addSkillPackage must not drop repository_url from the stored package."""
+        pkg = {
+            "name": "RepoPkg",
+            "source_type": "git",
+            "repository_url": "https://github.com/test/repo.git",
+            "github_token": "ghp_secret123",
+            "clone_path": "/tmp/clone",
+        }
+        with patch(
+            "skill_manager.core.skill_packages.check_skill_package_versions",
+            side_effect=lambda d: d,
+        ):
+            ctrl.addSkillPackage(pkg)
+
+        stored = mock_app._update_packages[-1]
+        assert stored["repository_url"] == "https://github.com/test/repo.git"
+        assert stored["github_token"] == "ghp_secret123"
+        assert stored["clone_path"] == "/tmp/clone"
+
+    def test_update_update_package_preserves_repository_url(self, ctrl, mock_app):
+        """updateUpdatePackage must not drop repository_url from the stored package."""
+        mock_app._update_packages = [_make_package(name="OldPkg", package_id="old_pkg_id12345")]
+        edited = {
+            "name": "EditedRepoPkg",
+            "repository_url": "https://github.com/test/edited.git",
+            "package_args": "--save-dev",
+            "update_command": "npm update",
+        }
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=lambda d: d,
+            ),
+            patch.object(ctrl, "_resolvePackageStorageState"),
+        ):
+            ctrl.updateUpdatePackage(0, edited)
+
+        stored = mock_app._update_packages[0]
+        assert stored["repository_url"] == "https://github.com/test/edited.git"
+        assert stored["package_args"] == "--save-dev"
+        assert stored["update_command"] == "npm update"
+
+    def test_add_skill_package_preserves_all_config_fields(self, ctrl, mock_app):
+        """All six config fields must survive the addSkillPackage round-trip.
+        Note: for source_type='git', detect_package_config clears update_command
+        and sets latest/current_version_command via setdefault."""
+        pkg = {
+            "name": "FullPkg",
+            "source_type": "git",
+            "repository_url": "https://github.com/test/repo.git",
+            "github_token": "ghp_token",
+            "package_args": "--save",
+            "update_command": "npm update",
+            "current_version_command": "node -v",
+            "latest_version_command": "npm show version",
+        }
+        with patch(
+            "skill_manager.core.skill_packages.check_skill_package_versions",
+            side_effect=lambda d: d,
+        ):
+            ctrl.addSkillPackage(pkg)
+
+        stored = mock_app._update_packages[-1]
+        assert stored["repository_url"] == "https://github.com/test/repo.git"
+        assert stored["github_token"] == "ghp_token"
+        assert stored["package_args"] == "--save"
+        # Git packages: update_command is cleared, version commands preserved
+        assert stored["update_command"] == ""
+        assert stored["current_version_command"] == "node -v"
+        assert stored["latest_version_command"] == "npm show version"

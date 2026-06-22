@@ -202,6 +202,7 @@ class ScreenshotController(QObject):
 
             self.app._library_model.addOrUpdateSkills([skill_data])
             self.app._quick_copy_model.addOrUpdateSkills([skill_data])
+            self.app.ops._refresh_selected_skill(filepath)
 
             if "Screenshots" not in set(self.app._categories):
                 self.app._categories = sorted(set(self.app._categories) | {"Screenshots"})

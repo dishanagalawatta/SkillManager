@@ -16,6 +16,8 @@
 | [ADR-0008](#adr-0008-windows-only-distribution) | Windows-only distribution | Accepted | 2026 |
 | [ADR-0009](#adr-0009-python-semantic-release-with-opt-in-tokens) | python-semantic-release with opt-in tokens | Accepted | 2026 |
 | [ADR-0010](#adr-0010-drop-tuf-use-github-releases-api) | Drop TUF, use GitHub Releases API | Accepted | 2026 |
+| [ADR-0011](#adr-0011-selection-refresh-invariant) | Selection refresh invariant | Accepted | 2026 |
+| [ADR-0012](#adr-0012-window-state-integrity) | Window state integrity | Accepted | 2026 |
 
 ---
 
@@ -174,3 +176,87 @@ the latest tag is greater than the running version.
 
 **Consequences.** Users download updates manually. `gh-pages` branch
 deleted. `TUF_KEY_*` secrets deleted. ADR-0008 unchanged.
+
+---
+
+## ADR-0011 — Selection refresh invariant
+
+**Status:** Accepted
+
+**Context.** `selectedSkill` is a passive dict snapshot set when the user
+clicks a skill. When any mutation calls `addOrUpdateSkills` (command
+create/update, screenshot capture, discovery scan), the model rows are
+updated but the snapshot is not refreshed. QML only re-binds when
+`selectedSkillChanged` fires, so the inspector shows stale data until
+the app restarts. Three independent code sites missed this contract.
+
+**Decision.** Every controller site that calls `addOrUpdateSkills` (or
+`setSkills`) after a mutation MUST call
+`OpsController._refresh_selected_skill(local_path)` and, for renames,
+pass the new path via `rename_path`. The helper replaces
+`_selected_skill` with a fresh dict from the model row and emits
+`selectedSkillChanged` when the path matches the selected skill.
+
+Affected call sites:
+- `OpsController.createCustomCommand` (after `_merge_discovered_skills`)
+- `OpsController.updateCustomCommandFull` (after `_merge_discovered_skills`)
+- `ScreenshotController` (after post-capture `addOrUpdateSkills`)
+- `DiscoveryController` (after incremental `addOrUpdateSkills`)
+
+**Consequences.** Inspector always reflects the latest state. The
+invariant is documented in `docs/API.md` § 5 and guarded by diagnostic
+logging (`CATEGORY_SELECTION_REFRESHED`). Future mutation sites that
+forget the helper are greppable and flagged in code review.
+
+---
+
+## ADR-0012 — Window state integrity
+
+**Status:** Accepted
+
+**Context.** The window's `x`, `y`, `width`, `height` are persisted via
+QML `onXChanged`/`onYChanged` handlers in `Main.qml`. When
+`hideWindowInstantly()` (screenshot auto-hide) sets `x = -32000`,
+`y = -32000`, `opacity = 0`, those values are saved to disk if the app
+is closed or crashes before `restoreWindowState()` runs. On next cold
+boot, the window opens at (-32000, -32000) — off-screen — and appears
+minimized/missing.
+
+Additionally, `Main.qml:24` sets `visible: false` to prevent QML load
+flicker, but `Component.onCompleted` did not explicitly re-show the
+window, relying on `app.py:root.show()` called asynchronously.
+
+**Decision.** Three-part fix:
+
+1. **Guard flag.** Add `property bool _isHidingForScreenshot: false` to
+   `Main.qml`. Set it `true` in `hideWindowInstantly()`, reset `false`
+   in `restoreWindowState()`. The `onXChanged`/`onYChanged`/`onWidthChanged`/`onHeightChanged`
+   handlers skip persistence when the guard is true.
+
+2. **Explicit startup show.** `Component.onCompleted` now calls
+   `window.visible = true`, `window.showNormal()`, `window.raise()`,
+   `window.requestActivate()` to guarantee the window is visible and
+   focused after QML loads.
+
+3. **Diagnostic logging.** `onVisibilityChanged` handler emits
+   `CATEGORY_WINDOW_STATE` to the diagnostic ring buffer, logging
+   visibility state, position, and opacity on every change.
+
+4. **Recovery script.** `scripts/recover_settings.py` detects and
+   resets off-screen coordinates (x/y = -32000), zero opacity, and
+   tiny dimensions (< 400) in the saved UI state.
+
+5. **Screen geometry clamping.** After QML loads, `app.py` queries
+   `QGuiApplication.primaryScreen().availableGeometry()` and clamps
+   each root window's position so it is at least partially visible
+   on the current primary monitor. This prevents windows saved on a
+   disconnected multi-monitor setup from being permanently off-screen.
+
+6. **Watchdog timer.** A 5-second `QTimer.singleShot` checks window
+   visibility and forces `show()` + `raise_()` if the window is still
+   not visible.
+
+**Consequences.** Window always appears on the primary monitor, even
+if saved coordinates were from a different monitor configuration.
+Off-screen positions from cancelled screenshots are never persisted.
+Diagnostic logging catches any future window state anomalies.
