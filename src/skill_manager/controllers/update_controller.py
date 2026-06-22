@@ -413,7 +413,9 @@ class UpdateController(BaseController):
                             discovered = []
                             for folder in updated:
                                 try:
-                                    folder_path = Path(pkg_path) / folder if pkg_path else Path(folder)
+                                    folder_path = (
+                                        Path(pkg_path) / folder if pkg_path else Path(folder)
+                                    )
                                     if folder_path.is_dir():
                                         skill_data = service.discover_single_skill(
                                             folder_path, folder_path
@@ -484,9 +486,7 @@ class UpdateController(BaseController):
                                 if skill_data:
                                     discovered_skills.append(skill_data)
                             except Exception as exc:
-                                logger.error(
-                                    "[SYNC SCAN] Failed scanning %s: %s", skill_path, exc
-                                )
+                                logger.error("[SYNC SCAN] Failed scanning %s: %s", skill_path, exc)
 
                 if discovered_skills:
                     patch_cache_add(discovered_skills)

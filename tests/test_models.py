@@ -264,7 +264,7 @@ def test_skill_model_client_filter_migration(qapp):
             "local_path": "/cmd/other.md",
             "is_command": False,
             "category": "Dev",
-        }
+        },
     ]
     model = SkillModel()
     model.setSkills(skills)

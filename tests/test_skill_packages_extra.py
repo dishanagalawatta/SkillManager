@@ -173,9 +173,7 @@ def test_relocate_packages_from_output_skip_same_as_dest(tmp_path):
     skill1.mkdir()
     (skill1 / "SKILL.md").write_text("content")
 
-    result = relocate_packages_from_output(
-        [f"Installed to {dest}"], str(dest), None
-    )
+    result = relocate_packages_from_output([f"Installed to {dest}"], str(dest), None)
     assert result == []
 
 
@@ -199,9 +197,7 @@ def test_relocate_packages_from_output_fallback_regex(tmp_path):
     dest = tmp_path / "dest"
     dest.mkdir()
     skills_inline = f"C:/nonesuch/{tmp_path.name}/skills"
-    result = relocate_packages_from_output(
-        [f"Installed to {skills_inline}"], str(dest), None
-    )
+    result = relocate_packages_from_output([f"Installed to {skills_inline}"], str(dest), None)
     assert result is None
 
 
@@ -216,9 +212,7 @@ def test_relocate_packages_from_output_standalone_skill(tmp_path):
     standalone.mkdir()
     (standalone / "SKILL.md").write_text("content")
 
-    result = relocate_packages_from_output(
-        [f"Installed to {standalone}"], str(dest), None
-    )
+    result = relocate_packages_from_output([f"Installed to {standalone}"], str(dest), None)
     assert result == ["standalone-skill"]
     assert (dest / "standalone-skill").is_dir()
 
@@ -261,9 +255,7 @@ def test_relocate_packages_from_output_container_move(tmp_path):
     dest = tmp_path / "dest"
     dest.mkdir()
 
-    result = relocate_packages_from_output(
-        [f"Installed to {skills_dir}"], str(dest), None
-    )
+    result = relocate_packages_from_output([f"Installed to {skills_dir}"], str(dest), None)
     assert result == ["skill1"]
     assert (dest / "skill1").is_dir()
 

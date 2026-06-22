@@ -45,9 +45,15 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
 
     assert "ToolTip {" in skill_item
     assert "id: screenshotTooltip" in skill_item
-    assert "visible: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
+    assert (
+        "visible: mouseArea.containsMouse && model && model.isScreenshot && model.path"
+        in skill_item
+    )
     assert "delay: 450" in skill_item
-    assert 'source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""' in skill_item
+    assert (
+        'source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""'
+        in skill_item
+    )
     assert "fillMode: Image.PreserveAspectFit" in skill_item
     assert "implicitWidth: Math.min(300, previewImg.implicitWidth)" in skill_item
 
@@ -59,7 +65,10 @@ def test_text_preview_tooltip_exists_in_skill_item():
     assert "visible: mouseArea.containsMouse && previewText.length > 0" in skill_item
     assert "model.isCommand && model.bodyContent" in skill_item
     assert "model.description" in skill_item
-    assert "font.family: (model && model.isCommand) ? \"Consolas, Monaco, Courier New, monospace\" : Theme.fontFamily" in skill_item
+    assert (
+        'font.family: (model && model.isCommand) ? "Consolas, Monaco, Courier New, monospace" : Theme.fontFamily'
+        in skill_item
+    )
     assert "width: Math.min(implicitWidth, 280)" in skill_item
     assert "substring(0, 180)" in skill_item
 

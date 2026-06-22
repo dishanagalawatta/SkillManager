@@ -427,7 +427,11 @@ class ConfigController(BaseController):
                 all_skills = getattr(model, "_all_skills", None)
                 if isinstance(all_skills, list):
                     for skill in all_skills:
-                        sp = skill.get("project_path") if isinstance(skill, dict) else getattr(skill, "project_path", None)
+                        sp = (
+                            skill.get("project_path")
+                            if isinstance(skill, dict)
+                            else getattr(skill, "project_path", None)
+                        )
                         if sp and str(sp) == str(path):
                             if isinstance(skill, dict):
                                 skill["project_label"] = new_label

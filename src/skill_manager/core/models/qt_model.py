@@ -270,13 +270,26 @@ class SkillModel(QAbstractListModel):
                 new_selected_ids = set()
                 changed = False
                 for selected_path in self._selected_ids:
-                    old_skill = next((s for s in self._all_skills if s.local_path == selected_path), None)
-                    if (old_skill and old_skill.is_command and old_skill.client
-                        and old_skill.client.lower() == old_client.lower()):
-
-                        new_skill = next((s for s in self._all_skills
-                                          if s.is_command and s.name == old_skill.name
-                                          and s.client and s.client.lower() == value.lower()), None)
+                    old_skill = next(
+                        (s for s in self._all_skills if s.local_path == selected_path), None
+                    )
+                    if (
+                        old_skill
+                        and old_skill.is_command
+                        and old_skill.client
+                        and old_skill.client.lower() == old_client.lower()
+                    ):
+                        new_skill = next(
+                            (
+                                s
+                                for s in self._all_skills
+                                if s.is_command
+                                and s.name == old_skill.name
+                                and s.client
+                                and s.client.lower() == value.lower()
+                            ),
+                            None,
+                        )
                         if new_skill and new_skill.local_path:
                             new_selected_ids.add(new_skill.local_path)
                             changed = True

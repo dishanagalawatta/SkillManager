@@ -640,7 +640,7 @@ def test_update_custom_command_full_multi_client(
     mock_discover.return_value = {
         "local_path": "/project/.agents/commands/Cmd.Codex.md",
         "name": "Cmd",
-        "category": "Commands"
+        "category": "Commands",
     }
     mock_app._categories = []
 
