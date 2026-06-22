@@ -3,6 +3,7 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 
+import json
 import logging
 from pathlib import Path
 
@@ -247,11 +248,18 @@ class UpdateController(BaseController):
             logger.error("Failed to add update package: %s", e)
             self.app._set_status(f"Error adding package: {e}")
 
-    @Slot(dict)
-    def addSkillPackage(self, data: dict):
-        """Adds a fully configured skill package (git/npx/custom)."""
+    @Slot(dict, result=str)
+    def addSkillPackage(self, data: dict) -> str:
+        """Adds a fully configured skill package (git/npx/custom).
+
+        Returns a JSON-encoded dict with keys ``ok`` (bool), ``error``
+        (str | None), and ``name`` (str).  QML callers should inspect the
+        return value and show an inline error on failure instead of closing
+        the dialog.
+        """
         if not data:
-            return
+            return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
+
         from skill_manager.core.skill_packages import (
             check_skill_package_versions,
             normalize_skill_package_config,
@@ -264,74 +272,129 @@ class UpdateController(BaseController):
             record.is_updating = False
             record.last_updated = "Never"
 
-            # 2. Version Check (returns dict, so we re-validate)
-            checked_data = check_skill_package_versions(record.model_dump())
-            final_record = UpdatePackageRecord.model_validate(checked_data)
+            # 2. Phase 1 — detect latest_version only (no snap yet)
+            detected_data = check_skill_package_versions(record.model_dump())
 
-            # 3. Commit to state
+            # 3. Block save if latest_version is undetectable
+            if not detected_data.get("latest_version"):
+                pkg_name = record.name or "unknown"
+                error_msg = (
+                    f'Could not detect latest version for "{pkg_name}". '
+                    "Provide a repository URL or a latest_version_command and try again."
+                )
+                self.app._set_status(f"Add failed: {error_msg}")
+                return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
+
+            # 4. Phase 2 — snap current_version = latest_version on add
+            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            final_record = UpdatePackageRecord.model_validate(synced_data)
+
+            # 5. Commit to state
             self.app._update_packages.append(final_record.model_dump())
             self._resolvePackageStorageState()
             self.app._set_status(f"Added skill package: {final_record.name}")
             capture_event("skill_package_added", {"source_type": final_record.source_type})
+
+            return json.dumps({"ok": True, "error": None, "name": final_record.name})
         except Exception as e:
             logger.error("Failed to add skill package: %s", e)
             self.app._set_status(f"Error adding skill package: {e}")
+            return json.dumps({"ok": False, "error": str(e), "name": data.get("name", "")})
 
-    @Slot(int, dict)
-    def updateUpdatePackage(self, index: int, data: dict):
-        """Updates configuration for an existing skill package."""
-        if 0 <= index < len(self.app._update_packages):
-            try:
-                # Preserve internal state
-                is_updating = self.app._update_packages[index].get("is_updating", False)
+    @Slot(int, dict, result=str)
+    def updateUpdatePackage(self, index: int, data: dict) -> str:
+        """Updates configuration for an existing skill package.
 
-                from skill_manager.core.skill_packages import (
-                    check_skill_package_versions,
-                    normalize_skill_package_config,
+        Returns a JSON-encoded dict with keys ``ok`` (bool), ``error``
+        (str | None), and ``name`` (str).  QML callers should inspect the
+        return value and show an inline error on failure instead of closing
+        the dialog.
+        """
+        if not (0 <= index < len(self.app._update_packages)):
+            return json.dumps({"ok": False, "error": "Invalid package index.", "name": ""})
+
+        if not data:
+            return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
+
+        from skill_manager.core.skill_packages import (
+            check_skill_package_versions,
+            normalize_skill_package_config,
+        )
+
+        try:
+            # Preserve internal state from existing record
+            existing = self.app._update_packages[index]
+            is_updating = existing.get("is_updating", False)
+            just_finished = existing.get("just_finished", False)
+            last_updated = existing.get("last_updated", "Never")
+
+            # 1. Normalize and Validate
+            normalized = normalize_skill_package_config(data)
+            record = UpdatePackageRecord.model_validate(normalized)
+            record.is_updating = is_updating
+            record.just_finished = just_finished
+            record.last_updated = last_updated
+
+            # 2. Phase 1 — detect latest_version only (no snap yet)
+            detected_data = check_skill_package_versions(record.model_dump())
+
+            # 3. Block save if latest_version is undetectable
+            if not detected_data.get("latest_version"):
+                pkg_name = record.name or "unknown"
+                error_msg = (
+                    f'Could not detect latest version for "{pkg_name}". '
+                    "Provide a repository URL or a latest_version_command and try again."
                 )
+                self.app._set_status(f"Edit failed: {error_msg}")
+                return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
 
-                normalized = normalize_skill_package_config(data)
-                record = UpdatePackageRecord.model_validate(normalized)
-                record.is_updating = is_updating
+            # 4. Phase 2 — snap current_version = latest_version on edit
+            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            final_record = UpdatePackageRecord.model_validate(synced_data)
 
-                # Refresh versions
-                checked_data = check_skill_package_versions(record.model_dump())
-                final_record = UpdatePackageRecord.model_validate(checked_data)
+            # Re-apply internal state (model_validate defaults these)
+            final_record.is_updating = is_updating
+            final_record.just_finished = just_finished
+            final_record.last_updated = last_updated
 
-                self.app._update_packages[index] = final_record.model_dump()
-                self._resolvePackageStorageState()
+            # 5. Commit to state
+            self.app._update_packages[index] = final_record.model_dump()
+            self._resolvePackageStorageState()
 
-                # Informative log: show what was saved and the version check result
-                current_ver = final_record.current_version or "unknown"
-                latest_ver = final_record.latest_version or "unknown"
-                status_msg = (
-                    f"Package settings saved: {final_record.name} "
-                    f"(version check: {current_ver} → {latest_ver})"
-                )
-                self.app._set_status(status_msg)
+            # Informative log: show what was saved and the version check result
+            current_ver = final_record.current_version or "unknown"
+            latest_ver = final_record.latest_version or "unknown"
+            status_msg = (
+                f"Package settings saved: {final_record.name} "
+                f"(version check: {current_ver} → {latest_ver})"
+            )
+            self.app._set_status(status_msg)
 
-                # Diagnostic log with full context
-                from skill_manager.core.diagnostics import (
-                    CATEGORY_UPDATE_RESULT,
-                    get_diagnostic_logger,
-                )
+            # Diagnostic log with full context
+            from skill_manager.core.diagnostics import (
+                CATEGORY_UPDATE_RESULT,
+                get_diagnostic_logger,
+            )
 
-                get_diagnostic_logger().log_event(
-                    "INFO",
-                    CATEGORY_UPDATE_RESULT,
-                    f"Config saved for package: {final_record.name}",
-                    data={
-                        "package_id": final_record.package_id,
-                        "source_type": final_record.source_type,
-                        "current_version": final_record.current_version,
-                        "latest_version": final_record.latest_version,
-                        "repository_url": final_record.repository_url,
-                        "index": index,
-                    },
-                )
-            except Exception as e:
-                logger.error("Failed to update skill package: %s", e)
-                self.app._set_status(f"Error updating skill package: {e}")
+            get_diagnostic_logger().log_event(
+                "INFO",
+                CATEGORY_UPDATE_RESULT,
+                f"Config saved for package: {final_record.name}",
+                data={
+                    "package_id": final_record.package_id,
+                    "source_type": final_record.source_type,
+                    "current_version": final_record.current_version,
+                    "latest_version": final_record.latest_version,
+                    "repository_url": final_record.repository_url,
+                    "index": index,
+                },
+            )
+
+            return json.dumps({"ok": True, "error": None, "name": final_record.name})
+        except Exception as e:
+            logger.error("Failed to update skill package: %s", e)
+            self.app._set_status(f"Error updating skill package: {e}")
+            return json.dumps({"ok": False, "error": str(e), "name": data.get("name", "")})
 
     @Slot(int)
     def removeUpdatePackage(self, index: int):
@@ -601,9 +664,7 @@ class UpdateController(BaseController):
                     def update_ui():
                         self._merge_discovered_skills(discovered_skills)
                         for skill_dict in discovered_skills:
-                            self.app.ops._refresh_selected_skill(
-                                skill_dict.get("local_path", "")
-                            )
+                            self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
 
                     QTimer.singleShot(0, self.app, update_ui)
 

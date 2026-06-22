@@ -187,7 +187,10 @@ class TestUpdateFlows:
             patch("skill_manager.controllers.update_controller.UpdatePackageRecord") as mock_rec,
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
-                side_effect=lambda d: d,
+                side_effect=lambda d, **kw: {
+                    **d,
+                    "latest_version": d.get("latest_version") or "1.0.0",
+                },
             ),
             patch(
                 "skill_manager.core.skill_packages.normalize_skill_package_config",
@@ -249,10 +252,12 @@ class TestUpdateFlows:
             "package_name": "@edited/pkg",
             "package_path": "/tmp/edited",
         }
+        detected = {**edited, "latest_version": "1.0.0", "current_version": ""}
+        synced = {**detected, "current_version": "1.0.0"}
         with (
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
-                side_effect=lambda d: d,
+                side_effect=[detected, synced],
             ),
             patch.object(ctrl, "_resolvePackageStorageState"),
         ):
@@ -543,9 +548,15 @@ class TestPackageConfigFieldPreservation:
             "github_token": "ghp_secret123",
             "clone_path": "/tmp/clone",
         }
-        with patch(
-            "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda d: d,
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=lambda d, **kw: {
+                    **d,
+                    "latest_version": d.get("latest_version") or "1.0.0",
+                },
+            ),
+            patch.object(ctrl, "_resolvePackageStorageState"),
         ):
             ctrl.addSkillPackage(pkg)
 
@@ -563,10 +574,12 @@ class TestPackageConfigFieldPreservation:
             "package_args": "--save-dev",
             "update_command": "npm update",
         }
+        detected = {**edited, "latest_version": "1.0.0", "current_version": ""}
+        synced = {**detected, "current_version": "1.0.0"}
         with (
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
-                side_effect=lambda d: d,
+                side_effect=[detected, synced],
             ),
             patch.object(ctrl, "_resolvePackageStorageState"),
         ):
@@ -591,9 +604,15 @@ class TestPackageConfigFieldPreservation:
             "current_version_command": "node -v",
             "latest_version_command": "npm show version",
         }
-        with patch(
-            "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda d: d,
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=lambda d, **kw: {
+                    **d,
+                    "latest_version": d.get("latest_version") or "1.0.0",
+                },
+            ),
+            patch.object(ctrl, "_resolvePackageStorageState"),
         ):
             ctrl.addSkillPackage(pkg)
 

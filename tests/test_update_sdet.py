@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,9 +51,15 @@ class TestUpdateControllerSDET:
             "extra_field": "should-be-ignored",
         }
 
-        with patch(
-            "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda x: x,
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=lambda x, **kw: {
+                    **x,
+                    "latest_version": x.get("latest_version") or "1.0.0",
+                },
+            ),
+            patch.object(controller, "_resolvePackageStorageState"),
         ):
             controller.addSkillPackage(data)
 
@@ -76,16 +83,28 @@ class TestUpdateControllerSDET:
     def test_update_update_package_persistence(self, controller, mock_app):
         mock_app._update_packages = [{"name": "Old", "package_id": "p1", "source_type": "npx"}]
 
-        new_data = {"name": "New", "package_id": "p1", "source_type": "git"}
+        new_data = {"name": "New", "package_id": "p1", "source_type": "npx"}
 
-        with patch(
-            "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda x: x,
+        detected = {
+            "name": "New",
+            "package_id": "p1",
+            "source_type": "npx",
+            "latest_version": "2.0.0",
+            "current_version": "",
+        }
+        synced = {**detected, "current_version": "2.0.0"}
+
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=[detected, synced],
+            ),
+            patch.object(controller, "_resolvePackageStorageState"),
         ):
             controller.updateUpdatePackage(0, new_data)
 
         assert mock_app._update_packages[0]["name"] == "New"
-        assert mock_app._update_packages[0]["source_type"] == "git"
+        assert mock_app._update_packages[0]["source_type"] == "npx"
 
     def test_resolve_package_storage_state_recovery(self, controller, mock_app):
         # Simulate corrupted config data
@@ -139,7 +158,7 @@ class TestUpdateControllerSDET:
             {"name": "TestPkg", "package_id": "test12345", "source_type": "git"}
         ]
 
-        def mock_check(source, force_refresh=False):
+        def mock_check(source, force_refresh=False, sync_current_to_latest=False):
             return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
 
         with (
@@ -168,7 +187,7 @@ class TestUpdateControllerSDET:
             }
         ]
 
-        def mock_check(source, force_refresh=False):
+        def mock_check(source, force_refresh=False, sync_current_to_latest=False):
             return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
 
         with (
@@ -177,11 +196,17 @@ class TestUpdateControllerSDET:
                 side_effect=mock_check,
             ),
             patch.object(controller, "_resolvePackageStorageState"),
-            patch(
-                "skill_manager.core.diagnostics.get_diagnostic_logger"
-            ) as mock_diag,
+            patch("skill_manager.core.diagnostics.get_diagnostic_logger") as mock_diag,
         ):
-            controller.updateUpdatePackage(0, {"name": "DiagPkg", "package_id": "diag12345", "source_type": "git", "repository_url": "https://github.com/test/repo.git"})
+            controller.updateUpdatePackage(
+                0,
+                {
+                    "name": "DiagPkg",
+                    "package_id": "diag12345",
+                    "source_type": "git",
+                    "repository_url": "https://github.com/test/repo.git",
+                },
+            )
 
             # Verify diagnostic event was logged
             mock_diag.return_value.log_event.assert_called_once()
@@ -196,3 +221,40 @@ class TestUpdateControllerSDET:
             assert data["current_version"] == "v1.0.0"
             assert data["latest_version"] == "v2.0.0"
             assert data["repository_url"] == "https://github.com/test/repo.git"
+
+    def test_update_update_package_blocked_when_undetectable(self, controller, mock_app):
+        """updateUpdatePackage returns JSON error when latest_version undetectable."""
+        mock_app._update_packages = [
+            {"name": "MysteryPkg", "package_id": "mystery123", "source_type": "custom"}
+        ]
+
+        with patch(
+            "skill_manager.core.skill_packages.check_skill_package_versions",
+            return_value={
+                "name": "MysteryPkg",
+                "source_type": "custom",
+                "current_version": "",
+                "latest_version": "",
+                "current_version_command": "",
+                "latest_version_command": "",
+                "repository_url": "",
+            },
+        ):
+            result = controller.updateUpdatePackage(
+                0,
+                {
+                    "name": "MysteryPkg",
+                    "source_type": "custom",
+                    "package_name": "",
+                    "repository_url": "",
+                    "update_command": "",
+                    "current_version_command": "",
+                    "latest_version_command": "",
+                },
+            )
+
+        parsed = json.loads(result)
+        assert parsed["ok"] is False
+        assert "Could not detect latest version" in parsed["error"]
+        # Original record should be unchanged
+        assert mock_app._update_packages[0]["name"] == "MysteryPkg"

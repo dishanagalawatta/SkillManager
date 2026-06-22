@@ -18,6 +18,99 @@
 | [ADR-0010](#adr-0010-drop-tuf-use-github-releases-api) | Drop TUF, use GitHub Releases API | Accepted | 2026 |
 | [ADR-0011](#adr-0011-selection-refresh-invariant) | Selection refresh invariant | Accepted | 2026 |
 | [ADR-0012](#adr-0012-window-state-integrity) | Window state integrity | Accepted | 2026 |
+| [ADR-0013](#adr-0013-package-add-snap-to-latest-policy) | Package add: snap-to-latest policy | Accepted | 2026 |
+| [ADR-0014](#adr-0014-package-edit-snap-to-latest-policy) | Package edit: snap-to-latest policy | Accepted | 2026 |
+
+---
+
+## ADR-0013 — Package add: snap-to-latest policy
+
+**Status:** Accepted
+
+**Context.** Adding a new skill package via `addSkillPackage` left
+`current_version` empty while `latest_version` was auto-detected from
+the registry. QML's fallback `|| "1.0.0"` rendered `v1.0.0 → v1.9.0`
+with an **Update** button — a newly-added package appeared outdated
+before any install had run. The model conflated "registered" with
+"installed".
+
+**Decision.** Three-part fix:
+
+1. **Snap on add.** When a package is added via `addSkillPackage`,
+   detect `latest_version` (phase 1) and then snap
+   `current_version = latest_version` (phase 2) using the new
+   `sync_current_to_latest` flag in `check_skill_package_versions`.
+   The package shows **Up to Date** immediately; the **Update** button
+   only appears when the registry moves ahead.
+
+2. **Block on undetectable latest.** If `latest_version` is empty
+   after phase-1 detection (no repo URL, npm unreachable, no
+   `latest_version_command`), the controller returns a structured
+   JSON error `{"ok": false, "error": "..."}` and does **not** append
+   to `_update_packages`. The QML dialog shows an inline error and
+   keeps the user's input for correction.
+
+3. **No migration.** Existing packages with `current_version=""` are
+   not auto-healed. Users fix them by re-adding or clicking Update
+   once. Release notes document this.
+
+**Consequences.** `addSkillPackage` now returns `result=str` (JSON)
+instead of void. `PackageEditDialog.qml` inspects the return value
+and shows an inline error on failure. The `_sync_current_to_latest_if_applicable`
+helper is reused by both `force_refresh=True` (post-update) and
+`sync_current_to_latest=True` (add) paths — no code duplication.
+
+---
+
+## ADR-0014 — Package edit: snap-to-latest policy
+
+**Status:** Accepted
+
+**Context.** Editing an existing skill package via `updateUpdatePackage`
+had the same broken behavior that `addSkillPackage` exhibited before
+ADR-0013: the QML dialog only sends user-input fields (no
+`current_version`), so the record's `current_version` defaulted to `""`.
+QML's `|| "1.0.0"` fallback rendered `v1.0.0 → vX.Y.Z` with an
+**Update** button — a just-edited package appeared outdated.
+
+Additionally, `updateUpdatePackage` used a single-phase call to
+`check_skill_package_versions` without `sync_current_to_latest`, so
+`current_version` was never snapped even when detectable.
+
+**Decision.** Mirror ADR-0013 for the edit path:
+
+1. **Snap on edit.** `updateUpdatePackage` now calls
+   `check_skill_package_versions` twice — phase 1 detect, phase 2 snap
+   via `sync_current_to_latest=True`. The package shows **Up to Date**
+   immediately after saving.
+
+2. **Block on undetectable latest.** If `latest_version` is empty
+   after phase-1 detection, the controller returns a structured
+   JSON error and does **not** overwrite the record. The QML dialog
+   shows an inline error and keeps the user's input.
+
+3. **Preserve internal state.** `is_updating`, `just_finished`, and
+   `last_updated` are read from the existing record before validation
+   and re-applied after `model_validate` (which defaults them).
+
+4. **JSON return.** The `@Slot` signature changes from
+   `(int, dict)` to `(int, dict, result=str)`. `PackageEditDialog.qml`
+   parses the return and shows inline errors on failure.
+
+5. **Extend snap to git sources.** The `_sync_current_to_latest_if_applicable`
+   helper now snaps for **all** source types (including git) when
+   `current_version` is empty and `latest_version` is available. The
+   previous `source_type != "git"` exclusion was too conservative —
+   git sources whose local clone path was not detected (e.g. user
+   entered the install path instead of the clone path) showed
+   `unknown → vX.Y.Z` after edit. The condition is now:
+   `latest AND !current AND !current_version_command`.
+
+**Consequences.** Consistent behavior between add and edit across all
+source types. The `_sync_current_to_latest_if_applicable` helper is
+now used by three code paths (post-update, add, edit) with zero
+duplication. Existing tests updated to handle the two-phase mock
+pattern.
 
 ---
 

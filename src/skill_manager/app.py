@@ -832,13 +832,13 @@ class AppController(QObject):
     def addUpdatePackage(self, n):
         self.updates.addUpdatePackage(n)
 
-    @Slot(dict)
+    @Slot(dict, result=str)
     def addSkillPackage(self, d):
-        self.updates.addSkillPackage(d)
+        return self.updates.addSkillPackage(d)
 
-    @Slot(int, dict)
+    @Slot(int, dict, result=str)
     def updateUpdatePackage(self, i, d):
-        self.updates.updateUpdatePackage(i, d)
+        return self.updates.updateUpdatePackage(i, d)
 
     @Slot(int)
     def removeUpdatePackage(self, i):
@@ -964,9 +964,7 @@ class AppController(QObject):
                 len(missing),
                 missing,
             )
-            self._set_status(
-                f"Warning: {len(missing)} configured directory(ies) not found"
-            )
+            self._set_status(f"Warning: {len(missing)} configured directory(ies) not found")
 
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
@@ -1132,7 +1130,9 @@ def main():  # pragma: no cover
         logger.error("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
     diag = get_diagnostic_logger()
-    diag.log_event("INFO", "window_state", f"QML loaded, {len(engine.rootObjects())} root object(s)")
+    diag.log_event(
+        "INFO", "window_state", f"QML loaded, {len(engine.rootObjects())} root object(s)"
+    )
     capture_event("app_opened")
 
     # Clamp window geometry to visible screen area to prevent off-screen windows.
@@ -1143,8 +1143,11 @@ def main():  # pragma: no cover
         geo = screen.availableGeometry()
         screen_x, screen_y = geo.x(), geo.y()
         screen_w, screen_h = geo.width(), geo.height()
-        diag.log_event("INFO", "window_state",
-            f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h})")
+        diag.log_event(
+            "INFO",
+            "window_state",
+            f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h})",
+        )
         for root in engine.rootObjects():
             r: Any = root
             win_x, win_y = r.x(), r.y()
@@ -1153,8 +1156,11 @@ def main():  # pragma: no cover
             new_x = max(screen_x, min(win_x, screen_x + screen_w - max(win_w, 100)))
             new_y = max(screen_y, min(win_y, screen_y + screen_h - max(win_h, 100)))
             if new_x != win_x or new_y != win_y:
-                diag.log_event("WARN", "window_state",
-                    f"Window off-screen at ({win_x}, {win_y}) — clamping to ({new_x}, {new_y})")
+                diag.log_event(
+                    "WARN",
+                    "window_state",
+                    f"Window off-screen at ({win_x}, {win_y}) — clamping to ({new_x}, {new_y})",
+                )
                 r.setX(new_x)
                 r.setY(new_y)
 
@@ -1170,10 +1176,18 @@ def main():  # pragma: no cover
             root_any.setIcon(app_icon)
             if hasattr(root, "show"):
                 root_any.show()
-                diag.log_event("INFO", "window_state", f"Called root.show() on root {i} (visible={getattr(root, 'isVisible', lambda: 'unknown')()})")
+                diag.log_event(
+                    "INFO",
+                    "window_state",
+                    f"Called root.show() on root {i} (visible={getattr(root, 'isVisible', lambda: 'unknown')()})",
+                )
 
     def apply_native_styles():
-        diag.log_event("INFO", "window_state", f"apply_native_styles: processing {len(engine.rootObjects())} root object(s)")
+        diag.log_event(
+            "INFO",
+            "window_state",
+            f"apply_native_styles: processing {len(engine.rootObjects())} root object(s)",
+        )
         for root in engine.rootObjects():
             try:
                 hwnd = int(root.winId())  # type: ignore[attr-defined]
@@ -1217,11 +1231,17 @@ def main():  # pragma: no cover
                 r: Any = root
                 vis = r.isVisible()
                 x, y, w, h = r.x(), r.y(), r.width(), r.height()
-                diag.log_event("INFO", "window_state",
-                    f"Watchdog: root {i} visible={vis}, geometry=({x}, {y}, {w}, {h})")
+                diag.log_event(
+                    "INFO",
+                    "window_state",
+                    f"Watchdog: root {i} visible={vis}, geometry=({x}, {y}, {w}, {h})",
+                )
                 if not vis:
-                    diag.log_event("WARN", "window_state",
-                        f"Watchdog: root {i} NOT VISIBLE after 5s — forcing show")
+                    diag.log_event(
+                        "WARN",
+                        "window_state",
+                        f"Watchdog: root {i} NOT VISIBLE after 5s — forcing show",
+                    )
                     r.show()
                     r.raise_()
                     r.requestActivate()
