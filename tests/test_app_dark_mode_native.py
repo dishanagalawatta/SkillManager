@@ -19,7 +19,7 @@ from skill_manager.app import DWMWA_USE_IMMERSIVE_DARK_MODE, _apply_immersive_da
 
 class TestApplyImmersiveDark:
     def test_sets_attribute_on(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, True)
 
         mock_dwm.assert_called_once()
@@ -32,7 +32,7 @@ class TestApplyImmersiveDark:
         assert args[3] == 4  # sizeof(DWORD)
 
     def test_sets_attribute_off(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, False)
 
         args = mock_dwm.call_args[0]
