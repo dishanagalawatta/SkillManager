@@ -6,7 +6,8 @@ from skill_manager.utils import win32
 def test_apply_native_style_windows_success_and_failure():
     window = MagicMock()
     with (
-        patch("skill_manager.utils.win32.pywinstyles.apply_style") as apply_style,
+        patch("skill_manager.utils.win32.pywinstyles", create=True) as mock_pywinstyles,
+        patch.object(mock_pywinstyles, "apply_style") as apply_style,
     ):
         win32.apply_native_style(window, "mica")
     window.update.assert_called_once()

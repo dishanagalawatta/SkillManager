@@ -618,12 +618,10 @@ class TestFilterEngineCategorizer:
         with (
             patch("skill_manager.utils.win32.WINDOWPLACEMENT", return_value=mock_placement),
             patch("skill_manager.utils.win32.ctypes.sizeof", return_value=44),
-            patch(
-                "skill_manager.utils.win32.ctypes.windll.user32.GetWindowPlacement",
-                return_value=True,
-            ),
             patch("skill_manager.utils.win32.ctypes.byref", side_effect=lambda x: x),
+            patch("skill_manager.utils.win32.ctypes.windll", create=True) as mock_windll,
         ):
+            mock_windll.user32.GetWindowPlacement.return_value = True
             result = get_window_placement(12345)
             assert isinstance(result, tuple)
             assert len(result) == 5
