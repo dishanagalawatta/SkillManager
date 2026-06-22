@@ -17,7 +17,8 @@ def test_sanitize_token():
     assert (
         sanitize_token("echo password='my secret'; other args") == "echo password='***'; other args"
     )
-    assert sanitize_token("echo password=secret; other args") == "echo password=***; other args"
+    assert sanitize_token("echo password=secret; other args") == "echo password=***"
+    assert sanitize_token("echo password='my secret") == "echo password=***"
     assert sanitize_token("ghp_123456789012345678901234567890123456 extra") == "*** extra"
     assert (
         sanitize_token(
