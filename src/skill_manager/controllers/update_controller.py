@@ -300,7 +300,35 @@ class UpdateController(BaseController):
 
                 self.app._update_packages[index] = final_record.model_dump()
                 self._resolvePackageStorageState()
-                self.app._set_status(f"Updated skill package: {final_record.name}")
+
+                # Informative log: show what was saved and the version check result
+                current_ver = final_record.current_version or "unknown"
+                latest_ver = final_record.latest_version or "unknown"
+                status_msg = (
+                    f"Package settings saved: {final_record.name} "
+                    f"(version check: {current_ver} → {latest_ver})"
+                )
+                self.app._set_status(status_msg)
+
+                # Diagnostic log with full context
+                from skill_manager.core.diagnostics import (
+                    CATEGORY_UPDATE_RESULT,
+                    get_diagnostic_logger,
+                )
+
+                get_diagnostic_logger().log_event(
+                    "INFO",
+                    CATEGORY_UPDATE_RESULT,
+                    f"Config saved for package: {final_record.name}",
+                    data={
+                        "package_id": final_record.package_id,
+                        "source_type": final_record.source_type,
+                        "current_version": final_record.current_version,
+                        "latest_version": final_record.latest_version,
+                        "repository_url": final_record.repository_url,
+                        "index": index,
+                    },
+                )
             except Exception as e:
                 logger.error("Failed to update skill package: %s", e)
                 self.app._set_status(f"Error updating skill package: {e}")
@@ -319,13 +347,38 @@ class UpdateController(BaseController):
     @Slot(int)
     def runPackageUpdate(self, index: int):
         """Runs update for a single skill package."""
+        from skill_manager.core.diagnostics import (
+            CATEGORY_UPDATE_RESULT,
+            CATEGORY_UPDATE_SLOT,
+            get_diagnostic_logger,
+        )
+
         if 0 <= index < len(self.app._update_packages):
+            diag = get_diagnostic_logger()
+            diag.log_event(
+                "INFO",
+                CATEGORY_UPDATE_SLOT,
+                f"runPackageUpdate({index}) invoked",
+                data={"package_count": len(self.app._update_packages)},
+            )
+
             self._resolvePackageStorageState()
-            source = self.app._update_packages[index]
+
+            # Replace the dict (not mutate in-place) so QML's QVariantMap
+            # snapshot is invalidated and delegate bindings re-evaluate.
+            source = dict(self.app._update_packages[index])
             source["is_updating"] = True
             source["just_finished"] = False
+            source["update_error"] = ""
+            self.app._update_packages[index] = source
             self.app.updatePackagesChanged.emit()
             self.app._set_status(f"Updating {source.get('name')}...")
+
+            diag.log_event(
+                "DEBUG",
+                CATEGORY_UPDATE_SLOT,
+                f"Package {source.get('name')} marked is_updating=True",
+            )
 
             def run():
                 from datetime import datetime
@@ -400,12 +453,25 @@ class UpdateController(BaseController):
                     updated_source["removals_verified"] = removals_verified
                     save_package_skill_inventory(inventory)
                     source.update(updated_source)
+                    source["update_error"] = ""
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    diag.log_event(
+                        "INFO",
+                        CATEGORY_UPDATE_RESULT,
+                        f"Package {source.get('name')} updated successfully",
+                    )
                     capture_event(
                         "skill_package_updated",
                         {"source_type": source.get("source_type", "unknown"), "success": True},
                     )
                 except Exception as e:
+                    source["update_error"] = str(e)
+                    diag.log_event(
+                        "ERROR",
+                        CATEGORY_UPDATE_RESULT,
+                        f"Package {source.get('name')} update failed: {e}",
+                        data={"error": str(e)},
+                    )
                     capture_event(
                         "skill_package_updated",
                         {"source_type": source.get("source_type", "unknown"), "success": False},
@@ -418,6 +484,7 @@ class UpdateController(BaseController):
                     def finalize_ui():
                         source["is_updating"] = False
                         source["just_finished"] = True
+                        # Replace dict to force QML re-eval of final state.
                         self.app._update_packages[index] = dict(source)
                         self.app.updatePackagesChanged.emit()
                         self.app._set_status(f"Update finished for {source.get('name')}")
@@ -464,6 +531,10 @@ class UpdateController(BaseController):
                             if discovered:
                                 patch_cache_add(discovered)
                                 self._merge_discovered_skills(discovered)
+                                for skill_dict in discovered:
+                                    self.app.ops._refresh_selected_skill(
+                                        skill_dict.get("local_path", "")
+                                    )
 
                         self.config.set("skills", self.app._update_packages)
 
@@ -529,6 +600,10 @@ class UpdateController(BaseController):
 
                     def update_ui():
                         self._merge_discovered_skills(discovered_skills)
+                        for skill_dict in discovered_skills:
+                            self.app.ops._refresh_selected_skill(
+                                skill_dict.get("local_path", "")
+                            )
 
                     QTimer.singleShot(0, self.app, update_ui)
 

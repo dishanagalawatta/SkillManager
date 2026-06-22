@@ -24,6 +24,7 @@ FrostOverlay 1.0 FrostOverlay.qml
 SmoothListView 1.0 SmoothListView.qml
 SmoothScrollView 1.0 SmoothScrollView.qml
 AppScrollBar 1.0 AppScrollBar.qml
+SleekProgressBar 1.0 SleekProgressBar.qml
 ShortcutsSettings 1.0 views/ShortcutsSettings.qml
 DiagnosticsPane 1.0 views/DiagnosticsPane.qml
 KeySequenceCapture 1.0 KeySequenceCapture.qml

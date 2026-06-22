@@ -12,6 +12,12 @@ from PySide6.QtCore import QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.diagnostics import (
+    CATEGORY_COMMAND_CREATED,
+    CATEGORY_COMMAND_UPDATED,
+    CATEGORY_SELECTION_REFRESHED,
+    get_diagnostic_logger,
+)
 from skill_manager.core.persistence import (
     load_temp_registry,
     load_temp_screenshots_registry,
@@ -540,6 +546,8 @@ class OpsController(BaseController):
     @Slot(str, str, str, str)
     def createCustomCommand(self, name: str, body: str, project_label: str, category: str):
         """Creates a Custom Command .md file."""
+        diag = get_diagnostic_logger()
+        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, project={project_label}")
         from skill_manager.core.commands import create_custom_command_file
 
         result = create_custom_command_file(
@@ -572,6 +580,7 @@ class OpsController(BaseController):
                 if skill_data:
                     patch_cache_add([skill_data])
                     self._merge_discovered_skills([skill_data])
+                    self._refresh_selected_skill(str(result.path))
             except Exception as exc:
                 logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
@@ -583,6 +592,8 @@ class OpsController(BaseController):
         body: str,
     ):
         """Updates an existing Custom Command .md file."""
+        diag = get_diagnostic_logger()
+        diag.log_event("INFO", CATEGORY_COMMAND_UPDATED, f"path={local_path}, name={name}")
         from skill_manager.core.commands import update_custom_command_file
 
         result = update_custom_command_file(
@@ -613,6 +624,8 @@ class OpsController(BaseController):
                 if skill_data:
                     patch_cache_add([skill_data])
                     self._merge_discovered_skills([skill_data])
+                    # For renames, local_path is the OLD path but result.path is NEW.
+                    self._refresh_selected_skill(local_path, rename_path=str(result.path))
             except Exception as exc:
                 logger.error("[UPDATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
@@ -645,3 +658,60 @@ class OpsController(BaseController):
         if new_cats:
             self.app._categories.sort()
             self.app.categoriesChanged.emit()
+
+    def _refresh_selected_skill(self, local_path: str, rename_path: str | None = None) -> None:
+        """Refresh ``_selected_skill`` after a model mutation.
+
+        If the mutated skill matches the currently selected one, replace
+        the stale snapshot with a fresh dict from the model and emit
+        ``selectedSkillChanged`` so QML re-binds.
+
+        For renames, pass ``rename_path`` (the new path) when
+        ``local_path`` is the old path that no longer exists in the model.
+
+        Called from ``createCustomCommand``, ``updateCustomCommandFull``,
+        and any other site that calls ``addOrUpdateSkills`` (or
+        ``setSkills``) after a mutation that may change the selected
+        skill's data.
+
+        See ``docs/adr/0011-selection-refresh-invariant.md``.
+        """
+        diag = get_diagnostic_logger()
+        selected = self.app._selected_skill
+        selected_path = selected.get("local_path") if isinstance(selected, dict) else None
+
+        if not selected_path:
+            diag.log_event("INFO", CATEGORY_SELECTION_REFRESHED, "noop: nothing selected")
+            return
+
+        if selected_path != local_path:
+            diag.log_event(
+                "INFO",
+                CATEGORY_SELECTION_REFRESHED,
+                f"not_selected: mutated {local_path}, selected is {selected_path}",
+            )
+            return
+
+        # For renames, the old path no longer exists. Try the new path.
+        lookup_path = rename_path or local_path
+
+        # Find the row in the active model
+        model = self.app.skillModel
+        for i in range(len(model._filtered_skills)):
+            skill = model._filtered_skills[i]
+            if skill.local_path == lookup_path:
+                self.app._selected_skill = model.get_skill_at(i)
+                self.app.selectedSkillChanged.emit()
+                diag.log_event(
+                    "INFO",
+                    CATEGORY_SELECTION_REFRESHED,
+                    f"refreshed: {lookup_path}"
+                    + (f" (renamed from {local_path})" if rename_path else ""),
+                )
+                return
+
+        diag.log_event(
+            "WARNING",
+            CATEGORY_SELECTION_REFRESHED,
+            f"not_in_view: {lookup_path} not found in active model",
+        )

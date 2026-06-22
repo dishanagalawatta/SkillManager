@@ -132,7 +132,9 @@ def session_mock_config(session_temp_dir):
     os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
     config = ConfigManager()
     yield config
-    os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+    # Do NOT pop SKILL_MANAGER_DATA_DIR — the session-level env var
+    # must persist so that every subsequent test uses the test-specific
+    # data dir instead of falling back to the real app-data directory.
 
 
 @pytest.fixture
@@ -140,10 +142,16 @@ def mock_config(temp_dir):
     """Provides a function-scoped mock config."""
     data_dir = temp_dir / "data"
     data_dir.mkdir(exist_ok=True)
+    previous = os.environ.get("SKILL_MANAGER_DATA_DIR")
     os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
     config = ConfigManager()
     yield config
-    os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+    # Restore the previous value instead of popping — prevents leakage
+    # to tests that don't use this fixture.
+    if previous is not None:
+        os.environ["SKILL_MANAGER_DATA_DIR"] = previous
+    else:
+        os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
 
 
 @pytest.fixture

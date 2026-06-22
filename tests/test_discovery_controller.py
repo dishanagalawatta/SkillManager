@@ -93,3 +93,90 @@ def test_finalize_loading_with_project_label(controller, mock_app):
     )
     controller._finalize_loading(state, is_final=False)
     assert mock_app._quick_copy_model.projectFilter == "MyProject"
+
+
+def test_finalize_loading_incremental_update_refreshes_selection(controller, mock_app):
+    """Incremental discovery update calls _refresh_selected_skill for each changed skill."""
+    controller._previous_skills = {
+        "/p/s1": SkillRecord(name="S1", local_path="/p/s1", category="Dev"),
+    }
+    state = CacheState(
+        skills=[SkillRecord(name="S1", local_path="/p/s1", category="Dev", body_content="updated")],
+        categories=["Dev"],
+        project_labels=["L"],
+        status="Finished",
+    )
+    mock_app.ops = MagicMock()
+    controller._finalize_loading(state, is_final=False)
+
+    mock_app.ops._refresh_selected_skill.assert_called_with("/p/s1")
+    mock_app._library_model.addOrUpdateSkills.assert_called_once()
+    mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once()
+
+
+def test_finalize_loading_full_load_does_not_refresh_selection(controller, mock_app):
+    """Full load (first scan) does not call _refresh_selected_skill."""
+    mock_app.ops = MagicMock()
+    state = CacheState(
+        skills=[SkillRecord(name="S1", local_path="/p/s1")],
+        categories=["Dev"],
+        project_labels=["L"],
+        status="Finished",
+    )
+    controller._finalize_loading(state, is_final=True)
+
+    mock_app.ops._refresh_selected_skill.assert_not_called()
+    mock_app._library_model.setSkills.assert_called_once()
+    mock_app._quick_copy_model.setSkills.assert_called_once()
+
+
+def test_finalize_loading_safety_net_preserves_cache(controller, mock_app):
+    """When final discovery returns 0 skills but cache had skills, preserve them."""
+    # Simulate previous scan had skills
+    controller._previous_skills = {
+        "/p/s1": SkillRecord(name="S1", local_path="/p/s1", category="Dev"),
+        "/p/s2": SkillRecord(name="S2", local_path="/p/s2", category="Dev"),
+    }
+    # Final discovery returns 0 skills (source dirs missing)
+    state = CacheState(
+        skills=[],
+        categories=[],
+        project_labels=[],
+        status="Found 0 skills (0 projects)",
+    )
+    mock_app.ops = MagicMock()
+    controller._finalize_loading(state, is_final=True)
+
+    # Should NOT remove skills from model
+    mock_app._library_model.removeSkillsByPath.assert_not_called()
+    mock_app._quick_copy_model.removeSkillsByPath.assert_not_called()
+    # Should NOT call setSkills (full replacement)
+    mock_app._library_model.setSkills.assert_not_called()
+    mock_app._quick_copy_model.setSkills.assert_not_called()
+    # Should set loading to False
+    assert mock_app._is_loading is False
+    mock_app.isLoadingChanged.emit.assert_called()
+    # Status should mention the warning
+    status_call = mock_app._set_status.call_args[0][0]
+    assert "Warning" in status_call or "missing" in status_call.lower()
+
+
+def test_finalize_loading_safety_net_not_triggered_for_non_final(controller, mock_app):
+    """Safety net only triggers on final discovery, not intermediate cache loads."""
+    controller._previous_skills = {
+        "/p/s1": SkillRecord(name="S1", local_path="/p/s1", category="Dev"),
+    }
+    # Non-final (cache callback) returns 0 skills — should NOT trigger safety net
+    state = CacheState(
+        skills=[],
+        categories=[],
+        project_labels=[],
+        status="Found 0 skills",
+    )
+    mock_app.ops = MagicMock()
+    controller._finalize_loading(state, is_final=False)
+
+    # Non-final with 0 skills and previous skills: removed_paths is non-empty,
+    # but is_final=False means the safety net doesn't trigger.
+    # It falls through to the incremental update path which removes old skills.
+    mock_app._library_model.removeSkillsByPath.assert_called_once()

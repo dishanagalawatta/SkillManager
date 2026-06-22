@@ -11,12 +11,19 @@ Window {
         y = AppController.ui_controller.windowY
         width = AppController.ui_controller.windowWidth
         height = AppController.ui_controller.windowHeight
+        // Ensure window is visible and raised on startup
+        window.visible = true
+        window.showNormal()
+        window.raise()
+        window.requestActivate()
+        AppController.logDiagnostic("INFO", "window_state",
+            "Component.onCompleted: window shown at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height + ", visibility=" + window.visibility)
     }
 
-    onWidthChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowWidth = width
-    onHeightChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowHeight = height
-    onXChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowX = x
-    onYChanged: if (window.visibility === Window.Windowed) AppController.ui_controller.windowY = y
+    onWidthChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowWidth = width
+    onHeightChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
+    onXChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
+    onYChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
     minimumWidth: 1050
     minimumHeight: 650
 
@@ -90,6 +97,7 @@ Window {
     property real savedHeight: 0
     property real savedOpacity: 1
     property bool pendingScreenshot: false
+    property bool _isHidingForScreenshot: false
 
     function saveWindowState() {
         wasMaximized = (window.visibility === Window.Maximized)
@@ -101,12 +109,14 @@ Window {
     }
 
     function hideWindowInstantly() {
+        _isHidingForScreenshot = true
         window.opacity = 0
         window.x = -32000
         window.y = -32000
     }
 
     function restoreWindowState() {
+        _isHidingForScreenshot = false
         window.opacity = savedOpacity
         if (wasMaximized) {
             window.showMaximized()
@@ -119,6 +129,11 @@ Window {
         }
         window.raise()
         window.requestActivate()
+    }
+
+    onVisibilityChanged: (visibility) => {
+        AppController.logDiagnostic("INFO", "window_state",
+            "Visibility changed: " + visibility + " at (" + window.x + ", " + window.y + "), opacity=" + window.opacity)
     }
 
     function navigateTo(view) {

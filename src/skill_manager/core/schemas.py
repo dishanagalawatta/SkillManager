@@ -217,6 +217,18 @@ class UpdatePackageRecord(BaseModel):
     updated_folders: list[str] = Field(default_factory=list)
     removals_verified: bool = False
 
+    # Package config fields (preserved from normalize_skill_package_config)
+    repository_url: str = ""
+    github_token: str = ""
+    configured_package_path: str = ""
+    clone_path: str = ""
+    package_args: str = ""
+    update_command: str = ""
+    verify_command: str = ""
+    current_version_command: str = ""
+    latest_version_command: str = ""
+    install_args: str = ""
+
     @field_validator("name", mode="before")
     @classmethod
     def _coerce_name(cls, value: Any) -> str:

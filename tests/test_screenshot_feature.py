@@ -352,3 +352,26 @@ def test_cancel_capture_no_pixmap(controller):
 
     assert called
     assert controller.current_full_pixmap is None
+
+
+def test_save_screenshot_refreshes_selection(controller, mock_app, tmp_path):
+    """saveScreenshot calls _refresh_selected_skill after model update."""
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = project_path
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "Antigravity"
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    crop_rect = QRect(10, 10, 50, 50)
+    mock_app.ops = MagicMock()
+
+    with patch("PySide6.QtGui.QGuiApplication.clipboard"):
+        controller.saveScreenshot(crop_rect, [])
+
+        mock_app.ops._refresh_selected_skill.assert_called_once()
+        # The filepath is passed to _refresh_selected_skill
+        call_args = mock_app.ops._refresh_selected_skill.call_args
+        assert call_args[0][0].endswith(".png") or "Screenshot_" in str(call_args)

@@ -45,7 +45,10 @@ from skill_manager.core.categories import get_category_emoji
 from skill_manager.core.config import (
     ConfigManager,
 )
-from skill_manager.core.diagnostics import get_diagnostic_logger
+from skill_manager.core.diagnostics import (
+    CATEGORY_SOURCE_MISSING,
+    get_diagnostic_logger,
+)
 from skill_manager.core.file_watch import SkillFolderWatcher
 from skill_manager.core.global_hotkey import GlobalHotkeyManager
 from skill_manager.core.image_provider import ScreenshotImageProvider
@@ -255,6 +258,10 @@ class AppController(QObject):
 
         # In tests, we often want to skip the initial background discovery
         skip_initial = skip_initial_load or os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1"
+
+        # Validate source paths at startup — warn early if directories are missing
+        if not skip_initial:
+            self._validate_source_paths()
 
         if not skip_initial:
             self._watcher.start()
@@ -841,6 +848,11 @@ class AppController(QObject):
     def clearPackageJustFinished(self, i):
         self.updates.clearPackageJustFinished(i)
 
+    @Slot(str, str, str)
+    def logDiagnostic(self, level: str, category: str, msg: str):
+        """QML-callable diagnostic logger — emits to the structured ring buffer."""
+        get_diagnostic_logger().log_event(level, category, msg)
+
     # --- Slots ---
 
     @Property(Qt.CheckState, notify=isPackageOnlyChanged)
@@ -919,6 +931,42 @@ class AppController(QObject):
 
         # Start the listener thread
         self.global_hotkey.start()
+
+    def _validate_source_paths(self):
+        """Check configured source/project paths exist at startup.
+
+        Logs warnings for missing directories so that users see early
+        feedback instead of a silent cache-wipe on next discovery.
+        """
+        diag = get_diagnostic_logger()
+        missing: list[str] = []
+        for src in self._sources:
+            if not os.path.isdir(src):
+                missing.append(src)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Source directory not found at startup: {src}",
+                    data={"source_path": src},
+                )
+        for proj in self._projects:
+            if not os.path.isdir(proj):
+                missing.append(proj)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Project directory not found at startup: {proj}",
+                    data={"source_path": proj},
+                )
+        if missing:
+            logger.warning(
+                "[APP] %d configured source/project directories not found: %s",
+                len(missing),
+                missing,
+            )
+            self._set_status(
+                f"Warning: {len(missing)} configured directory(ies) not found"
+            )
 
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
@@ -1083,12 +1131,37 @@ def main():  # pragma: no cover
     if not engine.rootObjects():
         logger.error("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
+    diag = get_diagnostic_logger()
+    diag.log_event("INFO", "window_state", f"QML loaded, {len(engine.rootObjects())} root object(s)")
     capture_event("app_opened")
+
+    # Clamp window geometry to visible screen area to prevent off-screen windows.
+    # Saved coordinates from a previous multi-monitor setup may be invalid if
+    # the monitor was disconnected.
+    screen = app.primaryScreen()
+    if screen:
+        geo = screen.availableGeometry()
+        screen_x, screen_y = geo.x(), geo.y()
+        screen_w, screen_h = geo.width(), geo.height()
+        diag.log_event("INFO", "window_state",
+            f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h})")
+        for root in engine.rootObjects():
+            r: Any = root
+            win_x, win_y = r.x(), r.y()
+            win_w, win_h = r.width(), r.height()
+            # Clamp so the window is at least partially visible
+            new_x = max(screen_x, min(win_x, screen_x + screen_w - max(win_w, 100)))
+            new_y = max(screen_y, min(win_y, screen_y + screen_h - max(win_h, 100)))
+            if new_x != win_x or new_y != win_y:
+                diag.log_event("WARN", "window_state",
+                    f"Window off-screen at ({win_x}, {win_y}) — clamping to ({new_x}, {new_y})")
+                r.setX(new_x)
+                r.setY(new_y)
 
     # Explicitly set icon on each QML window — QGuiApplication.setWindowIcon()
     # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
     if not app_icon.isNull():
-        for root in engine.rootObjects():
+        for i, root in enumerate(engine.rootObjects()):
             # ``engine.rootObjects()`` returns ``list[QObject]`` per the stub,
             # but QML roots are actually ``QWindow``/``QQuickWindow`` which
             # expose ``setIcon``/``show``/``winId``. Cast through ``Any`` so
@@ -1097,8 +1170,10 @@ def main():  # pragma: no cover
             root_any.setIcon(app_icon)
             if hasattr(root, "show"):
                 root_any.show()
+                diag.log_event("INFO", "window_state", f"Called root.show() on root {i} (visible={getattr(root, 'isVisible', lambda: 'unknown')()})")
 
     def apply_native_styles():
+        diag.log_event("INFO", "window_state", f"apply_native_styles: processing {len(engine.rootObjects())} root object(s)")
         for root in engine.rootObjects():
             try:
                 hwnd = int(root.winId())  # type: ignore[attr-defined]
@@ -1135,6 +1210,26 @@ def main():  # pragma: no cover
                 logger.error(f"Failed to apply native style/icon: {e}")
 
     QTimer.singleShot(0, apply_native_styles)
+
+    def _check_window_visible():
+        for i, root in enumerate(engine.rootObjects()):
+            try:
+                r: Any = root
+                vis = r.isVisible()
+                x, y, w, h = r.x(), r.y(), r.width(), r.height()
+                diag.log_event("INFO", "window_state",
+                    f"Watchdog: root {i} visible={vis}, geometry=({x}, {y}, {w}, {h})")
+                if not vis:
+                    diag.log_event("WARN", "window_state",
+                        f"Watchdog: root {i} NOT VISIBLE after 5s — forcing show")
+                    r.show()
+                    r.raise_()
+                    r.requestActivate()
+            except Exception as e:
+                diag.log_event("ERROR", "window_state", f"Watchdog error: {e}")
+
+    QTimer.singleShot(5000, _check_window_visible)
+
     ret = app.exec()
     # Force exit to prevent background threads (like concurrent.futures or watchdog) from hanging shutdown
     os._exit(ret)

@@ -45,6 +45,8 @@ class TestUpdateControllerSDET:
             "name": "My Git Package",
             "source_type": "git",
             "package_id": "my-git",
+            "repository_url": "https://github.com/test/repo.git",
+            "github_token": "ghp_secret",
             "extra_field": "should-be-ignored",
         }
 
@@ -60,6 +62,9 @@ class TestUpdateControllerSDET:
         assert "extra_field" not in record
         assert record["is_updating"] is False
         assert record["last_updated"] == "Never"
+        # Config fields must survive the round-trip (ADR-0008 regression)
+        assert record["repository_url"] == "https://github.com/test/repo.git"
+        assert record["github_token"] == "ghp_secret"
 
     def test_add_skill_package_invalid_data(self, controller, mock_app):
         # source_type should be git, npx, local, or custom.
@@ -127,3 +132,67 @@ class TestUpdateControllerSDET:
         controller.removeUpdatePackage(0)
         assert len(mock_app._update_packages) == 0
         mock_app.updatePackagesChanged.emit.assert_called()
+
+    def test_update_update_package_logs_version_check(self, controller, mock_app):
+        """updateUpdatePackage must log version check details."""
+        mock_app._update_packages = [
+            {"name": "TestPkg", "package_id": "test12345", "source_type": "git"}
+        ]
+
+        def mock_check(source, force_refresh=False):
+            return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
+
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=mock_check,
+            ),
+            patch.object(controller, "_resolvePackageStorageState"),
+        ):
+            controller.updateUpdatePackage(0, {"name": "TestPkg", "package_id": "test12345"})
+
+        # Verify status message includes version check details
+        status_call = mock_app._set_status.call_args[0][0]
+        assert "Package settings saved: TestPkg" in status_call
+        assert "v1.0.0" in status_call
+        assert "v2.0.0" in status_call
+
+    def test_update_update_package_diagnostic_event(self, controller, mock_app):
+        """updateUpdatePackage must emit a diagnostic log event with full context."""
+        mock_app._update_packages = [
+            {
+                "name": "DiagPkg",
+                "package_id": "diag12345",
+                "source_type": "git",
+                "repository_url": "https://github.com/test/repo.git",
+            }
+        ]
+
+        def mock_check(source, force_refresh=False):
+            return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
+
+        with (
+            patch(
+                "skill_manager.core.skill_packages.check_skill_package_versions",
+                side_effect=mock_check,
+            ),
+            patch.object(controller, "_resolvePackageStorageState"),
+            patch(
+                "skill_manager.core.diagnostics.get_diagnostic_logger"
+            ) as mock_diag,
+        ):
+            controller.updateUpdatePackage(0, {"name": "DiagPkg", "package_id": "diag12345", "source_type": "git", "repository_url": "https://github.com/test/repo.git"})
+
+            # Verify diagnostic event was logged
+            mock_diag.return_value.log_event.assert_called_once()
+            call_args = mock_diag.return_value.log_event.call_args
+            assert call_args[0][0] == "INFO"
+            assert call_args[0][1] == "update_result"
+            assert "Config saved for package: DiagPkg" in call_args[0][2]
+            # Verify data includes all expected fields
+            data = call_args[1]["data"]
+            assert data["package_id"] == "diag12345"
+            assert data["source_type"] == "git"
+            assert data["current_version"] == "v1.0.0"
+            assert data["latest_version"] == "v2.0.0"
+            assert data["repository_url"] == "https://github.com/test/repo.git"

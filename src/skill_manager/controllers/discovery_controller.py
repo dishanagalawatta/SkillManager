@@ -10,6 +10,11 @@ import traceback
 from PySide6.QtCore import Signal, Slot
 
 from skill_manager.controllers.base import BaseController
+from skill_manager.core.diagnostics import (
+    CATEGORY_CACHE_PRESERVED,
+    CATEGORY_DISCOVERY_EMPTY_RESULT,
+    get_diagnostic_logger,
+)
 from skill_manager.core.discovery import DiscoveryService
 from skill_manager.core.schemas import CacheState, SkillRecord
 
@@ -121,11 +126,51 @@ class DiscoveryController(BaseController):
 
         removed_paths = set(self._previous_skills.keys()) - set(new_skills_map.keys())
 
+        # SAFETY NET: When final discovery returns zero skills but the
+        # previous scan had skills, the source directories are likely
+        # missing (moved, unmounted, permission error).  Wiping the
+        # entire model would cause catastrophic data loss.  Instead,
+        # skip the removal and preserve existing skills.
+        if is_final and not new_skills_map and self._previous_skills:
+            diag = get_diagnostic_logger()
+            diag.log_event(
+                "WARNING",
+                CATEGORY_DISCOVERY_EMPTY_RESULT,
+                "Discovery returned 0 skills but cache had skills — "
+                "source directories may be missing. Preserving cached skills.",
+                data={
+                    "previous_skill_count": len(self._previous_skills),
+                    "removed_count": len(removed_paths),
+                },
+            )
+            diag.log_event(
+                "INFO",
+                CATEGORY_CACHE_PRESERVED,
+                f"Preserved {len(self._previous_skills)} cached skills "
+                f"(discovery safety net triggered)",
+            )
+            logger.warning(
+                "[DISCOVERY] Safety net: skipping removal of %d cached skills "
+                "because discovery returned 0 results (source dirs likely missing)",
+                len(removed_paths),
+            )
+            # Still update status/categories but keep existing skills
+            self.app._set_status(
+                f"Warning: source directories may be missing. "
+                f"Keeping {len(self._previous_skills)} cached skills."
+            )
+            if is_final:
+                self.app._is_loading = False
+                self.app.isLoadingChanged.emit()
+            return
+
         if self._previous_skills and (added_or_updated or removed_paths):
             # Incremental update — only touch changed skills
             if added_or_updated:
                 self.app._library_model.addOrUpdateSkills(added_or_updated)
                 self.app._quick_copy_model.addOrUpdateSkills(added_or_updated)
+                for skill_dict in added_or_updated:
+                    self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
             if removed_paths:
                 self.app._library_model.removeSkillsByPath(list(removed_paths))
                 self.app._quick_copy_model.removeSkillsByPath(list(removed_paths))

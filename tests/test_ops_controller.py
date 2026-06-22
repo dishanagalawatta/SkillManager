@@ -705,3 +705,256 @@ def test_copy_collection_to_clipboard_auto_minimize(mock_timer, ops_controller, 
 def test_send_paste_to_focused_window_failure_sets_status(mock_paste, ops_controller, mock_app):
     ops_controller._send_paste_to_focused_window()
     mock_app._set_status.assert_called_with("Copied, but could not paste automatically")
+
+
+# ---------------------------------------------------------------------------
+# _refresh_selected_skill tests
+# ---------------------------------------------------------------------------
+
+
+class TestRefreshSelectedSkill:
+    """Tests for OpsController._refresh_selected_skill."""
+
+    def test_noop_when_nothing_selected(self, ops_controller, mock_app):
+        mock_app._selected_skill = {}
+        ops_controller._refresh_selected_skill("/any/path")
+        mock_app.selectedSkillChanged.emit.assert_not_called()
+
+    def test_noop_when_different_path_selected(self, ops_controller, mock_app):
+        from skill_manager.core.models.entities import Skill
+
+        mock_app._selected_skill = {"local_path": "/other/path"}
+        skill = Skill(name="Test", local_path="/other/path")
+        mock_app.skillModel._filtered_skills = [skill]
+        ops_controller._refresh_selected_skill("/target/path")
+        mock_app.selectedSkillChanged.emit.assert_not_called()
+
+    def test_refreshes_when_same_path_selected(self, ops_controller, mock_app):
+        from skill_manager.core.models.entities import Skill
+
+        mock_app._selected_skill = {"local_path": "/cmd/Cmd.md", "name": "Cmd"}
+        updated_skill = Skill(name="Cmd", local_path="/cmd/Cmd.md", body_content="new body")
+        mock_app.skillModel._filtered_skills = [updated_skill]
+        mock_app.skillModel.get_skill_at.return_value = {
+            "local_path": "/cmd/Cmd.md",
+            "name": "Cmd",
+            "body_content": "new body",
+        }
+
+        ops_controller._refresh_selected_skill("/cmd/Cmd.md")
+
+        mock_app.selectedSkillChanged.emit.assert_called_once()
+        mock_app.skillModel.get_skill_at.assert_called_with(0)
+        assert mock_app._selected_skill["body_content"] == "new body"
+
+    def test_rename_refreshes_with_new_path(self, ops_controller, mock_app):
+        from skill_manager.core.models.entities import Skill
+
+        mock_app._selected_skill = {"local_path": "/cmd/Old.md", "name": "Old"}
+        renamed_skill = Skill(name="New", local_path="/cmd/New.md", body_content="updated")
+        mock_app.skillModel._filtered_skills = [renamed_skill]
+        mock_app.skillModel.get_skill_at.return_value = {
+            "local_path": "/cmd/New.md",
+            "name": "New",
+            "body_content": "updated",
+        }
+
+        ops_controller._refresh_selected_skill("/cmd/Old.md", rename_path="/cmd/New.md")
+
+        mock_app.selectedSkillChanged.emit.assert_called_once()
+        mock_app.skillModel.get_skill_at.assert_called_with(0)
+        assert mock_app._selected_skill["local_path"] == "/cmd/New.md"
+
+    def test_not_in_view_when_path_missing_from_model(self, ops_controller, mock_app):
+        mock_app._selected_skill = {"local_path": "/cmd/Missing.md"}
+        mock_app.skillModel._filtered_skills = []
+
+        ops_controller._refresh_selected_skill("/cmd/Missing.md")
+
+        mock_app.selectedSkillChanged.emit.assert_not_called()
+
+    def test_diagnostic_events_emitted(self, ops_controller, mock_app):
+
+        mock_app._selected_skill = {}
+        with patch("skill_manager.controllers.ops_controller.get_diagnostic_logger") as mock_diag:
+            ops_controller._refresh_selected_skill("/any/path")
+            mock_diag.return_value.log_event.assert_called_with(
+                "INFO", "selection_refreshed", "noop: nothing selected"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Integration: createCustomCommand refreshes selection
+# ---------------------------------------------------------------------------
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.commands.create_custom_command_file")
+def test_create_custom_command_refreshes_selection(
+    mock_create,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """createCustomCommand refreshes _selected_skill for the new command."""
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    cmd_path = tmp_path / "NewCmd.md"
+    mock_result = MagicMock(ok=True, message="Created command: NewCmd.md", path=cmd_path)
+    mock_create.return_value = mock_result
+    mock_discover.return_value = {
+        "local_path": str(cmd_path),
+        "name": "NewCmd",
+        "category": "Commands",
+    }
+
+    mock_app._selected_skill = {"local_path": str(cmd_path), "name": "NewCmd"}
+
+    from skill_manager.core.models.entities import Skill
+
+    skill = Skill(name="NewCmd", local_path=str(cmd_path), body_content="body")
+    mock_app.skillModel._filtered_skills = [skill]
+    mock_app.skillModel.get_skill_at.return_value = {
+        "local_path": str(cmd_path),
+        "name": "NewCmd",
+        "body_content": "body",
+    }
+
+    ops_controller.createCustomCommand("NewCmd", "body", "proj", "cat")
+    mock_app.selectedSkillChanged.emit.assert_called_once()
+    mock_app._library_model.addOrUpdateSkills.assert_called_once()
+    mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once()
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_refreshes_selection(
+    mock_update,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """updateCustomCommandFull refreshes _selected_skill when same path is selected."""
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    cmd_path = tmp_path / "Cmd.md"
+    cmd_path.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
+
+    mock_result = MagicMock(ok=True, message="Updated command: Cmd.md", path=cmd_path)
+    mock_update.return_value = mock_result
+    mock_discover.return_value = {
+        "local_path": str(cmd_path),
+        "name": "Cmd",
+        "category": "Commands",
+    }
+
+    mock_app._selected_skill = {"local_path": str(cmd_path), "name": "Cmd"}
+
+    from skill_manager.core.models.entities import Skill
+
+    skill = Skill(name="Cmd", local_path=str(cmd_path), body_content="new body")
+    mock_app.skillModel._filtered_skills = [skill]
+    mock_app.skillModel.get_skill_at.return_value = {
+        "local_path": str(cmd_path),
+        "name": "Cmd",
+        "body_content": "new body",
+    }
+
+    ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "new body")
+    mock_app.selectedSkillChanged.emit.assert_called_once()
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_rename_refreshes_selection(
+    mock_update,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """updateCustomCommandFull refreshes _selected_skill after a rename."""
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    old_path = tmp_path / "Old.md"
+    new_path = tmp_path / "New.md"
+    mock_result = MagicMock(ok=True, message="Updated command: New.md", path=new_path)
+    mock_update.return_value = mock_result
+    mock_discover.return_value = {
+        "local_path": str(new_path),
+        "name": "New",
+        "category": "Commands",
+    }
+
+    mock_app._selected_skill = {"local_path": str(old_path), "name": "Old"}
+
+    from skill_manager.core.models.entities import Skill
+
+    skill = Skill(name="New", local_path=str(new_path), body_content="updated")
+    mock_app.skillModel._filtered_skills = [skill]
+    mock_app.skillModel.get_skill_at.return_value = {
+        "local_path": str(new_path),
+        "name": "New",
+        "body_content": "updated",
+    }
+
+    ops_controller.updateCustomCommandFull(str(old_path), "New", "updated")
+    mock_app.selectedSkillChanged.emit.assert_called_once()
+    assert mock_app._selected_skill["local_path"] == str(new_path)
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.commands.create_custom_command_file")
+def test_create_custom_command_no_selection_refresh_for_different_skill(
+    mock_create,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """createCustomCommand does not refresh selection when a different skill is selected."""
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    cmd_path = tmp_path / "NewCmd.md"
+    mock_result = MagicMock(ok=True, message="Created command: NewCmd.md", path=cmd_path)
+    mock_create.return_value = mock_result
+    mock_discover.return_value = {
+        "local_path": str(cmd_path),
+        "name": "NewCmd",
+        "category": "Commands",
+    }
+
+    mock_app._selected_skill = {"local_path": "/other/skill/Skill.md"}
+
+    ops_controller.createCustomCommand("NewCmd", "body", "proj", "cat")
+    mock_app.selectedSkillChanged.emit.assert_not_called()
