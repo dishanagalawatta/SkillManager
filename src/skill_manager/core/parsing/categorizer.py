@@ -77,27 +77,40 @@ def categorize_skill(name: str, description: str, metadata: dict | None = None) 
             # Fast pre-filter: skip rapidfuzz if no regex matches
             cat_patterns = patterns.get(category, [])
             if cat_patterns:
-                regex_match = any(
-                    p.search(name_text) or p.search(desc_text)
-                    for p in cat_patterns
-                )
+                regex_match = any(p.search(name_text) or p.search(desc_text) for p in cat_patterns)
                 if not regex_match:
                     continue
 
             # Check name match
-            name_match = process.extractOne(
-                name_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
-            )
-            name_score = name_match[1] if name_match else 0
+            if process:
+                name_match = process.extractOne(
+                    name_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
+                )
+                name_score = name_match[1] if name_match else 0
+            else:
+                name_score = 0
+                for kw in keywords:
+                    s = fuzz.token_set_ratio(name_text, kw)
+                    if s > name_score:
+                        name_score = s
+
             cat_name_score = fuzz.token_set_ratio(category.lower(), name_text)
             if cat_name_score >= 85:
                 name_score = max(name_score, cat_name_score + 5)
 
             # Check desc match
-            desc_match = process.extractOne(
-                desc_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
-            )
-            desc_score = desc_match[1] if desc_match else 0
+            if process:
+                desc_match = process.extractOne(
+                    desc_text, keywords, scorer=fuzz.token_set_ratio, score_cutoff=85
+                )
+                desc_score = desc_match[1] if desc_match else 0
+            else:
+                desc_score = 0
+                for kw in keywords:
+                    s = fuzz.token_set_ratio(desc_text, kw)
+                    if s > desc_score:
+                        desc_score = s
+
             cat_desc_score = fuzz.token_set_ratio(category.lower(), desc_text)
             if cat_desc_score >= 85:
                 desc_score = max(desc_score, cat_desc_score)
