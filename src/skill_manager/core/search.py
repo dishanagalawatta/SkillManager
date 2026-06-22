@@ -161,7 +161,7 @@ class SearchEngine:
                         qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match
                     )
                     if match:
-                        max_token_match = max(max_token_match, match[1])
+                        max_token_match = match[1]
 
                     if max_token_match > 70:
                         break
