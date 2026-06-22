@@ -64,13 +64,15 @@ Rectangle {
                     onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
                     cursorShape: Qt.PointingHandCursor
 
-                    ToolTip.text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                    ToolTip.visible: containsMouse
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: sidebarToolTip
+                        text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
+                        visible: parent.containsMouse
+                    }
 
                     Accessible.role: Accessible.Button
-                    Accessible.name: ToolTip.text
-                    Accessible.description: ToolTip.text
+                    Accessible.name: sidebarToolTip.text
+                    Accessible.description: sidebarToolTip.text
                 }
             }
             

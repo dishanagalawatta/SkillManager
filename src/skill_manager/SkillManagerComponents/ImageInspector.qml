@@ -1380,9 +1380,10 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
                             onClicked: colorPopup.open()
-                            ToolTip.visible: containsMouse
-                            ToolTip.text: "Select Color"
-                            ToolTip.delay: 500
+                            SleekToolTip {
+                            visible: parent.containsMouse
+                            text: "Select Color"
+                        }
                         }
                     }
 
@@ -1440,9 +1441,10 @@ Rectangle {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
-                                        ToolTip.visible: containsMouse
-                                        ToolTip.text: modelData
-                                        ToolTip.delay: 500
+                                        SleekToolTip {
+                            visible: parent.containsMouse
+                            text: modelData
+                        }
                                         onClicked: {
                                             root.activeColor = Qt.color(modelData)
                                             colorPopup.close()
@@ -1487,9 +1489,10 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
                             onClicked: sizePopup.open()
-                            ToolTip.visible: containsMouse
-                            ToolTip.text: "Select Size"
-                            ToolTip.delay: 500
+                            SleekToolTip {
+                            visible: parent.containsMouse
+                            text: "Select Size"
+                        }
                         }
                     }
 
@@ -1530,9 +1533,10 @@ Rectangle {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
-                                        ToolTip.visible: containsMouse
-                                        ToolTip.text: "Size " + modelData
-                                        ToolTip.delay: 500
+                                        SleekToolTip {
+                            visible: parent.containsMouse
+                            text: "Size " + modelData
+                        }
                                         onClicked: {
                                             root.strokeWidth = modelData
                                             sizePopup.close()
@@ -1580,9 +1584,10 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
                             onClicked: eraserSizePopup.open()
-                            ToolTip.visible: containsMouse
-                            ToolTip.text: "Eraser Size"
-                            ToolTip.delay: 500
+                            SleekToolTip {
+                            visible: parent.containsMouse
+                            text: "Eraser Size"
+                        }
                         }
                     }
 
@@ -1661,9 +1666,10 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
                             onClicked: fontSizePopup.open()
-                            ToolTip.visible: containsMouse
-                            ToolTip.text: "Text Size"
-                            ToolTip.delay: 500
+                            SleekToolTip {
+                            visible: parent.containsMouse
+                            text: "Text Size"
+                        }
                         }
                     }
 
