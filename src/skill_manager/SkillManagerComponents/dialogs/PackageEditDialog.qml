@@ -250,6 +250,10 @@ Dialog {
                                         verticalAlignment: Text.AlignVCenter
                                         leftPadding: 12
                                     }
+
+                                    HoverHandler {
+                                        cursorShape: typeCombo.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    }
                                 }
                             }
                         }
