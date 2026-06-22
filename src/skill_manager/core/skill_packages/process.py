@@ -24,9 +24,9 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(echo password=)(?!['\"])([^;\r\n\s]+)", r"\1***", text)
     # Redact known GitHub API tokens
     if "ghp_" in text:
-        text = re.sub(r"ghp_[a-zA-Z0-9]{36}", "***", text)
+        text = re.sub(r"\bghp_[a-zA-Z0-9]{36}\b", "***", text)
     if "github_pat_" in text:
-        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82}", "***", text)
+        text = re.sub(r"\bgithub_pat_[a-zA-Z0-9_]{82}\b", "***", text)
     return text
 
 
