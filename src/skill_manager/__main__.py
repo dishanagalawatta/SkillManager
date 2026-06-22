@@ -9,7 +9,8 @@ def _patch_subprocess():
 
     class NoWindowPopen(original_popen):
         def __init__(self, *args, **kwargs):
-            kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+            if hasattr(subprocess, "CREATE_NO_WINDOW"):
+                kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
             super().__init__(*args, **kwargs)
 
     subprocess.Popen = NoWindowPopen
