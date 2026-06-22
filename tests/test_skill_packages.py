@@ -516,3 +516,8 @@ def test_sanitize_token_git_credential_helper():
     sanitized2 = sanitize_token(text2)
     assert "password=***" in sanitized2
     assert "}; f pull" in sanitized2
+
+    text3 = r'echo password="my\"secret"; echo next'
+    sanitized3 = sanitize_token(text3)
+    assert 'password="***"' in sanitized3
+    assert 'echo next' in sanitized3

@@ -34,5 +34,5 @@
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
 ## 2026-06-03 - [Robust Log Redaction for Mixed Quotes]
 **Vulnerability:** Simple regex replacements (e.g., `.*`) for secret redaction can destroy trailing log context or command outputs, making debugging difficult. Conversely, overly strict patterns (e.g., `[^'";\s]+`) can fail on secrets with spaces, causing catastrophic 'fail-open' secret exposure.
-**Learning:** Shell strings can contain secrets wrapped in varying quote styles (single, double, none). A single regex is often brittle.
-**Prevention:** Separate the redaction logic into independent regexes for quoted values (`(password=)(['"])(.*?)\2`) and unquoted values (`(password=)(?!['"])([^;\r\n]+)`). This safely captures spaces inside quotes while preventing trailing command text from being swallowed.
+**Learning:** Shell strings can contain secrets wrapped in varying quote styles (single, double, none). A single regex is often brittle, and simple non-greedy match `(.*?)` can prematurely stop if the secret itself contains an escaped quote.
+**Prevention:** Separate the redaction logic into independent regexes for quoted values (e.g., `(password=)(['"])((?:(?!\2)[^\\]|\\.)*)\2` to handle escaped quotes) and unquoted values (`(password=)(?!['"])([^;\r\n]+)`). This safely captures spaces inside quotes while preventing trailing command text from being swallowed.
