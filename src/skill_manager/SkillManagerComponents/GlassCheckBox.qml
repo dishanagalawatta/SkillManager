@@ -17,9 +17,9 @@ Item {
 
     activeFocusOnTab: true
 
-    Keys.onSpacePressed: function(event) { control.toggled(); event.accepted = true; }
-    Keys.onReturnPressed: function(event) { control.toggled(); event.accepted = true; }
-    Keys.onEnterPressed: function(event) { control.toggled(); event.accepted = true; }
+    Keys.onSpacePressed: { control.toggled(); event.accepted = true; }
+    Keys.onReturnPressed: { control.toggled(); event.accepted = true; }
+    Keys.onEnterPressed: { control.toggled(); event.accepted = true; }
 
     Rectangle {
         id: bgRect

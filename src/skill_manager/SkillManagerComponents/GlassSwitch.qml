@@ -17,9 +17,9 @@ Item {
 
     activeFocusOnTab: true
 
-    Keys.onSpacePressed: function(event) { control.checked = !control.checked; event.accepted = true; }
-    Keys.onReturnPressed: function(event) { control.checked = !control.checked; event.accepted = true; }
-    Keys.onEnterPressed: function(event) { control.checked = !control.checked; event.accepted = true; }
+    Keys.onSpacePressed: { control.checked = !control.checked; event.accepted = true; }
+    Keys.onReturnPressed: { control.checked = !control.checked; event.accepted = true; }
+    Keys.onEnterPressed: { control.checked = !control.checked; event.accepted = true; }
 
     Rectangle {
         id: track
