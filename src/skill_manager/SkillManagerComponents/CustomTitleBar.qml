@@ -143,5 +143,9 @@ Rectangle {
         Accessible.role: Accessible.Button
         Accessible.name: btn.tooltipText
         Accessible.description: btn.tooltipText
+
+        HoverHandler {
+            cursorShape: Qt.PointingHandCursor
+        }
     }
 }
