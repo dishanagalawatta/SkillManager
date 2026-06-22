@@ -104,12 +104,14 @@ Item {
         cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
 
-        ToolTip.text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
-        ToolTip.visible: containsMouse
-        ToolTip.delay: 400
+        SleekToolTip {
+            id: headerToolTip
+            text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
+            visible: mouseAreaMain.containsMouse
+        }
 
         Accessible.role: Accessible.Button
         Accessible.name: root.mainCatName
-        Accessible.description: ToolTip.text
+        Accessible.description: headerToolTip.text
     }
 }

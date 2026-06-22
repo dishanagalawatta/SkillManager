@@ -176,13 +176,15 @@ Rectangle {
             Behavior on color { ColorAnimation { duration: 150 } }
         }
 
-        ToolTip.text: btn.tooltipText
-        ToolTip.visible: btn.hovered && btn.tooltipText !== ""
-        ToolTip.delay: 400
+        SleekToolTip {
+            id: btnToolTip
+            text: btn.tooltipText
+            visible: btn.hovered && btn.tooltipText !== ""
+        }
 
         Accessible.role: Accessible.Button
         Accessible.name: btn.tooltipText
-        Accessible.description: btn.tooltipText
+        Accessible.description: btnToolTip.text
     }
 }
 

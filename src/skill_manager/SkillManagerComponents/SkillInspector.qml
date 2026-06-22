@@ -150,8 +150,10 @@ Rectangle {
                             inspectorContextMenu.popup()
                         }
                     }
-                    ToolTip.text: "Argument (e.g. ultra)"
-                    ToolTip.visible: hovered
+                    SleekToolTip {
+                        text: "Argument (e.g. ultra)"
+                        visible: parent.hovered
+                    }
                 }
                 IconButton {
                     id: starButton
@@ -179,12 +181,15 @@ Rectangle {
                         radius: Theme.radiusPill
                     }
                     
-                    ToolTip.visible: hovered
-                    ToolTip.text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    SleekToolTip {
+                        id: starToolTip
+                        visible: parent.hovered
+                        text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: starToolTip.text
                 }
 
                 IconButton {
@@ -192,13 +197,15 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Close Inspector"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: closeToolTip
+                        text: "Close Inspector"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Close Inspector"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: closeToolTip.text
                 }
             }
 
@@ -486,9 +493,10 @@ Rectangle {
             onClicked: (mouse) => root.isCollapsed = false
             cursorShape: Qt.PointingHandCursor
 
-            ToolTip.text: "Expand Inspector"
-            ToolTip.visible: containsMouse
-            ToolTip.delay: 400
+            SleekToolTip {
+                text: "Expand Inspector"
+                visible: parent.containsMouse
+            }
 
             Accessible.role: Accessible.Button
             Accessible.name: "Expand Inspector"
