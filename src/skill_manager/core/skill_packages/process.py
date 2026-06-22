@@ -88,7 +88,8 @@ def run_process(
     }
 
     import sys
-    if hasattr(subprocess, 'CREATE_NO_WINDOW') and sys.platform == 'win32':
+
+    if hasattr(subprocess, "CREATE_NO_WINDOW") and sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     process = subprocess.Popen(command, **kwargs)
