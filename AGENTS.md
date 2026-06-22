@@ -1,7 +1,8 @@
 # Agent Instructions
 
 > Read [`ADR_INDEX.md`](ADR_INDEX.md) once at session start. Read
-> [`README.md`](README.md) for layout.
+> [`README.md`](README.md) for layout. Read
+> [`docs/HOUSEKEEPING.md`](docs/HOUSEKEEPING.md) before cleanup.
 
 ## Package Manager
 
@@ -32,7 +33,7 @@
   `skill_manager.core.diagnostics.get_diagnostic_logger().log_event()`
   with a `CATEGORY_*` constant. Do not use `logging`.
 - **Out of scope.** `TODO.md`, `.agents/commands/**`. Do not read,
-  modify, or reference.
+  modify, or reference. `image/TODO` is excluded.
 
 ## Required Reading
 
@@ -41,3 +42,4 @@
 3. [`ADR_INDEX.md`](ADR_INDEX.md)
 4. [`docs/API.md`](docs/API.md)
 5. [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md)
+6. [`docs/HOUSEKEEPING.md`](docs/HOUSEKEEPING.md)

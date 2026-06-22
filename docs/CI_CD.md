@@ -101,6 +101,7 @@ See [docs/SECURITY.md](SECURITY.md) for the list of CVEs silenced in
 Run the same checks locally:
 
 ```bash
+export QML_DISABLE_DISK_CACHE=1  # ADR-0001 — prevents stale QML bytecode
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest --cov=skill_manager --cov-fail-under=90

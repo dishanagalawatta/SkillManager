@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Chores
+- Workspace cleanup: audit `.gitignore`, archive 24 orphan conductor plans
+- Add ADR-0015 (conductor root plan archival) and ADR-0016 (`.opencode` gitignore policy)
+- Add `docs/HOUSEKEEPING.md` with cleanup rules and exclusion list
+- Add `metadata.json` to 7 conductor tracks missing it
+- Fix `docs/ARCHITECTURE.md` CI/CD section: replace release-please reference with python-semantic-release
+- Update `docs/API.md`: document package add/edit JSON return types (ADR-0013/0014)
+- Update `AGENTS.md`: add housekeeping pointer and `image/TODO` exclusion
+- Update `README.md`: add `docs/HOUSEKEEPING.md` to documentation table
+- Update `DESIGN.md`: add ADR-0003/0004/0008 cross-links
+
 ## v1.5.0
 
 ### Features

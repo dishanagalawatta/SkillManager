@@ -20,6 +20,56 @@
 | [ADR-0012](#adr-0012-window-state-integrity) | Window state integrity | Accepted | 2026 |
 | [ADR-0013](#adr-0013-package-add-snap-to-latest-policy) | Package add: snap-to-latest policy | Accepted | 2026 |
 | [ADR-0014](#adr-0014-package-edit-snap-to-latest-policy) | Package edit: snap-to-latest policy | Accepted | 2026 |
+| [ADR-0015](#adr-0015-conductor-root-plan-archival) | Conductor root plan archival | Accepted | 2026 |
+| [ADR-0016](#adr-0016-opencode-gitignore-policy) | `.opencode` gitignore policy | Accepted | 2026 |
+
+---
+
+## ADR-0015 — Conductor root plan archival
+
+**Status:** Accepted
+
+**Context.** Root-level `*.md` plans accumulated at `conductor/` over
+time. These are temporary proposals, not tracks. Without a lifecycle
+rule, stale plans clutter the workspace and confuse navigation.
+
+**Decision.** Root-level plans follow a two-path rule:
+
+1. **Promote.** When a plan is selected for implementation, create
+   `conductor/tracks/<slug>/` with `metadata.json`, `plan.md`, and
+   optionally `spec.md`. Delete or deprecate the root-level stub.
+
+2. **Archive.** Plans idle ≥ 30 days are moved into
+   `conductor/_archive/<YYYY-MM-DD>/`. The root retains only six
+   authoritative files: `workflow.md`, `tracks.md`, `product.md`,
+   `tech-stack.md`, `plan.md`, `design_decisions.md`.
+
+**Consequences.** Conductor root is predictable. Stale plans are
+recoverable from `_archive/` but no longer clutter the working
+directory. The archival rule is documented in `conductor/workflow.md`
+§ 4a.
+
+---
+
+## ADR-0016 — `.opencode` gitignore policy
+
+**Status:** Accepted
+
+**Context.** The `.opencode/` directory contains local agent tooling
+configuration (`package.json`, `node_modules/`, plans). It is
+developer-local and must not be committed. The directory's internal
+`.gitignore` excludes its own files, but the main `.gitignore` did
+not list the top-level directory, causing it to appear as untracked
+in `git status`.
+
+**Decision.** Add `.opencode/` to the main `.gitignore` under the
+"OS & editor" section. The directory's internal `.gitignore` is
+retained for backward compatibility but is now redundant at the
+repository level.
+
+**Consequences.** `.opencode/` is fully excluded from version
+control. Developers who use opencode retain their local config;
+CI and fresh clones never see it.
 
 ---
 

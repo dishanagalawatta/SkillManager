@@ -52,10 +52,11 @@ See [docs/INSTALL.md](docs/INSTALL.md) for full details.
 | Engineer | [docs/RELEASING.md](docs/RELEASING.md) | Release lifecycle. |
 | Engineer | [docs/CI_CD.md](docs/CI_CD.md) | Pipelines. |
 | Contributor | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | PR + commit rules. |
-| Decision | [ADR_INDEX.md](ADR_INDEX.md) | Architecture decisions. |
+| Ops | [docs/HOUSEKEEPING.md](docs/HOUSEKEEPING.md) | Workspace cleanup rules. |
+| Decision | [ADR_INDEX.md](ADR_INDEX.md) | Architecture decisions (ADR-0001–0016). |
 | Agent | [AGENTS.md](AGENTS.md) | Agent instructions. |
 | Designer | [DESIGN.md](DESIGN.md) | Design system. |
-| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle. |
+| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle (local-only). |
 
 ## Quality Gates
 
