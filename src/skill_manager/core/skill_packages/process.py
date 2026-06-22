@@ -18,7 +18,7 @@ def sanitize_token(text: str) -> str:
         # Robustly redact multiline passwords within Git credential helpers.
         text = re.sub(r"(echo password=).*?(?=; \}; f)", r"\1***", text, flags=re.DOTALL)
         # Fail-safe fallback: redact the rest of the line for any unclosed or plain password logs.
-        text = re.sub(r"(echo password=).*", r"\1***", text)
+        text = re.sub(r"(echo password=).*", r"\1***", text, flags=re.DOTALL)
     return text
 
 def _emit(output_callback: None | Callable[[str], None], message: str):
