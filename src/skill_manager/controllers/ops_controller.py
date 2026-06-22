@@ -377,6 +377,7 @@ class OpsController(BaseController):
 
                 discovered_skills = []
                 if result["details"]:
+                    diag = get_diagnostic_logger()
                     service = DiscoveryService(
                         sources=list(self.app._sources),
                         projects=self.app._projects,
@@ -389,9 +390,15 @@ class OpsController(BaseController):
                             skill_path = Path(detail["message"])
                             proj_path = Path(detail["project"])
                             try:
-                                skill_data = service.discover_single_skill(skill_path, proj_path)
+                                skill_data = service.discover_single(skill_path, proj_path)
                                 if skill_data:
                                     discovered_skills.append(skill_data)
+                                else:
+                                    diag.log_event(
+                                        "WARNING",
+                                        CATEGORY_SELECTION_REFRESHED,
+                                        f"discover_single returned None for skill: {skill_path}",
+                                    )
                             except Exception as exc:
                                 logger.error(
                                     "[TARGETED SCAN] Failed scanning %s: %s", skill_path, exc
@@ -576,11 +583,17 @@ class OpsController(BaseController):
                 project_aliases=self.app._project_aliases,
             )
             try:
-                skill_data = service.discover_single_skill(result.path, result.path.parent)
+                skill_data = service.discover_single(result.path, result.path.parent)
                 if skill_data:
                     patch_cache_add([skill_data])
                     self._merge_discovered_skills([skill_data])
                     self._refresh_selected_skill(str(result.path))
+                else:
+                    diag.log_event(
+                        "WARNING",
+                        CATEGORY_SELECTION_REFRESHED,
+                        f"discover_single returned None for command: {result.path}",
+                    )
             except Exception as exc:
                 logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
@@ -620,12 +633,18 @@ class OpsController(BaseController):
                 project_aliases=self.app._project_aliases,
             )
             try:
-                skill_data = service.discover_single_skill(result.path, result.path.parent)
+                skill_data = service.discover_single(result.path, result.path.parent)
                 if skill_data:
                     patch_cache_add([skill_data])
                     self._merge_discovered_skills([skill_data])
                     # For renames, local_path is the OLD path but result.path is NEW.
                     self._refresh_selected_skill(local_path, rename_path=str(result.path))
+                else:
+                    diag.log_event(
+                        "WARNING",
+                        CATEGORY_SELECTION_REFRESHED,
+                        f"discover_single returned None for command: {result.path}",
+                    )
             except Exception as exc:
                 logger.error("[UPDATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
