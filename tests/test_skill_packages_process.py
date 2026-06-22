@@ -16,19 +16,24 @@ def test_sanitize_token():
     assert sanitize_token("echo password=secret") == "echo password=***"
 
     # Multiline token with quotes
-    assert sanitize_token("echo password='secret\nmore'") == "echo password='***'"
-    assert sanitize_token('echo password="secret\nmore"') == "echo password='***'"
+    assert sanitize_token("echo password='secret\nmore'") == "echo password=***"
+    assert sanitize_token('echo password="secret\nmore"') == "echo password=***"
 
     # Internal quotes
-    assert sanitize_token('echo password="sec\'ret"') == "echo password='***'"
-    assert sanitize_token("echo password='sec\"ret'") == "echo password='***'"
+    assert sanitize_token('echo password="sec\'ret"') == "echo password=***"
+    assert sanitize_token("echo password='sec\"ret'") == "echo password=***"
 
     # Inline multiple statements
     assert sanitize_token("echo password=secret; echo next") == "echo password=***; echo next"
     assert (
-        sanitize_token("echo password='secret\nmore'; echo next")
-        == "echo password='***'; echo next"
+        sanitize_token("echo password='secret\nmore'; echo next") == "echo password=***; echo next"
     )
+
+    # Token with single quotes (shlex.quote style)
+    assert sanitize_token("echo password='secret'\"'\"'more'") == "echo password=***"
+
+    # Token ending with backslash
+    assert sanitize_token("echo password='secret\\'") == "echo password=***"
 
     assert sanitize_token("no token here") == "no token here"
     assert sanitize_token(None) is None
