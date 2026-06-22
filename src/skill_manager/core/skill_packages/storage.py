@@ -77,7 +77,9 @@ def resolve_package_storage(
     return result
 
 
-def package_project_path_conflicts(packages: list[dict[str, Any]], projects: list[str]) -> list[str]:
+def package_project_path_conflicts(
+    packages: list[dict[str, Any]], projects: list[str]
+) -> list[str]:
     from skill_manager.core.copier import normalize_project_skills_path
 
     project_keys = set()
@@ -99,7 +101,9 @@ def package_project_path_conflicts(packages: list[dict[str, Any]], projects: lis
 
 def scan_package_inventory(package: dict[str, Any]) -> dict[str, Any]:
     package_path = Path(
-        os.path.expanduser(str(package.get("resolved_package_path") or package.get("package_path") or ""))
+        os.path.expanduser(
+            str(package.get("resolved_package_path") or package.get("package_path") or "")
+        )
     )
     skills: dict[str, dict[str, Any]] = {}
     scan_ok = True
@@ -167,7 +171,11 @@ def inventory_removals_verified(previous: dict[str, Any] | None, current: dict[s
 def promote_package_storage(package: dict[str, Any], previous_inventory: dict[str, Any] | None):
     old_path = Path(os.path.expanduser(str(package.get("_previous_resolved_package_path") or "")))
     new_path = Path(os.path.expanduser(str(package.get("resolved_package_path") or "")))
-    if not old_path or not new_path or normalize_storage_key(old_path) == normalize_storage_key(new_path):
+    if (
+        not old_path
+        or not new_path
+        or normalize_storage_key(old_path) == normalize_storage_key(new_path)
+    ):
         return {"moved": 0, "skipped": 0}
     if not old_path.is_dir():
         return {"moved": 0, "skipped": 0}

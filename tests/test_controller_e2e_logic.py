@@ -13,6 +13,7 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     # Isolation: Mock cache to prevent loading real data from project root
     import skill_manager.core.discovery as discovery
     import skill_manager.core.persistence as persistence
+
     monkeypatch.setattr(persistence, "load_cache", lambda: None)
     monkeypatch.setattr(persistence, "save_cache", lambda x: True)
     monkeypatch.setattr(discovery, "load_cache", lambda: None)
@@ -29,7 +30,10 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     skill_folder.mkdir(exist_ok=True)
     skill_file = skill_folder / "SKILL.md"
     # Using frontmatter so name is correctly parsed as "Test Skill"
-    skill_file.write_text("---\nname: Test Skill\ncategory: Testing\n---\n# Test Skill\nDescription here.", encoding="utf-8")
+    skill_file.write_text(
+        "---\nname: Test Skill\ncategory: Testing\n---\n# Test Skill\nDescription here.",
+        encoding="utf-8",
+    )
 
     proj_dir = temp_dir / "proj"
     proj_dir.mkdir(exist_ok=True)
@@ -39,7 +43,10 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     proj_skills_root.mkdir(parents=True, exist_ok=True)
     proj_skill_folder = proj_skills_root / "project-skill"
     proj_skill_folder.mkdir(exist_ok=True)
-    (proj_skill_folder / "SKILL.md").write_text("---\nname: Project Skill\ncategory: ProjCategory\n---\n# Project Skill\nProj description.", encoding="utf-8")
+    (proj_skill_folder / "SKILL.md").write_text(
+        "---\nname: Project Skill\ncategory: ProjCategory\n---\n# Project Skill\nProj description.",
+        encoding="utf-8",
+    )
 
     # Setup test configuration
     # Clear EVERYTHING to ensure total isolation from default/real config
@@ -51,12 +58,11 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     controller.config_mgr.addSource(str(lib_dir))
     controller.config_mgr.addProject(str(proj_dir))
 
-
-
     # Force a refresh
     controller.refreshSkills()
 
     return controller
+
 
 def test_controller_navigation_workflow(app_controller):
     """Verify navigation state management across controllers."""
@@ -74,6 +80,7 @@ def test_controller_navigation_workflow(app_controller):
     assert app_controller.ui.currentView.replace(" ", "") == "QuickCopy"
     assert app_controller.skillModel == app_controller.quickCopyModel
 
+
 def test_controller_search_and_filter_workflow(app_controller):
     """Verify search filtering logic through the controller bridge."""
     app_controller.currentView = "Library"
@@ -85,6 +92,7 @@ def test_controller_search_and_filter_workflow(app_controller):
     # We use a very long random string that definitely won't match
     app_controller.libraryModel.filterText = "KJFSD8934URKFDJ9834URKFDJ9834UR"
     assert app_controller.libraryModel.rowCount() == 0
+
 
 def test_controller_quick_copy_workflow(app_controller):
     """Verify the end-to-end quick copy flow via controller slots."""
@@ -116,6 +124,7 @@ def test_controller_quick_copy_workflow(app_controller):
     text = clipboard.text()
     assert text == "/skill:Project Skill"
 
+
 def test_controller_skill_deletion_workflow(app_controller, temp_dir):
     """Verify skill deletion flow and its impact on the models."""
     # Use Quick Copy view which contains project skills
@@ -141,8 +150,9 @@ def test_controller_skill_deletion_workflow(app_controller, temp_dir):
 
     # Process events to let the QTimer fire refreshSkills
     from PySide6.QtCore import QCoreApplication
-    QCoreApplication.processEvents() # Fires refreshSkills
-    QCoreApplication.processEvents() # Fires _on_discovery_finished
+
+    QCoreApplication.processEvents()  # Fires refreshSkills
+    QCoreApplication.processEvents()  # Fires _on_discovery_finished
 
     # Verify file is gone
     assert not Path(skill_path).exists()

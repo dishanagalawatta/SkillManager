@@ -120,7 +120,7 @@ def test_parse_skill_md_malformed_encoding(temp_dir):
     skill_file = temp_dir / "SKILL_BAD.md"
     # Write some bytes that aren't valid UTF-8
     with open(skill_file, "wb") as f:
-        f.write(b"\xff\xfe\x00\x00") # UTF-32 BOM or similar
+        f.write(b"\xff\xfe\x00\x00")  # UTF-32 BOM or similar
 
     data = parse_skill_md(str(skill_file))
     assert data["raw_content"] == ""
@@ -152,20 +152,22 @@ def test_parse_frontmatter_complex_types():
 
 def test_parse_skill_md_complex_markdown(temp_dir):
     skill_file = temp_dir / "COMPLEX.md"
-    skill_file.write_text("""# Title
+    skill_file.write_text(
+        """# Title
 > This is a quote.
 * List item
 ```python
 print("code")
 ```
 First real paragraph.
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
     data = parse_skill_md(str(skill_file))
     # It currently extracts all non-header lines as description if no frontmatter
     assert "First real paragraph." in data["description"]
     assert "> This is a quote." in data["description"]
-
 
 
 def test_parse_command_md_no_headers(temp_dir):
@@ -186,9 +188,8 @@ def test_parse_skill_md_with_commands(temp_dir):
     cmds_dir = skill_dir / "commands"
     cmds_dir.mkdir()
     (cmds_dir / "cmd1.md").write_text("# Cmd 1")
-    (cmds_dir / "README.md").write_text("# Readme") # Should be ignored
+    (cmds_dir / "README.md").write_text("# Readme")  # Should be ignored
 
     data = parse_skill_md(str(skill_file))
     assert len(data["commands"]) == 1
     assert "cmd1.md" in data["commands"][0]
-

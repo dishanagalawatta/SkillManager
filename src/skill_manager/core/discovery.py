@@ -119,8 +119,6 @@ class DiscoveryService:
             or ("Master Library" if is_package else "Unknown Project"),
             "project_root": skill.get("project_root", ""),
             "project_path": skill.get("project_path", ""),
-
-
             "is_starred": metadata.get("starred", False)
             or metadata.get("essential", False)
             or local_path in self.starred_paths,
@@ -148,7 +146,6 @@ class DiscoveryService:
             )
 
         return data
-
 
     def _process_command_file(
         self, cmd_file: Path, project: dict[str, Any]
@@ -236,5 +233,6 @@ class DiscoveryService:
         skill_data["search_text"] = build_skill_search_text(skill_data)
 
         # Now transform it using public transform_skill
-        return self.transform_skill(skill_data, is_package=False, project_label=skill_data["project_label"])
-
+        return self.transform_skill(
+            skill_data, is_package=False, project_label=skill_data["project_label"]
+        )

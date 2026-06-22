@@ -131,7 +131,7 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     source = {
         "name": "test",
         "package_path": str(package_path),
-        "update_command": 'python -c "print(\'ok\')"',
+        "update_command": "python -c \"print('ok')\"",
         "managed_folders": ["old-skill"],
     }
 
@@ -336,13 +336,13 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
     dir_with_apostrophe.mkdir()
 
     import shlex
+
     quoted_path = shlex.quote(str(dir_with_apostrophe))
 
     messages = []
     # This should succeed without raising a Verification failed exception
     assert _intercept_cross_platform_command(
-        f"test -d {quoted_path} && echo \"Skills installed in \"{quoted_path}",
-        messages.append
+        f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}', messages.append
     )
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
 
@@ -484,10 +484,12 @@ def test_check_skill_package_versions_commands_git_and_npm(temp_dir):
 
     with (
         patch(
-            "skill_manager.core.skill_packages.versioning.run_version_command", side_effect=["v1.0", "v2.0"]
+            "skill_manager.core.skill_packages.versioning.run_version_command",
+            side_effect=["v1.0", "v2.0"],
         ),
         patch(
-            "skill_manager.core.skill_packages.versioning.get_git_tag", side_effect=["v3.0", "v1.5", "v3.0"]
+            "skill_manager.core.skill_packages.versioning.get_git_tag",
+            side_effect=["v3.0", "v1.5", "v3.0"],
         ),
     ):
         updated = check_skill_package_versions(source, force_refresh=True)
@@ -520,7 +522,10 @@ def test_run_skill_package_update_cleanup_failure_and_verify(temp_dir):
 
     with (
         patch("skill_manager.core.skill_packages.updater._run_shell_command") as shell,
-        patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output", return_value=[]),
+        patch(
+            "skill_manager.core.skill_packages.updater.relocate_packages_from_output",
+            return_value=[],
+        ),
         patch(
             "skill_manager.core.skill_packages.updater._remove_package_folder",
             side_effect=OSError("locked"),
@@ -562,9 +567,7 @@ def test_run_shell_command_intercept_and_process():
 
 
 @patch("skill_manager.core.skill_packages.updater.run_process")
-def test_run_skill_package_update_uses_staging_for_relative_generator_output(
-    mock_run, tmp_path
-):
+def test_run_skill_package_update_uses_staging_for_relative_generator_output(mock_run, tmp_path):
     package_path = tmp_path / "package"
     package_path.mkdir()
     repo_skill = tmp_path / "repo" / ".agents" / "skills" / "brainstorming"
@@ -616,7 +619,10 @@ def test_run_process_emits_sanitized_output_and_throttles_progress():
     messages = []
 
     with (
-        patch("skill_manager.core.skill_packages.process._resolve_process_command", return_value=["tool"]),
+        patch(
+            "skill_manager.core.skill_packages.process._resolve_process_command",
+            return_value=["tool"],
+        ),
         patch("subprocess.Popen", return_value=proc),
         patch("time.time", side_effect=[1, 1.1, 1.2] + [2.0] * 10),
     ):
@@ -663,7 +669,9 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
         "package_path": str(clone_path),
     }
 
-    mock_run.side_effect = subprocess.CalledProcessError(1, ["git", "pull"], stderr="Conflict or network error")
+    mock_run.side_effect = subprocess.CalledProcessError(
+        1, ["git", "pull"], stderr="Conflict or network error"
+    )
     with pytest.raises(subprocess.CalledProcessError):
         _run_git_package_update(source, None)
 
@@ -673,15 +681,20 @@ def test_run_git_package_update_conflict_and_network_failures(mock_run, temp_dir
         "clone_path": str(new_clone_path),
         "package_path": str(new_clone_path),
     }
-    mock_run.side_effect = subprocess.CalledProcessError(128, ["git", "clone"], stderr="Could not resolve host")
+    mock_run.side_effect = subprocess.CalledProcessError(
+        128, ["git", "clone"], stderr="Could not resolve host"
+    )
     with pytest.raises(subprocess.CalledProcessError):
         _run_git_package_update(source_new, None)
 
 
 def test_run_process_timeout_handling():
     with (
-        patch("skill_manager.core.skill_packages.process._resolve_process_command", return_value=["some-cmd"]),
-        patch("subprocess.Popen") as mock_popen
+        patch(
+            "skill_manager.core.skill_packages.process._resolve_process_command",
+            return_value=["some-cmd"],
+        ),
+        patch("subprocess.Popen") as mock_popen,
     ):
         mock_popen.side_effect = subprocess.SubprocessError("Process failed to start")
         with pytest.raises(subprocess.SubprocessError):
