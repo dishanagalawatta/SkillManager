@@ -165,7 +165,7 @@ class SearchEngine:
                     if all_doc_tokens:
                         for qt in query_tokens:
                             match = process.extractOne(
-                                qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=70
+                                qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=65
                             )
                             if match:
                                 max_token_match = match[1]
