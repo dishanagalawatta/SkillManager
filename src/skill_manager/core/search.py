@@ -164,9 +164,9 @@ class SearchEngine:
                             score = fuzz.ratio(qt, dt)
                             if score > max_token_match:
                                 max_token_match = score
-                            if max_token_match > 70:
+                            if max_token_match >= 65:
                                 break
-                        if max_token_match > 70:
+                        if max_token_match >= 65:
                             break
 
                 # If no query token has a decent match with any document token, it's irrelevant
