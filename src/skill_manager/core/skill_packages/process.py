@@ -85,8 +85,11 @@ def run_process(
         "encoding": "utf-8",
         "errors": "replace",
         "bufsize": 1,
-        "creationflags": subprocess.CREATE_NO_WINDOW,
     }
+
+    import sys
+    if hasattr(subprocess, 'CREATE_NO_WINDOW') and sys.platform == 'win32':
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     process = subprocess.Popen(command, **kwargs)
     lastemit_time = 0
