@@ -28,7 +28,7 @@ def sanitize_token(text: str) -> str:
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
         # Separate patterns for quoted and unquoted values to avoid dropping trailing context
-        text = re.sub(r"(echo password=)(['\"])(?:(?!\2)[^\r\n\\]|\\.)*(?:\2|(?=[\r\n]|$))", r"\1\2***\2", text)
+        text = re.sub(r"(echo password=)(['\"])(.*?)\2", r"\1\2***\2", text)
         text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
 
     return text
