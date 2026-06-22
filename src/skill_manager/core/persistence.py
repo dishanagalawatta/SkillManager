@@ -232,23 +232,15 @@ def patch_cache_add(
             data["projects"] = list(projects_map.values())
 
         # Re-compute categories and project_labels
-        data["categories"] = sorted(
-            {s["category"] for s in data["skills"] if s.get("category")}
-        )
+        data["categories"] = sorted({s["category"] for s in data["skills"] if s.get("category")})
         data["project_labels"] = sorted(
-            {
-                p["project_label"]
-                for p in data.get("projects", [])
-                if p.get("project_label")
-            }
+            {p["project_label"] for p in data.get("projects", []) if p.get("project_label")}
         )
 
         # Update status
         num_skills = len(data["skills"])
         num_projects = len(data.get("projects", []))
-        data["status"] = (
-            f"Found {num_skills} skills in master library ({num_projects} projects)"
-        )
+        data["status"] = f"Found {num_skills} skills in master library ({num_projects} projects)"
 
         _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data, indent=2)
 

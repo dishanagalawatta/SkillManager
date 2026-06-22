@@ -17,7 +17,16 @@ def detect_git_remote(package_path: str) -> str:
 
     try:
         result = subprocess.run(
-            ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "config", "--get", "remote.origin.url"],
+            [
+                "git",
+                "-c",
+                "protocol.ext.allow=never",
+                "-C",
+                str(path),
+                "config",
+                "--get",
+                "remote.origin.url",
+            ],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -30,6 +39,7 @@ def detect_git_remote(package_path: str) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout.strip()
+
 
 def run_version_command(command: str) -> str:
     command = str(command or "").strip()
@@ -47,6 +57,7 @@ def run_version_command(command: str) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout.strip()
+
 
 def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
     """Fetches the latest semantic tag or fallback to commit hash."""
@@ -103,7 +114,16 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 return ""
 
             result = subprocess.run(
-                ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "describe", "--tags", "--abbrev=0"],
+                [
+                    "git",
+                    "-c",
+                    "protocol.ext.allow=never",
+                    "-C",
+                    str(path),
+                    "describe",
+                    "--tags",
+                    "--abbrev=0",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -112,7 +132,16 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 return result.stdout.strip()
 
             result = subprocess.run(
-                ["git", "-c", "protocol.ext.allow=never", "-C", str(path), "rev-parse", "--short", "HEAD"],
+                [
+                    "git",
+                    "-c",
+                    "protocol.ext.allow=never",
+                    "-C",
+                    str(path),
+                    "rev-parse",
+                    "--short",
+                    "HEAD",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -123,7 +152,10 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
         pass
     return ""
 
-def check_skill_package_versions(source: dict[str, Any], force_refresh: bool = False) -> dict[str, Any]:
+
+def check_skill_package_versions(
+    source: dict[str, Any], force_refresh: bool = False
+) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
 
     current_version = source.get("current_version", "")

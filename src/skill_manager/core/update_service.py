@@ -112,7 +112,10 @@ class UpdateService:
                         or source.get("package_path")
                         or source.get("local_path")
                     )
-                    if source_path and self._ownership_project_key(source_path) in unsafe_project_keys:
+                    if (
+                        source_path
+                        and self._ownership_project_key(source_path) in unsafe_project_keys
+                    ):
                         _log_update(
                             "WARN",
                             "update.package.skipped",

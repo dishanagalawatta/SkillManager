@@ -196,7 +196,7 @@ class UIController(BaseController):
         if self.app._client_format != f:
             self.app._client_format = f
             self.app.clientFormatChanged.emit()
-            self.currentViewChanged.emit() # Logo depends on it
+            self.currentViewChanged.emit()  # Logo depends on it
             self.triggerSave()
 
     @Slot(str)
@@ -307,9 +307,11 @@ class UIController(BaseController):
                 os.startfile(path)
             elif sys.platform == "darwin":
                 import subprocess
+
                 subprocess.run(["open", "--", path])
             else:
                 import subprocess
+
                 # xdg-open doesn't support '--' reliably; prevent argument injection
                 # by making sure paths starting with '-' become relative or absolute.
                 safe_path = path

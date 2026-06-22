@@ -110,7 +110,7 @@ def test_spec_logging_filter_logic():
         lno=10,
         msg="%s: QML plugin binary %r does not exist!",
         args=("some_plugin.dll",),
-        exc_info=None
+        exc_info=None,
     )
 
     # Apply filter
@@ -125,6 +125,7 @@ def test_spec_logging_filter_logic():
 
 def test_spec_file_exclusions_and_hiddenimports():
     import ast
+
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     spec_path = os.path.join(project_root, "packaging", "skill_manager.spec")
 
@@ -134,7 +135,11 @@ def test_spec_file_exclusions_and_hiddenimports():
     parsed = ast.parse(spec_content)
     analysis_call = None
     for node in ast.walk(parsed):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Analysis":
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "Analysis"
+        ):
             analysis_call = node
             break
 
@@ -157,11 +162,33 @@ def test_spec_file_exclusions_and_hiddenimports():
     # Check for PyInstaller exclusions
     expected_excludes = [
         # Unix-only modules
-        "pwd", "grp", "fcntl", "termios", "readline", "_scproxy", "posix", "resource", "_posixsubprocess", "_posixshmem",
+        "pwd",
+        "grp",
+        "fcntl",
+        "termios",
+        "readline",
+        "_scproxy",
+        "posix",
+        "resource",
+        "_posixsubprocess",
+        "_posixshmem",
         # Platform/Internal noise
-        "vms_lib", "java", "java.lang", "_frozen_importlib", "_frozen_importlib_external", "sitecustomize", "usercustomize",
+        "vms_lib",
+        "java",
+        "java.lang",
+        "_frozen_importlib",
+        "_frozen_importlib_external",
+        "sitecustomize",
+        "usercustomize",
         # Optional library features
-        "redis", "IPython", "dotenv.ipython", "brotli", "brotlicffi", "h2", "socks", "_typeshed"
+        "redis",
+        "IPython",
+        "dotenv.ipython",
+        "brotli",
+        "brotlicffi",
+        "h2",
+        "socks",
+        "_typeshed",
     ]
     for ex in expected_excludes:
         assert ex in excludes, f"Module {ex} should be excluded in spec file excludes list"
@@ -169,6 +196,7 @@ def test_spec_file_exclusions_and_hiddenimports():
 
 def test_rapidfuzz_dependency():
     import tomllib
+
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     pyproject_path = os.path.join(project_root, "pyproject.toml")
 
@@ -177,6 +205,7 @@ def test_rapidfuzz_dependency():
 
     dependencies = data.get("project", {}).get("dependencies", [])
     import re
+
     has_rapidfuzz = False
     for dep in dependencies:
         name = re.split(r"[><=~! ]", dep)[0]
@@ -185,5 +214,3 @@ def test_rapidfuzz_dependency():
             break
 
     assert has_rapidfuzz, "rapidfuzz should be in pyproject.toml project dependencies"
-
-

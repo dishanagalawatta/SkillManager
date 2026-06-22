@@ -68,6 +68,7 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
     if clone_path != package_path:
         _emit(output_callback, f"Installed to {path}")
 
+
 def _run_npm_update(
     source: dict[str, Any],
     output_callback: Callable[[str], None] | None,
@@ -81,10 +82,14 @@ def _run_npm_update(
     if source.get("package_args"):
         # Local import or copy _split_args
         from .config import _split_args
+
         command.extend(_split_args(source["package_args"]))
     run_process(command, output_callback, cwd=cwd)
 
-def _intercept_cross_platform_command(command: str, output_callback: Callable[[str], None] | None) -> bool:
+
+def _intercept_cross_platform_command(
+    command: str, output_callback: Callable[[str], None] | None
+) -> bool:
     command = str(command or "").strip()
     if not command.startswith("test "):
         return False
@@ -102,7 +107,9 @@ def _intercept_cross_platform_command(command: str, output_callback: Callable[[s
             if path_tokens:
                 path = "".join(path_tokens)
         except ValueError:
-            if (path.startswith('"') and path.endswith('"')) or (path.startswith("'") and path.endswith("'")):
+            if (path.startswith('"') and path.endswith('"')) or (
+                path.startswith("'") and path.endswith("'")
+            ):
                 path = path[1:-1]
 
     if path.startswith("~."):
@@ -125,11 +132,14 @@ def _intercept_cross_platform_command(command: str, output_callback: Callable[[s
                     if msg_tokens:
                         msg = " ".join(msg_tokens)
                 except ValueError:
-                    if (msg.startswith('"') and msg.endswith('"')) or (msg.startswith("'") and msg.endswith("'")):
+                    if (msg.startswith('"') and msg.endswith('"')) or (
+                        msg.startswith("'") and msg.endswith("'")
+                    ):
                         msg = msg[1:-1]
             _emit(output_callback, msg)
 
     return True
+
 
 def _run_shell_command(
     command: str,
@@ -140,7 +150,10 @@ def _run_shell_command(
         return
     run_process(command, output_callback, shell=True, cwd=cwd)
 
-def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None = None) -> dict[str, Any]:
+
+def run_skill_package_update(
+    source: dict[str, Any], output_callback: Callable[[str], None] | None = None
+) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
     source.setdefault("current_version", "")
     source.setdefault("latest_version", "")
@@ -158,9 +171,7 @@ def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[
 
     uses_staging = source.get("source_type") == "npm" or bool(source.get("update_command"))
     staging_context = (
-        tempfile.TemporaryDirectory(
-            prefix="skillmanager-package-", ignore_cleanup_errors=True
-        )
+        tempfile.TemporaryDirectory(prefix="skillmanager-package-", ignore_cleanup_errors=True)
         if uses_staging
         else nullcontext(None)
     )
@@ -187,17 +198,25 @@ def run_skill_package_update(source: dict[str, Any], output_callback: Callable[[
                 outdated = set(old_managed) - set(new_managed)
                 removed = []
                 if outdated:
-                    _emit(output_callback, f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...")
+                    _emit(
+                        output_callback,
+                        f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...",
+                    )
                     dest_base = Path(os.path.expanduser(package_path))
                     for folder_name in sorted(outdated):
                         folder_path = dest_base / folder_name
                         if folder_path.is_dir():
-                            _emit(output_callback, f"[DEBUG] Deleting outdated skill folder: {folder_name}")
+                            _emit(
+                                output_callback,
+                                f"[DEBUG] Deleting outdated skill folder: {folder_name}",
+                            )
                             try:
                                 _remove_package_folder(folder_path)
                                 removed.append(folder_name)
                             except Exception as e:
-                                _emit(output_callback, f"[ERROR] Failed to delete {folder_name}: {e}")
+                                _emit(
+                                    output_callback, f"[ERROR] Failed to delete {folder_name}: {e}"
+                                )
 
                 source["managed_folders"] = new_managed
                 source["removed_folders"] = removed

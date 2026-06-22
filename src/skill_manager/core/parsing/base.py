@@ -48,6 +48,7 @@ def parse_frontmatter(frontmatter: str) -> dict[str, Any]:
     flush_multiline()
     return parsed
 
+
 def normalize_description(value: Any) -> str:
     if value is None:
         return ""
@@ -56,6 +57,7 @@ def normalize_description(value: Any) -> str:
     elif not isinstance(value, str):
         value = str(value)
     return " ".join(value.split()).strip(" \"'")
+
 
 def extract_markdown_description(content: str) -> str:
     body = re.sub(

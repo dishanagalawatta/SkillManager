@@ -22,17 +22,20 @@ nested:
     assert "Line 1" in parsed["description"]
     assert parsed["nested"]["key"] == "value"
 
+
 def test_parse_frontmatter_malformed():
     fm = "this is not yaml : :::"
     parsed = parse_frontmatter(fm)
     assert isinstance(parsed, dict)
     # Should not crash, might be empty or partial
 
+
 def test_normalize_description_types():
     assert normalize_description(None) == ""
     assert normalize_description(["a", "b"]) == "a b"
     assert normalize_description(123) == "123"
     assert normalize_description("  extra   spaces  ") == "extra spaces"
+
 
 def test_extract_markdown_description_no_fm():
     content = """
@@ -44,6 +47,7 @@ Second paragraph.
     desc = extract_markdown_description(content)
     assert desc == "First paragraph."
 
+
 def test_extract_markdown_description_with_fm():
     content = """---
 name: Test
@@ -53,6 +57,7 @@ Actual description here.
 """
     desc = extract_markdown_description(content)
     assert desc == "Actual description here."
+
 
 def test_categorize_skill_weighting():
     # Test that name has higher signal. Use a keyword that doesn't collide with "Tool"
@@ -66,6 +71,7 @@ def test_categorize_skill_weighting():
     desc = "This is a system deployment"
     cat = categorize_skill(name, desc)
     assert cat["sub_category"] == "DevOps"
+
 
 def test_categorize_skill_uncategorized():
     cat = categorize_skill("XYZ", "abc def")
