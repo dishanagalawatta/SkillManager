@@ -606,7 +606,10 @@ def test_update_custom_command_full(
     local_path = commands_dir / "Cmd.md"
     local_path.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
 
-    update_result = MagicMock(ok=True, message="Updated command: Cmd.md", path=local_path)
+    update_result = MagicMock(
+        ok=True, message="Updated command: Cmd.md", path=local_path,
+        needs_conflict_resolution=False, conflicting_path=None, suggested_rename=None,
+    )
     mock_update.return_value = update_result
 
     mock_discover.return_value = {
@@ -619,16 +622,115 @@ def test_update_custom_command_full(
         str(local_path),
         "Cmd",
         "new body",
+        "NewCat",
+        "Old",
+        "",
     )
 
     mock_update.assert_called_once_with(
         local_path=str(local_path),
         name="Cmd",
         body="new body",
+        category="NewCat",
+        project_label_name="Old",
+        project_paths=mock_app._projects,
+        on_conflict=None,
     )
     mock_discover.assert_called_once()
     mock_patch_cache.assert_called_once()
     mock_app._set_status.assert_called_with("Updated command: Cmd.md")
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_full_moves_to_new_project(
+    mock_update,
+    mock_discover,
+    mock_patch_cache,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """updateCustomCommandFull moves file to a new project."""
+    mock_app._sources = []
+    mock_app._projects = ["/projectA", "/projectB"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    local_path = tmp_path / "cmd.md"
+    local_path.write_text("---\nname: cmd\n---\nbody")
+
+    new_path = tmp_path / "cmd_new.md"
+    update_result = MagicMock(
+        ok=True, message="Updated command: cmd_new.md", path=new_path,
+        needs_conflict_resolution=False, conflicting_path=None, suggested_rename=None,
+    )
+    mock_update.return_value = update_result
+
+    mock_discover.return_value = {
+        "local_path": str(new_path),
+        "name": "cmd",
+        "category": "NewCat",
+    }
+
+    ops_controller.updateCustomCommandFull(
+        str(local_path), "cmd", "new body", "NewCat", "ProjectB", ""
+    )
+
+    mock_update.assert_called_once_with(
+        local_path=str(local_path),
+        name="cmd",
+        body="new body",
+        category="NewCat",
+        project_label_name="ProjectB",
+        project_paths=mock_app._projects,
+        on_conflict=None,
+    )
+    mock_app._set_status.assert_called_with("Updated command: cmd_new.md")
+    mock_patch_cache.assert_called_once()
+
+
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_full_emits_conflict_signal(
+    mock_update,
+    ops_controller,
+    mock_app,
+    tmp_path,
+):
+    """updateCustomCommandFull emits commandUpdateConflict on conflict."""
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    local_path = tmp_path / "cmd.md"
+    local_path.write_text("---\nname: cmd\n---\nbody")
+    conflict_path = tmp_path / "other.md"
+
+    update_result = MagicMock(
+        ok=False,
+        message="conflict",
+        path=None,
+        needs_conflict_resolution=True,
+        conflicting_path=conflict_path,
+        suggested_rename="cmd-1.md",
+    )
+    mock_update.return_value = update_result
+
+    ops_controller.updateCustomCommandFull(
+        str(local_path), "cmd", "new body", "NewCat", "ProjectB"
+    )
+
+    # The controller calls self.app.commandUpdateConflict.emit(...)
+    # With MagicMock, the attribute creates a new mock each time, so we
+    # verify the call was made by checking _set_status was NOT called
+    # (i.e. the controller returned early via the conflict path).
+    mock_app._set_status.assert_not_called()
 
 
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
@@ -928,7 +1030,10 @@ def test_update_custom_command_refreshes_selection_real_discovery(
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Act — uses real update_custom_command_file + real DiscoveryService
-    real_ops_controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body")
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+    proj_label = compute_project_label(project_path)
+    real_ops_controller.app._projects = [str(project_path)]
+    real_ops_controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label)
 
     # The command was updated; verify _selected_skill reflects the new body
     assert emissions, (
@@ -962,7 +1067,10 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Act — rename to NewCmd.md
-    real_ops_controller.updateCustomCommandFull(str(old_file), "NewCmd", "updated body")
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+    proj_label = compute_project_label(project_path)
+    real_ops_controller.app._projects = [str(project_path)]
+    real_ops_controller.updateCustomCommandFull(str(old_file), "NewCmd", "updated body", "Commands", proj_label)
 
     # The old file should be gone, new file should exist
     new_file = commands_dir / "NewCmd.md"

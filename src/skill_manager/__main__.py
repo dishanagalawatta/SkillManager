@@ -65,6 +65,9 @@ def setup_logging():
         handlers=[logging.StreamHandler(), logging.FileHandler(log_file, encoding="utf-8")],
     )
 
+    for noisy in ("markdown_it", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 def main():
     # Force-clear QML cache in dev mode (uv run / editable install)

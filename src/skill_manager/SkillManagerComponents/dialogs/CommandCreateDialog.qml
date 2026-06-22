@@ -1,5 +1,5 @@
 /**
- * Purpose: A modern "Solid Matte" dialog for creating custom commands.
+ * Purpose: A modern "Solid Matte" dialog for creating or editing custom commands.
  * Usage:
  * CommandCreateDialog {
  *     id: commandDialog
@@ -14,19 +14,19 @@ import App 1.0
 
 Dialog {
     id: root
-    
+
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
     width: 750
     modal: true
     padding: 0
-    
+
     background: Rectangle {
         color: Theme.glassPill
         radius: Theme.radiusCard
         border.color: Theme.glassBorder
         border.width: 1
-        
+
         layer.enabled: true
         layer.effect: DropShadow {
             radius: 20
@@ -38,12 +38,20 @@ Dialog {
 
     property bool editMode: false
     property string editLocalPath: ""
+    property string editProjectLabel: ""
+    property string editCategoryValue: ""
+    property string orphanCategory: ""
+    property bool awaitingConflictResolution: false
+    property var pendingArgs: ({})
 
     function openWithContext() {
         editMode = false
         editLocalPath = ""
+        editProjectLabel = AppController.currentProject || ""
+        editCategoryValue = ""
+        orphanCategory = ""
+        awaitingConflictResolution = false
         cmdNameInput.text = ""
-        cmdCategoryInput.text = ""
         cmdBodyInput.text = ""
         open()
     }
@@ -51,32 +59,37 @@ Dialog {
     function openForEdit(skill) {
         editMode = true
         editLocalPath = skill.local_path || ""
+        editProjectLabel = skill.project_label || AppController.currentProject || ""
+        editCategoryValue = skill.category || ""
+        orphanCategory = (skill.category
+                          && AppController.categories.indexOf(skill.category) === -1)
+            ? skill.category : ""
+        awaitingConflictResolution = false
         cmdNameInput.text = skill.name || ""
-        cmdCategoryInput.text = skill.category || ""
         cmdBodyInput.text = skill.body_content || ""
         open()
     }
 
     contentItem: ColumnLayout {
         spacing: 0
-        
+
         // Header
         Rectangle {
             Layout.fillWidth: true
             height: 60
             color: "transparent"
-            
+
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 24
                 anchors.rightMargin: 16
                 spacing: 12
-                
+
                 Text {
-                    text: "⌨️"
+                    text: "\u2328\uFE0F"
                     font.pixelSize: 20
                 }
-                
+
                 Text {
                     text: editMode ? "Edit Custom Command" : "Create Custom Command"
                     font.family: Theme.fontFamily
@@ -85,19 +98,19 @@ Dialog {
                     color: Theme.label
                     Layout.fillWidth: true
                 }
-                
+
                 IconButton {
-                    text: "✕"
+                    text: "\u2715"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     onClicked: root.reject()
-                    
+
                     background: Rectangle {
                         radius: 16
                         color: parent.hovered ? Theme.glassHover : "transparent"
                     }
-                    
+
                     contentItem: Text {
                         text: parent.text
                         font.pixelSize: 16
@@ -107,7 +120,7 @@ Dialog {
                     }
                 }
             }
-            
+
             Rectangle {
                 anchors.bottom: parent.bottom
                 width: parent.width
@@ -115,23 +128,23 @@ Dialog {
                 color: Theme.separator
             }
         }
-        
+
         // Content
         ColumnLayout {
             Layout.fillWidth: true
             Layout.margins: 24
             spacing: 20
-            
+
             // Name and Category
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 16
-                
+
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
                     Text { text: "Command Name"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    TextField { 
+                    TextField {
                         id: cmdNameInput
                         placeholderText: "e.g. PR Template"
                         Accessible.role: Accessible.EditableText
@@ -145,7 +158,7 @@ Dialog {
                         rightPadding: 16
                         topPadding: 12
                         bottomPadding: 12
-                        background: Rectangle { 
+                        background: Rectangle {
                             radius: Theme.radiusField
                             color: parent.activeFocus ? Theme.glassActive : Theme.glassHover
                             border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
@@ -153,40 +166,47 @@ Dialog {
                         }
                     }
                 }
-                
+
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
                     Text { text: "Category"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    TextField { 
-                        id: cmdCategoryInput
-                        placeholderText: "e.g. Git, Dev"
-                        Accessible.role: Accessible.EditableText
-                        Accessible.name: "Category"
+                    GlassDropdown {
+                        id: cmdCategoryDrop
                         Layout.fillWidth: true
-                        selectByMouse: true
-                        font.family: Theme.fontFamily
-                        color: Theme.label
-                        placeholderTextColor: Theme.secondaryLabel
-                        leftPadding: 16
-                        rightPadding: 16
-                        topPadding: 12
-                        bottomPadding: 12
-                        background: Rectangle { 
-                            radius: Theme.radiusField
-                            color: parent.activeFocus ? Theme.glassActive : Theme.glassHover
-                            border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
-                            border.width: parent.activeFocus ? 2 : 1
+                        model: {
+                            let cats = AppController.categories.slice()
+                            if (root.orphanCategory && cats.indexOf(root.orphanCategory) === -1) {
+                                cats = cats.concat([root.orphanCategory]).sort()
+                            }
+                            return ["\u2014 No Category \u2014"].concat(cats)
+                        }
+                        currentIndex: {
+                            if (!root.editCategoryValue) return 0
+                            let idx = model.indexOf(root.editCategoryValue)
+                            return idx === -1 ? 0 : idx
+                        }
+                        onActivated: (index) => {
+                            if (index === 0) {
+                                root.editCategoryValue = ""
+                            } else {
+                                let cats = AppController.categories.slice()
+                                if (root.orphanCategory && cats.indexOf(root.orphanCategory) === -1) {
+                                    cats = cats.concat([root.orphanCategory]).sort()
+                                }
+                                root.editCategoryValue = cats[index - 1] || ""
+                            }
+                            root.orphanCategory = ""
                         }
                     }
                 }
             }
-            
+
             // Project
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 16
-                
+
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -196,25 +216,24 @@ Dialog {
                         Layout.fillWidth: true
                         model: AppController.projectLabels
                         currentIndex: {
-                            let idx = model.indexOf(AppController.currentProject);
-                            return Math.max(0, idx);
+                            let label = root.editProjectLabel || AppController.currentProject
+                            return Math.max(0, model.indexOf(label))
                         }
                         onActivated: (index) => {
-                            if (index >= 0 && index < AppController.projectLabels.length) {
-                                AppController.setCurrentProject(AppController.projectLabels[index])
-                            }
+                            if (index >= 0 && index < AppController.projectLabels.length)
+                                root.editProjectLabel = AppController.projectLabels[index]
                         }
                     }
                 }
             }
-            
+
             // Command Body
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 4
                 Text { text: "Command Content"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                
+
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 350
@@ -222,12 +241,12 @@ Dialog {
                     color: Theme.glassHover
                     border.color: cmdBodyInput.activeFocus ? Theme.accent : Theme.glassBorder
                     border.width: cmdBodyInput.activeFocus ? 2 : 1
-                    
+
                     SmoothScrollView {
                         anchors.fill: parent
                         anchors.margins: 12
                         clip: true
-                        
+
                         TextArea {
                             id: cmdBodyInput
                             placeholderText: "Paste your command or system prompt here..."
@@ -244,32 +263,32 @@ Dialog {
                 }
             }
         }
-        
+
         // Footer
         Rectangle {
             Layout.fillWidth: true
             height: 80
             color: "transparent"
-            
+
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 24
                 spacing: 12
-                
+
                 Item { Layout.fillWidth: true }
-                
+
                 ActionButton {
                     text: "Cancel"
                     Layout.preferredWidth: 100
                     Layout.preferredHeight: 40
                     onClicked: root.reject()
-                    
+
                     background: Rectangle {
                         radius: Theme.radiusButton
                         color: parent.hovered ? Theme.glassHover : "transparent"
                         border.color: Theme.glassBorder
                     }
-                    
+
                     contentItem: Text {
                         text: parent.text
                         font.family: Theme.fontFamily
@@ -280,37 +299,48 @@ Dialog {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
-                
+
                 ActionButton {
                     id: createBtn
                     text: editMode ? "Update Command" : "Create Command"
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 40
                     enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== ""
-                    
+
                     onClicked: {
+                        root.pendingArgs = {
+                            localPath: editMode ? editLocalPath : "",
+                            name: cmdNameInput.text,
+                            body: cmdBodyInput.text,
+                            category: editCategoryValue,
+                            projectLabel: projectDrop.currentText
+                        }
+                        root.awaitingConflictResolution = editMode
                         if (editMode) {
                             AppController.updateCustomCommandFull(
-                                editLocalPath,
-                                cmdNameInput.text,
-                                cmdBodyInput.text
+                                root.pendingArgs.localPath,
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.category,
+                                root.pendingArgs.projectLabel,
+                                ""
                             )
                         } else {
                             AppController.createCustomCommand(
-                                cmdNameInput.text,
-                                cmdBodyInput.text,
-                                projectDrop.currentText,
-                                cmdCategoryInput.text
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.projectLabel,
+                                root.pendingArgs.category
                             )
+                            root.accept()
                         }
-                        root.accept()
                     }
-                    
+
                     background: Rectangle {
                         radius: Theme.radiusButton
                         color: !parent.enabled ? Theme.secondaryLabel : (parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent))
                     }
-                    
+
                     contentItem: Text {
                         text: parent.text
                         font.family: Theme.fontFamily
@@ -322,6 +352,173 @@ Dialog {
                     }
                 }
             }
+        }
+    }
+
+    // Conflict resolution dialog
+    Dialog {
+        id: conflictDialog
+        title: "File already exists"
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.NoButton
+        width: 450
+        property string conflictPath: ""
+        property string suggestedRename: ""
+
+        background: Rectangle {
+            color: Theme.glassPill
+            radius: Theme.radiusCard
+            border.color: Theme.glassBorder
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text {
+                text: "A file named '" + conflictDialog.suggestedRename + "' already exists in the target location.\n\nWhat would you like to do?"
+                wrapMode: Text.Wrap
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeBody
+                color: Theme.label
+                Layout.margins: 16
+            }
+        }
+
+        footer: RowLayout {
+            spacing: 8
+            Layout.margins: 12
+
+            ActionButton {
+                text: "Cancel"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 36
+                onClicked: {
+                    AppController.updateCustomCommandFull(
+                        root.pendingArgs.localPath,
+                        root.pendingArgs.name,
+                        root.pendingArgs.body,
+                        root.pendingArgs.category,
+                        root.pendingArgs.projectLabel,
+                        "cancel"
+                    )
+                    conflictDialog.close()
+                    root.awaitingConflictResolution = false
+                    root.reject()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.glassBorder
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Medium
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            ActionButton {
+                text: "Overwrite"
+                Layout.preferredWidth: 120
+                Layout.preferredHeight: 36
+                onClicked: {
+                    AppController.updateCustomCommandFull(
+                        root.pendingArgs.localPath,
+                        root.pendingArgs.name,
+                        root.pendingArgs.body,
+                        root.pendingArgs.category,
+                        root.pendingArgs.projectLabel,
+                        "overwrite"
+                    )
+                    conflictDialog.close()
+                    root.awaitingConflictResolution = false
+                    root.accept()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.alpha(Theme.accent, 0.85) : Theme.accent
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            ActionButton {
+                text: "Rename ('" + conflictDialog.suggestedRename + "')"
+                Layout.preferredWidth: 200
+                Layout.preferredHeight: 36
+                onClicked: {
+                    AppController.updateCustomCommandFull(
+                        root.pendingArgs.localPath,
+                        root.pendingArgs.name,
+                        root.pendingArgs.body,
+                        root.pendingArgs.category,
+                        root.pendingArgs.projectLabel,
+                        "rename"
+                    )
+                    conflictDialog.close()
+                    root.awaitingConflictResolution = false
+                    root.accept()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.alpha(Theme.accent, 0.85) : Theme.accent
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onCommandUpdateConflict(oldPath, conflictPath, suggestedRename) {
+            if (!root.awaitingConflictResolution) return
+            conflictDialog.conflictPath = conflictPath
+            conflictDialog.suggestedRename = suggestedRename
+            if (!root.visible) {
+                root.editMode = true
+                root.editLocalPath = root.pendingArgs.localPath
+                cmdNameInput.text = root.pendingArgs.name
+                cmdBodyInput.text = root.pendingArgs.body
+                root.editCategoryValue = root.pendingArgs.category
+                root.editProjectLabel = root.pendingArgs.projectLabel
+                root.open()
+            }
+            conflictDialog.open()
+        }
+        function onCommandUpdateCompleted(oldPath, newPath) {
+            if (!root.awaitingConflictResolution) return
+            if (oldPath !== root.pendingArgs.localPath) return
+            root.awaitingConflictResolution = false
+            root.accept()
         }
     }
 }

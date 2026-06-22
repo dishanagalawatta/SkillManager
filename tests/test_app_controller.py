@@ -747,10 +747,13 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     On main (pre-fix), this fails because discover_single returns
     None for bare .md command files.
     """
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
     project_path = temp_dir / "proj"
     project_path.mkdir(parents=True, exist_ok=True)
     commands_dir = project_path / ".agents" / "commands"
     commands_dir.mkdir(parents=True, exist_ok=True)
+    controller._projects = [str(project_path)]
 
     cmd_file = commands_dir / "Cmd.md"
     _write_command_file(cmd_file, "Cmd", "old body")
@@ -761,7 +764,8 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     emissions = []
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body")
+    proj_label = compute_project_label(project_path)
+    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label, "")
 
     assert emissions, (
         "selectedSkillChanged was not emitted — "

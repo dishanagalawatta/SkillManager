@@ -3,8 +3,9 @@ import ctypes
 import logging
 from ctypes import wintypes
 
+pywinstyles = None
 with contextlib.suppress(ImportError):
-    import pywinstyles
+    import pywinstyles  # type: ignore[no-redef, used-before-def]
 
 logger = logging.getLogger(__name__)
 

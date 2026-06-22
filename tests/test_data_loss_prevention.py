@@ -264,24 +264,29 @@ class TestRecoveryScriptWindowState:
             json.dumps(legacy_config), encoding="utf-8"
         )
 
-        # Import recover_settings module directly
+        # Import recover_settings module directly. The dynamic import +
+        # module-level attribute patching below is a deliberate test
+        # isolation trick that pyright can't infer (``spec_from_file_location``
+        # returns ``None`` only for an invalid spec; the script_path above
+        # is hard-coded and known-valid, and ``ModuleType`` permits arbitrary
+        # attribute assignment at runtime even though the stub type forbids it).
         script_path = Path(__file__).resolve().parent.parent / "scripts" / "recover_settings.py"
-        spec = spec_from_file_location("recover_settings", script_path)
-        mod = module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        spec = spec_from_file_location("recover_settings", script_path)  # type: ignore[assignment]
+        mod = module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
 
         orig_app = mod.APP_DATA_CONFIG
         orig_legacy = mod.LEGACY_CONFIG
-        mod.APP_DATA_CONFIG = data_dir / "config.json"
-        mod.LEGACY_CONFIG = legacy_dir / "config.json"
+        mod.APP_DATA_CONFIG = data_dir / "config.json"  # type: ignore[attr-defined]
+        mod.LEGACY_CONFIG = legacy_dir / "config.json"  # type: ignore[attr-defined]
 
         try:
             mod.recover()
             result = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
             return result.get("ui_state", {})
         finally:
-            mod.APP_DATA_CONFIG = orig_app
-            mod.LEGACY_CONFIG = orig_legacy
+            mod.APP_DATA_CONFIG = orig_app  # type: ignore[attr-defined]
+            mod.LEGACY_CONFIG = orig_legacy  # type: ignore[attr-defined]
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_fixes_offscreen_window_x(self):

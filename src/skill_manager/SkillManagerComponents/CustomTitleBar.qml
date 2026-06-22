@@ -82,7 +82,7 @@ Rectangle {
         TitleBarButton {
             iconSource: Theme.darkMode ? AppController.ui_controller.getAssetUri("ui/sun-icon.svg") : AppController.ui_controller.getAssetUri("ui/moon-icon.svg")
             tooltipText: "Toggle Theme"
-            onClicked: Theme.darkMode = !Theme.darkMode
+            onClicked: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode
             hoverColor: Theme.glassHover
         }
 

@@ -181,6 +181,24 @@ def test_ui_controller_preference_toggles(ui_controller):
     assert ui_controller.rememberFilters is False
 
 
+def test_dark_mode_changed_signal_count(ui_controller):
+    """darkModeChanged must fire exactly once per value change and zero times on no-op."""
+    spy = MagicMock()
+    ui_controller.darkModeChanged.connect(spy)
+
+    # Change from default (False) to True — signal fires once
+    ui_controller.darkMode = True
+    assert spy.call_count == 1
+
+    # No-op: set to True again — signal must not fire
+    ui_controller.darkMode = True
+    assert spy.call_count == 1
+
+    # Change back to False — signal fires again
+    ui_controller.darkMode = False
+    assert spy.call_count == 2
+
+
 def test_ui_controller_set_view_filter(ui_controller, mock_app):
     model = mock_app.skillModel
     ui_controller.setViewFilter("category", "Dev")

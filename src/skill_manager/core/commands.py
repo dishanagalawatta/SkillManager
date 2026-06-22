@@ -1,3 +1,4 @@
+import os
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -11,6 +12,16 @@ class CommandCreateResult:
     ok: bool
     message: str
     path: Path | None = None
+
+
+@dataclass(frozen=True)
+class CommandUpdateResult:
+    ok: bool
+    message: str
+    path: Path | None = None
+    needs_conflict_resolution: bool = False
+    conflicting_path: Path | None = None
+    suggested_rename: str | None = None
 
 
 def find_project_path_by_label(project_label_name: str, project_paths: list[str]) -> Path | None:
@@ -44,16 +55,36 @@ def build_command_content(
     )
 
 
+def _next_non_conflicting(target_dir: Path, safe_name: str) -> str:
+    stem, suffix = os.path.splitext(safe_name)
+    i = 1
+    while (target_dir / f"{stem}-{i}{suffix}").exists():
+        i += 1
+    return f"{stem}-{i}{suffix}"
+
+
 def update_custom_command_file(
     *,
     local_path: str,
     name: str,
     body: str,
-) -> CommandCreateResult:
-    """Updates an existing command file in place. Renames file if name changed."""
+    category: str | None = None,
+    project_label_name: str | None = None,
+    project_paths: list[str] | None = None,
+    on_conflict: str | None = None,
+) -> CommandUpdateResult:
+    """Updates an existing command file in place.
+
+    - Renames the file if ``name`` changed.
+    - Moves the file to a different project's commands dir if
+      ``project_label_name`` resolves to a different project than the
+      file's current project.
+    - If ``category`` is falsy, preserves the existing frontmatter
+      category; otherwise writes the new value.
+    """
     path = Path(local_path)
     if not path.is_file():
-        return CommandCreateResult(False, f"Error: Command file not found at {local_path}")
+        return CommandUpdateResult(False, f"Error: Command file not found at {local_path}")
 
     try:
         content = path.read_text(encoding="utf-8-sig")
@@ -61,26 +92,58 @@ def update_custom_command_file(
 
         metadata, _ = split_frontmatter(content)
     except Exception as exc:
-        return CommandCreateResult(False, f"Error reading command file: {exc}")
+        return CommandUpdateResult(False, f"Error reading command file: {exc}")
 
-    category = metadata.get("category", "") if metadata else ""
+    existing_category = metadata.get("category", "") if metadata else ""
+    effective_category = category if category else existing_category
 
     new_filename = build_command_filename(name)
-    new_path = path.parent / new_filename
+
+    # Resolve target project directory (None = "stay in current project").
+    target_project_path: Path | None = None
+    if project_label_name and project_paths is not None:
+        candidate = find_project_path_by_label(project_label_name, project_paths)
+        if candidate is None:
+            return CommandUpdateResult(
+                False, f"Error: Could not find project directory for {project_label_name}"
+            )
+        if candidate.resolve() != project_root_for_project(path.parent).resolve():
+            target_project_path = candidate
+
+    if target_project_path is not None:
+        target_dir = project_root_for_project(target_project_path) / ".agents" / "commands"
+    else:
+        target_dir = path.parent
+
+    new_path = target_dir / new_filename
 
     if new_path.exists() and new_path != path:
-        return CommandCreateResult(False, f"Error: Command {new_filename} already exists")
+        if not on_conflict:
+            return CommandUpdateResult(
+                ok=False,
+                message=f"File already exists: {new_path}",
+                needs_conflict_resolution=True,
+                conflicting_path=new_path,
+                suggested_rename=_next_non_conflicting(target_dir, new_filename),
+            )
+        if on_conflict == "cancel":
+            return CommandUpdateResult(False, "Cancelled by user", path=path)
+        if on_conflict == "rename":
+            new_path = target_dir / _next_non_conflicting(target_dir, new_filename)
+        # "overwrite" → keep new_path; write_text will replace it
 
-    new_content = build_command_content(name, body, category)
+    new_content = build_command_content(name, body, effective_category)
 
     try:
+        if target_project_path is not None:
+            target_dir.mkdir(parents=True, exist_ok=True)
         new_path.write_text(new_content, encoding="utf-8")
         if new_path != path:
             path.unlink()
     except Exception as exc:
-        return CommandCreateResult(False, f"Error updating command: {exc}", path)
+        return CommandUpdateResult(False, f"Error updating command: {exc}", path=path)
 
-    return CommandCreateResult(True, f"Updated command: {new_path.name}", new_path)
+    return CommandUpdateResult(True, f"Updated command: {new_path.name}", new_path)
 
 
 def create_custom_command_file(
