@@ -31,6 +31,7 @@ def temp_data_dir():
     path.mkdir(parents=True)
     yield path
     import shutil
+
     shutil.rmtree(path, ignore_errors=True)
 
 
@@ -145,9 +146,7 @@ class TestLegacyConfigFallback:
         data_dir.mkdir()
 
         # App-data config has no projects
-        (data_dir / "config.json").write_text(
-            '{"sources": [], "shortcuts": {}}', encoding="utf-8"
-        )
+        (data_dir / "config.json").write_text('{"sources": [], "shortcuts": {}}', encoding="utf-8")
 
         # Create a fake CWD with legacy data/config.json
         fake_cwd = temp_data_dir / "cwd"
@@ -179,9 +178,7 @@ class TestLegacyConfigFallback:
         fake_cwd.mkdir()
         legacy_data = fake_cwd / "data"
         legacy_data.mkdir()
-        (legacy_data / "config.json").write_text(
-            '{"targets": ["legacy"]}', encoding="utf-8"
-        )
+        (legacy_data / "config.json").write_text('{"targets": ["legacy"]}', encoding="utf-8")
 
         with (
             patch.dict(os.environ, {"SKILL_MANAGER_DATA_DIR": str(data_dir)}, clear=False),
@@ -225,9 +222,7 @@ class TestSourcePathValidation:
         svc.discover_all(use_cache=False)
 
         events = diag.get_recent_events(50)
-        source_missing_events = [
-            e for e in events if e.get("category") == CATEGORY_SOURCE_MISSING
-        ]
+        source_missing_events = [e for e in events if e.get("category") == CATEGORY_SOURCE_MISSING]
         assert len(source_missing_events) >= 2  # both source and project
 
         diag.set_enabled(False)
@@ -252,17 +247,13 @@ class TestRecoveryScriptWindowState:
 
         # Write app-data config with corrupted UI state
         app_config = {"sources": [], "projects": [], "ui_state": ui_state}
-        (data_dir / "config.json").write_text(
-            json.dumps(app_config), encoding="utf-8"
-        )
+        (data_dir / "config.json").write_text(json.dumps(app_config), encoding="utf-8")
 
         # Write legacy config with targets
         targets = legacy_targets or [str(tmp / "real_project")]
         (tmp / "real_project").mkdir(exist_ok=True)
         legacy_config = {"targets": targets}
-        (legacy_dir / "config.json").write_text(
-            json.dumps(legacy_config), encoding="utf-8"
-        )
+        (legacy_dir / "config.json").write_text(json.dumps(legacy_config), encoding="utf-8")
 
         # Import recover_settings module directly. The dynamic import +
         # module-level attribute patching below is a deliberate test
@@ -291,44 +282,61 @@ class TestRecoveryScriptWindowState:
 
     def test_fixes_offscreen_window_x(self):
         """Off-screen window_x should be reset to 100."""
-        result = self._run_recovery_with_ui_state({
-            "window_x": -32000, "window_y": 200,
-            "window_width": 1200, "window_height": 800,
-        })
+        result = self._run_recovery_with_ui_state(
+            {
+                "window_x": -32000,
+                "window_y": 200,
+                "window_width": 1200,
+                "window_height": 800,
+            }
+        )
         assert result["window_x"] == 100
         assert result["window_y"] == 200  # preserved
 
     def test_fixes_offscreen_window_y(self):
         """Off-screen window_y should be reset to 100."""
-        result = self._run_recovery_with_ui_state({
-            "window_x": 200, "window_y": -32000,
-            "window_width": 1200, "window_height": 800,
-        })
+        result = self._run_recovery_with_ui_state(
+            {
+                "window_x": 200,
+                "window_y": -32000,
+                "window_width": 1200,
+                "window_height": 800,
+            }
+        )
         assert result["window_x"] == 200  # preserved
         assert result["window_y"] == 100
 
     def test_fixes_zero_opacity(self):
         """Zero window_opacity should be reset to 1.0."""
-        result = self._run_recovery_with_ui_state({
-            "window_x": 200, "window_y": 200,
-            "window_opacity": 0.0,
-        })
+        result = self._run_recovery_with_ui_state(
+            {
+                "window_x": 200,
+                "window_y": 200,
+                "window_opacity": 0.0,
+            }
+        )
         assert result["window_opacity"] == 1.0
 
     def test_fixes_tiny_dimensions(self):
         """Window dimensions < 400 should be reset to defaults."""
-        result = self._run_recovery_with_ui_state({
-            "window_x": 200, "window_y": 200,
-            "window_width": 100, "window_height": 50,
-        })
+        result = self._run_recovery_with_ui_state(
+            {
+                "window_x": 200,
+                "window_y": 200,
+                "window_width": 100,
+                "window_height": 50,
+            }
+        )
         assert result["window_width"] == 1200
         assert result["window_height"] == 800
 
     def test_preserves_valid_ui_state(self):
         """Valid UI state should not be modified."""
         original = {
-            "window_x": 500, "window_y": 300,
-            "window_width": 1400, "window_height": 900,
+            "window_x": 500,
+            "window_y": 300,
+            "window_width": 1400,
+            "window_height": 900,
             "window_opacity": 1.0,
         }
         result = self._run_recovery_with_ui_state(original)
