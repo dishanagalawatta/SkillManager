@@ -162,7 +162,7 @@ class SearchEngine:
                     # C extensions instead of iterating in Python, yielding massive speedups in hot paths.
                     if process is not None:
                         match = process.extractOne(
-                            qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match
+                            qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max(max_token_match, 65)
                         )
                         if match and match[1] > max_token_match:
                             max_token_match = match[1]
