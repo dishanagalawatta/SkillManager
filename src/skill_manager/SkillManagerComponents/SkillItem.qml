@@ -33,10 +33,20 @@ Item {
             width: parent.width
             height: 34
             visible: root.isFirstInSub && !root.isMainCollapsed
+            activeFocusOnTab: true
+
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                    Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
+                    event.accepted = true
+                }
+            }
 
             Rectangle {
                 anchors.fill: parent
-                color: mouseAreaSub.containsMouse ? Theme.glassHover : "transparent"
+                color: (mouseAreaSub.containsMouse || subHeader.activeFocus) ? Theme.glassHover : "transparent"
+                border.color: subHeader.activeFocus ? Theme.accent : "transparent"
+                border.width: subHeader.activeFocus ? 2 : 0
                 radius: Theme.radiusSmall
                 anchors.leftMargin: 24 // Start Level 1 Background
                 anchors.rightMargin: 2
@@ -150,12 +160,21 @@ Item {
 
                     // Multi-select Checkbox
                     Rectangle {
+                        id: checkboxRect
                         width: root.compactRows ? 18 : 20
                         height: root.compactRows ? 18 : 20
                         radius: Theme.radiusSmall
                         color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
-                        border.width: model && model.isSelected ? 0 : 1
-                        border.color: Theme.glassBorder
+                        border.width: checkboxRect.activeFocus ? 2 : (model && model.isSelected ? 0 : 1)
+                        border.color: checkboxRect.activeFocus ? Theme.accent : Theme.glassBorder
+                        activeFocusOnTab: true
+
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                                AppController.skillModel.toggleSelection(index)
+                                event.accepted = true
+                            }
+                        }
                         
                         Text {
                             anchors.centerIn: parent
