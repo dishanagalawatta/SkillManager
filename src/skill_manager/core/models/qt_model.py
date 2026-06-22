@@ -58,6 +58,35 @@ class SkillModel(QAbstractListModel):
     IsPackageRole = Qt.ItemDataRole.UserRole + 25
     IsScreenshotRole = Qt.ItemDataRole.UserRole + 26
 
+    _ALL_ROLES = [
+        NameRole,
+        CategoryRole,
+        DescriptionRole,
+        PathRole,
+        ProjectRole,
+        IsStarredRole,
+        IsSelectedRole,
+        SearchTextRole,
+        IsArchivedRole,
+        IsCollectionRole,
+        SectionRole,
+        RawContentRole,
+        BodyContentRole,
+        RiskRole,
+        SourceRole,
+        DateRole,
+        IsCollapsedRole,
+        IsCommandRole,
+        ClientRole,
+        MainCategoryNameRole,
+        IsFirstInSubcategoryRole,
+        IsMainCollapsedRole,
+        IsSubCollapsedRole,
+        SubCategoryNameRole,
+        IsPackageRole,
+        IsScreenshotRole,
+    ]
+
     filterChanged = Signal()
     showArchivedChanged = Signal()
     categoryFilterChanged = Signal()
@@ -622,6 +651,7 @@ class SkillModel(QAbstractListModel):
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]):
         was_empty = len(self._all_skills) == 0
+        updated_paths = {s_dict.get("local_path", "") for s_dict in new_skills}
         skills_dict = {s.local_path: s for s in self._all_skills}
         for s_dict in new_skills:
             skill = Skill.from_dict_fast(s_dict)
@@ -635,6 +665,12 @@ class SkillModel(QAbstractListModel):
             self._search_engine = SearchEngine(new_skills)
 
         self._apply_filter(reset=was_empty)
+
+        if updated_paths and not was_empty:
+            for row, skill in enumerate(self._filtered_skills):
+                if skill.local_path in updated_paths:
+                    idx = self.index(row, 0)
+                    self.dataChanged.emit(idx, idx, self._ALL_ROLES)
 
     @Slot(int, bool)
     def setSelected(self, row, selected):

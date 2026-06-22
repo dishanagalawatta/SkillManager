@@ -583,7 +583,7 @@ class UpdateController(BaseController):
                                         Path(pkg_path) / folder if pkg_path else Path(folder)
                                     )
                                     if folder_path.is_dir():
-                                        skill_data = service.discover_single_skill(
+                                        skill_data = service.discover_single(
                                             folder_path, folder_path
                                         )
                                         if skill_data:
@@ -652,7 +652,7 @@ class UpdateController(BaseController):
                             skill_path = Path(detail["message"])
                             proj_path = Path(detail["project"])
                             try:
-                                skill_data = service.discover_single_skill(skill_path, proj_path)
+                                skill_data = service.discover_single(skill_path, proj_path)
                                 if skill_data:
                                     discovered_skills.append(skill_data)
                             except Exception as exc:

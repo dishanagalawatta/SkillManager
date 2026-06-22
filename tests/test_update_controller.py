@@ -136,7 +136,7 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
 
 
 @patch("skill_manager.controllers.update_controller.QTimer.singleShot")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.quick_copy.discover_package_skills")
@@ -180,7 +180,7 @@ def test_sync_project_emits_categories_changed(
 
 
 @patch("skill_manager.controllers.update_controller.QTimer.singleShot")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.quick_copy.discover_package_skills")
@@ -295,7 +295,7 @@ def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_pa
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add") as mock_patch_cache,
         patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single_skill",
+            "skill_manager.core.discovery.DiscoveryService.discover_single",
             return_value=mock_skill,
         ) as mock_discover_single,
     ):
@@ -365,7 +365,7 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add"),
         patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None
+            "skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None
         ),
     ):
         update_controller.runPackageUpdate(0)

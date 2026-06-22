@@ -580,56 +580,148 @@ class DiscoveryService:
         data["search_text"] = build_skill_search_text(data)
         return data
 
-    def discover_single_skill(self, skill_path: Path, project_path: Path) -> dict[str, Any] | None:
-        """Parses and normalizes a single skill at skill_path belonging to project_path."""
+    def discover_single(self, path: Path, project_path: Path) -> dict[str, Any] | None:
+        """Parse and normalize a single skill or command file.
+
+        Dispatches to the correct parser based on the path shape:
+
+        * ``path`` is a ``.md`` file → command file parser
+        * ``path`` is a directory containing ``SKILL.md`` → skill folder parser
+
+        Returns ``None`` when the file/folder does not match either shape or
+        parsing fails.
+        """
+        if path.is_file() and path.suffix.lower() == ".md":
+            return self._discover_single_command(path, project_path)
+
+        if path.is_dir():
+            return self._discover_single_skill_folder(path, project_path)
+
+        return None
+
+    def _discover_single_command(self, cmd_file: Path, project_path: Path) -> dict[str, Any] | None:
+        """Parse a single command ``.md`` file into a normalized dict."""
+        effective_project = self._find_project_root_for_command(cmd_file, project_path)
+        resolved = self._resolve_project_dict(effective_project)
+        if not resolved:
+            return None
+        return self._process_command_file(cmd_file, resolved, cache=None)
+
+    @staticmethod
+    def _find_project_root_for_command(cmd_file: Path, project_path: Path) -> Path:
+        """Walk up from *cmd_file* to locate the project root.
+
+        Command files live under ``<project_root>/.agents/commands/``.
+        If *project_path* is the ``commands`` dir (or any child of the project),
+        we walk upward until we find a directory that contains ``.agents``.
+        """
+        # If project_path already looks like a project root (has .agents), use it
+        if (project_path / ".agents").is_dir():
+            return project_path
+
+        # Walk up from the command file's parent looking for .agents/
+        candidate = cmd_file.parent
+        for _ in range(5):  # guard against runaway traversal
+            if (candidate / ".agents").is_dir():
+                return candidate
+            parent = candidate.parent
+            if parent == candidate:
+                break
+            candidate = parent
+
+        # Fallback: use project_path as-is
+        return project_path
+
+    def _discover_single_skill_folder(
+        self, skill_path: Path, project_path: Path
+    ) -> dict[str, Any] | None:
+        """Parse a single skill folder (containing ``SKILL.md``)."""
+        data = discover_single_skill(skill_path, project_path, self.project_aliases)
+        if data is None:
+            return None
+        return self.transform_skill(
+            data, is_package=False, project_label=data.get("project_label", "")
+        )
+
+    def _resolve_project_dict(self, project_path: Path) -> dict[str, Any] | None:
+        """Build the minimal project dict needed by ``_process_command_file``."""
         import os
 
-        from skill_manager.core.parsing import (
-            build_skill_search_text,
-            categorize_skill,
-            parse_skill_md,
-        )
         from skill_manager.core.quick_copy import (
-            classification_text,
             project_label,
             project_root_for_project,
             resolve_resilient_path,
-            skill_base_relative,
         )
 
-        skill_md_path = skill_path / "SKILL.md"
-        if not skill_md_path.is_file():
+        resolved = resolve_resilient_path(project_path)
+        if not resolved:
             return None
+        return {
+            "project_label": project_label(resolved, self.project_aliases, str(project_path)),
+            "project_root": str(project_root_for_project(resolved)),
+            "project_path": str(resolved),
+            "project_key": os.path.normcase(str(resolved)),
+        }
 
-        resolved_project = resolve_resilient_path(project_path)
-        if not resolved_project:
-            return None
-        project_key = os.path.normcase(str(resolved_project))
+    def discover_single_skill(self, skill_path: Path, project_path: Path) -> dict[str, Any] | None:
+        """Parses and normalizes a single skill at skill_path belonging to project_path."""
+        return discover_single_skill(skill_path, project_path, self.project_aliases)
 
-        skill_data = parse_skill_md(str(skill_md_path))
-        if not skill_data.get("name"):
-            skill_data["name"] = skill_path.name
-        skill_data["folder_name"] = skill_path.name
-        skill_data["local_path"] = str(skill_path)
-        skill_data["skill_md_path"] = str(skill_md_path)
-        skill_data["project_key"] = project_key
-        skill_data["project_path"] = str(resolved_project)
-        skill_data["project_root"] = str(project_root_for_project(resolved_project))
-        skill_data["skill_base_relative"] = skill_base_relative(resolved_project)
-        skill_data["project_label"] = project_label(
-            resolved_project, self.project_aliases, str(project_path)
-        )
-        skill_data.setdefault("metadata", {})
-        cat_info = categorize_skill(
-            skill_data.get("name", ""),
-            classification_text(skill_data),
-            skill_data.get("metadata", {}),
-        )
-        skill_data["main_category"] = cat_info.get("main_category", "")
-        skill_data["category"] = cat_info.get("sub_category", "")
-        skill_data["search_text"] = build_skill_search_text(skill_data)
 
-        # Now transform it using public transform_skill
-        return self.transform_skill(
-            skill_data, is_package=False, project_label=skill_data["project_label"]
-        )
+def discover_single_skill(
+    skill_path: Path, project_path: Path, project_aliases: dict[str, str]
+) -> dict[str, Any] | None:
+    """Module-level helper: parse a skill folder containing ``SKILL.md``."""
+    import os
+
+    from skill_manager.core.parsing import (
+        build_skill_search_text,
+        categorize_skill,
+        parse_skill_md,
+    )
+    from skill_manager.core.quick_copy import (
+        classification_text,
+        project_label,
+        project_root_for_project,
+        resolve_resilient_path,
+        skill_base_relative,
+    )
+
+    skill_md_path = skill_path / "SKILL.md"
+    if not skill_md_path.is_file():
+        return None
+
+    resolved_project = resolve_resilient_path(project_path)
+    if not resolved_project:
+        return None
+    project_key = os.path.normcase(str(resolved_project))
+
+    skill_data = parse_skill_md(str(skill_md_path))
+    if not skill_data.get("name"):
+        skill_data["name"] = skill_path.name
+    skill_data["folder_name"] = skill_path.name
+    skill_data["local_path"] = str(skill_path)
+    skill_data["skill_md_path"] = str(skill_md_path)
+    skill_data["project_key"] = project_key
+    skill_data["project_path"] = str(resolved_project)
+    skill_data["project_root"] = str(project_root_for_project(resolved_project))
+    skill_data["skill_base_relative"] = skill_base_relative(resolved_project)
+    skill_data["project_label"] = project_label(
+        resolved_project, project_aliases, str(project_path)
+    )
+    skill_data.setdefault("metadata", {})
+    cat_info = categorize_skill(
+        skill_data.get("name", ""),
+        classification_text(skill_data),
+        skill_data.get("metadata", {}),
+    )
+    skill_data["main_category"] = cat_info.get("main_category", "")
+    skill_data["category"] = cat_info.get("sub_category", "")
+    skill_data["search_text"] = build_skill_search_text(skill_data)
+
+    # Now transform it using public transform_skill
+    # We need a DiscoveryService instance to call transform_skill, but this
+    # is a module-level function.  For back-compat we just return the raw
+    # normalized dict — callers that need the full transform can use the
+    # instance method ``discover_single_skill`` on DiscoveryService.
+    return skill_data

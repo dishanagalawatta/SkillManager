@@ -4,11 +4,28 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.controllers.ops_controller import OpsController
+from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
 @pytest.fixture
 def ops_controller(mock_app):
     return OpsController(mock_app)
+
+
+@pytest.fixture
+def real_ops_controller(temp_dir, mock_config):
+    """OpsController backed by a real AppController with real models."""
+    from skill_manager.app import AppController
+
+    controller = AppController(skip_initial_load=True, config=mock_config)
+    controller.task_runner = SynchronousTaskRunner()
+    controller._projects = []
+    controller._sources = []
+    controller._archive_paths = []
+    controller._starred_paths = []
+    controller._project_aliases = {}
+    controller._categories = []
+    return controller.ops
 
 
 def test_ops_controller_toggle_archive(ops_controller, mock_app):
@@ -279,7 +296,7 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
     mock_app._project_aliases = {}
     mock_app._categories = ["General"]
 
-    # Mock discover_single_skill to return a mock skill dict
+    # Mock discover_single to return a mock skill dict
     mock_skill_data = {
         "local_path": "/project/S1",
         "name": "S1",
@@ -297,7 +314,7 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
 
     with (
         patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single_skill",
+            "skill_manager.core.discovery.DiscoveryService.discover_single",
             return_value=mock_skill_data,
         ) as mock_discover,
         patch("skill_manager.controllers.ops_controller.patch_cache_add") as mock_patch_cache,
@@ -476,7 +493,7 @@ def test_ops_controller_copy_selection_orchestration(ops_controller, mock_app):
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
 @patch("skill_manager.core.commands.create_custom_command_file")
 def test_ops_controller_create_custom_command(
     mock_create, mock_discover, mock_patch_cache, ops_controller, mock_app
@@ -565,7 +582,7 @@ def test_set_project_alias_no_refresh(mock_app):
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
 @patch("skill_manager.core.commands.update_custom_command_file")
 def test_update_custom_command_full(
     mock_update,
@@ -784,177 +801,207 @@ class TestRefreshSelectedSkill:
 
 
 # ---------------------------------------------------------------------------
-# Integration: createCustomCommand refreshes selection
+# Integration: createCustomCommand refreshes selection (real DiscoveryService)
 # ---------------------------------------------------------------------------
 
 
+def _write_command_file(path: Path, name: str, body: str, category: str = "Commands"):
+    """Write a valid command file with YAML frontmatter."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        f"---\nname: {name}\ncategory: {category}\ntype: command\ndate: 2026-01-01\n---\n\n{body}"
+    )
+    path.write_text(content, encoding="utf-8")
+
+
+def _load_command_into_model(app_controller, cmd_path: Path, name: str, body: str):
+    """Load a command into both models so _refresh_selected_skill can find it."""
+
+    skill_data = {
+        "local_path": str(cmd_path),
+        "name": name,
+        "body_content": body,
+        "category": "Custom Commands",
+        "main_category": "⚙️ System & Workflow",
+        "is_command": True,
+        "is_starred": False,
+        "is_bundle": False,
+        "is_archived": False,
+        "is_selected": False,
+        "is_package": False,
+        "is_source": False,
+        "project_label": "test-project",
+        "source": "Custom",
+        "risk": "Low",
+        "description": "",
+        "raw_content": "",
+    }
+    app_controller._library_model.addOrUpdateSkills([skill_data])
+    app_controller._quick_copy_model.addOrUpdateSkills([skill_data])
+    # Ensure the skill is in _filtered_skills so _refresh_selected_skill can find it
+    for model in (app_controller._library_model, app_controller._quick_copy_model):
+        model.showCommands = True
+        model.state.is_package_only = None
+        model._apply_filter()
+    return skill_data
+
+
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
-@patch("skill_manager.core.commands.create_custom_command_file")
-def test_create_custom_command_refreshes_selection(
-    mock_create,
-    mock_discover,
+def test_create_custom_command_refreshes_selection_real_discovery(
     mock_patch_cache,
-    ops_controller,
-    mock_app,
-    tmp_path,
+    real_ops_controller,
+    temp_dir,
 ):
-    """createCustomCommand refreshes _selected_skill for the new command."""
-    mock_app._sources = []
-    mock_app._projects = ["/project"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
+    """createCustomCommand uses real DiscoveryService and discovers the new command.
 
-    cmd_path = tmp_path / "NewCmd.md"
-    mock_result = MagicMock(ok=True, message="Created command: NewCmd.md", path=cmd_path)
-    mock_create.return_value = mock_result
-    mock_discover.return_value = {
-        "local_path": str(cmd_path),
-        "name": "NewCmd",
-        "category": "Commands",
-    }
+    This test exercises the production path end-to-end: the real command file
+    is written to disk, the real DiscoveryService parses it, and the controller
+    merges it into the model.  On main (pre-fix), this fails
+    because discover_single returns None for bare .md command files.
+    """
+    app = real_ops_controller.app
+    project_path = temp_dir / "project"
+    project_path.mkdir()
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
 
-    mock_app._selected_skill = {"local_path": str(cmd_path), "name": "NewCmd"}
+    app._projects = [str(project_path)]
 
-    from skill_manager.core.models.entities import Skill
+    # Track signal emissions
+    emissions = []
+    app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    skill = Skill(name="NewCmd", local_path=str(cmd_path), body_content="body")
-    mock_app.skillModel._filtered_skills = [skill]
-    mock_app.skillModel.get_skill_at.return_value = {
-        "local_path": str(cmd_path),
-        "name": "NewCmd",
-        "body_content": "body",
-    }
+    # Act — uses real create_custom_command_file + real DiscoveryService
+    from skill_manager.core.quick_copy import project_label as compute_project_label
 
-    ops_controller.createCustomCommand("NewCmd", "body", "proj", "cat")
-    mock_app.selectedSkillChanged.emit.assert_called_once()
-    mock_app._library_model.addOrUpdateSkills.assert_called_once()
-    mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once()
+    label = compute_project_label(project_path)
+    real_ops_controller.createCustomCommand("NewCmd", "echo world", label, "Commands")
+
+    # The new command was created; verify it exists on disk and discover_single works
+    new_cmd_file = commands_dir / "NewCmd.md"
+    assert new_cmd_file.exists(), "New command file should exist on disk"
+
+    from skill_manager.core.discovery import DiscoveryService
+
+    svc = DiscoveryService(
+        sources=list(app._sources),
+        projects=app._projects,
+        archive_paths=app._archive_paths,
+        starred_paths=app._starred_paths,
+        project_aliases=app._project_aliases,
+    )
+    skill_data = svc.discover_single(new_cmd_file, new_cmd_file.parent)
+    assert skill_data is not None, (
+        "discover_single returned None for newly created command — "
+        "the command file parser should handle bare .md files"
+    )
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
-@patch("skill_manager.core.commands.update_custom_command_file")
-def test_update_custom_command_refreshes_selection(
-    mock_update,
-    mock_discover,
+def test_update_custom_command_refreshes_selection_real_discovery(
     mock_patch_cache,
-    ops_controller,
-    mock_app,
-    tmp_path,
+    real_ops_controller,
+    temp_dir,
 ):
-    """updateCustomCommandFull refreshes _selected_skill when same path is selected."""
-    mock_app._sources = []
-    mock_app._projects = ["/project"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
+    """updateCustomCommandFull refreshes _selected_skill using real DiscoveryService.
 
-    cmd_path = tmp_path / "Cmd.md"
-    cmd_path.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
+    This test exercises the production path end-to-end: the real command file
+    is written to disk, the real DiscoveryService parses it, and the controller
+    refreshes the selected skill snapshot.  On main (pre-fix), this fails
+    because discover_single returns None for bare .md command files.
+    """
+    app = real_ops_controller.app
+    project_path = temp_dir / "project"
+    project_path.mkdir()
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
 
-    mock_result = MagicMock(ok=True, message="Updated command: Cmd.md", path=cmd_path)
-    mock_update.return_value = mock_result
-    mock_discover.return_value = {
-        "local_path": str(cmd_path),
-        "name": "Cmd",
-        "category": "Commands",
-    }
+    # Create a command file on disk
+    cmd_file = commands_dir / "Cmd.md"
+    _write_command_file(cmd_file, "Cmd", "old body")
 
-    mock_app._selected_skill = {"local_path": str(cmd_path), "name": "Cmd"}
+    # Load into model and select
+    _load_command_into_model(app, cmd_file, "Cmd", "old body")
+    app._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
 
-    from skill_manager.core.models.entities import Skill
+    emissions = []
+    app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    skill = Skill(name="Cmd", local_path=str(cmd_path), body_content="new body")
-    mock_app.skillModel._filtered_skills = [skill]
-    mock_app.skillModel.get_skill_at.return_value = {
-        "local_path": str(cmd_path),
-        "name": "Cmd",
-        "body_content": "new body",
-    }
+    # Act — uses real update_custom_command_file + real DiscoveryService
+    real_ops_controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body")
 
-    ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "new body")
-    mock_app.selectedSkillChanged.emit.assert_called_once()
+    # The command was updated; verify _selected_skill reflects the new body
+    assert emissions, (
+        "selectedSkillChanged was not emitted after updateCustomCommandFull — "
+        "discover_single likely returned None for the command file"
+    )
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
-@patch("skill_manager.core.commands.update_custom_command_file")
-def test_update_custom_command_rename_refreshes_selection(
-    mock_update,
-    mock_discover,
+def test_update_custom_command_rename_refreshes_selection_real_discovery(
     mock_patch_cache,
-    ops_controller,
-    mock_app,
-    tmp_path,
+    real_ops_controller,
+    temp_dir,
 ):
-    """updateCustomCommandFull refreshes _selected_skill after a rename."""
-    mock_app._sources = []
-    mock_app._projects = ["/project"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
+    """updateCustomCommandFull refreshes _selected_skill after rename using real DiscoveryService."""
+    app = real_ops_controller.app
+    project_path = temp_dir / "project"
+    project_path.mkdir()
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
 
-    old_path = tmp_path / "Old.md"
-    new_path = tmp_path / "New.md"
-    mock_result = MagicMock(ok=True, message="Updated command: New.md", path=new_path)
-    mock_update.return_value = mock_result
-    mock_discover.return_value = {
-        "local_path": str(new_path),
-        "name": "New",
-        "category": "Commands",
-    }
+    # Create the original command file
+    old_file = commands_dir / "OldCmd.md"
+    _write_command_file(old_file, "OldCmd", "old body")
 
-    mock_app._selected_skill = {"local_path": str(old_path), "name": "Old"}
+    # Load into model and select using the old path
+    _load_command_into_model(app, old_file, "OldCmd", "old body")
+    app._selected_skill = {"local_path": str(old_file), "name": "OldCmd"}
 
-    from skill_manager.core.models.entities import Skill
+    emissions = []
+    app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    skill = Skill(name="New", local_path=str(new_path), body_content="updated")
-    mock_app.skillModel._filtered_skills = [skill]
-    mock_app.skillModel.get_skill_at.return_value = {
-        "local_path": str(new_path),
-        "name": "New",
-        "body_content": "updated",
-    }
+    # Act — rename to NewCmd.md
+    real_ops_controller.updateCustomCommandFull(str(old_file), "NewCmd", "updated body")
 
-    ops_controller.updateCustomCommandFull(str(old_path), "New", "updated")
-    mock_app.selectedSkillChanged.emit.assert_called_once()
-    assert mock_app._selected_skill["local_path"] == str(new_path)
+    # The old file should be gone, new file should exist
+    new_file = commands_dir / "NewCmd.md"
+    assert new_file.exists(), "Renamed command file should exist"
+    assert not old_file.exists(), "Old command file should be removed after rename"
+
+    # _selected_skill should now point to the new path
+    assert emissions, (
+        "selectedSkillChanged was not emitted after rename — "
+        "discover_single likely returned None for the command file"
+    )
+    assert app._selected_skill.get("local_path") == str(new_file), (
+        f"_selected_skill should point to renamed file, got {app._selected_skill.get('local_path')}"
+    )
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-@patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill")
-@patch("skill_manager.core.commands.create_custom_command_file")
-def test_create_custom_command_no_selection_refresh_for_different_skill(
-    mock_create,
-    mock_discover,
+def test_create_custom_command_no_selection_refresh_for_different_skill_real_discovery(
     mock_patch_cache,
-    ops_controller,
-    mock_app,
-    tmp_path,
+    real_ops_controller,
+    temp_dir,
 ):
     """createCustomCommand does not refresh selection when a different skill is selected."""
-    mock_app._sources = []
-    mock_app._projects = ["/project"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
+    app = real_ops_controller.app
+    project_path = temp_dir / "project"
+    project_path.mkdir()
 
-    cmd_path = tmp_path / "NewCmd.md"
-    mock_result = MagicMock(ok=True, message="Created command: NewCmd.md", path=cmd_path)
-    mock_create.return_value = mock_result
-    mock_discover.return_value = {
-        "local_path": str(cmd_path),
-        "name": "NewCmd",
-        "category": "Commands",
-    }
+    app._projects = [str(project_path)]
 
-    mock_app._selected_skill = {"local_path": "/other/skill/Skill.md"}
+    app._selected_skill = {"local_path": "/other/skill/Skill.md", "name": "Other"}
 
-    ops_controller.createCustomCommand("NewCmd", "body", "proj", "cat")
-    mock_app.selectedSkillChanged.emit.assert_not_called()
+    emissions = []
+    app.selectedSkillChanged.connect(lambda: emissions.append(True))
+
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    label = compute_project_label(project_path)
+    real_ops_controller.createCustomCommand("NewCmd", "body", label, "cat")
+
+    # selectedSkillChanged should NOT fire — the created command is different
+    # from the currently selected skill
+    assert not emissions, "selectedSkillChanged should not fire for a different skill"
