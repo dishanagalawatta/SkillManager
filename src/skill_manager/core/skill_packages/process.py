@@ -20,12 +20,12 @@ def sanitize_token(text: str) -> str:
 
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        # Handle double-quoted passwords securely
-        text = re.sub(r'(echo password=)"(?:\\.|[^"\\])*"', r'\1"***"', text)
-        # Handle single-quoted passwords securely
-        text = re.sub(r"(echo password=)'(?:\\.|[^'\\])*'", r"\1'***'", text)
-        # Handle unquoted passwords (stop at spaces, newlines, or semicolons)
-        text = re.sub(r"(echo password=)(?!['\"])([^;\s\r\n]+)", r"\1***", text)
+        # Handle double-quoted, single-quoted, and unquoted passwords securely
+        text = re.sub(
+            r"(echo password=)(?:\"(?:\\.|[^\"\\])*\"|'(?:[^'\\]|\\.)*'|\\.|[^;\\s&|()<>'\"} ])+",
+            r"\1***",
+            text,
+        )
 
     # Explicitly redact known token patterns
     if "ghp_" in text:
