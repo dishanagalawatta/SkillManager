@@ -26,10 +26,10 @@ def sanitize_token(text: str) -> str:
         # Unquoted (stops at semicolon, space, or newline)
         text = re.sub(r'(echo password=)(?![\'"])([^;\s\r\n]+)', r'\1***', text)
     # Match generic GitHub Personal Access Tokens if present
-    if "ghp_" in text:
-        text = re.sub(r"ghp_[a-zA-Z0-9]{36}", "ghp_***", text)
+    if any(prefix in text for prefix in ("ghp_", "gho_", "ghu_", "ghs_", "ghr_")):
+        text = re.sub(r"(gh[opusr]_)[a-zA-Z0-9]{36,}", r"\1***", text)
     if "github_pat_" in text:
-        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82}", "github_pat_***", text)
+        text = re.sub(r"(github_pat_)[a-zA-Z0-9_]{82,}", r"\1***", text)
     return text
 
 
