@@ -94,9 +94,7 @@ def test_controller_copy_single_skill(controller):
 @patch("skill_manager.controllers.discovery_controller.DiscoveryService")
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
 @patch("PySide6.QtCore.QTimer.singleShot")
-def test_controller_sync_project(
-    mock_timer, mock_copy, mock_discovery_svc, controller
-):
+def test_controller_sync_project(mock_timer, mock_copy, mock_discovery_svc, controller):
     # Mock Timer to run callback immediately
     mock_timer.side_effect = lambda ms, receiver, method: (
         method() if callable(method) else method.call()
@@ -307,7 +305,10 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
 
     with patch("skill_manager.core.commands.create_custom_command_file") as mock_create:
         from skill_manager.core.commands import CommandCreateResult
-        mock_create.return_value = CommandCreateResult(ok=True, message="Created command: Deploy.Codex.md")
+
+        mock_create.return_value = CommandCreateResult(
+            ok=True, message="Created command: Deploy.Codex.md"
+        )
         controller.createCustomCommand("Deploy", "Codex", "body", "proj", "Ops")
 
     assert controller.statusMessage == "Created command: Deploy.Codex.md"
@@ -448,9 +449,7 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.compactListRows is False
 
 
-def test_controller_load_initial_data_success_and_error(
-    controller, temp_dir
-):
+def test_controller_load_initial_data_success_and_error(controller, temp_dir):
     update_source_path = temp_dir / "update-source"
     update_source_path.mkdir()
     controller._update_packages = [{"package_path": str(update_source_path)}]
@@ -470,8 +469,10 @@ def test_controller_load_initial_data_success_and_error(
     )
 
     with (
-        patch("skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service),
-        patch("PySide6.QtAsyncio.run", side_effect=lambda coro: None), # Avoid real async loop
+        patch(
+            "skill_manager.controllers.discovery_controller.DiscoveryService", return_value=service
+        ),
+        patch("PySide6.QtAsyncio.run", side_effect=lambda coro: None),  # Avoid real async loop
     ):
         controller.loadInitialData()
 
@@ -482,7 +483,7 @@ def test_controller_load_initial_data_success_and_error(
         _projects_state=[],
         cats=["Dev"],
         proj_labels=["P"],
-        status="Done"
+        status="Done",
     )
     assert controller.categories == ["Dev"]
     assert controller.statusMessage == "Done"
@@ -495,9 +496,7 @@ def test_controller_load_initial_data_success_and_error(
     assert controller.statusMessage == "Error scanning skills: boom"
 
 
-def test_controller_load_initial_data_delays_final_refresh_after_cache_preview(
-    controller
-):
+def test_controller_load_initial_data_delays_final_refresh_after_cache_preview(controller):
     # This test is now less relevant as we've switched to QtAsyncio
     # and the delay is internal to the coroutine. We'll verify it doesn't crash.
     with patch("PySide6.QtAsyncio.run", side_effect=lambda coro: None):
@@ -588,8 +587,14 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
             "skill_manager.core.skill_packages.run_skill_package_update",
             return_value={"name": "Repo", "source_type": "git", "package_path": "x"},
         ),
-        patch("skill_manager.core.skill_packages.scan_package_inventory", return_value={"scan_ok": True, "skills": {}}),
-        patch("skill_manager.core.skill_packages.diff_package_inventory", return_value={"removed": [], "added": [], "updated": []}),
+        patch(
+            "skill_manager.core.skill_packages.scan_package_inventory",
+            return_value={"scan_ok": True, "skills": {}},
+        ),
+        patch(
+            "skill_manager.core.skill_packages.diff_package_inventory",
+            return_value={"removed": [], "added": [], "updated": []},
+        ),
         patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=True),
         patch("skill_manager.controllers.update_controller.capture_event"),
     ):

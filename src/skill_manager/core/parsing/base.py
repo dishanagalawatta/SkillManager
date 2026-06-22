@@ -15,6 +15,7 @@ def normalize_description(value: Any) -> str:
         value = str(value)
     return " ".join(value.split()).strip(" \"'")
 
+
 def extract_markdown_description(content: str) -> str:
     body = split_frontmatter(content)[1]
 

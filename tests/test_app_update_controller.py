@@ -7,7 +7,7 @@ from skill_manager.controllers.app_update_controller import AppUpdateController
 
 @pytest.fixture(autouse=True)
 def mock_tufup_client():
-    with patch('skill_manager.controllers.app_update_controller.Client') as mock:
+    with patch("skill_manager.controllers.app_update_controller.Client") as mock:
         yield mock
 
 
@@ -32,6 +32,7 @@ async def test_check_tuf_updates_success():
     controller.updateAvailableChanged.emit.assert_called()
     controller.latestVersionChanged.emit.assert_called()
 
+
 @pytest.mark.asyncio
 async def test_check_tuf_updates_no_update():
     mock_app = MagicMock()
@@ -48,6 +49,7 @@ async def test_check_tuf_updates_no_update():
     assert controller.updateAvailable is False
     controller.updateAvailableChanged.emit.assert_called()
 
+
 @pytest.mark.asyncio
 async def test_check_tuf_updates_failure():
     mock_app = MagicMock()
@@ -61,13 +63,17 @@ async def test_check_tuf_updates_failure():
     await controller._check_tuf_updates()
     assert controller.updateAvailable is False
 
+
 @pytest.mark.asyncio
 async def test_properties():
     mock_app = MagicMock()
     controller = AppUpdateController(mock_app)
-    assert controller.downloadUrl == "https://github.com/dishanagalawatta/SkillManager/releases/latest"
+    assert (
+        controller.downloadUrl == "https://github.com/dishanagalawatta/SkillManager/releases/latest"
+    )
     assert controller.isUpdating is False
     assert controller.updateProgress == 0.0
+
 
 @pytest.mark.asyncio
 async def test_check_for_updates_slots():
@@ -79,7 +85,10 @@ async def test_check_for_updates_slots():
 
     controller._is_updating = False
     controller.checkForUpdates()
-    mock_app.task_runner.submit.assert_called_once_with(controller._sync_check_updates, controller._on_updates_checked)
+    mock_app.task_runner.submit.assert_called_once_with(
+        controller._sync_check_updates, controller._on_updates_checked
+    )
+
 
 @pytest.mark.asyncio
 async def test_check_tuf_updates_no_client():
@@ -88,6 +97,7 @@ async def test_check_tuf_updates_no_client():
     controller._client = None
     # Should return early without error
     await controller._check_tuf_updates()
+
 
 @pytest.mark.asyncio
 async def test_download_and_apply_update_early_returns():
@@ -109,6 +119,7 @@ async def test_download_and_apply_update_early_returns():
     controller.downloadAndApplyUpdate()
     assert controller._is_updating is False
 
+
 @pytest.mark.asyncio
 async def test_download_and_apply_update_success():
     mock_app = MagicMock()
@@ -117,12 +128,13 @@ async def test_download_and_apply_update_success():
     controller._client = MagicMock()
     controller._update_available = True
 
-    with patch('skill_manager.controllers.app_update_controller.asyncio.create_task') as mock_task:
+    with patch("skill_manager.controllers.app_update_controller.asyncio.create_task") as mock_task:
         controller.downloadAndApplyUpdate()
         assert controller._is_updating is True
         mock_task.assert_called_once()
         coro = mock_task.call_args[0][0]
         coro.close()
+
 
 @pytest.mark.asyncio
 async def test_apply_update_success():
@@ -130,10 +142,12 @@ async def test_apply_update_success():
     controller = AppUpdateController(mock_app)
 
     mock_client = MagicMock()
+
     # Call progress hook to test it
     def side_effect(*args, **kwargs):
-        kwargs['progress_hook'](50, 100)
+        kwargs["progress_hook"](50, 100)
         return True
+
     mock_client.download_and_apply_update.side_effect = side_effect
     controller._client = mock_client
 
@@ -147,6 +161,7 @@ async def test_apply_update_success():
     mock_app._set_status.assert_called_with("Update applied. Please restart SkillManager.")
     assert controller.isUpdating is False
 
+
 @pytest.mark.asyncio
 async def test_apply_update_failure():
     mock_app = MagicMock()
@@ -158,6 +173,7 @@ async def test_apply_update_failure():
 
     await controller._apply_update()
     mock_app._set_status.assert_called_with("Update failed.")
+
 
 @pytest.mark.asyncio
 async def test_apply_update_exception():

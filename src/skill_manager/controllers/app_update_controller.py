@@ -18,8 +18,12 @@ logger = logging.getLogger(__name__)
 
 # TUF Repository Configuration
 # These will be hosted on GitHub Pages
-TUF_METADATA_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
-TUF_TARGETS_URL = "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
+TUF_METADATA_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/metadata/"
+)
+TUF_TARGETS_URL = (
+    "https://raw.githubusercontent.com/dishanagalawatta/SkillManager/gh-pages/targets/"
+)
 
 
 class AppUpdateController(BaseController):
@@ -48,7 +52,8 @@ class AppUpdateController(BaseController):
         tuf_root_dest = self._tuf_dir / "root.json"
         if not tuf_root_dest.exists():
             import shutil
-            if getattr(sys, 'frozen', False):
+
+            if getattr(sys, "frozen", False):
                 bundled_root = Path(sys._MEIPASS) / "skill_manager" / "assets" / "tuf" / "root.json"
             else:
                 bundled_root = Path(__file__).parent.parent / "assets" / "tuf" / "root.json"
@@ -64,7 +69,9 @@ class AppUpdateController(BaseController):
         try:
             self._client = Client(
                 app_name="SkillManager",
-                app_install_dir=str(Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()),
+                app_install_dir=str(
+                    Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+                ),
                 current_version=skill_manager.__version__,
                 metadata_base_url=TUF_METADATA_URL,
                 target_base_url=TUF_TARGETS_URL,
@@ -105,7 +112,7 @@ class AppUpdateController(BaseController):
 
         # We need a BackgroundTaskRunner for threading, not asyncio.create_task
         # since PySide6 app doesn't have an asyncio loop running by default.
-        if hasattr(self.app, 'task_runner'):
+        if hasattr(self.app, "task_runner"):
             logger.debug("Submitting update check to task runner.")
             self.app.task_runner.submit(self._sync_check_updates, self._on_updates_checked)
         else:
@@ -176,7 +183,7 @@ class AppUpdateController(BaseController):
                 lambda: self._client.download_and_apply_update(
                     progress_hook=progress_hook,
                     # For Windows, we might need a custom install script if file is in use
-                )
+                ),
             )
 
             if success:

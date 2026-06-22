@@ -287,7 +287,9 @@ def test_ops_controller_copy_selected_exception(mock_timer, mock_copy, ops_contr
 
 @patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
 @patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
-def test_ops_controller_delete_skills_partial_failure(mock_timer, mock_del, ops_controller, mock_app):
+def test_ops_controller_delete_skills_partial_failure(
+    mock_timer, mock_del, ops_controller, mock_app
+):
     # Execute singleShot callbacks immediately
     mock_timer.side_effect = lambda ms, obj, cb: cb()
 
@@ -316,7 +318,7 @@ def test_ops_controller_aliases(ops_controller):
 
 def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
     mock_app.skillModel.getSelectedPaths.return_value = ["/p1", "/p2"]
-    mock_app._archive_paths = ["/p1"] # /p1 already archived
+    mock_app._archive_paths = ["/p1"]  # /p1 already archived
 
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.archiveSelectedSkills()

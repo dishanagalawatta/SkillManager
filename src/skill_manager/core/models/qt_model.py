@@ -370,6 +370,7 @@ class SkillModel(QAbstractListModel):
             )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Error applying filter: {e}")
         finally:
             if reset:

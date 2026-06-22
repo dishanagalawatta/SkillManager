@@ -46,7 +46,9 @@ def get_app_data_dir() -> Path:
     if override:
         return Path(override).expanduser()
 
-    if os.name == "nt" and (base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")):
+    if os.name == "nt" and (
+        base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    ):
         app_dir = Path(base_dir) / APP_NAME
     elif os.name != "nt":
         if xdg_data_home := os.environ.get("XDG_DATA_HOME"):
@@ -113,7 +115,9 @@ def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = N
 DATA_DIR = get_app_data_dir()
 CONFIG_FILE = resolve_data_file(CONFIG_FILENAME)
 SKILL_LIBRARY_CACHE_FILE = resolve_data_file(SKILL_LIBRARY_CACHE_FILENAME)
-SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(SKILL_LIBRARY_ARCHIVE_FILE_NAME := SKILL_LIBRARY_ARCHIVE_FILENAME)
+SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(
+    SKILL_LIBRARY_ARCHIVE_FILE_NAME := SKILL_LIBRARY_ARCHIVE_FILENAME
+)
 SKILL_LIBRARY_STARRED_FILE = resolve_data_file(SKILL_LIBRARY_STARRED_FILENAME)
 SKILL_LIBRARY_CLIPBOARD_FILE = resolve_data_file(SKILL_LIBRARY_CLIPBOARD_FILENAME)
 QUICK_COPY_FILE = resolve_data_file(QUICK_COPY_FILENAME)
@@ -196,7 +200,9 @@ class ConfigManager:
     def save(self) -> None:
         """Saves current configuration."""
         try:
-            content = orjson.dumps(self.data, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE)
+            content = orjson.dumps(
+                self.data, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE
+            )
             with open(self.config_path, "wb") as f:
                 f.write(content)
         except Exception as e:

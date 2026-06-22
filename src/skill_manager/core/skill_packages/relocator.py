@@ -43,7 +43,9 @@ def _is_safe_relative_to(expanded: Path, resolve_base: Path) -> bool:
         if os.path.abspath(expanded) == os.path.abspath(resolve_base):
             return True
         if hasattr(os.path, "commonpath"):
-            return os.path.commonpath([os.path.abspath(expanded), os.path.abspath(resolve_base)]) == os.path.abspath(resolve_base)
+            return os.path.commonpath(
+                [os.path.abspath(expanded), os.path.abspath(resolve_base)]
+            ) == os.path.abspath(resolve_base)
     except Exception:
         pass
 
@@ -172,11 +174,11 @@ def relocate_packages_from_output(
                 expanded = candidate.resolve()
                 if expanded.is_dir():
                     if base_path and not _is_safe_relative_to(expanded, resolve_base):
-                            _emit(
-                                output_callback,
-                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                            )
-                            continue
+                        _emit(
+                            output_callback,
+                            f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                        )
+                        continue
                     detected_paths.add(expanded)
                     _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
                     match_found = True
@@ -191,11 +193,11 @@ def relocate_packages_from_output(
                     expanded = Path(os.path.expanduser(raw_path)).resolve()
                     if expanded.is_dir():
                         if base_path and not _is_safe_relative_to(expanded, resolve_base):
-                                _emit(
-                                    output_callback,
-                                    f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                                )
-                                continue
+                            _emit(
+                                output_callback,
+                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                            )
+                            continue
                         detected_paths.add(expanded)
                         _emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
                 except Exception:

@@ -123,7 +123,10 @@ class UpdateService:
                         or source.get("package_path")
                         or source.get("local_path")
                     )
-                    if source_path and self._ownership_project_key(source_path) in unsafe_project_keys:
+                    if (
+                        source_path
+                        and self._ownership_project_key(source_path) in unsafe_project_keys
+                    ):
                         _log_update(
                             "WARN",
                             "update.package.skipped",
@@ -482,7 +485,9 @@ class UpdateService:
                 try:
                     updated_sources.append(check_skill_package_versions(source))
                 except Exception as exc:
-                    logger.error(f"[ERROR] Failed to check versions for {source.get('name')}: {exc}")
+                    logger.error(
+                        f"[ERROR] Failed to check versions for {source.get('name')}: {exc}"
+                    )
                     updated_sources.append(source)
 
             completion_callback(

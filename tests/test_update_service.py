@@ -190,7 +190,9 @@ def test_cleanup_removed_project_skills_requires_verified_removal(mock_proj, ser
     ]
     ownership = {UpdateService._ownership_project_key("/project"): {"old": "pkg_1"}}
     with (
-        patch("skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership),
+        patch(
+            "skill_manager.core.update_service.load_project_skill_ownership", return_value=ownership
+        ),
         patch("skill_manager.core.update_service.delete_project_skill_folders") as delete,
     ):
         service._cleanup_removed_project_skills(
@@ -285,9 +287,7 @@ def test_run_global_update_suppresses_deletion_when_inventory_scan_is_unsafe(
     mock_delete.assert_not_called()
     saved_inventory = mock_save_inventory.call_args.args[0]
     assert saved_inventory["pkg_1"]["skills"] == {"alpha": {"fingerprint": "old"}}
-    assert any(
-        "Skipped project deletion" in call.args[0] for call in status_cb.call_args_list
-    )
+    assert any("Skipped project deletion" in call.args[0] for call in status_cb.call_args_list)
 
 
 @patch("skill_manager.core.update_service.save_package_skill_inventory")

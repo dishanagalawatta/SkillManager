@@ -43,6 +43,7 @@ def run_version_command(command: str) -> str:
     try:
         command_list = shlex.split(command)
         import shutil
+
         executable = shutil.which(command_list[0])
         if executable:
             command_list[0] = executable
@@ -71,14 +72,23 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
                 # GitPython doesn't have a direct way to set -c for ls-remote easily in cmd.Git()
                 # but we can use the environment or specialized git config if needed.
                 # For ls-remote, passing config via -c is reliable.
-                config_args = ["-c", "protocol.ext.allow=never", "-c", f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f"]
+                config_args = [
+                    "-c",
+                    "protocol.ext.allow=never",
+                    "-c",
+                    f"credential.helper=!f() {{ echo username=token; echo password={shlex.quote(token)}; }}; f",
+                ]
             else:
                 config_args = ["-c", "protocol.ext.allow=never"]
 
             # Fetch tags
             try:
                 # Use raw git command via GitPython to have full control over arguments
-                output = g.execute(["git"] + config_args + ["ls-remote", "--tags", "--sort=-v:refname", "--", path_or_url])
+                output = g.execute(
+                    ["git"]
+                    + config_args
+                    + ["ls-remote", "--tags", "--sort=-v:refname", "--", path_or_url]
+                )
                 if output:
                     lines = output.strip().split("\n")
                     for line in lines:
@@ -122,10 +132,14 @@ async def check_skill_package_versions_async(
 ) -> dict[str, Any]:
     """Async version of check_skill_package_versions for non-blocking UI."""
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: check_skill_package_versions(source, force_refresh))
+    return await loop.run_in_executor(
+        None, lambda: check_skill_package_versions(source, force_refresh)
+    )
 
 
-def check_skill_package_versions(source: dict[str, Any], force_refresh: bool = False) -> dict[str, Any]:
+def check_skill_package_versions(
+    source: dict[str, Any], force_refresh: bool = False
+) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
 
     current_version = source.get("current_version", "")

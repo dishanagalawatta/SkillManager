@@ -20,8 +20,14 @@ def parse_command_md(filepath: str) -> dict[str, Any] | None:
 
         # Skip common non-command files
         if stem.lower() in {
-            "readme", "license", "changelog", "contributing",
-            "todo", "package", "security", "skill",
+            "readme",
+            "license",
+            "changelog",
+            "contributing",
+            "todo",
+            "package",
+            "security",
+            "skill",
         }:
             return None
 
@@ -56,6 +62,7 @@ def parse_command_md(filepath: str) -> dict[str, Any] | None:
             else:
                 try:
                     from skill_manager.core.quick_copy import CLIENT_FORMATS
+
                     if stem in CLIENT_FORMATS:
                         data["client"] = stem
                 except ImportError:

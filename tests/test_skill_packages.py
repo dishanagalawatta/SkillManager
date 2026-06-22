@@ -127,7 +127,7 @@ def test_run_skill_package_update_with_relocation(mock_check, mock_relocate, moc
     source = {
         "name": "test",
         "package_path": str(package_path),
-        "update_command": 'python -c "print(\'ok\')"',
+        "update_command": "python -c \"print('ok')\"",
         "managed_folders": ["old-skill"],
     }
 
@@ -330,13 +330,13 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
     dir_with_apostrophe.mkdir()
 
     import shlex
+
     quoted_path = shlex.quote(str(dir_with_apostrophe))
 
     messages = []
     # This should succeed without raising a Verification failed exception
     assert _intercept_cross_platform_command(
-        f"test -d {quoted_path} && echo \"Skills installed in \"{quoted_path}",
-        messages.append
+        f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}', messages.append
     )
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
 
@@ -477,8 +477,11 @@ def test_run_git_package_update_conflict_and_network_failures(mock_repo_class, t
 
 def test_run_process_timeout_handling():
     with (
-        patch("skill_manager.core.skill_packages.process._resolve_process_command", return_value=["some-cmd"]),
-        patch("subprocess.Popen") as mock_popen
+        patch(
+            "skill_manager.core.skill_packages.process._resolve_process_command",
+            return_value=["some-cmd"],
+        ),
+        patch("subprocess.Popen") as mock_popen,
     ):
         mock_popen.side_effect = subprocess.SubprocessError("Process failed to start")
         with pytest.raises(subprocess.SubprocessError):
@@ -506,6 +509,7 @@ def test_run_process_timeout(mock_popen):
     mock_proc.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_proc
 
+
 def test_sanitize_token_git_credential_helper():
     text1 = "git -c \"credential.helper=!f() { echo username=token; echo password='secret_token_123'; }; f\" pull nonexistent\nSome other line"
     sanitized1 = sanitize_token(text1)
@@ -520,4 +524,4 @@ def test_sanitize_token_git_credential_helper():
     text3 = r'echo password="my\"secret"; echo next'
     sanitized3 = sanitize_token(text3)
     assert 'password="***"' in sanitized3
-    assert 'echo next' in sanitized3
+    assert "echo next" in sanitized3

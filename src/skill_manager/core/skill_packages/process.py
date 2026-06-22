@@ -22,6 +22,7 @@ def sanitize_token(text: str) -> str:
         text = re.sub(r"(echo password=)(?!['\"])([^;\r\n]+)", r"\1***", text)
     return text
 
+
 def _emit(output_callback: None | Callable[[str], None], message: str):
     message = sanitize_token(str(message))
     # Print to terminal for debugging and visibility
@@ -34,6 +35,7 @@ def _emit(output_callback: None | Callable[[str], None], message: str):
         logger.info(message)
     if output_callback:
         output_callback(message)
+
 
 def _resolve_process_command(command: str | list[str], shell: bool = False) -> str | list[str]:
     if shell or not isinstance(command, list) or not command:
@@ -49,6 +51,7 @@ def _resolve_process_command(command: str | list[str], shell: bool = False) -> s
             f"Executable '{executable}' was not found on PATH while running: {' '.join(command)}"
         )
     return [resolved, *command[1:]]
+
 
 def run_process(
     command: str | list[str],

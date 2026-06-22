@@ -17,6 +17,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 
 try:
     from sentry_sdk.integrations.pyside6 import PySide6Integration
+
     HAS_SENTRY_PYSIDE6 = True
 except ImportError:
     HAS_SENTRY_PYSIDE6 = False
@@ -170,7 +171,9 @@ class AppController(QObject):
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
         self.config_mgr.autoCheckUpdatesChanged.connect(self.autoCheckUpdatesChanged.emit)
         self.config_mgr.autoDownloadUpdatesChanged.connect(self.autoDownloadUpdatesChanged.emit)
-        self.config_mgr.updateCheckIntervalHoursChanged.connect(self.updateCheckIntervalHoursChanged.emit)
+        self.config_mgr.updateCheckIntervalHoursChanged.connect(
+            self.updateCheckIntervalHoursChanged.emit
+        )
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -200,8 +203,7 @@ class AppController(QObject):
                 watch_paths.append(pkg_path)
 
         self._watcher = SkillFolderWatcher(
-            paths=watch_paths,
-            callback=lambda _: QTimer.singleShot(0, self.refreshSkills)
+            paths=watch_paths, callback=lambda _: QTimer.singleShot(0, self.refreshSkills)
         )
 
         # In tests, we often want to skip the initial background discovery
@@ -262,22 +264,28 @@ class AppController(QObject):
     # --- Gateway Properties ---
 
     @Property(QObject, constant=True)
-    def ui_controller(self): return self.ui
+    def ui_controller(self):
+        return self.ui
 
     @Property(QObject, constant=True)
-    def config_controller(self): return self.config_mgr
+    def config_controller(self):
+        return self.config_mgr
 
     @Property(QObject, constant=True)
-    def ops_controller(self): return self.ops
+    def ops_controller(self):
+        return self.ops
 
     @Property(QObject, constant=True)
-    def update_controller(self): return self.updates
+    def update_controller(self):
+        return self.updates
 
     @Property(QObject, constant=True)
-    def discovery_controller(self): return self.discovery
+    def discovery_controller(self):
+        return self.discovery
 
     @Property(QObject, constant=True)
-    def app_update_controller(self): return self.app_updater
+    def app_update_controller(self):
+        return self.app_updater
 
     # --- Core Properties ---
 
@@ -359,228 +367,402 @@ class AppController(QObject):
     # These will be removed once QML is updated to use controller namespaces.
 
     @Property(str, notify=currentViewChanged)
-    def currentView(self): return self.ui.currentView
+    def currentView(self):
+        return self.ui.currentView
+
     @currentView.setter
-    def currentView(self, v): self.ui.currentView = v
+    def currentView(self, v):
+        self.ui.currentView = v
 
     @Property(int, notify=windowWidthChanged)
-    def windowWidth(self): return self.ui.windowWidth
+    def windowWidth(self):
+        return self.ui.windowWidth
+
     @windowWidth.setter
-    def windowWidth(self, v): self.ui.windowWidth = v
+    def windowWidth(self, v):
+        self.ui.windowWidth = v
 
     @Property(int, notify=windowHeightChanged)
-    def windowHeight(self): return self.ui.windowHeight
+    def windowHeight(self):
+        return self.ui.windowHeight
+
     @windowHeight.setter
-    def windowHeight(self, v): self.ui.windowHeight = v
+    def windowHeight(self, v):
+        self.ui.windowHeight = v
 
     @Property(int, notify=windowXChanged)
-    def windowX(self): return self.ui.windowX
+    def windowX(self):
+        return self.ui.windowX
+
     @windowX.setter
-    def windowX(self, v): self.ui.windowX = v
+    def windowX(self, v):
+        self.ui.windowX = v
 
     @Property(int, notify=windowYChanged)
-    def windowY(self): return self.ui.windowY
+    def windowY(self):
+        return self.ui.windowY
+
     @windowY.setter
-    def windowY(self, v): self.ui.windowY = v
+    def windowY(self, v):
+        self.ui.windowY = v
 
     @Property(bool, notify=darkModeChanged)
-    def darkMode(self): return self.ui.darkMode
+    def darkMode(self):
+        return self.ui.darkMode
+
     @darkMode.setter
-    def darkMode(self, v): self.ui.darkMode = v
+    def darkMode(self, v):
+        self.ui.darkMode = v
 
     @Property(str, notify=startupViewChanged)
-    def startupView(self): return self.ui.startupView
+    def startupView(self):
+        return self.ui.startupView
+
     @startupView.setter
-    def startupView(self, v): self.ui.startupView = v
+    def startupView(self, v):
+        self.ui.startupView = v
 
     @Property(bool, notify=rememberFiltersChanged)
-    def rememberFilters(self): return self.ui.rememberFilters
+    def rememberFilters(self):
+        return self.ui.rememberFilters
+
     @rememberFilters.setter
-    def rememberFilters(self, v): self.ui.rememberFilters = v
+    def rememberFilters(self, v):
+        self.ui.rememberFilters = v
 
     @Property(str, notify=defaultProjectFilterChanged)
-    def defaultProjectFilter(self): return self.ui.defaultProjectFilter
+    def defaultProjectFilter(self):
+        return self.ui.defaultProjectFilter
+
     @defaultProjectFilter.setter
-    def defaultProjectFilter(self, v): self.ui.defaultProjectFilter = v
+    def defaultProjectFilter(self, v):
+        self.ui.defaultProjectFilter = v
 
     @Property(bool, notify=reducedMotionChanged)
-    def reducedMotion(self): return self.ui.reducedMotion
+    def reducedMotion(self):
+        return self.ui.reducedMotion
+
     @reducedMotion.setter
-    def reducedMotion(self, v): self.ui.reducedMotion = v
+    def reducedMotion(self, v):
+        self.ui.reducedMotion = v
 
     @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self): return self.ui.compactListRows
+    def compactListRows(self):
+        return self.ui.compactListRows
+
     @compactListRows.setter
-    def compactListRows(self, v): self.ui.compactListRows = v
+    def compactListRows(self, v):
+        self.ui.compactListRows = v
 
     @Property(str, notify=shortcutsChanged)
-    def shortcutSearch(self): return self.config_mgr.shortcutSearch
+    def shortcutSearch(self):
+        return self.config_mgr.shortcutSearch
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutCopy(self): return self.config_mgr.shortcutCopy
+    def shortcutCopy(self):
+        return self.config_mgr.shortcutCopy
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutArchive(self): return self.config_mgr.shortcutArchive
+    def shortcutArchive(self):
+        return self.config_mgr.shortcutArchive
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutDelete(self): return self.config_mgr.shortcutDelete
+    def shortcutDelete(self):
+        return self.config_mgr.shortcutDelete
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutRefresh(self): return self.config_mgr.shortcutRefresh
+    def shortcutRefresh(self):
+        return self.config_mgr.shortcutRefresh
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutExpandAll(self): return self.config_mgr.shortcutExpandAll
+    def shortcutExpandAll(self):
+        return self.config_mgr.shortcutExpandAll
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutCollapseAll(self): return self.config_mgr.shortcutCollapseAll
+    def shortcutCollapseAll(self):
+        return self.config_mgr.shortcutCollapseAll
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutTopOfList(self): return self.config_mgr.shortcutTopOfList
+    def shortcutTopOfList(self):
+        return self.config_mgr.shortcutTopOfList
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutClearSelection(self): return self.config_mgr.shortcutClearSelection
+    def shortcutClearSelection(self):
+        return self.config_mgr.shortcutClearSelection
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutThemeToggle(self): return self.config_mgr.shortcutThemeToggle
+    def shortcutThemeToggle(self):
+        return self.config_mgr.shortcutThemeToggle
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutQuickCopyView(self): return self.config_mgr.shortcutQuickCopyView
+    def shortcutQuickCopyView(self):
+        return self.config_mgr.shortcutQuickCopyView
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutLibraryView(self): return self.config_mgr.shortcutLibraryView
+    def shortcutLibraryView(self):
+        return self.config_mgr.shortcutLibraryView
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutUpdatesView(self): return self.config_mgr.shortcutUpdatesView
+    def shortcutUpdatesView(self):
+        return self.config_mgr.shortcutUpdatesView
+
     @Property(str, notify=shortcutsChanged)
-    def shortcutSettingsView(self): return self.config_mgr.shortcutSettingsView
+    def shortcutSettingsView(self):
+        return self.config_mgr.shortcutSettingsView
 
     @Property(str, notify=currentViewChanged)
-    def logoSource(self): return self.ui.logoSource
+    def logoSource(self):
+        return self.ui.logoSource
 
     @Property(list, notify=projectsChanged)
-    def updateProjects(self): return self.config_mgr.updateProjects
+    def updateProjects(self):
+        return self.config_mgr.updateProjects
 
     @Property(list, notify=clientFormatsChanged)
-    def clientFormats(self): return self.config_mgr.clientFormats
+    def clientFormats(self):
+        return self.config_mgr.clientFormats
 
     @Property(list, notify=customCollectionsChanged)
-    def customCollections(self): return self.config_mgr.customCollections
+    def customCollections(self):
+        return self.config_mgr.customCollections
 
     @Property(list, notify=projectsChanged)
-    def projectLabels(self): return self.config_mgr.projectLabels
+    def projectLabels(self):
+        return self.config_mgr.projectLabels
 
     # --- Proxy Slots (Temporary for QML compatibility) ---
 
     @Slot()
-    def load_initial_data(self): self.loadInitialData()
+    def load_initial_data(self):
+        self.loadInitialData()
 
     @Slot(str, result=str)
-    def getLogoSource(self, f): return self.ui.getLogoSource(f)
+    def getLogoSource(self, f):
+        return self.ui.getLogoSource(f)
 
     @Slot(str, result=str)
-    def getAssetUri(self, p): return self.ui.getAssetUri(p)
+    def getAssetUri(self, p):
+        return self.ui.getAssetUri(p)
 
     @Slot(str, str)
-    def setViewFilter(self, k, v): self.ui.setViewFilter(k, v)
+    def setViewFilter(self, k, v):
+        self.ui.setViewFilter(k, v)
+
     @Slot(str, str, str)
-    def setViewFilterForView(self, view, k, v): self.ui.setViewFilterForView(view, k, v)
+    def setViewFilterForView(self, view, k, v):
+        self.ui.setViewFilterForView(view, k, v)
+
     @Slot()
-    def clearViewFilters(self): self.ui.clearViewFilters()
+    def clearViewFilters(self):
+        self.ui.clearViewFilters()
+
     @Slot(int)
-    def selectSkill(self, i): self.ui.selectSkill(i)
+    def selectSkill(self, i):
+        self.ui.selectSkill(i)
+
     @Slot()
-    def clearVisibleSelection(self): self.ui.clearVisibleSelection()
+    def clearVisibleSelection(self):
+        self.ui.clearVisibleSelection()
+
     @Slot()
-    def selectAllVisibleSkills(self): self.ui.selectAllVisibleSkills()
+    def selectAllVisibleSkills(self):
+        self.ui.selectAllVisibleSkills()
+
     @Slot()
-    def toggleAllVisibleCategories(self): self.ui.toggleAllVisibleCategories()
-    @Slot(str)
-    def launchSkill(self, p): self.ui.launchSkill(p)
-    @Slot(str)
-    def openPath(self, p): self.ui.openPath(p)
-    @Slot()
-    def resetUiState(self): self.ui.resetUiState()
-    @Slot(str)
-    def setClientFormat(self, f): self.ui.setClientFormat(f)
-    @Slot(str)
-    def setStartupView(self, v): self.ui.setStartupView(v)
-    @Slot(bool)
-    def setRememberFilters(self, b): self.ui.setRememberFilters(b)
-    @Slot(str)
-    def setDefaultProjectFilter(self, f): self.ui.setDefaultProjectFilter(f)
-    @Slot(bool)
-    def setReducedMotion(self, b): self.ui.setReducedMotion(b)
-    @Slot(bool)
-    def setCompactListRows(self, b): self.ui.setCompactListRows(b)
+    def toggleAllVisibleCategories(self):
+        self.ui.toggleAllVisibleCategories()
 
     @Slot(str)
-    def addSource(self, u): self.config_mgr.addSource(u)
+    def launchSkill(self, p):
+        self.ui.launchSkill(p)
+
     @Slot(str)
-    def removeSource(self, p): self.config_mgr.removeSource(p)
+    def openPath(self, p):
+        self.ui.openPath(p)
+
+    @Slot()
+    def resetUiState(self):
+        self.ui.resetUiState()
+
+    @Slot(str)
+    def setClientFormat(self, f):
+        self.ui.setClientFormat(f)
+
+    @Slot(str)
+    def setStartupView(self, v):
+        self.ui.setStartupView(v)
+
+    @Slot(bool)
+    def setRememberFilters(self, b):
+        self.ui.setRememberFilters(b)
+
+    @Slot(str)
+    def setDefaultProjectFilter(self, f):
+        self.ui.setDefaultProjectFilter(f)
+
+    @Slot(bool)
+    def setReducedMotion(self, b):
+        self.ui.setReducedMotion(b)
+
+    @Slot(bool)
+    def setCompactListRows(self, b):
+        self.ui.setCompactListRows(b)
+
+    @Slot(str)
+    def addSource(self, u):
+        self.config_mgr.addSource(u)
+
+    @Slot(str)
+    def removeSource(self, p):
+        self.config_mgr.removeSource(p)
+
     @Slot(int)
-    def removeSourceByIndex(self, i): self.config_mgr.removeSourceByIndex(i)
+    def removeSourceByIndex(self, i):
+        self.config_mgr.removeSourceByIndex(i)
+
     @Slot(str)
-    def addProject(self, u): self.config_mgr.addProject(u)
+    def addProject(self, u):
+        self.config_mgr.addProject(u)
+
     @Slot(str)
-    def removeProject(self, p): self.config_mgr.removeProject(p)
+    def removeProject(self, p):
+        self.config_mgr.removeProject(p)
+
     @Slot(int)
-    def removeUpdateProject(self, i): self.config_mgr.removeUpdateProject(i)
+    def removeUpdateProject(self, i):
+        self.config_mgr.removeUpdateProject(i)
+
     @Slot(str, str)
-    def setProjectAlias(self, p, a): self.config_mgr.setProjectAlias(p, a)
+    def setProjectAlias(self, p, a):
+        self.config_mgr.setProjectAlias(p, a)
+
     @Slot(str, str, result=str)
-    def verifyGitPackage(self, u, t=None): return self.config_mgr.verifyGitPackage(u, t)
+    def verifyGitPackage(self, u, t=None):
+        return self.config_mgr.verifyGitPackage(u, t)
+
     @Slot(str, str)
-    def setShortcut(self, a, s): self.config_mgr.setShortcut(a, s)
+    def setShortcut(self, a, s):
+        self.config_mgr.setShortcut(a, s)
+
     @Slot()
-    def resetShortcuts(self): self.config_mgr.resetShortcuts()
+    def resetShortcuts(self):
+        self.config_mgr.resetShortcuts()
+
     @Slot(str, list)
-    def saveCustomCollection(self, n, p): self.config_mgr.saveCustomCollection(n, p)
+    def saveCustomCollection(self, n, p):
+        self.config_mgr.saveCustomCollection(n, p)
+
     @Slot(str)
-    def deleteCustomCollection(self, n): self.config_mgr.deleteCustomCollection(n)
+    def deleteCustomCollection(self, n):
+        self.config_mgr.deleteCustomCollection(n)
+
     @Slot(str)
-    def applyCollectionSelection(self, n): self.config_mgr.applyCollectionSelection(n)
+    def applyCollectionSelection(self, n):
+        self.config_mgr.applyCollectionSelection(n)
+
     @Slot(str, result=list)
-    def getCollectionPaths(self, n): return self.config_mgr.getCollectionPaths(n)
+    def getCollectionPaths(self, n):
+        return self.config_mgr.getCollectionPaths(n)
 
     @Slot()
-    def toggleCurrentSkillArchive(self): self.ops.toggleCurrentSkillArchive()
+    def toggleCurrentSkillArchive(self):
+        self.ops.toggleCurrentSkillArchive()
+
     @Slot()
-    def toggleCurrentSkillStarred(self): self.ops.toggleCurrentSkillStarred()
+    def toggleCurrentSkillStarred(self):
+        self.ops.toggleCurrentSkillStarred()
+
     @Slot(str)
-    def copySkillToClipboard(self, p): self.ops.copySkillToClipboard(p)
+    def copySkillToClipboard(self, p):
+        self.ops.copySkillToClipboard(p)
+
     @Slot()
-    def copyCurrentSelectionOrFocusedSkill(self): self.ops.copyCurrentSelectionOrFocusedSkill()
+    def copyCurrentSelectionOrFocusedSkill(self):
+        self.ops.copyCurrentSelectionOrFocusedSkill()
+
     @Slot()
-    def copySelectedSkillsToClipboard(self): self.ops.copySelectedSkillsToClipboard()
+    def copySelectedSkillsToClipboard(self):
+        self.ops.copySelectedSkillsToClipboard()
+
     @Slot(str)
-    def copyTextToClipboard(self, c): self.ops.copyTextToClipboard(c)
+    def copyTextToClipboard(self, c):
+        self.ops.copyTextToClipboard(c)
+
     @Slot(dict, str)
-    def copySkillReference(self, s, a=""): self.ops.copySkillReference(s, a)
+    def copySkillReference(self, s, a=""):
+        self.ops.copySkillReference(s, a)
+
     @Slot(str)
-    def deleteSkill(self, p): self.ops.deleteSkill(p)
-    @Slot()
-    def deleteSelectedSkills(self): self.ops.deleteSelectedSkills()
-    @Slot()
-    def archiveSelectedSkills(self): self.ops.archiveSelectedSkills()
-    @Slot(str)
-    def copySelectedSkillsToProject(self, p): self.ops.copySelectedSkillsToProject(p)
-    @Slot(str)
-    def copySelectedSkillsToProjectTemporarily(self, p): self.ops.copySelectedSkillsToProjectTemporarily(p)
-    @Slot(str, str, str, str, str)
-    def createCustomCommand(self, n, cl, b, pl, cat): self.ops.createCustomCommand(n, cl, b, pl, cat)
-    @Slot(str)
-    def addToArchive(self, p): self.ops.addToArchive(p)
+    def deleteSkill(self, p):
+        self.ops.deleteSkill(p)
 
     @Slot()
-    def updateNow(self): self.updates.updateNow()
+    def deleteSelectedSkills(self):
+        self.ops.deleteSelectedSkills()
+
     @Slot()
-    def scanForUpdates(self): self.updates.scanForUpdates()
+    def archiveSelectedSkills(self):
+        self.ops.archiveSelectedSkills()
+
+    @Slot(str)
+    def copySelectedSkillsToProject(self, p):
+        self.ops.copySelectedSkillsToProject(p)
+
+    @Slot(str)
+    def copySelectedSkillsToProjectTemporarily(self, p):
+        self.ops.copySelectedSkillsToProjectTemporarily(p)
+
+    @Slot(str, str, str, str, str)
+    def createCustomCommand(self, n, cl, b, pl, cat):
+        self.ops.createCustomCommand(n, cl, b, pl, cat)
+
+    @Slot(str)
+    def addToArchive(self, p):
+        self.ops.addToArchive(p)
+
     @Slot()
-    def updateAllOutdated(self): self.updates.updateAllOutdated()
+    def updateNow(self):
+        self.updates.updateNow()
+
+    @Slot()
+    def scanForUpdates(self):
+        self.updates.scanForUpdates()
+
+    @Slot()
+    def updateAllOutdated(self):
+        self.updates.updateAllOutdated()
+
     @Slot(str, str)
-    def updateSkillInProject(self, s, p): self.updates.updateSkillInProject(s, p)
+    def updateSkillInProject(self, s, p):
+        self.updates.updateSkillInProject(s, p)
+
     @Slot(int)
-    def runPackageUpdate(self, i): self.updates.runPackageUpdate(i)
+    def runPackageUpdate(self, i):
+        self.updates.runPackageUpdate(i)
+
     @Slot(str)
-    def syncProject(self, p): self.updates.syncProject(p)
+    def syncProject(self, p):
+        self.updates.syncProject(p)
+
     @Slot(str)
-    def addUpdatePackage(self, n): self.updates.addUpdatePackage(n)
+    def addUpdatePackage(self, n):
+        self.updates.addUpdatePackage(n)
+
     @Slot(dict)
-    def addSkillPackage(self, d): self.updates.addSkillPackage(d)
+    def addSkillPackage(self, d):
+        self.updates.addSkillPackage(d)
+
     @Slot(int, dict)
-    def updateUpdatePackage(self, i, d): self.updates.updateUpdatePackage(i, d)
+    def updateUpdatePackage(self, i, d):
+        self.updates.updateUpdatePackage(i, d)
+
     @Slot(int)
-    def removeUpdatePackage(self, i): self.updates.removeUpdatePackage(i)
+    def removeUpdatePackage(self, i):
+        self.updates.removeUpdatePackage(i)
+
     @Slot(int)
-    def clearPackageJustFinished(self, i): self.updates.clearPackageJustFinished(i)
+    def clearPackageJustFinished(self, i):
+        self.updates.clearPackageJustFinished(i)
 
     # --- Slots ---
 
@@ -618,11 +800,11 @@ class AppController(QObject):
 
     def on_quit(self):
         """Ensures all pending state is saved before exit."""
-        if hasattr(self, '_watcher'):
+        if hasattr(self, "_watcher"):
             self._watcher.stop()
-        if hasattr(self, '_scheduler') and self._scheduler.running:
+        if hasattr(self, "_scheduler") and self._scheduler.running:
             self._scheduler.shutdown(wait=False)
-        if hasattr(self, '_update_check_timer') and self._update_check_timer.isActive():
+        if hasattr(self, "_update_check_timer") and self._update_check_timer.isActive():
             self._update_check_timer.stop()
         if self.ui._save_timer.isActive():
             self.ui._save_timer.stop()
@@ -637,7 +819,7 @@ def main():  # pragma: no cover
         integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
-        environment="production" if getattr(sys, 'frozen', False) else "development",
+        environment="production" if getattr(sys, "frozen", False) else "development",
         release=f"skill-manager@{skill_manager.__version__}",
     )
 
@@ -664,15 +846,21 @@ def main():  # pragma: no cover
         sys.exit(-1)
     capture_event("app_opened")
     if HAS_PYWINSTYLES:
+
         def apply_native_styles():
             for root in engine.rootObjects():
                 try:
                     hwnd = root.winId()
                     pywinstyles.apply_style(hwnd, "mica")
-                    ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4)
-                    ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4)
+                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4
+                    )
+                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4
+                    )
                 except Exception as e:
                     logger.error(f"Failed to apply native style: {e}")
+
         QTimer.singleShot(500, apply_native_styles)
     sys.exit(app.exec())
 
