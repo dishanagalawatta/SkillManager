@@ -46,7 +46,7 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
     assert "ToolTip {" in skill_item
     assert "id: screenshotTooltip" in skill_item
     assert (
-        "visible: mouseArea.containsMouse && model && model.isScreenshot && model.path"
+        "active: mouseArea.containsMouse && model && model.isScreenshot && model.path"
         in skill_item
     )
     assert "delay: 450" in skill_item
@@ -63,7 +63,7 @@ def test_text_preview_tooltip_exists_in_skill_item():
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
 
     assert "id: textPreviewTooltip" in skill_item
-    assert "visible: mouseArea.containsMouse && previewText.length > 0" in skill_item
+    assert "active: mouseArea.containsMouse && previewText.length > 0" in skill_item
     assert "model.isCommand && model.bodyContent" in skill_item
     assert "model.description" in skill_item
     assert (

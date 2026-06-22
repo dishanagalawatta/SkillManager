@@ -84,6 +84,15 @@ a property on `AppController` and is independently testable.
 emit `selectedSkillChanged` as a side effect of refreshing the
 `selectedSkill` snapshot after model mutation.
 
+**Package add/edit returns.** `addSkillPackage` and
+`updateUpdatePackage` now return `result=str` (JSON) instead of
+`void`. QML callers MUST parse the return value; on failure the
+controller returns `{"ok": false, "error": "..."}` and does not
+append/overwrite the record. See
+[`ADR-0013`](../ADR_INDEX.md#adr-0013-package-add-snap-to-latest-policy)
+and
+[`ADR-0014`](../ADR_INDEX.md#adr-0014-package-edit-snap-to-latest-policy).
+
 ## 5. Signals (selected)
 
 | Signal | Payload | Emitted when |

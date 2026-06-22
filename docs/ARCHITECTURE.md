@@ -112,13 +112,10 @@ SkillManager is distributed as a native standalone executable for Windows. The p
 - **Windows**: PyInstaller output wrapped into `SkillManager_Setup.exe` via Inno Setup (`packaging/windows/installer.iss`). Portable ZIP also generated.
 
 ### 3. CI/CD Pipeline
-The project uses [release-please](https://github.com/googleapis/release-please-action) with Conventional Commits:
-1. **Dual-Branch Strategy**:
-   - `develop` branch: Development pre-releases (e.g., `v1.5.1-dev.1`).
-   - `main` branch: Stable releases (e.g., `v1.5.0`).
-2. **Conventional Commits**: `feat:` (minor), `fix:` (patch), `feat!:` (major) drive version bumps automatically.
-3. **Build**: `windows-latest` × Python 3.12 + 3.13.
-4. **Artifact Publishing**: Native installer and portable ZIP attached to GitHub Release.
+The project uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in tokens (see ADR-0009):
+1. **Opt-In Version Bumps**: Commits must include `[patch]`, `[minor]`, `[major]`, or `[dev]` to trigger a release.
+2. **Build**: `windows-latest` × Python 3.12 + 3.13.
+3. **Artifact Publishing**: Native installer and portable ZIP attached to GitHub Release.
 
 ### 4. Application Updates
 - `AppUpdateController` checks the GitHub Releases API for new versions.
