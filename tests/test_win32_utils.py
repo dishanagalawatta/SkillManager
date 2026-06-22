@@ -6,7 +6,9 @@ from skill_manager.utils import win32
 def test_apply_native_style_windows_success_and_failure():
     window = MagicMock()
     import ctypes
-    if not hasattr(ctypes, "windll"): ctypes.windll = MagicMock()
+
+    if not hasattr(ctypes, "windll"):
+        ctypes.windll = MagicMock()
     with (
         patch("skill_manager.utils.win32.pywinstyles") as apply_style,
     ):
