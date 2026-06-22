@@ -597,23 +597,42 @@ class OpsController(BaseController):
             except Exception as exc:
                 logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
-    @Slot(str, str, str)
+    @Slot(str, str, str, str, str, str)
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
         body: str,
+        category: str,
+        project_label: str,
+        on_conflict: str = "",
     ):
         """Updates an existing Custom Command .md file."""
         diag = get_diagnostic_logger()
-        diag.log_event("INFO", CATEGORY_COMMAND_UPDATED, f"path={local_path}, name={name}")
+        diag.log_event(
+            "INFO",
+            CATEGORY_COMMAND_UPDATED,
+            f"path={local_path}, name={name}, project={project_label}, on_conflict={on_conflict}",
+        )
         from skill_manager.core.commands import update_custom_command_file
 
         result = update_custom_command_file(
             local_path=local_path,
             name=name,
             body=body,
+            category=category,
+            project_label_name=project_label,
+            project_paths=self.app._projects,
+            on_conflict=on_conflict or None,
         )
+
+        if result.needs_conflict_resolution and result.conflicting_path:
+            self.app.commandUpdateConflict.emit(
+                local_path,
+                str(result.conflicting_path),
+                result.suggested_rename or "",
+            )
+            return
 
         if not result.ok:
             self.app._set_status(result.message)
@@ -637,8 +656,9 @@ class OpsController(BaseController):
                 if skill_data:
                     patch_cache_add([skill_data])
                     self._merge_discovered_skills([skill_data])
-                    # For renames, local_path is the OLD path but result.path is NEW.
+                    # For renames AND project moves, local_path is the OLD path but result.path is NEW.
                     self._refresh_selected_skill(local_path, rename_path=str(result.path))
+                    self.app.notify_command_updated(local_path, str(result.path))
                 else:
                     diag.log_event(
                         "WARNING",

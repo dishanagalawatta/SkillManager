@@ -66,7 +66,9 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
     app_controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Update the command
-    app_controller.ops.updateCustomCommandFull(str(cmd_file), "Cmd", "new body")
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+    proj_label = compute_project_label(project_path)
+    app_controller.ops.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label)
 
     # Signal should fire
     assert emissions, "selectedSkillChanged was not emitted"

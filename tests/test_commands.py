@@ -199,7 +199,7 @@ def test_update_custom_command_file_rename_conflict(tmp_path):
     assert "already exists" in result.message
 
 
-def test_update_custom_command_file_preserves_category(tmp_path):
+def test_update_custom_command_file_changes_category(tmp_path):
     cmd_file = tmp_path / "cmd.md"
     cmd_file.write_text(
         "---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\noriginal"
@@ -209,8 +209,174 @@ def test_update_custom_command_file_preserves_category(tmp_path):
         local_path=str(cmd_file),
         name="cmd",
         body="updated body",
+        category="NewCat",
+    )
+    assert result.ok
+    content = cmd_file.read_text()
+    assert "category: NewCat" in content
+    assert "updated body" in content
+
+
+def test_update_custom_command_file_preserves_existing_when_category_empty(tmp_path):
+    cmd_file = tmp_path / "cmd.md"
+    cmd_file.write_text(
+        "---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\noriginal"
+    )
+
+    result = update_custom_command_file(
+        local_path=str(cmd_file),
+        name="cmd",
+        body="updated body",
+        category="",
     )
     assert result.ok
     content = cmd_file.read_text()
     assert "category: DevOps" in content
-    assert "updated body" in content
+
+
+def test_update_custom_command_file_moves_to_new_project(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text(
+        "---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\nbody"
+    )
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        category="NewCat",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+    )
+    assert result.ok
+    assert not src.exists()
+    dst = proj_b / ".agents" / "commands" / "cmd.md"
+    assert dst.exists()
+    assert "new body" in dst.read_text()
+    assert "category: NewCat" in dst.read_text()
+
+
+def test_update_custom_command_file_returns_conflict_marker(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text("---\nname: cmd\ncategory: Y\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+    )
+    assert not result.ok
+    assert result.needs_conflict_resolution
+    assert str(result.conflicting_path) == str(blocker)
+    assert result.suggested_rename == "cmd-1.md"
+    assert src.exists()
+
+
+def test_update_custom_command_file_auto_renames_on_conflict(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+        on_conflict="rename",
+    )
+    assert result.ok
+    assert not src.exists()
+    assert blocker.exists()
+    assert (proj_b / ".agents" / "commands" / "cmd-1.md").exists()
+
+
+def test_update_custom_command_file_overwrites_on_conflict(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+        on_conflict="overwrite",
+    )
+    assert result.ok
+    assert not src.exists()
+    assert "new body" in blocker.read_text()
+
+
+def test_update_custom_command_file_cancels_on_conflict(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    for p in (proj_a, proj_b):
+        (p / ".agents" / "skills").mkdir(parents=True)
+        (p / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\noriginal")
+    original_content = src.read_text()
+
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text("---\nname: cmd\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+        on_conflict="cancel",
+    )
+    assert not result.ok
+    assert result.path == src
+    assert src.exists()
+    assert src.read_text() == original_content
+    assert "existing" in blocker.read_text()

@@ -3,6 +3,7 @@ Purpose: Main entry point for Skill Manager (PySide6 version).
 Usage: python run.py
 """
 
+import contextlib
 import ctypes
 import logging
 import os
@@ -27,43 +28,68 @@ except ImportError:
     pywinstyles = None  # type: ignore[assignment]
     HAS_PYWINSTYLES = False
 
+# DWM attribute for immersive dark mode title bar
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 
-from skill_manager.controllers.app_update_controller import AppUpdateController
-from skill_manager.controllers.config_controller import ConfigController
-from skill_manager.controllers.discovery_controller import DiscoveryController
-from skill_manager.controllers.font_database_bridge import FontDatabaseBridge
-from skill_manager.controllers.image_inspector_controller import ImageInspectorController
-from skill_manager.controllers.ops_controller import OpsController
-from skill_manager.controllers.screenshot_controller import ScreenshotController
-from skill_manager.controllers.ui_controller import UIController
-from skill_manager.controllers.update_controller import UpdateController
-from skill_manager.core.analytics import (
+
+def _apply_immersive_dark(hwnd: int, enabled: bool) -> None:
+    """Set the DWM immersive-dark-mode attribute on the window.
+
+    ``enabled=True`` tells the OS to render the title bar and system
+    buttons in dark style; ``enabled=False`` reverts to light.
+    """
+    with contextlib.suppress(Exception):
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(ctypes.c_int(1 if enabled else 0)),
+            4,
+        )
+
+
+# The ``_apply_immersive_dark`` helper above is intentionally defined
+# before these imports so the constant and helper sit next to the
+# ``pywinstyles`` try/except that depends on the same DWM surface.
+# ruff flags module-level imports that follow executable code as E402;
+# suppress per-line so the import order remains readable.
+from skill_manager.controllers.app_update_controller import AppUpdateController  # noqa: E402
+from skill_manager.controllers.config_controller import ConfigController  # noqa: E402
+from skill_manager.controllers.discovery_controller import DiscoveryController  # noqa: E402
+from skill_manager.controllers.font_database_bridge import FontDatabaseBridge  # noqa: E402
+from skill_manager.controllers.image_inspector_controller import (  # noqa: E402
+    ImageInspectorController,
+)
+from skill_manager.controllers.ops_controller import OpsController  # noqa: E402
+from skill_manager.controllers.screenshot_controller import ScreenshotController  # noqa: E402
+from skill_manager.controllers.ui_controller import UIController  # noqa: E402
+from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
+from skill_manager.core.analytics import (  # noqa: E402
     capture_event,
     shutdown as posthog_shutdown,
 )
-from skill_manager.core.categories import get_category_emoji
-from skill_manager.core.config import (
+from skill_manager.core.categories import get_category_emoji  # noqa: E402
+from skill_manager.core.config import (  # noqa: E402
     ConfigManager,
 )
-from skill_manager.core.diagnostics import (
+from skill_manager.core.diagnostics import (  # noqa: E402
     CATEGORY_SOURCE_MISSING,
     get_diagnostic_logger,
 )
-from skill_manager.core.file_watch import SkillFolderWatcher
-from skill_manager.core.global_hotkey import GlobalHotkeyManager
-from skill_manager.core.image_provider import ScreenshotImageProvider
-from skill_manager.core.models import SkillModel
-from skill_manager.core.persistence import (
+from skill_manager.core.file_watch import SkillFolderWatcher  # noqa: E402
+from skill_manager.core.global_hotkey import GlobalHotkeyManager  # noqa: E402
+from skill_manager.core.image_provider import ScreenshotImageProvider  # noqa: E402
+from skill_manager.core.models import SkillModel  # noqa: E402
+from skill_manager.core.persistence import (  # noqa: E402
     load_archive,
     load_starred,
 )
-from skill_manager.core.resources import (
+from skill_manager.core.resources import (  # noqa: E402
     invalidate_qml_disk_cache_if_stale,
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
-from skill_manager.core.schemas import UpdatePackageRecord
-from skill_manager.utils.task_runner import BackgroundTaskRunner
+from skill_manager.core.schemas import UpdatePackageRecord  # noqa: E402
+from skill_manager.utils.task_runner import BackgroundTaskRunner  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +144,10 @@ class AppController(QObject):
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
+
+    # Command update signals (cross-controller notification)
+    commandUpdateConflict = Signal(str, str, str)   # oldPath, conflictPath, suggestedRename
+    commandUpdateCompleted = Signal(str, str)        # oldPath, newPath
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
@@ -330,7 +360,7 @@ class AppController(QObject):
     def currentProject(self):  # type: ignore[reportRedeclaration]
         return self._current_project_label
 
-    @currentProject.setter
+    @currentProject.setter  # type: ignore[func-attr]
     def currentProject(self, label):
         self.setCurrentProject(label)
 
@@ -434,7 +464,7 @@ class AppController(QObject):
     def currentView(self):  # type: ignore[reportRedeclaration]
         return self.ui.currentView
 
-    @currentView.setter
+    @currentView.setter  # type: ignore[func-attr]
     def currentView(self, v):
         self.ui.currentView = v
 
@@ -442,7 +472,7 @@ class AppController(QObject):
     def windowWidth(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowWidth
 
-    @windowWidth.setter
+    @windowWidth.setter  # type: ignore[func-attr]
     def windowWidth(self, v):
         self.ui.windowWidth = v
 
@@ -450,7 +480,7 @@ class AppController(QObject):
     def windowHeight(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowHeight
 
-    @windowHeight.setter
+    @windowHeight.setter  # type: ignore[func-attr]
     def windowHeight(self, v):
         self.ui.windowHeight = v
 
@@ -458,7 +488,7 @@ class AppController(QObject):
     def windowX(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowX
 
-    @windowX.setter
+    @windowX.setter  # type: ignore[func-attr]
     def windowX(self, v):
         self.ui.windowX = v
 
@@ -466,7 +496,7 @@ class AppController(QObject):
     def windowY(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowY
 
-    @windowY.setter
+    @windowY.setter  # type: ignore[func-attr]
     def windowY(self, v):
         self.ui.windowY = v
 
@@ -474,7 +504,7 @@ class AppController(QObject):
     def darkMode(self):  # type: ignore[reportRedeclaration]
         return self.ui.darkMode
 
-    @darkMode.setter
+    @darkMode.setter  # type: ignore[func-attr]
     def darkMode(self, v):
         self.ui.darkMode = v
 
@@ -482,7 +512,7 @@ class AppController(QObject):
     def startupView(self):  # type: ignore[reportRedeclaration]
         return self.ui.startupView
 
-    @startupView.setter
+    @startupView.setter  # type: ignore[func-attr]
     def startupView(self, v):
         self.ui.startupView = v
 
@@ -490,7 +520,7 @@ class AppController(QObject):
     def rememberFilters(self):  # type: ignore[reportRedeclaration]
         return self.ui.rememberFilters
 
-    @rememberFilters.setter
+    @rememberFilters.setter  # type: ignore[func-attr]
     def rememberFilters(self, v):
         self.ui.rememberFilters = v
 
@@ -498,7 +528,7 @@ class AppController(QObject):
     def reducedMotion(self):  # type: ignore[reportRedeclaration]
         return self.ui.reducedMotion
 
-    @reducedMotion.setter
+    @reducedMotion.setter  # type: ignore[func-attr]
     def reducedMotion(self, v):
         self.ui.reducedMotion = v
 
@@ -506,7 +536,7 @@ class AppController(QObject):
     def compactListRows(self):  # type: ignore[reportRedeclaration]
         return self.ui.compactListRows
 
-    @compactListRows.setter
+    @compactListRows.setter  # type: ignore[func-attr]
     def compactListRows(self, v):
         self.ui.compactListRows = v
 
@@ -792,9 +822,13 @@ class AppController(QObject):
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
-    @Slot(str, str, str)
-    def updateCustomCommandFull(self, lp, n, b):
-        self.ops.updateCustomCommandFull(lp, n, b)
+    @Slot(str, str, str, str, str, str)
+    def updateCustomCommandFull(self, lp, n, b, cat, proj, on_conflict=""):
+        self.ops.updateCustomCommandFull(lp, n, b, cat, proj, on_conflict)
+
+    @Slot(str, str)
+    def notify_command_updated(self, old_path: str, new_path: str) -> None:
+        self.commandUpdateCompleted.emit(old_path, new_path)
 
     @Slot(str, str, str, str)
     def createCustomCommand(self, n, b, pl, cat):
@@ -859,7 +893,7 @@ class AppController(QObject):
     def isPackageOnly(self):  # type: ignore[reportRedeclaration]
         return self._library_model.isPackageOnly
 
-    @isPackageOnly.setter
+    @isPackageOnly.setter  # type: ignore[func-attr]
     def isPackageOnly(self, value):
         self._library_model.isPackageOnly = value
         self._quick_copy_model.isPackageOnly = value
@@ -1102,8 +1136,8 @@ def main():  # pragma: no cover
         "App",
         1,
         0,
-        "AppController",
-        controller,  # type: ignore[arg-type]
+        "AppController",  # type: ignore[arg-type]
+        controller,
     )
     app.aboutToQuit.connect(controller.on_quit)
 
@@ -1188,14 +1222,13 @@ def main():  # pragma: no cover
             "window_state",
             f"apply_native_styles: processing {len(engine.rootObjects())} root object(s)",
         )
+        dark = bool(controller.ui.darkMode)
         for root in engine.rootObjects():
             try:
                 hwnd = int(root.winId())  # type: ignore[attr-defined]
                 if HAS_PYWINSTYLES and pywinstyles is not None:
                     pywinstyles.apply_style(hwnd, "mica")
-                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                        hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4
-                    )
+                    _apply_immersive_dark(hwnd, dark)
                     ctypes.windll.dwmapi.DwmSetWindowAttribute(
                         hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4
                     )
@@ -1224,6 +1257,22 @@ def main():  # pragma: no cover
                 logger.error(f"Failed to apply native style/icon: {e}")
 
     QTimer.singleShot(0, apply_native_styles)
+
+    def _reapply_immersive_dark_from_dark_mode() -> None:
+        """Re-apply the DWM immersive-dark attribute when darkMode changes."""
+        dark = bool(controller.ui.darkMode)
+        for root in engine.rootObjects():
+            try:
+                hwnd = int(root.winId())  # type: ignore[attr-defined]
+                _apply_immersive_dark(hwnd, dark)
+            except Exception as e:
+                diag.log_event(
+                    "WARN",
+                    "window_state",
+                    f"Immersive-dark re-apply skipped for root: {e}",
+                )
+
+    controller.ui.darkModeChanged.connect(_reapply_immersive_dark_from_dark_mode)
 
     def _check_window_visible():
         for i, root in enumerate(engine.rootObjects()):

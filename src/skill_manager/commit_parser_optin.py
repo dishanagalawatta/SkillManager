@@ -60,7 +60,7 @@ class OptInCommitParser(CommitParser[ParsedCommit, OptInParserOptions]):
 
     parser_options = OptInParserOptions
 
-    def parse(self, commit: Commit) -> ParsedCommit | ParseError:
+    def parse(self, commit: Commit) -> ParsedCommit | ParseError:  # type: ignore[override]
         # ``Commit.message`` is ``bytes | str`` depending on the GitPython
         # version. Decode here so downstream string operations type-check.
         message = (
