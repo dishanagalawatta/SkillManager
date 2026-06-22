@@ -28,10 +28,11 @@ def sanitize_token(text: str) -> str:
         )
 
     # Explicitly redact known token patterns
+    # Explicitly redact known token patterns
     if "ghp_" in text:
-        text = re.sub(r"ghp_[a-zA-Z0-9]{36}", "***", text)
+        text = re.sub(r"ghp_[a-zA-Z0-9]{36,}", "***", text)
     if "github_pat_" in text:
-        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82}", "***", text)
+        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82,}", "***", text)
 
     return text
 
