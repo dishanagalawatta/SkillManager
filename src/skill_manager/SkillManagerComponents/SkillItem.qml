@@ -34,10 +34,20 @@ Item {
             height: 34
             visible: root.isFirstInSub && !root.isMainCollapsed
 
+            activeFocusOnTab: true
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                    Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
+                    event.accepted = true
+                }
+            }
+
             Rectangle {
                 anchors.fill: parent
-                color: mouseAreaSub.containsMouse ? Theme.glassHover : "transparent"
+                color: subHeader.activeFocus ? Theme.glassActive : (mouseAreaSub.containsMouse ? Theme.glassHover : "transparent")
                 radius: Theme.radiusSmall
+                border.color: subHeader.activeFocus ? Theme.accent : "transparent"
+                border.width: subHeader.activeFocus ? 2 : 0
                 anchors.leftMargin: 24 // Start Level 1 Background
                 anchors.rightMargin: 2
                 anchors.topMargin: 2
