@@ -36,3 +36,8 @@
 **Vulnerability:** The `sanitize_token` function used a greedy `.*` regex match for `echo password=`, which failed to correctly bound redaction, potentially leaking secrets if line boundaries failed or causing log data loss by stripping massive portions of text.
 **Learning:** When using Python regex to redact secrets from multiline or unstructured text, greedy matches (`.*`) without newline/boundary constraints (`\r`, `\n`) or escape-aware logic fail catastrophically in logs.
 **Prevention:** Always use explicit matching of known token formats (e.g., GitHub tokens), and for unstructured strings like `echo password=`, use safe escape-aware patterns bounded strictly to quotes or spaces.
+
+## 2024-05-27 - [Information Disclosure via Incomplete Regex Redaction]
+**Vulnerability:** The `sanitize_token` regex designed to redact unquoted passwords (`echo password=secret`) used `([^;\n]+)`. This pattern excluded semicolons and Unix newlines (`\n`) but failed to exclude carriage returns (`\r`) or spaces (`\s`). In environments outputting Windows line endings (`\r\n`) or where the secret was followed by a space, the regex would either fail to redact the secret entirely or over-redact subsequent commands.
+**Learning:** When writing regexes to match unquoted shell tokens (where whitespace signifies the end of the token), the exclusion character class must explicitly include all forms of whitespace (`\r`, `\n`, `\s`) to ensure correct boundaries across different OS environments.
+**Prevention:** Use comprehensive exclusion classes like `[^;\r\n\s]+` when capturing shell tokens bounded by whitespace or command separators.
