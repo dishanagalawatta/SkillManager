@@ -607,8 +607,12 @@ def test_update_custom_command_full(
     local_path.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
 
     update_result = MagicMock(
-        ok=True, message="Updated command: Cmd.md", path=local_path,
-        needs_conflict_resolution=False, conflicting_path=None, suggested_rename=None,
+        ok=True,
+        message="Updated command: Cmd.md",
+        path=local_path,
+        needs_conflict_resolution=False,
+        conflicting_path=None,
+        suggested_rename=None,
     )
     mock_update.return_value = update_result
 
@@ -665,8 +669,12 @@ def test_update_custom_command_full_moves_to_new_project(
 
     new_path = tmp_path / "cmd_new.md"
     update_result = MagicMock(
-        ok=True, message="Updated command: cmd_new.md", path=new_path,
-        needs_conflict_resolution=False, conflicting_path=None, suggested_rename=None,
+        ok=True,
+        message="Updated command: cmd_new.md",
+        path=new_path,
+        needs_conflict_resolution=False,
+        conflicting_path=None,
+        suggested_rename=None,
     )
     mock_update.return_value = update_result
 
@@ -722,9 +730,7 @@ def test_update_custom_command_full_emits_conflict_signal(
     )
     mock_update.return_value = update_result
 
-    ops_controller.updateCustomCommandFull(
-        str(local_path), "cmd", "new body", "NewCat", "ProjectB"
-    )
+    ops_controller.updateCustomCommandFull(str(local_path), "cmd", "new body", "NewCat", "ProjectB")
 
     # The controller calls self.app.commandUpdateConflict.emit(...)
     # With MagicMock, the attribute creates a new mock each time, so we
@@ -1031,9 +1037,12 @@ def test_update_custom_command_refreshes_selection_real_discovery(
 
     # Act — uses real update_custom_command_file + real DiscoveryService
     from skill_manager.core.quick_copy import project_label as compute_project_label
+
     proj_label = compute_project_label(project_path)
     real_ops_controller.app._projects = [str(project_path)]
-    real_ops_controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label)
+    real_ops_controller.updateCustomCommandFull(
+        str(cmd_file), "Cmd", "new body", "Commands", proj_label
+    )
 
     # The command was updated; verify _selected_skill reflects the new body
     assert emissions, (
@@ -1068,9 +1077,12 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
 
     # Act — rename to NewCmd.md
     from skill_manager.core.quick_copy import project_label as compute_project_label
+
     proj_label = compute_project_label(project_path)
     real_ops_controller.app._projects = [str(project_path)]
-    real_ops_controller.updateCustomCommandFull(str(old_file), "NewCmd", "updated body", "Commands", proj_label)
+    real_ops_controller.updateCustomCommandFull(
+        str(old_file), "NewCmd", "updated body", "Commands", proj_label
+    )
 
     # The old file should be gone, new file should exist
     new_file = commands_dir / "NewCmd.md"

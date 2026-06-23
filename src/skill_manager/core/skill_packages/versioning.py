@@ -49,7 +49,8 @@ def run_version_command(command: str) -> str:
             command_list[0] = executable
 
         kwargs = {"shell": False, "capture_output": True, "text": True, "timeout": 30}
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
         result = subprocess.run(command_list, **kwargs)
     except (OSError, subprocess.SubprocessError, ValueError) as e:

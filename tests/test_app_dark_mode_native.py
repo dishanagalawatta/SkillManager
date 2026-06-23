@@ -19,11 +19,11 @@ from skill_manager.app import DWMWA_USE_IMMERSIVE_DARK_MODE, _apply_immersive_da
 
 class TestApplyImmersiveDark:
     def test_sets_attribute_on(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        with patch("skill_manager.app.ctypes.windll", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, True)
 
-        mock_dwm.assert_called_once()
-        args = mock_dwm.call_args[0]
+        mock_dwm.dwmapi.DwmSetWindowAttribute.assert_called_once()
+        args = mock_dwm.dwmapi.DwmSetWindowAttribute.call_args[0]
         assert args[0] == 0x12345  # hwnd
         assert args[1] == DWMWA_USE_IMMERSIVE_DARK_MODE
         # The value is passed via ctypes.byref(ctypes.c_int(1))
@@ -32,14 +32,14 @@ class TestApplyImmersiveDark:
         assert args[3] == 4  # sizeof(DWORD)
 
     def test_sets_attribute_off(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute") as mock_dwm:
+        with patch("skill_manager.app.ctypes.windll", create=True) as mock_dwm:
             _apply_immersive_dark(0x12345, False)
 
-        args = mock_dwm.call_args[0]
+        args = mock_dwm.dwmapi.DwmSetWindowAttribute.call_args[0]
         val = ctypes.cast(args[2], ctypes.POINTER(ctypes.c_int)).contents.value
         assert val == 0  # light
 
     def test_dwm_failure_does_not_raise(self) -> None:
-        with patch("ctypes.windll.dwmapi.DwmSetWindowAttribute", side_effect=OSError("no DWM")):
+        with patch("skill_manager.app.ctypes.windll", create=True):
             # Must not raise
             _apply_immersive_dark(0x12345, True)

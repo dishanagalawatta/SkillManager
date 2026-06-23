@@ -364,9 +364,7 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
         patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add"),
-        patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None
-        ),
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None),
     ):
         update_controller.runPackageUpdate(0)
 

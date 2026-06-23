@@ -146,8 +146,8 @@ class AppController(QObject):
     isRecordingShortcutChanged = Signal()
 
     # Command update signals (cross-controller notification)
-    commandUpdateConflict = Signal(str, str, str)   # oldPath, conflictPath, suggestedRename
-    commandUpdateCompleted = Signal(str, str)        # oldPath, newPath
+    commandUpdateConflict = Signal(str, str, str)  # oldPath, conflictPath, suggestedRename
+    commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()

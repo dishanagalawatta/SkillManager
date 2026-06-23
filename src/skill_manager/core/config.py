@@ -162,11 +162,10 @@ class ConfigManager:
         self.data: dict[str, Any] = {}
         # Safety guard: prevent test code from writing to production data dir
         if os.environ.get("SKILL_MANAGER_TESTING") == "1":
-
             real_prod = str(Path(os.environ.get("LOCALAPPDATA", "")) / APP_NAME)
-            if str(self.config_path).startswith(real_prod) and not str(
-                self.config_path
-            ).startswith(str(Path(os.environ.get("SKILL_MANAGER_DATA_DIR", "")))):
+            if str(self.config_path).startswith(real_prod) and not str(self.config_path).startswith(
+                str(Path(os.environ.get("SKILL_MANAGER_DATA_DIR", "")))
+            ):
                 raise RuntimeError(
                     f"ConfigManager in test mode must not write to production "
                     f"data dir: {self.config_path}. Set SKILL_MANAGER_DATA_DIR "
@@ -239,9 +238,7 @@ class ConfigManager:
                                     legacy_config_path,
                                 )
                         except Exception as e:
-                            logger.warning(
-                                "Error reading legacy config for fallback: %s", e
-                            )
+                            logger.warning("Error reading legacy config for fallback: %s", e)
 
                 # Ensure default shortcuts are present
                 if "shortcuts" not in self.data:

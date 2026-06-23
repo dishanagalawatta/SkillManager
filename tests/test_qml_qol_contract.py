@@ -46,8 +46,7 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
     assert "ToolTip {" in skill_item
     assert "id: screenshotTooltip" in skill_item
     assert (
-        "active: mouseArea.containsMouse && model && model.isScreenshot && model.path"
-        in skill_item
+        "active: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
     )
     assert "delay: 450" in skill_item
     assert (
