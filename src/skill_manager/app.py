@@ -256,10 +256,14 @@ class AppController(QObject):
         self._library_model.showStarred = True
         self._library_model.filterByClient = True
 
-        self._quick_copy_model.showCommands = True
-        self._quick_copy_model.isPackageOnly = False  # type: ignore[arg-type]
-        self._quick_copy_model.showStarred = True
-        self._quick_copy_model.filterByClient = True
+        self._quick_copy_model._begin_batch()
+        try:
+            self._quick_copy_model.showCommands = True
+            self._quick_copy_model.isPackageOnly = False  # type: ignore[arg-type]
+            self._quick_copy_model.showStarred = True
+            self._quick_copy_model.filterByClient = True
+        finally:
+            self._quick_copy_model._end_batch()
 
         # Reactive client filter: sync model filters when user selects a different client
         self.clientFormatChanged.connect(self._on_client_format_changed)

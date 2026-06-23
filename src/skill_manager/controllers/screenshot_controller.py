@@ -139,13 +139,24 @@ class ScreenshotController(QObject):
                     project_label(p, aliases, p) == project_label_or_path
                     or str(p) == project_label_or_path
                 ):
-                    project_path = str(project_root_for_project(Path(p)))
-                    matched_project = p
-                    break
+                    candidate = str(project_root_for_project(Path(p)))
+                    if Path(candidate).is_dir():
+                        project_path = candidate
+                        matched_project = p
+                        break
+                    logger.warning(
+                        "Matched project root does not exist: %s (from %s)",
+                        candidate,
+                        p,
+                    )
 
         if not project_path and self.app.projects:
-            matched_project = self.app.projects[0]
-            project_path = str(project_root_for_project(Path(matched_project)))
+            for p in self.app.projects:
+                candidate = str(project_root_for_project(Path(p)))
+                if Path(candidate).is_dir():
+                    matched_project = p
+                    project_path = candidate
+                    break
 
         if not project_path:
             logger.warning("No active project found, cannot save screenshot.")
@@ -183,6 +194,9 @@ class ScreenshotController(QObject):
 
             self.captureFinished.emit(filepath)
 
+            # Remove any stale screenshot entries before adding the new one
+            self._cleanup_stale_screenshot_skills()
+
             # Create a virtual skill for the new screenshot to avoid a full library refresh
             skill_data = {
                 "name": filename,
@@ -210,3 +224,15 @@ class ScreenshotController(QObject):
         else:
             logger.error("Failed to save screenshot to %s", filepath)
             self.app._set_status("Failed to save screenshot.")
+
+    def _cleanup_stale_screenshot_skills(self):
+        """Remove skill entries whose screenshot files no longer exist on disk."""
+        for model in (self.app._library_model, self.app._quick_copy_model):
+            stale_paths = [
+                s.local_path
+                for s in model._all_skills
+                if s.is_screenshot and s.local_path and not Path(s.local_path).exists()
+            ]
+            if stale_paths:
+                logger.info("Removing %d stale screenshot entries", len(stale_paths))
+                model.removeSkillsByPath(stale_paths)

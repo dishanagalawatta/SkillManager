@@ -549,7 +549,7 @@ Item {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
-                model: AppController.quickCopyModel
+                model: AppController.isLoading ? null : AppController.quickCopyModel
                 clip: true
                 spacing: 0
                 

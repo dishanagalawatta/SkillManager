@@ -15,8 +15,8 @@
 
 # 2. High-Level Milestones
 
-* **Goal A:** Patch Things up
-* **Goal B:** Cover Backlog
+* **Goal A:** 
+* **Goal B:**
 
 ---
 
@@ -24,8 +24,7 @@
 
 ## To Do (Ready for Pickup)
 
-- [ ] `[P1]` Develop automated reply method for GitHub issues
-- [ ] `[P99]` Improve Test Coverage
+* [ ] Autodetect skills mentioned in commands, carry (prompt user) skills when copy command to other projects.
 
 ## In Progress
 
