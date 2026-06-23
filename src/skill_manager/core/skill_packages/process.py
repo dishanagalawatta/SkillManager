@@ -24,7 +24,20 @@ def sanitize_token(text: str | None) -> str | None:
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
     # Matches echo password=... in git credential helpers
     if "echo password=" in text:
-        text = re.sub(r"(echo password=).*", r"\1***", text)
+        # Handle double-quoted passwords (remove quotes and content)
+        text = re.sub(r'(echo password=)"([^"]*)"', r'\1***', text)
+        # Handle single-quoted passwords (remove quotes and content)
+        text = re.sub(r"(echo password=)'([^']*)'", r'\1***', text)
+        # Handle unquoted passwords (stop at semicolon, newline, or end)
+        # Use negative lookahead to avoid matching after quotes are already processed
+        text = re.sub(r'(echo password=)(?![\'"])([^;\n]+)', lambda m: m.group(1) + '***', text)
+
+    # Explicitly redact known token patterns
+    if "ghp_" in text:
+        text = re.sub(r"ghp_[a-zA-Z0-9]{36,}", "***", text)
+    if "github_pat_" in text:
+        text = re.sub(r"github_pat_[a-zA-Z0-9_]{82,}", "***", text)
+
     return text
 
 
@@ -87,9 +100,7 @@ def run_process(
         "bufsize": 1,
     }
 
-    import sys
-
-    if hasattr(subprocess, "CREATE_NO_WINDOW") and sys.platform == "win32":
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
     process = subprocess.Popen(command, **kwargs)

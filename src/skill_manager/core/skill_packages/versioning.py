@@ -49,9 +49,7 @@ def run_version_command(command: str) -> str:
             command_list[0] = executable
 
         kwargs = {"shell": False, "capture_output": True, "text": True, "timeout": 30}
-        import sys
-
-        if hasattr(subprocess, "CREATE_NO_WINDOW") and sys.platform == "win32":
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
         result = subprocess.run(command_list, **kwargs)
