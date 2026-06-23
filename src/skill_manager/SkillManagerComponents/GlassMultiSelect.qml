@@ -24,6 +24,17 @@ Item {
     implicitWidth: 160
     implicitHeight: 36
 
+    activeFocusOnTab: true
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: root.displayText
+
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+        }
+    }
+
     function toggleAll(checked) {
         selectedValues = checked ? model.slice() : []
         selectionChanged()
@@ -46,8 +57,8 @@ Item {
         anchors.fill: parent
         radius: Theme.radiusPill
         color: mouseArea.containsMouse ? Theme.glassHover : Theme.glassPill
-        border.color: popup.opened ? Theme.accent : Theme.glassBorder
-        border.width: popup.opened ? 2 : 1
+        border.color: root.activeFocus || popup.opened ? Theme.accent : Theme.glassBorder
+        border.width: root.activeFocus || popup.opened ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
