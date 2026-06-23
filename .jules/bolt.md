@@ -1,3 +1,3 @@
 ## 2024-06-20 - Rapidfuzz extractOne vs Loop
-**Learning:** To optimize performance when applying fuzzy string matching against an array of text targets, replacing nested Python iteration loops with `rapidfuzz.process.extractOne(..., scorer=fuzz.ratio, score_cutoff=...)` yields massive speedups by delegating operations to optimized C extensions.
-**Action:** Replace manual loops evaluating max fuzzy ratios on list items with `extractOne`, using dynamic `score_cutoff` correctly tracking maximum scores instead of static cutoffs.
+**Learning:** `rapidfuzz.process.extractOne` evaluates the entire sequence to find the absolute maximum match. If the existing Python loop optimizes large list evaluations with an early exit (e.g. `if max_score > 70: break`), replacing it blindly with `extractOne` can actually cause performance regressions and functional differences.
+**Action:** Always verify if the original looping logic relies on early termination thresholds. If it does, and the list size is significant, avoid `extractOne` and instead optimize the Python loop using fast-path exact substring checks before invoking expensive `fuzz.ratio` operations.

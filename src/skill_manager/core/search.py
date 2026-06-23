@@ -10,11 +10,10 @@ import re
 from typing import Any
 
 try:
-    from rapidfuzz import fuzz, process
+    from rapidfuzz import fuzz
 except ImportError:
     # Fallback to basic matching if rapidfuzz is not available
     fuzz = None
-    process = None
 
 
 class SkillIndexer:
@@ -136,7 +135,7 @@ class SearchEngine:
         Calculate a weighted relevance score for a skill.
         """
         # If no rapidfuzz, fallback to simple substring check
-        if fuzz is None or process is None:
+        if fuzz is None:
             if query in index_data["full_text"]:
                 return 100.0 if query in index_data["name"] else 50.0
             return 0.0
@@ -157,12 +156,15 @@ class SearchEngine:
                         max_token_match = 100
                         break
 
-                    match = process.extractOne(
-                        qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match
-                    )
-                    if match:
-                        max_token_match = max(max_token_match, match[1])
-
+                    for dt in all_doc_tokens:
+                        if qt == dt:
+                            max_token_match = 100
+                            break
+                        score = fuzz.ratio(qt, dt)
+                        if score > max_token_match:
+                            max_token_match = score
+                        if max_token_match > 70:
+                            break
                     if max_token_match > 70:
                         break
 
