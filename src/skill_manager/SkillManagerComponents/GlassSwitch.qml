@@ -15,13 +15,19 @@ Item {
     implicitWidth: 44
     implicitHeight: 24
 
+    activeFocusOnTab: true
+
+    Keys.onSpacePressed: { control.checked = !control.checked; event.accepted = true; }
+    Keys.onReturnPressed: { control.checked = !control.checked; event.accepted = true; }
+    Keys.onEnterPressed: { control.checked = !control.checked; event.accepted = true; }
+
     Rectangle {
         id: track
         anchors.fill: parent
         radius: height / 2
         color: control.checked ? Theme.accent : Theme.glassHover
-        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
-        border.width: control.visualFocus ? 2 : 1
+        border.color: control.activeFocus ? Theme.accent : Theme.glassBorder
+        border.width: control.activeFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
@@ -59,7 +65,10 @@ Item {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: control.checked = !control.checked
+        onClicked: {
+            control.forceActiveFocus();
+            control.checked = !control.checked;
+        }
     }
 
     Accessible.role: Accessible.CheckBox

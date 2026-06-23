@@ -15,6 +15,12 @@ Item {
     width: buttonSize
     height: buttonSize
 
+    activeFocusOnTab: true
+
+    Keys.onSpacePressed: { control.toggled(); event.accepted = true; }
+    Keys.onReturnPressed: { control.toggled(); event.accepted = true; }
+    Keys.onEnterPressed: { control.toggled(); event.accepted = true; }
+
     Rectangle {
         id: bgRect
         anchors.fill: parent
@@ -29,12 +35,13 @@ Item {
         }
         
         border.color: {
+            if (control.activeFocus) return Theme.accent
             if (control.checkState === Qt.Checked || control.checkState === Qt.PartiallyChecked) {
                 return "transparent"
             }
             return mouseArea.containsMouse ? Theme.accent : Theme.alpha(Theme.label, 0.15)
         }
-        border.width: 1
+        border.width: control.activeFocus ? 2 : 1
 
         Behavior on color { ColorAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
@@ -87,7 +94,10 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: control.toggled()
+        onClicked: {
+            control.forceActiveFocus();
+            control.toggled();
+        }
     }
 
     SleekToolTip {
