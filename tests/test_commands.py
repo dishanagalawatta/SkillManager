@@ -245,9 +245,7 @@ def test_update_custom_command_file_moves_to_new_project(tmp_path):
     (proj_b / ".agents" / "commands").mkdir(parents=True)
 
     src = proj_a / ".agents" / "commands" / "cmd.md"
-    src.write_text(
-        "---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\nbody"
-    )
+    src.write_text("---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\nbody")
 
     result = update_custom_command_file(
         local_path=str(src),
@@ -278,7 +276,9 @@ def test_update_custom_command_file_returns_conflict_marker(tmp_path):
     src = proj_a / ".agents" / "commands" / "cmd.md"
     src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
     blocker = proj_b / ".agents" / "commands" / "cmd.md"
-    blocker.write_text("---\nname: cmd\ncategory: Y\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+    blocker.write_text(
+        "---\nname: cmd\ncategory: Y\ntype: command\ndate: 2026-01-01\n---\n\nexisting"
+    )
 
     result = update_custom_command_file(
         local_path=str(src),

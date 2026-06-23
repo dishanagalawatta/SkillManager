@@ -305,9 +305,7 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
 
     with (
         patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
-        patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None
-        ),
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None),
     ):
         from skill_manager.core.commands import CommandCreateResult
 
