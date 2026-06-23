@@ -1,28 +1,42 @@
 # Environment Variables
 
-Reference for every environment variable SkillManager reads.
+> Canonical reference. `.env.example` is the source for *defaults*; this
+> file is the source for *contract*. Update both when a variable is added,
+> renamed, or retired.
 
-## Test / CI
+## Read order
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `QT_QUICK_CONTROLS_STYLE` | Qt Quick Controls style. Must be `Basic` for headless test runs. | unset (uses platform default) |
-| `QT_QPA_PLATFORM` | Qt platform plugin. `offscreen` for headless CI. | unset (native) |
-| `QML_DISABLE_DISK_CACHE` | Disable QML disk cache. Set user-scope permanently. PySide6 6.11.1 serves stale cached bytecode after QML edits; this prevents that class of bug. | unset |
-| `SKILL_MANAGER_TESTING` | When set, `AppController` skips non-essential startup (analytics, real network, state restore). | unset |
-| `SKILL_MANAGER_SKIP_INITIAL_LOAD` | When set, `AppController.__init__` does not auto-load skills on startup. | unset |
-| `SKILL_MANAGER_DATA_DIR` | Override per-user data dir (`%APPDATA%/SkillManager`). Tests should point to a per-run tempdir. | platform default |
-| `SKILL_MANAGER_LOG_LEVEL` | Log level for the QML console bridge. `DEBUG` / `INFO` / `WARNING` / `ERROR`. | `INFO` |
+All variables are read once at process start. Restart the app to apply
+changes. `.env` overrides process environment.
 
-## Analytics (PostHog)
+## Qt / QML
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `POSTHOG_PROJECT_TOKEN` | Project token for self-hosted or cloud PostHog. Empty disables telemetry. | empty |
-| `POSTHOG_HOST` | PostHog host URL. | empty |
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `QT_QUICK_CONTROLS_STYLE` | yes (test) | unset | Must be `Basic` in headless tests. |
+| `QML_DISABLE_DISK_CACHE` | yes | `0` | Set to `1`. See ADR-0001. |
+| `QT_QPA_PLATFORM` | test only | native | `offscreen` in CI. |
+
+## Application
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `SKILL_MANAGER_TESTING` | test only | unset | Skip analytics/network/state-restore. |
+| `SKILL_MANAGER_SKIP_INITIAL_LOAD` | test only | unset | Skip initial skill load. |
+| `SKILL_MANAGER_DATA_DIR` | optional | platformdirs | Override user data dir. |
+| `SKILL_MANAGER_LOG_LEVEL` | optional | `INFO` | QML console bridge log level. |
+
+## Telemetry
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `POSTHOG_PROJECT_TOKEN` | optional | empty | Empty disables. |
+| `POSTHOG_HOST` | optional | empty | PostHog host URL. |
+| `SENTRY_DSN` | optional | empty | Empty disables Sentry. |
 
 ## Conventions
 
-- `.env` is git-ignored; copy from `.env.example` for local overrides.
-- All variables are read at process start. Restart the app to apply changes.
-- CI sets `QT_QPA_PLATFORM=offscreen` and `SKILL_MANAGER_TESTING=1` automatically (see `run_tests.py`).
+- `.env` is git-ignored.
+- All variables are read at process start.
+- CI sets `QT_QPA_PLATFORM=offscreen` and `SKILL_MANAGER_TESTING=1` automatically.
+- Test runs set `SKILL_MANAGER_DATA_DIR` to a per-run tempdir.

@@ -20,7 +20,13 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     proj_dir = temp_dir / "proj"
     proj_dir.mkdir(exist_ok=True)
 
-    # Clear previous state
+    # Clear previous state. The session-scoped ``app_controller`` fixture
+    # accumulates model data across tests (e.g. ``test_ui_discovery_flow``
+    # injects ``Skill Alpha``/``Skill Beta``). Without a model reset here,
+    # ``quickCopyModel`` row 0 may still point at leftover data, and the
+    # "copy to clipboard" assertion picks up the wrong skill.
+    app_controller.libraryModel.setSkills([])
+    app_controller.quickCopyModel.setSkills([])
     while app_controller.sources:
         app_controller.config_mgr.removeSource(app_controller.sources[0])
     while app_controller.projects:
@@ -58,6 +64,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     """Verify navigation, search filtering, and quick copy flow in a single sequence."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     # Force a known starting view
@@ -135,6 +142,7 @@ def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_dat
     """Verify navigation to Updates view and interaction with scan/lists."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     nav_updates = root.findChild(QQuickItem, "navUpdates")

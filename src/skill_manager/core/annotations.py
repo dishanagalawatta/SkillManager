@@ -46,17 +46,17 @@ class AnnotationEngine:
             elif isinstance(ann, ArrowAnnotation):
                 AnnotationEngine._draw_arrow(painter, ann)
             elif isinstance(ann, FilledRectAnnotation):
-                AnnotationEngine._draw_filled_rect(painter, ann)
+                AnnotationEngine.draw_filled_rect(painter, ann)
             elif isinstance(ann, FreehandAnnotation):
-                AnnotationEngine._draw_freehand(painter, ann)
+                AnnotationEngine.draw_freehand(painter, ann)
             elif isinstance(ann, TextAnnotation):
-                AnnotationEngine._draw_text(painter, ann)
+                AnnotationEngine.draw_text(painter, ann)
             elif isinstance(ann, HighlightAnnotation):
                 AnnotationEngine._draw_highlight(painter, ann)
             elif isinstance(ann, EllipseAnnotation):
-                AnnotationEngine._draw_ellipse(painter, ann)
+                AnnotationEngine.draw_ellipse(painter, ann)
             elif isinstance(ann, FilledEllipseAnnotation):
-                AnnotationEngine._draw_filled_ellipse(painter, ann)
+                AnnotationEngine.draw_filled_ellipse(painter, ann)
 
     @staticmethod
     def _draw_rect(painter: QPainter, ann: RectAnnotation):
@@ -102,7 +102,7 @@ class AnnotationEngine:
         painter.drawPolygon(arrowhead)
 
     @staticmethod
-    def _draw_filled_rect(painter: QPainter, ann: FilledRectAnnotation):
+    def draw_filled_rect(painter: QPainter, ann: FilledRectAnnotation):
         color = QColor(ann.color)
         painter.setPen(QColor(0, 0, 0, 0))
         painter.setBrush(color)
@@ -110,7 +110,7 @@ class AnnotationEngine:
         painter.drawRect(rect)
 
     @staticmethod
-    def _draw_freehand(painter: QPainter, ann: FreehandAnnotation):
+    def draw_freehand(painter: QPainter, ann: FreehandAnnotation):
         if not ann.points:
             return
 
@@ -131,7 +131,7 @@ class AnnotationEngine:
         painter.drawPath(path)
 
     @staticmethod
-    def _draw_text(painter: QPainter, ann: TextAnnotation):
+    def draw_text(painter: QPainter, ann: TextAnnotation):
         color = QColor(ann.color)
         font = QFont(ann.fontFamily, ann.fontSize)
         font.setWeight(QFont.Weight.DemiBold)
@@ -157,7 +157,7 @@ class AnnotationEngine:
         painter.drawRect(rect)
 
     @staticmethod
-    def _draw_ellipse(painter: QPainter, ann: EllipseAnnotation):
+    def draw_ellipse(painter: QPainter, ann: EllipseAnnotation):
         color = QColor(ann.color)
         pen = QPen(color, ann.strokeWidth)
         painter.setPen(pen)
@@ -166,7 +166,7 @@ class AnnotationEngine:
         painter.drawEllipse(rect)
 
     @staticmethod
-    def _draw_filled_ellipse(painter: QPainter, ann: FilledEllipseAnnotation):
+    def draw_filled_ellipse(painter: QPainter, ann: FilledEllipseAnnotation):
         color = QColor(ann.color)
         painter.setPen(QColor(0, 0, 0, 0))
         painter.setBrush(color)

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def resource_path(relative_path: str, *, base_path: str | None = None) -> str:
     if base_path is None:
         if hasattr(sys, "_MEIPASS"):
-            base_path = sys._MEIPASS
+            base_path = sys._MEIPASS  # type: ignore[attr-defined]
         else:
             # First try relative to the project root (where it lives in the repo)
             # src/skill_manager/core/resources.py -> Project Root is 3 levels up from core
@@ -19,6 +19,7 @@ def resource_path(relative_path: str, *, base_path: str | None = None) -> str:
                 base_path = str(project_root)
             else:
                 base_path = os.path.abspath(".")
+    assert base_path is not None
     return os.path.join(base_path, relative_path)
 
 
@@ -36,6 +37,7 @@ def qml_components_dir(
         package_file = __file__
 
     if frozen:
+        assert meipass is not None  # frozen=True implies meipass was set
         base = Path(meipass)
         internal = base / "_internal"
         if internal.exists():
@@ -130,10 +132,12 @@ def force_clear_qml_disk_cache() -> bool:
         return False
 
 
-def logo_asset_for_client(fmt: str) -> str:
+def logo_asset_for_client(fmt: str | None) -> str:
     fmt_lower = str(fmt or "").lower()
     if "antigravity" in fmt_lower:
         return "clients/antigravity.svg"
+    if "opencode" in fmt_lower:
+        return "clients/opencode.svg"
     if "gemini" in fmt_lower:
         return "clients/gemini-cli.svg"
     if "codex" in fmt_lower:

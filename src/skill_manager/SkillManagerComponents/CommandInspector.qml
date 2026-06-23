@@ -103,13 +103,15 @@ Rectangle {
                         }
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Edit settings"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: editCmdToolTip
+                        text: "Edit settings"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Edit settings"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: editCmdToolTip.text
                 }
 
                 IconButton {
@@ -124,13 +126,15 @@ Rectangle {
                         root.closed()
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Delete command"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: delCmdToolTip
+                        text: "Delete command"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Delete command"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: delCmdToolTip.text
                 }
 
                 IconButton {
@@ -138,13 +142,15 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Close Inspector"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: closeCmdToolTip
+                        text: "Close Inspector"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Close Inspector"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: closeCmdToolTip.text
                 }
             }
 
@@ -223,9 +229,11 @@ Rectangle {
             onClicked: (mouse) => root.isCollapsed = false
             cursorShape: Qt.PointingHandCursor
 
-            ToolTip.text: "Expand Inspector"
-            ToolTip.visible: containsMouse
-            ToolTip.delay: 400
+            SleekToolTip {
+                id: expCmdToolTip
+                text: "Expand Inspector"
+                visible: parent.containsMouse
+            }
 
             Accessible.role: Accessible.Button
             Accessible.name: "Expand Inspector"

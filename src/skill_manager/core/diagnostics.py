@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_RING_BUFFER = 1000
 _MAX_ROTATION_FILES = 5
-_MAX_ROTATION_BYTES = 5 * 1024 * 1024  # 5 MB per file
+MAX_ROTATION_BYTES = 5 * 1024 * 1024  # 5 MB per file
 _LOG_FILENAME = "diagnostic.log"
 _BUNDLE_LOG_FILENAME = "diagnostic_bundle.json"
 
@@ -55,18 +55,27 @@ CATEGORY_UV_RUN_DETECTED = "uv_run_detected"
 CATEGORY_APP_UPDATE_CHECK = "app_update_check"
 CATEGORY_APP_UPDATE_AVAILABLE = "app_update_available"
 CATEGORY_APP_UPDATE_UP_TO_DATE = "app_update_up_to_date"
-CATEGORY_APP_UPDATE_APPLIED = "app_update_applied"
-CATEGORY_APP_UPDATE_FAILED = "app_update_failed"
 CATEGORY_APP_UPDATE_SKIPPED_DEV = "app_update_skipped_dev"
-CATEGORY_TUF_CLIENT_INIT = "tuf_client_init"
-CATEGORY_TUF_BUNDLE_VALIDATION = "tuf_bundle_validation"
+CATEGORY_APP_UPDATE_FAILED = "app_update_failed"
+CATEGORY_RELEASE_CHECK = "release_check"
+CATEGORY_UPDATE_CLICK = "update_click"
+CATEGORY_UPDATE_SLOT = "update_slot"
+CATEGORY_UPDATE_RESULT = "update_result"
+CATEGORY_COMMAND_CREATED = "command_created"
+CATEGORY_COMMAND_UPDATED = "command_updated"
+CATEGORY_SELECTION_REFRESHED = "selection_refreshed"
+CATEGORY_CONFIG_MIGRATION = "config_migration"
+CATEGORY_SOURCE_MISSING = "source_missing"
+CATEGORY_DISCOVERY_EMPTY_RESULT = "discovery_empty_result"
+CATEGORY_CACHE_PRESERVED = "cache_preserved"
+CATEGORY_WINDOW_STATE = "window_state"
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _log_dir() -> Path:
+def log_dir() -> Path:
     """Return XDG-compliant log directory.
 
     Windows: %LOCALAPPDATA%/SkillManager/logs/
@@ -85,7 +94,7 @@ def _current_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _platform_info() -> dict[str, str]:
+def platform_info() -> dict[str, str]:
     return {
         "platform": sys.platform,
         "os": platform.system(),
@@ -94,7 +103,7 @@ def _platform_info() -> dict[str, str]:
     }
 
 
-def _qt_version() -> str:
+def qt_version() -> str:
     try:
         from PySide6.QtCore import QLibraryInfo
 
@@ -103,7 +112,7 @@ def _qt_version() -> str:
         return "unknown"
 
 
-def _app_version() -> str:
+def app_version() -> str:
     try:
         import skill_manager
 
@@ -121,13 +130,17 @@ class DiagnosticLogger:
     """Thread-safe JSON-line diagnostic logger with ring buffer and rotation."""
 
     def __init__(self, log_dir: Path | None = None) -> None:
-        self._log_dir = log_dir or _log_dir()
-        self._log_file = self._log_dir / _LOG_FILENAME
+        # Call the module-level ``log_dir()`` helper explicitly via the
+        # module's globals to avoid the parameter name shadowing the
+        # function within this scope.
+        self.log_dir = log_dir or globals()["log_dir"]()
+        self.log_file = self.log_dir / _LOG_FILENAME
         self._lock = threading.Lock()
-        self._ring: deque[dict[str, Any]] = deque(maxlen=_MAX_RING_BUFFER)
+        self.ring: deque[dict[str, Any]] = deque(maxlen=_MAX_RING_BUFFER)
         self._initialized = False
-        self._log_level = "INFO"
-        self._context: dict[str, Any] = {}
+        self.log_level = "INFO"
+        self.context: dict[str, Any] = {}
+        self._enabled: bool = False
 
     def initialize(
         self,
@@ -135,37 +148,50 @@ class DiagnosticLogger:
         context: dict[str, Any] | None = None,
     ) -> None:
         """Initialize logger: create dirs, set level, populate context."""
-        self._log_level = log_level.upper()
-        self._context = {
-            "app_version": _app_version(),
-            "qt_version": _qt_version(),
+        self.log_level = log_level.upper()
+        self.context = {
+            "app_version": app_version(),
+            "qt_version": qt_version(),
             "platform": sys.platform,
             "python_version": platform.python_version(),
         }
         if context:
-            self._context.update(context)
+            self.context.update(context)
 
         try:
-            self._log_dir.mkdir(parents=True, exist_ok=True)
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+
             self._initialized = True
         except OSError as exc:
             logger.warning("Could not create diagnostic log directory: %s", exc)
             self._initialized = False
 
-    def _rotate_if_needed(self) -> None:
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable diagnostic logging at runtime.
+
+        When disabled, log_event() returns immediately — no ring buffer,
+        no file I/O, no JSON serialization.
+        """
+        self._enabled = bool(enabled)
+
+    def is_enabled(self) -> bool:
+        """Return True if diagnostic logging is currently enabled."""
+        return self._enabled
+
+    def rotate_if_needed(self) -> None:
         """Rotate log file if it exceeds max size."""
-        if not self._log_file.exists():
+        if not self.log_file.exists():
             return
         try:
-            if self._log_file.stat().st_size < _MAX_ROTATION_BYTES:
+            if self.log_file.stat().st_size < MAX_ROTATION_BYTES:
                 return
         except OSError:
             return
 
         # Rotate: diagnostic.log.1 -> diagnostic.log.2 -> ... -> delete oldest
         for i in range(_MAX_ROTATION_FILES - 1, 0, -1):
-            src = self._log_file.with_suffix(f".log.{i}")
-            dst = self._log_file.with_suffix(f".log.{i + 1}")
+            src = self.log_file.with_suffix(f".log.{i}")
+            dst = self.log_file.with_suffix(f".log.{i + 1}")
             if src.exists():
                 if i + 1 >= _MAX_ROTATION_FILES:
                     with contextlib.suppress(OSError):
@@ -174,8 +200,8 @@ class DiagnosticLogger:
                     with contextlib.suppress(OSError):
                         src.rename(dst)
         with contextlib.suppress(OSError):
-            rotated = self._log_file.with_suffix(".log.1")
-            self._log_file.rename(rotated)
+            rotated = self.log_file.with_suffix(".log.1")
+            self.log_file.rename(rotated)
 
     def log_event(
         self,
@@ -192,7 +218,10 @@ class DiagnosticLogger:
             msg: Human-readable message.
             data: Optional additional structured data.
         """
-        if level.upper() == "DEBUG" and self._log_level != "DEBUG":
+        if not self._enabled:
+            return
+
+        if level.upper() == "DEBUG" and self.log_level != "DEBUG":
             return
 
         event: dict[str, Any] = {
@@ -200,23 +229,23 @@ class DiagnosticLogger:
             "level": level.upper(),
             "category": category,
             "msg": msg,
-            "ctx": self._context.copy(),
+            "ctx": self.context.copy(),
         }
         if data:
             event["data"] = data
 
         # Ring buffer (always, even if not initialized)
         with self._lock:
-            self._ring.append(event)
+            self.ring.append(event)
 
         # File output
         if not self._initialized:
             return
 
         try:
-            self._rotate_if_needed()
+            self.rotate_if_needed()
             line = json.dumps(event, ensure_ascii=False, default=str) + "\n"
-            with self._lock, open(self._log_file, "a", encoding="utf-8") as f:
+            with self._lock, open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(line)
         except OSError as exc:
             # Fallback to stderr if file write fails
@@ -230,30 +259,81 @@ class DiagnosticLogger:
             "Application started",
             data={
                 "frozen": getattr(sys, "frozen", False),
-                "dev_mode": _is_dev_mode(),
-                "log_level": self._log_level,
+                "dev_mode": is_dev_mode(),
+                "log_level": self.log_level,
             },
         )
 
     def get_recent_events(self, count: int = 100) -> list[dict[str, Any]]:
         """Return the most recent diagnostic events from the ring buffer."""
         with self._lock:
-            items = list(self._ring)
+            items = list(self.ring)
         return items[-count:]
+
+    def get_diagnostic_counts(self) -> dict[str, int]:
+        """Return aggregate level counts from the ring buffer."""
+        counts = {"errors": 0, "warnings": 0, "info": 0, "debug": 0, "total": 0}
+        with self._lock:
+            for event in self.ring:
+                level = event.get("level", "")
+                if level == "ERROR":
+                    counts["errors"] += 1
+                elif level == "WARNING":
+                    counts["warnings"] += 1
+                elif level == "INFO":
+                    counts["info"] += 1
+                elif level == "DEBUG":
+                    counts["debug"] += 1
+                counts["total"] += 1
+        return counts
+
+    def get_health_status(self) -> str:
+        """Return health status: 'green', 'yellow', or 'red'."""
+        counts = self.get_diagnostic_counts()
+        if counts["errors"] > 0:
+            return "red"
+        if counts["warnings"] > 0:
+            return "yellow"
+        return "green"
+
+    def get_recent_events_human(self, count: int = 20) -> list[dict[str, str]]:
+        """Return the most recent events in a human-readable format.
+
+        Each entry has: time, level, category, message.
+        """
+        with self._lock:
+            items = list(self.ring)
+        rows: list[dict[str, str]] = []
+        for event in items[-count:]:
+            ts = event.get("ts", "")
+            # Strip timezone offset and truncate for display
+            try:
+                display_time = ts[11:19]  # HH:MM:SS
+            except (IndexError, TypeError):
+                display_time = ts
+            rows.append(
+                {
+                    "time": display_time,
+                    "level": event.get("level", ""),
+                    "category": event.get("category", ""),
+                    "message": event.get("msg", ""),
+                }
+            )
+        return rows
 
     def get_log_path(self) -> str:
         """Return the path to the current diagnostic log file."""
-        return str(self._log_file)
+        return str(self.log_file)
 
     def clear_logs(self) -> None:
         """Clear the ring buffer and delete log files."""
         with self._lock:
-            self._ring.clear()
+            self.ring.clear()
         try:
-            if self._log_file.exists():
-                self._log_file.unlink()
+            if self.log_file.exists():
+                self.log_file.unlink()
             for i in range(1, _MAX_ROTATION_FILES + 1):
-                f = self._log_file.with_suffix(f".log.{i}")
+                f = self.log_file.with_suffix(f".log.{i}")
                 if f.exists():
                     f.unlink()
         except OSError as exc:
@@ -274,7 +354,9 @@ class DiagnosticLogger:
             Path to the created zip file, or empty string on failure.
         """
         if output_dir is None:
-            output_dir = self._log_dir
+            output_dir = self.log_dir
+        if output_dir is None:
+            return ""
         output_path = Path(output_dir)
         try:
             output_path.mkdir(parents=True, exist_ok=True)
@@ -289,13 +371,13 @@ class DiagnosticLogger:
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 # Write manifest
                 manifest = {
-                    "app_version": _app_version(),
-                    "qt_version": _qt_version(),
+                    "app_version": app_version(),
+                    "qt_version": qt_version(),
                     "platform": sys.platform,
                     "os": platform.system(),
                     "os_version": platform.version(),
                     "python_version": platform.python_version(),
-                    "log_level": self._log_level,
+                    "log_level": self.log_level,
                     "recent_events": self.get_recent_events(50),
                     "exported_at": _current_iso(),
                 }
@@ -305,10 +387,10 @@ class DiagnosticLogger:
                 )
 
                 # Include log files
-                if self._log_file.exists():
-                    zf.write(self._log_file, _LOG_FILENAME)
+                if self.log_file.exists():
+                    zf.write(self.log_file, _LOG_FILENAME)
                 for i in range(1, _MAX_ROTATION_FILES + 1):
-                    f = self._log_file.with_suffix(f".log.{i}")
+                    f = self.log_file.with_suffix(f".log.{i}")
                     if f.exists():
                         zf.write(f, f.name)
 
@@ -341,7 +423,7 @@ def get_diagnostic_logger() -> DiagnosticLogger:
 # ---------------------------------------------------------------------------
 
 
-def _is_dev_mode() -> bool:
+def is_dev_mode() -> bool:
     """Detect if running via 'uv run' or in development mode.
 
     Checks:

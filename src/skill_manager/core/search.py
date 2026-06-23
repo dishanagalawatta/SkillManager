@@ -98,7 +98,7 @@ class SearchEngine:
         self._indexed_data = list(self._skills_map.values())
 
     def query(
-        self, query_text: str, threshold: float = 30.0, valid_paths: set = None
+        self, query_text: str, threshold: float = 30.0, valid_paths: set | None = None
     ) -> list[tuple[dict[str, Any], float]]:
         """
         Search for skills matching the query.
@@ -150,20 +150,25 @@ class SearchEngine:
 
             if all_doc_tokens:
                 max_token_match = 0
+
+                # Fast path: check all query tokens for exact substring matches first
                 for qt in query_tokens:
-                    # Exact substring match provides an immediate pass
                     if qt in index_data["full_text"]:
                         max_token_match = 100
                         break
 
-                    for dt in all_doc_tokens:
-                        score = fuzz.ratio(qt, dt)
-                        if score > max_token_match:
-                            max_token_match = score
+                # Slow path: only evaluate fuzzy matches if no fast-path match was found
+                if max_token_match == 0:
+                    unique_doc_tokens = dict.fromkeys(all_doc_tokens)
+                    for qt in query_tokens:
+                        for dt in unique_doc_tokens:
+                            score = fuzz.ratio(qt, dt)
+                            if score > max_token_match:
+                                max_token_match = score
+                            if max_token_match > 70:
+                                break
                         if max_token_match > 70:
                             break
-                    if max_token_match > 70:
-                        break
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:

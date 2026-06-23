@@ -9,11 +9,13 @@ Button {
     property bool isActive: false
     property string iconText: ""
 
+    signal activeChanged(bool active)
+
     padding: 0
 
     contentItem: Item {
         implicitHeight: 32
-        implicitWidth: contentRow.implicitWidth
+        implicitWidth: contentRow.implicitWidth + 16
 
         RowLayout {
             id: contentRow
@@ -44,7 +46,6 @@ Button {
     }
 
     background: Rectangle {
-        implicitWidth: 100
         implicitHeight: 32
         radius: Theme.radiusPill
         color: control.isActive ? Theme.glassActive : (control.hovered ? Theme.glassHover : Theme.glassPill)
@@ -55,7 +56,7 @@ Button {
         Behavior on border.color { ColorAnimation { duration: 200 } }
     }
 
-    onClicked: isActive = !isActive
+    onClicked: control.activeChanged(control.isActive)
 
     Accessible.role: Accessible.Button
     Accessible.name: control.text

@@ -3,8 +3,9 @@ import ctypes
 import logging
 from ctypes import wintypes
 
+pywinstyles = None
 with contextlib.suppress(ImportError):
-    import pywinstyles
+    import pywinstyles  # type: ignore[no-redef, used-before-def]
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ def apply_native_style(window, style_name: str) -> None:
         window: The tkinter window object (Tk or Toplevel).
         style_name: The name of the style to apply.
     """
+    if pywinstyles is None:
+        return
     try:
         # Update the window to ensure HWND is available
         window.update()
@@ -89,3 +92,24 @@ def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     ) = placement_data[4]
 
     return bool(ctypes.windll.user32.SetWindowPlacement(hwnd, ctypes.byref(placement)))
+
+
+def send_paste_to_focused_window() -> bool:
+    """Simulate Ctrl+V keystroke via Win32 keybd_event.
+
+    Returns True on success, False on failure (non-Windows or permission error).
+    """
+    try:
+        user32 = ctypes.windll.user32
+        VK_CONTROL = 0x11
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+        return True
+    except Exception:
+        logger.error("Failed to send paste keystroke", exc_info=True)
+        return False

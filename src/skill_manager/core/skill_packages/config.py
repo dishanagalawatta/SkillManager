@@ -34,11 +34,11 @@ def _fallback_package_name(source: dict[str, Any]) -> str:
     return "Unnamed Package"
 
 
-def _split_args(value: Any) -> list[str]:
+def split_args(value: Any) -> list[str]:
     return [part for part in str(value or "").split() if part]
 
 
-def _parse_npx_command(command: str) -> tuple[str, str]:
+def parse_npx_command(command: str) -> tuple[str, str]:
     command = command.strip()
     match = re.match(r"^npx\s+(?:--yes\s+)?(?:--\s+)?(?P<package>[^\s]+)(?P<args>.*)$", command)
     if not match:
@@ -48,8 +48,8 @@ def _parse_npx_command(command: str) -> tuple[str, str]:
     return package_name, args
 
 
-def _detect_command_type(command: str) -> str:
-    if _parse_npx_command(command)[0]:
+def detect_command_type(command: str) -> str:
+    if parse_npx_command(command)[0]:
         return "npx"
     return "custom"
 
@@ -58,7 +58,7 @@ def _apply_npx_defaults(source: dict[str, Any]):
     package_name = str(source.get("package_name") or "").strip()
 
     if package_name:
-        parts = _split_args(package_name)
+        parts = split_args(package_name)
         if parts and parts[0] == "npx":
             parts.pop(0)
             if parts and parts[0] == "--yes":
@@ -76,7 +76,7 @@ def _apply_npx_defaults(source: dict[str, Any]):
 
     update_command = str(source.get("update_command") or "").strip()
     if not package_name and update_command:
-        parsed_package, parsed_args = _parse_npx_command(update_command)
+        parsed_package, parsed_args = parse_npx_command(update_command)
         package_name = parsed_package
         source["package_name"] = package_name
         source.setdefault("package_args", parsed_args)
@@ -103,7 +103,7 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
         if package_name:
             source_type = "npx"
         elif update_command:
-            source_type = _detect_command_type(update_command)
+            source_type = detect_command_type(update_command)
         source["source_type"] = source_type
 
     if source_type == "npx":
@@ -173,7 +173,7 @@ def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
         "storage_mode",
     ):
         if data and hasattr(data, "get") and data.get(key):
-            source[key] = data.get(key)
+            source[key] = data.get(key)  # type: ignore[index]
 
     if not source["name"]:
         source["name"] = _fallback_package_name(source)

@@ -1,132 +1,75 @@
 # SkillManager
 
-<p align="center">
-  <img src="assets/brand/logo.png" width="128" height="128" alt="SkillManager Logo">
-  <br>
-  <b>A professional workspace to manage, sync, and deploy your AI agent skills.</b>
-</p>
+> A professional workspace to manage, sync, and deploy AI agent skills
+> across multiple project repositories. Windows desktop · PySide6 /
+> QML · Python 3.12+.
 
-<p align="center">
-  <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-</p>
+## Features
 
----
+- **Quick Copy** — browse project skills, copy formatted references.
+- **Surgical Sync** — update only outdated skills across repos.
+- **App Update** — background version checks via GitHub Releases API.
+- **Screenshot & Redact** — capture screenshots with PII redaction.
+- **Central Library** — single, searchable hub for skill metadata.
+- **Liquid Glass UI** — hardware-accelerated, native Windows 11 shell.
 
-## Overview & Demo
-
-<video src="https://github.com/user-attachments/assets/29541600-3647-474d-8a3e-98160cdd37ff" controls="controls" muted="muted" style="max-height:640px;"></video>
-*Watch the 3-minute overview of SkillManager directly inline.*
-
----
-
-## Key Features
-
-SkillManager is designed for developers who need to manage growing libraries of AI skills across dozens of project repositories.
-
-- **Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard.
-- **Surgical Sync**: Intelligent synchronization that updates outdated skills across multiple repositories without full rescans.
-- **Secure Auto-Update**: Background application updates powered by TUF (The Update Framework) for robust and secure delivery.
-- **Screenshot & Redaction**: Capture screenshots with PII redaction capabilities for AI context.
-- **Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
-- **Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
-- **Zero-Config Entry**: Professional installer for Windows.
-
----
-
-## Quick Start (Developers)
+## Quick Start
 
 ```bash
-# 1. Install dependencies
 uv sync
-
-# 2. Run the app
 uv run skill-manager
-
-# 3. Run the full test suite
 python run_tests.py
 ```
 
-The full local-dev loop, debugging recipes, and PySide6/QML cache
-invalidation steps live in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+## End-User Install
 
----
+**winget** (recommended — no SmartScreen warning):
 
-## Visual Showcase
+```powershell
+winget install --id dishanagalawatta.SkillManager -e
+```
 
-### The Central Library
+**Direct download**: grab `SkillManager_Setup.exe` from
+[Releases](https://github.com/dishanagalawatta/SkillManager/releases).
+Click **More info → Run anyway** if SmartScreen appears.
+No Python required.
 
-Manage thousands of skills with ease. Filter by category, search instantly, and preview content in a high-fidelity editor.
-![Library View](assets/readme/SkillManager_Library.png)
-
-### Quick Copy Integration
-
-The ultimate developer companion. Keep your most-used skills just a click away while working in your IDE.
-![Quick Copy](assets/readme/SkillManager_QuickCopy.png)
-
-### Premium Design
-
-Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design system provide a focused, distraction-free environment.
-![UI Mockup](assets/readme/SkillManager_UI_mockup.jpeg)
-
----
-
-## Getting Started
-
-### For End Users
-
-You don't need Python or any developer tools to use SkillManager.
-
-1. Visit the **[Releases](https://github.com/dishanagalawatta/SkillManager/releases)** page.
-2. Download the installer for Windows:
-   - **Windows**: `SkillManager_Setup.exe`
-3. Install and launch!
-
-### For Developers
-
-If you want to contribute or build from source, see the
-**[Development Guide](docs/DEVELOPMENT.md)**, then the
-**[Contributing Guide](docs/CONTRIBUTING.md)** for PR conventions and
-release tagging.
-
----
+See [docs/INSTALL.md](docs/INSTALL.md) for full details.
 
 ## Documentation
 
 | Audience | Document | Purpose |
 |----------|----------|---------|
-| User | [User Guide](docs/USER_GUIDE.md) | End-user manual |
-| Engineer | [Architecture](docs/ARCHITECTURE.md) | Module map, lifecycle, data flow |
-| Engineer | [API Reference](docs/API.md) | `AppController` Q_PROPERTY / Slot / Signal surface |
-| Engineer | [Environment](docs/ENVIRONMENT.md) | Every environment variable |
-| Engineer | [Development](docs/DEVELOPMENT.md) | Local-dev loop, debugging |
-| Engineer | [Categories](docs/CATEGORIES.md) | Skill taxonomy and parser rules |
-| Engineer | [Versioning](docs/VERSIONING.md) | Release trigger rules |
-| Engineer | [Releasing](docs/RELEASING.md) | Release lifecycle guide |
-| Contributor | [Contributing](docs/CONTRIBUTING.md) | PR + commit + review rules |
-| Decision | [ADR Index](ADR_INDEX.md) | All architecture decisions |
-| Agent | [AGENTS.md](AGENTS.md) | Agent-facing instructions (concise) |
-| Designer | [Design](DESIGN.md) | "Solid Matte & Liquid Glass" system |
-| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle |
-
----
+| Everyone | [README.md](README.md) | This file. |
+| User | [docs/INSTALL.md](docs/INSTALL.md) | Installation guide (winget, direct download). |
+| User | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | End-user manual. |
+| Engineer | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map, lifecycle. |
+| Engineer | [docs/API.md](docs/API.md) | `AppController` surface. |
+| Engineer | [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) | Every env var. |
+| Engineer | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local-dev loop. |
+| Engineer | [docs/CATEGORIES.md](docs/CATEGORIES.md) | Skill taxonomy. |
+| Engineer | [docs/VERSIONING.md](docs/VERSIONING.md) | Release triggers. |
+| Engineer | [docs/RELEASING.md](docs/RELEASING.md) | Release lifecycle. |
+| Engineer | [docs/CI_CD.md](docs/CI_CD.md) | Pipelines. |
+| Contributor | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | PR + commit rules. |
+| Ops | [docs/HOUSEKEEPING.md](docs/HOUSEKEEPING.md) | Workspace cleanup rules. |
+| Decision | [ADR_INDEX.md](ADR_INDEX.md) | Architecture decisions (ADR-0001–0016). |
+| Agent | [AGENTS.md](AGENTS.md) | Agent instructions. |
+| Designer | [DESIGN.md](DESIGN.md) | Design system. |
+| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle (local-only). |
 
 ## Quality Gates
 
-| Gate | Command | Source |
-|------|---------|--------|
-| Lint | `uv run ruff check .` | ruff config in `pyproject.toml` |
-| Format | `uv run ruff format .` | ruff config in `pyproject.toml` |
-| Test | `uv run pytest` | `pyproject.toml` `[tool.pytest.ini_options]` |
-| Full Suite | `python run_tests.py` | Sequential + parallel + lint |
-| QML Diagnostic | `uv run pytest tests/test_qml_comprehensive_diagnostic.py` | `tests/test_qml_comprehensive_diagnostic.py` |
+| Gate | Command |
+|------|---------|
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Test | `uv run pytest` |
+| Full Suite | `python run_tests.py` |
+| QML Diagnostic | `uv run pytest tests/test_qml_comprehensive_diagnostic.py` |
 
-CI runs all of the above. A PR is mergeable only when all five pass.
-
----
+A PR is mergeable only when all five pass.
 
 ## License
 
-[**MIT License**](LICENSE)
-
-Copyright (c) 2026 Don Dishan Kanchuka Agalawatta
+[MIT](LICENSE) — Copyright (c) 2026 Don Dishan Kanchuka Agalawatta.

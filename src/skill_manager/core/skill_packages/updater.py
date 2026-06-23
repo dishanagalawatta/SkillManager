@@ -11,16 +11,16 @@ from typing import Any
 from git import Repo, cmd
 
 from .config import normalize_skill_package_config
-from .process import _emit, run_process
+from .process import emit, run_process
 from .relocator import relocate_packages, relocate_packages_from_output
 from .versioning import check_skill_package_versions
 
 
-def _remove_package_folder(path: Path) -> None:
+def remove_package_folder(path: Path) -> None:
     shutil.rmtree(path)
 
 
-def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
+def run_git_package_update(source: dict[str, Any], output_callback: Callable[[str], None] | None):
     repository_url = source.get("repository_url")
     package_path = source.get("resolved_package_path") or source.get("package_path")
     clone_path = source.get("clone_path")
@@ -50,41 +50,46 @@ def _run_git_package_update(source: dict[str, Any], output_callback: Callable[[s
         )
 
     if (path / ".git").is_dir():
-        _emit(output_callback, f"Pulling {repository_url} in {path}...")
+        emit(output_callback, f"Pulling {repository_url} in {path}...")
         try:
             repo = Repo(path)
             # We use git.cmd.Git for more control over the pull command with config arguments
             g = repo.git
             # Execute pull with config args
-            output = g.execute(["git"] + config_args + ["pull", "--ff-only"])
+            output = g.execute(["git"] + config_args + ["pull", "--ff-only"])  # type: ignore[arg-type]
             if output:
-                _emit(output_callback, output)
-            _emit(output_callback, f"Successfully pulled '{repository_url}'.")
+                # ``Git.execute`` returns ``Tuple[int, bytes, str]`` (subprocess
+                # result) when called via subprocess; the git Python API exposes
+                # only the bytes body. Cast through ``str`` for parsing.
+                output_str = output.decode() if isinstance(output, bytes) else str(output)
+                emit(output_callback, output_str)  # type: ignore[arg-type]
+            emit(output_callback, f"Successfully pulled '{repository_url}'.")
         except Exception as e:
-            _emit(output_callback, f"Git pull failed: {e}")
+            emit(output_callback, f"Git pull failed: {e}")
             raise
     elif path.exists() and any(path.iterdir()):
         raise ValueError(f"Clone path exists but is not an empty git checkout: {path}")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
-        _emit(output_callback, f"Cloning {repository_url} into {path}...")
+        emit(output_callback, f"Cloning {repository_url} into {path}...")
         try:
             # Repo.clone_from doesn't easily support arbitrary git -c arguments
             # so we use git.cmd.Git directly
             g = cmd.Git()
-            output = g.execute(["git"] + config_args + ["clone", "--", repository_url, str(path)])
+            output = g.execute(["git"] + config_args + ["clone", "--", repository_url, str(path)])  # type: ignore[arg-type]
             if output:
-                _emit(output_callback, output)
-            _emit(output_callback, f"Successfully cloned '{repository_url}'.")
+                output_str = output.decode() if isinstance(output, bytes) else str(output)
+                emit(output_callback, output_str)  # type: ignore[arg-type]
+            emit(output_callback, f"Successfully cloned '{repository_url}'.")
         except Exception as e:
-            _emit(output_callback, f"Git clone failed: {e}")
+            emit(output_callback, f"Git clone failed: {e}")
             raise
 
     if clone_path != package_path:
-        _emit(output_callback, f"Installed to {path}")
+        emit(output_callback, f"Installed to {path}")
 
 
-def _run_npx_update(
+def run_npx_update(
     source: dict[str, Any],
     output_callback: Callable[[str], None] | None,
     cwd: str | os.PathLike | None = None,
@@ -95,13 +100,13 @@ def _run_npx_update(
 
     command = ["npx", "--yes", "--", package_name]
     if source.get("package_args"):
-        from .config import _split_args
+        from .config import split_args
 
-        command.extend(_split_args(source["package_args"]))
+        command.extend(split_args(source["package_args"]))
     run_process(command, output_callback, cwd=cwd)
 
 
-def _intercept_cross_platform_command(
+def intercept_cross_platform_command(
     command: str, output_callback: Callable[[str], None] | None
 ) -> bool:
     command = str(command or "").strip()
@@ -133,7 +138,7 @@ def _intercept_cross_platform_command(
 
     if not Path(expanded_path).is_dir():
         msg = f"Verification failed: Directory not found: {expanded_path}"
-        _emit(output_callback, msg)
+        emit(output_callback, msg)
         raise RuntimeError(msg)
 
     if len(parts) > 1:
@@ -150,17 +155,17 @@ def _intercept_cross_platform_command(
                         msg.startswith("'") and msg.endswith("'")
                     ):
                         msg = msg[1:-1]
-            _emit(output_callback, msg)
+            emit(output_callback, msg)
 
     return True
 
 
-def _run_shell_command(
+def run_shell_command(
     command: str,
     output_callback: Callable[[str], None] | None,
     cwd: str | os.PathLike | None = None,
 ):
-    if _intercept_cross_platform_command(command, output_callback):
+    if intercept_cross_platform_command(command, output_callback):
         return
     run_process(command, output_callback, shell=True, cwd=cwd)
 
@@ -192,15 +197,15 @@ def run_skill_package_update(
     with staging_context as staging_dir:
         staging_path = staging_dir
         if source.get("source_type") == "npx":
-            _run_npx_update(source, intercept_callback, cwd=staging_path)
+            run_npx_update(source, intercept_callback, cwd=staging_path)
         elif source.get("update_command"):
-            _run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
+            run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
         else:
-            _run_git_package_update(source, intercept_callback)
+            run_git_package_update(source, intercept_callback)
 
         if package_path:
             if uses_staging:
-                _emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
+                emit(output_callback, f"[DEBUG] Relocating skills from output to: {package_path}")
                 new_managed = relocate_packages_from_output(
                     captured_output,
                     package_path,
@@ -209,7 +214,7 @@ def run_skill_package_update(
                     package_name_prefix=source.get("name", ""),
                 )
             else:
-                _emit(output_callback, f"[DEBUG] Relocating skills from source to: {package_path}")
+                emit(output_callback, f"[DEBUG] Relocating skills from source to: {package_path}")
                 clone_path = source.get("clone_path") or package_path
                 source_path = Path(os.path.expanduser(clone_path))
 
@@ -225,7 +230,7 @@ def run_skill_package_update(
                 outdated = set(old_managed) - set(new_managed)
                 removed = []
                 if outdated:
-                    _emit(
+                    emit(
                         output_callback,
                         f"[DEBUG] Cleaning up {len(outdated)} outdated skill folders...",
                     )
@@ -233,15 +238,15 @@ def run_skill_package_update(
                     for folder_name in sorted(outdated):
                         folder_path = dest_base / folder_name
                         if folder_path.is_dir():
-                            _emit(
+                            emit(
                                 output_callback,
                                 f"[DEBUG] Deleting outdated skill folder: {folder_name}",
                             )
                             try:
-                                _remove_package_folder(folder_path)
+                                remove_package_folder(folder_path)
                                 removed.append(folder_name)
                             except Exception as e:
-                                _emit(
+                                emit(
                                     output_callback, f"[ERROR] Failed to delete {folder_name}: {e}"
                                 )
 
@@ -249,8 +254,8 @@ def run_skill_package_update(
                 source["removed_folders"] = removed
 
     if source.get("verify_command"):
-        _emit(output_callback, f"Verifying {source['name']}...")
-        _run_shell_command(source["verify_command"], output_callback)
+        emit(output_callback, f"Verifying {source['name']}...")
+        run_shell_command(source["verify_command"], output_callback)
 
     updated_source_info = check_skill_package_versions(source, force_refresh=True)
     source.update(updated_source_info)

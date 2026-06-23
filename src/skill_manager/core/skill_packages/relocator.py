@@ -5,10 +5,10 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from .process import _emit
+from .process import emit
 
 
-def _relocate_path_internal(
+def relocate_path_internal(
     src_path: Path, dest_base: Path, output_callback: Callable[[str], None] | None
 ) -> bool:
     """Internal helper to move a single directory to dest_base."""
@@ -18,21 +18,21 @@ def _relocate_path_internal(
             if dest_path.resolve() == src_path.resolve():
                 return False
             if dest_path.is_dir():
-                _emit(output_callback, f"Cleaning up existing folder at {dest_path}...")
+                emit(output_callback, f"Cleaning up existing folder at {dest_path}...")
                 shutil.rmtree(dest_path)
             else:
                 dest_path.unlink()
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        _emit(output_callback, f"Relocating {src_path.name} -> {dest_path}...")
+        emit(output_callback, f"Relocating {src_path.name} -> {dest_path}...")
         shutil.copytree(str(src_path), str(dest_path), dirs_exist_ok=True)
         return True
     except Exception as e:
-        _emit(output_callback, f"Relocation failed for {src_path}: {e}")
+        emit(output_callback, f"Relocation failed for {src_path}: {e}")
         return False
 
 
-def _is_safe_relative_to(path: Path, base_path: Path) -> bool:
+def is_safe_relative_to(path: Path, base_path: Path) -> bool:
     try:
         path.resolve().relative_to(base_path.resolve())
         return True
@@ -40,7 +40,7 @@ def _is_safe_relative_to(path: Path, base_path: Path) -> bool:
         return False
 
 
-def _merge_and_move_lockfile(
+def merge_and_move_lockfile(
     source_lock: Path, target_lock: Path, output_callback: Callable[[str], None] | None
 ):
     """Moves and carefully merges a skill lockfile."""
@@ -50,11 +50,11 @@ def _merge_and_move_lockfile(
     try:
         if not target_lock.exists():
             target_lock.parent.mkdir(parents=True, exist_ok=True)
-            _emit(output_callback, f"Moving lockfile -> {target_lock}...")
+            emit(output_callback, f"Moving lockfile -> {target_lock}...")
             shutil.copy2(str(source_lock), str(target_lock))
             return
 
-        _emit(output_callback, f"Merging lockfile -> {target_lock}...")
+        emit(output_callback, f"Merging lockfile -> {target_lock}...")
         try:
             with open(target_lock, encoding="utf-8-sig") as f:
                 target_data = json.load(f)
@@ -79,7 +79,7 @@ def _merge_and_move_lockfile(
             json.dump(target_data, f, indent=2)
 
     except Exception as e:
-        _emit(output_callback, f"Failed to merge lockfile: {e}")
+        emit(output_callback, f"Failed to merge lockfile: {e}")
 
 
 def relocate_packages(
@@ -90,19 +90,19 @@ def relocate_packages(
 ) -> list[str] | None:
     """Extracts valid skill folders from source_path and moves them to target_package_path."""
     if not target_package_path:
-        _emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
+        emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
         return None
 
     dest_base = Path(os.path.expanduser(target_package_path))
     source_dir = Path(os.path.expanduser(str(source_path))).resolve()
 
     if not source_dir.is_dir():
-        _emit(output_callback, f"[ERROR] Relocation source is not a directory: {source_dir}")
+        emit(output_callback, f"[ERROR] Relocation source is not a directory: {source_dir}")
         return None
 
     skills_dir = source_dir / "skills"
     if not skills_dir.is_dir():
-        _emit(
+        emit(
             output_callback,
             f"[WARNING] No 'skills' folder found in {source_dir}. Skipping relocation.",
         )
@@ -111,23 +111,23 @@ def relocate_packages(
     managed_folder_names = set()
     relocated_count = 0
 
-    _emit(output_callback, f"Processing container: {skills_dir.name}")
+    emit(output_callback, f"Processing container: {skills_dir.name}")
     try:
         for child in skills_dir.iterdir():
             if child.is_dir() and not child.name.startswith("."):
                 # Validate that it is a proper skill folder
                 if not (child / "SKILL.md").is_file() and not (child / "config.json").is_file():
-                    _emit(output_callback, f"[WARNING] Skipping '{child.name}': No SKILL.md found.")
+                    emit(output_callback, f"[WARNING] Skipping '{child.name}': No SKILL.md found.")
                     continue
 
                 managed_folder_names.add(child.name)
-                if _relocate_path_internal(child, dest_base, output_callback):
+                if relocate_path_internal(child, dest_base, output_callback):
                     relocated_count += 1
     except Exception as e:
-        _emit(output_callback, f"Failed to iterate container {skills_dir}: {e}")
+        emit(output_callback, f"Failed to iterate container {skills_dir}: {e}")
 
     if relocated_count > 0:
-        _emit(output_callback, f"Successfully relocated {relocated_count} folders.")
+        emit(output_callback, f"Successfully relocated {relocated_count} folders.")
 
     target_root = dest_base.parent
     if target_root.resolve() == Path.cwd().resolve():
@@ -153,12 +153,12 @@ def relocate_packages(
             tgt_lock = target_root / target_lock_name
             if src_lock.resolve() != tgt_lock.resolve():
                 if lock_name.endswith(".json"):
-                    _merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
+                    merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
                 else:
                     try:
                         if not tgt_lock.exists():
                             tgt_lock.parent.mkdir(parents=True, exist_ok=True)
-                            _emit(output_callback, f"Moving manifest -> {tgt_lock}...")
+                            emit(output_callback, f"Moving manifest -> {tgt_lock}...")
                             shutil.copy2(str(src_lock), str(tgt_lock))
                     except OSError:
                         pass
@@ -174,7 +174,7 @@ def relocate_packages_from_output(
     package_name_prefix: str = "",
 ) -> list[str] | None:
     if not target_package_path:
-        _emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
+        emit(output_callback, "[DEBUG] Relocation skipped: No target package_path configured.")
         return None
 
     dest_base = Path(os.path.expanduser(target_package_path))
@@ -186,7 +186,7 @@ def relocate_packages_from_output(
     path_regex = re.compile(r"((?:/|[a-zA-Z]:\\|\~)[^\s│]+)")
     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-    _emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for package paths...")
+    emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for package paths...")
     detected_paths = set()
     for line in captured_output:
         clean_line = ansi_escape.sub("", line)
@@ -200,14 +200,14 @@ def relocate_packages_from_output(
                     candidate = resolve_base / candidate
                 expanded = candidate.resolve()
                 if expanded.is_dir():
-                    if base_path and not _is_safe_relative_to(expanded, resolve_base):
-                        _emit(
+                    if base_path and not is_safe_relative_to(expanded, resolve_base):
+                        emit(
                             output_callback,
                             f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
                         )
                         continue
                     detected_paths.add(expanded)
-                    _emit(output_callback, f"[DEBUG] Detected path: {expanded}")
+                    emit(output_callback, f"[DEBUG] Detected path: {expanded}")
                     match_found = True
             except Exception:
                 continue
@@ -219,19 +219,19 @@ def relocate_packages_from_output(
                 try:
                     expanded = Path(os.path.expanduser(raw_path)).resolve()
                     if expanded.is_dir():
-                        if base_path and not _is_safe_relative_to(expanded, resolve_base):
-                            _emit(
+                        if base_path and not is_safe_relative_to(expanded, resolve_base):
+                            emit(
                                 output_callback,
                                 f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
                             )
                             continue
                         detected_paths.add(expanded)
-                        _emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
+                        emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
                 except Exception:
                     continue
 
     if not detected_paths:
-        _emit(output_callback, "[DEBUG] No package paths detected in output.")
+        emit(output_callback, "[DEBUG] No package paths detected in output.")
         return None
 
     managed_folder_names = set()
@@ -247,7 +247,7 @@ def relocate_packages_from_output(
             continue
 
         if src_path.name.lower() in ("skills", "agents", ".agents"):
-            _emit(output_callback, f"Processing container: {src_path.name}")
+            emit(output_callback, f"Processing container: {src_path.name}")
             try:
                 for child in src_path.iterdir():
                     if child.is_dir() and not child.name.startswith("."):
@@ -270,37 +270,37 @@ def relocate_packages_from_output(
                                             not (inner_child / "SKILL.md").is_file()
                                             and not (inner_child / "config.json").is_file()
                                         ):
-                                            _emit(
+                                            emit(
                                                 output_callback,
                                                 f"[WARNING] Skipping '{inner_child.name}': No SKILL.md found.",
                                             )
                                             continue
                                         managed_folder_names.add(inner_child.name)
-                                        if _relocate_path_internal(
+                                        if relocate_path_internal(
                                             inner_child, dest_base, output_callback
                                         ):
                                             relocated_count += 1
                             else:
-                                _emit(
+                                emit(
                                     output_callback,
                                     f"[WARNING] Skipping '{child.name}': No SKILL.md found.",
                                 )
                             continue
                         managed_folder_names.add(child.name)
-                        if _relocate_path_internal(child, dest_base, output_callback):
+                        if relocate_path_internal(child, dest_base, output_callback):
                             relocated_count += 1
             except Exception as e:
-                _emit(output_callback, f"Failed to iterate container {src_path}: {e}")
+                emit(output_callback, f"Failed to iterate container {src_path}: {e}")
         else:
             if not (src_path / "SKILL.md").is_file() and not (src_path / "config.json").is_file():
-                _emit(output_callback, f"[WARNING] Skipping '{src_path.name}': No SKILL.md found.")
+                emit(output_callback, f"[WARNING] Skipping '{src_path.name}': No SKILL.md found.")
             else:
                 managed_folder_names.add(src_path.name)
-                if _relocate_path_internal(src_path, dest_base, output_callback):
+                if relocate_path_internal(src_path, dest_base, output_callback):
                     relocated_count += 1
 
     if relocated_count > 0:
-        _emit(output_callback, f"Successfully relocated {relocated_count} folders.")
+        emit(output_callback, f"Successfully relocated {relocated_count} folders.")
 
     unique_source_roots = {p.parent.parent for p in detected_paths}
     target_root = dest_base.parent
@@ -327,12 +327,12 @@ def relocate_packages_from_output(
                 tgt_lock = target_root / target_lock_name
                 if src_lock.resolve() != tgt_lock.resolve():
                     if lock_name.endswith(".json"):
-                        _merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
+                        merge_and_move_lockfile(src_lock, tgt_lock, output_callback)
                     else:
                         try:
                             if not tgt_lock.exists():
                                 tgt_lock.parent.mkdir(parents=True, exist_ok=True)
-                                _emit(output_callback, f"Moving manifest -> {tgt_lock}...")
+                                emit(output_callback, f"Moving manifest -> {tgt_lock}...")
                                 shutil.copy2(str(src_lock), str(tgt_lock))
                         except OSError:
                             pass

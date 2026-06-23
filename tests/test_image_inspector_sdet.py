@@ -54,28 +54,28 @@ class TestAnnotationEngine:
         pixmap = QPixmap(100, 100)
         painter = QPainter(pixmap)
         ann = EllipseAnnotation(x=10, y=10, width=30, height=20)
-        AnnotationEngine._draw_ellipse(painter, ann)
+        AnnotationEngine.draw_ellipse(painter, ann)
         painter.end()
 
     def test_draw_filled_ellipse(self):
         pixmap = QPixmap(100, 100)
         painter = QPainter(pixmap)
         ann = FilledEllipseAnnotation(x=10, y=10, width=30, height=20)
-        AnnotationEngine._draw_filled_ellipse(painter, ann)
+        AnnotationEngine.draw_filled_ellipse(painter, ann)
         painter.end()
 
     def test_draw_text_with_font_family(self):
         pixmap = QPixmap(100, 100)
         painter = QPainter(pixmap)
         ann = TextAnnotation(x=10, y=10, text="Test", fontFamily="Arial")
-        AnnotationEngine._draw_text(painter, ann)
+        AnnotationEngine.draw_text(painter, ann)
         painter.end()
 
     def test_draw_filled_rect(self):
         pixmap = QPixmap(100, 100)
         painter = QPainter(pixmap)
         ann = FilledRectAnnotation(x=10, y=10, width=30, height=20)
-        AnnotationEngine._draw_filled_rect(painter, ann)
+        AnnotationEngine.draw_filled_rect(painter, ann)
         painter.end()
 
     def test_freehand_empty_points(self):
@@ -86,7 +86,7 @@ class TestAnnotationEngine:
         mock_ann = MagicMock(spec=FreehandAnnotation)
         mock_ann.points = []
 
-        AnnotationEngine._draw_freehand(painter, mock_ann)
+        AnnotationEngine.draw_freehand(painter, mock_ann)
         painter.end()
 
 

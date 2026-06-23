@@ -96,10 +96,10 @@ class FilterEngine:
             sub_cat = self.get_sub_category(skill)
             section = f"{main_cat}|{sub_cat}"
 
-            skill._main_category_name = main_cat
-            skill._sub_category_name = sub_cat
-            skill._section_name = section
-            skill._is_first_in_subcategory = section != previous_section
+            skill.main_category_name = main_cat
+            skill.sub_category_name = sub_cat
+            skill.section_name = section
+            skill.is_first_in_subcategory = section != previous_section
             previous_section = section
         return skills
 
@@ -112,8 +112,8 @@ class FilterEngine:
         seen_section = set()
 
         for skill in skills:
-            main_cat = skill._main_category_name or self.get_main_category(skill)
-            section = skill._section_name or self.get_section(skill)
+            main_cat = skill.main_category_name or self.get_main_category(skill)
+            section = skill.section_name or self.get_section(skill)
 
             if main_cat in collapsed_categories:
                 if main_cat not in seen_main:

@@ -72,11 +72,11 @@ def test_categorize_skill_metadata_exact_match():
 
 
 def test_get_category_patterns_caching():
-    from skill_manager.core.parsing.categorizer import _get_category_patterns
+    from skill_manager.core.parsing.categorizer import get_category_patterns
 
-    patterns = _get_category_patterns()
+    patterns = get_category_patterns()
     assert "Testing" in patterns or "Web Development" in patterns
-    patterns2 = _get_category_patterns()
+    patterns2 = get_category_patterns()
     assert patterns2 is patterns
 
 

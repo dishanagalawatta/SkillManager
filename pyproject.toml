@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.5.0"
+version = "1.8.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
@@ -22,7 +22,7 @@ dependencies = [
     "platformdirs",
     "posthog>=7.14.2",
     "pydantic>=2",
-    "pydantic-settings",
+    "pydantic-settings>=2.14.2",
     "python-frontmatter",
     "python-dotenv>=1.2.2",
     "rapidfuzz",
@@ -33,10 +33,10 @@ dependencies = [
     "orjson",
     "diskcache",
     "sentry-sdk",
-    "tufup>=0.10.0",
     "gitpython>=3.1.50",
     "apscheduler>=3.11.2",
     "pynput>=1.8.2",
+    "msgpack>=1.2.1",
 ]
 
 
@@ -74,7 +74,7 @@ where = ["src"]
 include = ["skill_manager*"]
 
 [tool.setuptools.package-data]
-skill_manager = ["assets/tuf/*", "assets/brand/*", "assets/ui/*", "assets/clients/*"]
+skill_manager = ["assets/brand/*", "assets/ui/*", "assets/clients/*"]
 
 
 [tool.coverage.run]
@@ -107,6 +107,7 @@ dev = [
     "pytest-xdist",
     "pytest-sugar",
     "pip-audit",
+    "python-semantic-release>=10.5.3",
 ]
 
 
@@ -114,3 +115,22 @@ dev = [
 filterwarnings = [
     "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
 ]
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/skill_manager/__init__.py:__version__"]
+branch = "main"
+upload_to_pypi = false
+build_command = ""
+changelog_file = "CHANGELOG.md"
+
+commit_parser = "src/skill_manager/commit_parser_optin.py:OptInCommitParser"
+
+changelog.exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''Initial [Cc]ommit.*''',
+]
+
+tag_format = "v{version}"

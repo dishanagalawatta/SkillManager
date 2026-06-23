@@ -24,7 +24,7 @@ def _disable_qml_disk_cache():
     os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 
-def _is_dev_mode() -> bool:
+def is_dev_mode() -> bool:
     """Detect if running via 'uv run' or in development mode.
 
     Checks:
@@ -57,7 +57,7 @@ from skill_manager.core.resources import force_clear_qml_disk_cache  # noqa: E40
 
 
 def setup_logging():
-    log_level = logging.DEBUG if _is_dev_mode() else logging.INFO
+    log_level = logging.DEBUG if is_dev_mode() else logging.INFO
     log_file = DATA_DIR / "skill_manager.log"
     logging.basicConfig(
         level=log_level,
@@ -65,20 +65,28 @@ def setup_logging():
         handlers=[logging.StreamHandler(), logging.FileHandler(log_file, encoding="utf-8")],
     )
 
+    for noisy in ("markdown_it", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 def main():
     # Force-clear QML cache in dev mode (uv run / editable install)
-    if _is_dev_mode():
+    if is_dev_mode():
         force_clear_qml_disk_cache()
 
     setup_logging()
 
     # Initialize diagnostic logger
+    from skill_manager.core.config import ConfigManager
     from skill_manager.core.diagnostics import get_diagnostic_logger
 
     diag = get_diagnostic_logger()
-    log_level = "DEBUG" if _is_dev_mode() else "INFO"
+    log_level = "DEBUG" if is_dev_mode() else "INFO"
     diag.initialize(log_level=log_level)
+
+    # Enable only if the user has opted in via Settings > General
+    _cfg = ConfigManager()
+    diag.set_enabled(_cfg.get("diagnostic_logging", False))
     diag.log_startup()
 
     app_main()

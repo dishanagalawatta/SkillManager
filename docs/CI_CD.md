@@ -2,14 +2,14 @@
 
 ## Overview
 
-SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, and release-please for automated releases.
+SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, and python-semantic-release with opt-in tokens for automated releases.
 
 ## Workflows
 
 ```
 .github/workflows/
 ├── ci.yml                    # PR + main/develop push gate
-├── release.yml               # release-please PR-driven releases
+├── release.yml               # semantic-release + build + attach assets
 ├── _lint.yml                 # Ruff check + format (reusable)
 ├── _test-python.yml          # Test on Windows (reusable)
 ├── _build-pyinstaller.yml    # PyInstaller build for Windows (reusable)
@@ -31,38 +31,38 @@ security-scan ────────┘
 
 ## Release Pipeline (`release.yml`)
 
-Uses [release-please](https://github.com/googleapis/release-please-action) for automated releases from conventional commits.
+Uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in tokens for automated releases.
 
 ```
-Push to main/develop
+Push to main (with [patch]/[minor]/[major]/[dev] token)
   └─► CI workflow runs (lint, tests, security, gate)
         └─► Release workflow triggers on CI completion
-              └─► release-please opens/updates Release PR
-                    └─► Reviewer merges Release PR
-                          └─► Creates tag + GitHub Release
-                                └─► build.yml attaches Windows artifacts
+              └─► Semantic Release (version bump + tag + GitHub Release)
+                    └─► Build (PyInstaller on Windows)
+                          └─► Attach Assets (upload to GitHub Release)
+                                └─► Users download from GitHub Releases
 ```
 
-The Release workflow is gated on CI success via `workflow_run` trigger — release-please only runs when CI passes. This prevents creating releases from broken commits.
+The Release workflow is gated on CI success via `workflow_run` trigger.
 
-### Commit Convention (Conventional Commits)
+### Opt-In Release Tokens
 
-| Prefix | Type | Release Bump |
+| Token | Version Bump | Example |
 |---|---|---|
-| `feat:` | New feature | Minor |
-| `fix:` | Bug fix | Patch |
-| `feat!:` | Breaking change | Major |
-| `perf:` | Performance | Patch |
-| `docs:`, `test:`, `chore:`, `ci:` | Maintenance | None |
+| `[patch]` | Patch (`x.y.z` → `x.y.(z+1)`) | `fix: ui alignment [patch]` |
+| `[minor]` | Minor (`x.y.z` → `x.(y+1).0`) | `feat: add new view [minor]` |
+| `[major]` | Major (`x.y.z` → `(x+1).0.0`) | `feat!: redesign API [major]` |
+| `[dev]` | Pre-release (`x.y.z-dev.N`) | `fix: experiment [dev]` |
+
+Commits without a token are ignored by the release system.
 
 ### Branch Strategy
 
-- **`main`**: Stable releases (`v1.5.0`)
-- **`develop`**: Development pre-releases (`v1.5.1-dev.1`)
+- **`main`**: Stable releases (`vX.Y.Z`) or pre-releases with `[dev]` token
 
 ### Breaking Changes
 
-Add `!` after the type prefix: `feat!: redesign API`
+Use the `[major]` token: `feat!: redesign API [major]`
 
 ## Action Pinning
 
@@ -72,25 +72,24 @@ All third-party actions are pinned to full commit SHAs (not floating tags). Depe
 |---|---|---|
 | `actions/checkout` | `11bd7190...` | v4.2.2 |
 | `actions/setup-python` | `a26af69b...` | v5.6.0 |
-| `astral-sh/setup-uv` | `8b06e0d2...` | v6.0.1 |
+| `astral-sh/setup-uv` | `6b9c6063...` | v6.0.1 |
 | `actions/upload-artifact` | `4cec3d8a...` | v4.6.1 |
 | `actions/download-artifact` | `d3f86a10...` | v4.3.0 |
 | `softprops/action-gh-release` | `da05d552...` | v2.2.2 |
+| `peaceiris/actions-gh-pages` | `4f9cc660...` | v4.0.0 |
+| `python-semantic-release/python-semantic-release` | — | v10.5.3 |
 
 ## Branch Protection (Recommended)
 
 Apply via GitHub UI or `gh api`:
 
 - `main`: require CI gate to pass, require 1 approval, no force push
-- `develop`: require CI gate to pass, allow force push from bots
 
 ## Secret Inventory
 
 | Secret | Purpose | Required |
 |---|---|---|
 | `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
-
-No external API keys are required for CI. Release-please uses `GITHUB_TOKEN` for PR creation and tagging.
 
 ### Suppressed CVEs
 
@@ -102,6 +101,7 @@ See [docs/SECURITY.md](SECURITY.md) for the list of CVEs silenced in
 Run the same checks locally:
 
 ```bash
+export QML_DISABLE_DISK_CACHE=1  # ADR-0001 — prevents stale QML bytecode
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest --cov=skill_manager --cov-fail-under=90
@@ -114,20 +114,15 @@ The Release workflow depends on the following repo-level setting (Settings → A
 - **Workflow permissions**: "Read and write permissions"
 - **Allow GitHub Actions to create and approve pull requests**: enabled
 
-Without the second checkbox, `release-please-action` fails with
-"GitHub Actions is not permitted to create or approve pull requests",
-because the `GITHUB_TOKEN` cannot open the release PR regardless of the
-per-workflow `permissions:` block.
-
 ## Troubleshooting
 
 ### Coverage below 90%
 
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
 
-### Release-please not creating PR
+### Semantic Release not creating release
 
-Ensure commits on `main`/`develop` follow Conventional Commits format. Release-please only creates a PR when there are releasable changes (`feat:`, `fix:`, `perf:`).
+Ensure commits on `main` include an opt-in token (`[patch]`, `[minor]`, `[major]`, or `[dev]`) in the subject line.
 
 ### Artifact upload fails
 

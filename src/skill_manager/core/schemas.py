@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -102,20 +102,28 @@ class SkillRecord(BaseModel):
 class ShortcutConfig(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
+    # Find & Select
     search: str = "Ctrl+F"
+    select_all: str = "Ctrl+A"
+    clear_selection: str = "Esc"
+    # Clipboard
     copy_: str = Field(default="Ctrl+C", alias="copy")
+    # Skill Ops
+    refresh: str = "F5"
     archive: str = "Ctrl+Shift+X"
     delete: str = "Delete"
-    refresh: str = "F5"
+    # Tree View
     expand_all: str = "Ctrl+E"
     collapse_all: str = "Ctrl+Shift+E"
     top_of_list: str = "Home"
-    clear_selection: str = "Esc"
-    theme_toggle: str = "Ctrl+T"
+    # Navigate
     quick_copy_view: str = "Alt+1"
     library_view: str = "Alt+2"
     updates_view: str = "Alt+3"
     settings_view: str = "Alt+4"
+    # Tools
+    theme_toggle: str = "Ctrl+T"
+    screenshot: str = "Ctrl+Shift+S"
 
 
 class CollectionConfig(BaseModel):
@@ -123,6 +131,8 @@ class CollectionConfig(BaseModel):
 
     paths: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
+    shortcut: str = ""
+    shortcut_enabled: bool = True
 
 
 class AppConfig(BaseSettings):
@@ -133,16 +143,14 @@ class AppConfig(BaseSettings):
     project_aliases: dict[str, str] = Field(default_factory=dict)
     shortcuts: dict[str, str] = Field(default_factory=dict)
     scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-    show_menu_icons: bool = True
-    compact_menu: bool = False
-    auto_check_updates: bool = True
-    auto_download_updates: bool = False
-    update_check_interval_hours: int = Field(default=24, ge=1, le=168)
-    skill_package_auto_update: bool = True
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
     auto_minimize_on_quick_copy: bool = False
     temporary_screenshots: bool = False
+    diagnostic_logging: bool = False
+    top_bar_clients: list[str] = Field(
+        default_factory=lambda: ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+    )
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod
@@ -152,7 +160,7 @@ class AppConfig(BaseSettings):
     @field_validator("skill_package_auto_update_mode")
     @classmethod
     def _validate_update_mode(cls, value: str) -> str:
-        allowed = {"prompt", "auto", "notify"}
+        allowed = {"off", "prompt", "silent"}
         if value not in allowed:
             return "prompt"
         return value
@@ -164,14 +172,6 @@ class AppConfig(BaseSettings):
             return float(value)
         except (ValueError, TypeError):
             return 1.0
-
-    @field_validator("update_check_interval_hours", mode="before")
-    @classmethod
-    def _coerce_int(cls, value: Any) -> int:
-        try:
-            return int(float(value))
-        except (ValueError, TypeError):
-            return 24
 
     @classmethod
     def from_legacy(cls, data: dict[str, Any]) -> AppConfig:
@@ -217,6 +217,18 @@ class UpdatePackageRecord(BaseModel):
     updated_folders: list[str] = Field(default_factory=list)
     removals_verified: bool = False
 
+    # Package config fields (preserved from normalize_skill_package_config)
+    repository_url: str = ""
+    github_token: str = ""
+    configured_package_path: str = ""
+    clone_path: str = ""
+    package_args: str = ""
+    update_command: str = ""
+    verify_command: str = ""
+    current_version_command: str = ""
+    latest_version_command: str = ""
+    install_args: str = ""
+
     @field_validator("name", mode="before")
     @classmethod
     def _coerce_name(cls, value: Any) -> str:
@@ -239,7 +251,6 @@ class AnnotationPoint(BaseModel):
 
 class BaseAnnotation(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    type: str
     color: str = "#FF0000"
     strokeWidth: int = 3
 
@@ -313,8 +324,18 @@ class HighlightAnnotation(BaseAnnotation):
     color: str = "#FFFF00"
 
 
-# Union type for validation
-Annotation = (
+# Discriminated union for validation.
+#
+# The ``type`` field is the discriminator — it lives on each
+# annotation subclass as a ``Literal[...]`` (e.g. ``"rect"``,
+# ``"arrow"``) and is intentionally *not* declared on the
+# ``BaseAnnotation`` base class. This keeps each subclass' ``type``
+# field independent (no mutable-class-attribute override), so pyright
+# no longer rejects the discriminator narrowing with
+# ``reportIncompatibleVariableOverride``. ``Field(discriminator=...)``
+# tells Pydantic to validate by inspecting the discriminator value
+# first, avoiding a left-to-right trial of every union member.
+Annotation = Annotated[
     RectAnnotation
     | ArrowAnnotation
     | FilledRectAnnotation
@@ -322,19 +343,18 @@ Annotation = (
     | TextAnnotation
     | HighlightAnnotation
     | EllipseAnnotation
-    | FilledEllipseAnnotation
-)
+    | FilledEllipseAnnotation,
+    Field(discriminator="type"),
+]
 
 
 class AppUpdateState(BaseModel):
     model_config = ConfigDict(extra="ignore")
     is_checking: bool = False
-    is_updating: bool = False
     update_available: bool = False
     has_checked: bool = False
     current_version: str = ""
     latest_version: str = ""
-    progress: float = 0.0
     error: str | None = None
 
 

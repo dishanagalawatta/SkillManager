@@ -100,9 +100,11 @@ Item {
         }
     }
 
-    ToolTip.visible: mouseArea.containsMouse && tooltipText !== ""
-    ToolTip.delay: 400
-    ToolTip.text: tooltipText
+    SleekToolTip {
+        id: cbToolTip
+        visible: mouseArea.containsMouse && tooltipText !== ""
+        text: tooltipText
+    }
     
     Accessible.role: Accessible.CheckBox
     Accessible.name: tooltipText

@@ -24,28 +24,17 @@
 
 ## To Do (Ready for Pickup)
 
-- [ ] `[P0]` Order for copy to clipboard - selected order
-- [ ] `[P1]` Disable Shortcut keys
 - [ ] `[P1]` Develop automated reply method for GitHub issues
 - [ ] `[P99]` Improve Test Coverage
 
 ## In Progress
 
-- [ ] **[High Severity]** Investigate and fix the update process validation
 - [ ] **[High Severity]** fix failing github actions
 
 ---
 
 # 4. Bug Tracker
 
-- [ ] **[Low Severity]** Staring skill motion refining
-- [ ] check
-
 ---
 
 # 5. Icebox / Backlog
-
-- [ ] Drop any file to quick copy
-- [ ] Custom method to bring your own client AI agent copy/paste style to users
-
----

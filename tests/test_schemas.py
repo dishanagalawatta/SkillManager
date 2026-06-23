@@ -65,7 +65,7 @@ class TestAppConfig:
         config = AppConfig.from_legacy(data)
         assert config.projects == ["project1"]
         assert config.project_aliases == {"p1": "Project 1"}
-        assert config.show_menu_icons is False
+        assert config.show_menu_icons is False  # type: ignore[attr-defined]
         assert "targets" not in config.model_dump()
 
     def test_from_legacy_prefers_current_keys(self):

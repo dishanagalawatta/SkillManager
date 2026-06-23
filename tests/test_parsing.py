@@ -78,6 +78,7 @@ Body here.
     )
 
     data = parse_command_md(str(cmd_file))
+    assert data is not None
     assert data["name"] == "Deploy"
     assert data["description"] == "Deploy command"
 
@@ -173,6 +174,7 @@ def test_parse_command_md_no_headers(temp_dir):
     cmd_file.write_text("Just some text here without any markdown headers.")
 
     data = parse_command_md(str(cmd_file))
+    assert data is not None
     assert data["name"] == "no_headers"
     assert data["description"] == "Just some text here without any markdown headers."
 

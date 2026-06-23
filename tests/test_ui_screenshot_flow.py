@@ -23,8 +23,8 @@ class TestUIScreenshotFlow:
         with qtbot.waitSignal(app_controller.screenshot_controller.showOverlay, timeout=2000):
             app_controller.screenshot_controller.takeScreenshot()
 
-        assert app_controller.screenshot_controller._current_full_pixmap is not None
-        assert not app_controller.screenshot_controller._current_full_pixmap.isNull()
+        assert app_controller.screenshot_controller.current_full_pixmap is not None
+        assert not app_controller.screenshot_controller.current_full_pixmap.isNull()
 
         # 3. Simulate User action from QML: Saving a cropped area with a redaction
         crop_rect = QRect(0, 0, 100, 100)

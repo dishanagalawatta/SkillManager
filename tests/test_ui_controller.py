@@ -140,7 +140,7 @@ def test_ui_controller_inspector_width_reset(ui_controller):
 
 def test_ui_controller_set_inspector_width_slot(ui_controller):
     ui_controller.setInspectorWidth(450)
-    assert ui_controller._state.inspector_width == 450
+    assert ui_controller.state.inspector_width == 450
 
 
 def test_ui_controller_window_geometry_properties(ui_controller):
@@ -179,6 +179,24 @@ def test_ui_controller_preference_toggles(ui_controller):
     # Remember Filters
     ui_controller.rememberFilters = False
     assert ui_controller.rememberFilters is False
+
+
+def test_dark_mode_changed_signal_count(ui_controller):
+    """darkModeChanged must fire exactly once per value change and zero times on no-op."""
+    spy = MagicMock()
+    ui_controller.darkModeChanged.connect(spy)
+
+    # Change from default (False) to True — signal fires once
+    ui_controller.darkMode = True
+    assert spy.call_count == 1
+
+    # No-op: set to True again — signal must not fire
+    ui_controller.darkMode = True
+    assert spy.call_count == 1
+
+    # Change back to False — signal fires again
+    ui_controller.darkMode = False
+    assert spy.call_count == 2
 
 
 def test_ui_controller_set_view_filter(ui_controller, mock_app):

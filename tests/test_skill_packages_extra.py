@@ -4,43 +4,43 @@ from unittest.mock import patch
 import pytest
 
 from skill_manager.core.skill_packages.relocator import (
-    _is_safe_relative_to,
-    _merge_and_move_lockfile,
-    _relocate_path_internal,
+    is_safe_relative_to,
+    merge_and_move_lockfile,
     relocate_packages,
+    relocate_path_internal,
 )
 from skill_manager.core.skill_packages.updater import (
-    _intercept_cross_platform_command,
-    _run_git_package_update,
-    _run_npx_update,
+    intercept_cross_platform_command,
+    run_git_package_update,
+    run_npx_update,
     run_skill_package_update,
 )
 
 
-def test_run_git_package_update_missing_args():
+def testrun_git_package_update_missing_args():
     with pytest.raises(ValueError, match="Configure a repository_url"):
-        _run_git_package_update({"clone_path": "path"}, None)
+        run_git_package_update({"clone_path": "path"}, None)
 
 
-def test_run_git_package_update_token(tmp_path):
+def testrun_git_package_update_token(tmp_path):
     with patch("skill_manager.core.skill_packages.updater.cmd.Git") as mock_git:
-        _run_git_package_update(
+        run_git_package_update(
             {"repository_url": "url", "clone_path": str(tmp_path), "github_token": "secret"}, None
         )
         args = mock_git.return_value.execute.call_args[0][0]
         assert any("credential.helper" in arg and "secret" in arg for arg in args)
 
 
-def test_run_git_package_update_not_empty(tmp_path):
+def testrun_git_package_update_not_empty(tmp_path):
     (tmp_path / "file.txt").write_text("hello")
     with pytest.raises(ValueError, match="Clone path exists but is not an empty git checkout"):
-        _run_git_package_update({"repository_url": "url", "clone_path": str(tmp_path)}, None)
+        run_git_package_update({"repository_url": "url", "clone_path": str(tmp_path)}, None)
 
 
-def test_run_git_package_update_installed_to(tmp_path):
+def testrun_git_package_update_installed_to(tmp_path):
     messages = []
     with patch("skill_manager.core.skill_packages.updater.cmd.Git"):
-        _run_git_package_update(
+        run_git_package_update(
             {
                 "repository_url": "url",
                 "clone_path": str(tmp_path),
@@ -51,35 +51,35 @@ def test_run_git_package_update_installed_to(tmp_path):
     assert any(f"Installed to {tmp_path}" in m for m in messages)
 
 
-def test_run_npx_update_missing_package():
+def testrun_npx_update_missing_package():
     with pytest.raises(ValueError, match="Configure an npx package name."):
-        _run_npx_update({}, None)
+        run_npx_update({}, None)
 
 
-def test_intercept_cross_platform_command_quotes(tmp_path):
+def testintercept_cross_platform_command_quotes(tmp_path):
     # Test path with quotes and echo with quotes
     p = tmp_path / "quoted dir"
     p.mkdir()
     messages = []
 
     cmd = f"test -d '{p}' && echo 'Hello World'"
-    assert _intercept_cross_platform_command(cmd, messages.append) is True
+    assert intercept_cross_platform_command(cmd, messages.append) is True
     assert messages[-1] == "Hello World"
 
     cmd = f'test -d "{p}" && echo "Hello World"'
-    assert _intercept_cross_platform_command(cmd, messages.append) is True
+    assert intercept_cross_platform_command(cmd, messages.append) is True
 
 
-def test_relocate_path_internal_exceptions(tmp_path):
+def testrelocate_path_internal_exceptions(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
     dest = tmp_path / "dest"
 
     with patch("shutil.copytree", side_effect=Exception("Copy failed")):
-        assert not _relocate_path_internal(src, dest, None)
+        assert not relocate_path_internal(src, dest, None)
 
 
-def test_merge_and_move_lockfile_invalid_json(tmp_path):
+def testmerge_and_move_lockfile_invalid_json(tmp_path):
     src = tmp_path / "src.json"
     dest = tmp_path / "dest.json"
 
@@ -87,14 +87,14 @@ def test_merge_and_move_lockfile_invalid_json(tmp_path):
     src.write_text('{"version": "1.0"}')
     dest.write_text("not json")
 
-    _merge_and_move_lockfile(src, dest, None)
+    merge_and_move_lockfile(src, dest, None)
 
     merged = json.loads(dest.read_text())
     assert merged["version"] == "1.0"
 
     # Src has invalid JSON
     src.write_text("not json")
-    _merge_and_move_lockfile(src, dest, None)
+    merge_and_move_lockfile(src, dest, None)
     # Shouldn't crash
 
 
@@ -125,28 +125,28 @@ def test_relocate_packages_manifest_move(tmp_path):
     assert (tmp_path / ".pkg-antigravity-install-manifest.json").exists()
 
 
-def test_is_safe_relative_to(tmp_path):
+def testis_safe_relative_to(tmp_path):
     inner = tmp_path / "inner" / "sub"
     inner.mkdir(parents=True)
-    assert _is_safe_relative_to(inner, tmp_path)
+    assert is_safe_relative_to(inner, tmp_path)
 
     outer = tmp_path.parent / "unrelated"
     outer.mkdir(exist_ok=True)
-    assert not _is_safe_relative_to(outer, tmp_path)
+    assert not is_safe_relative_to(outer, tmp_path)
 
 
-def test_merge_and_move_lockfile_source_missing(tmp_path):
+def testmerge_and_move_lockfile_source_missing(tmp_path):
     src = tmp_path / "missing.json"
     dest = tmp_path / "dest.json"
-    _merge_and_move_lockfile(src, dest, None)
+    merge_and_move_lockfile(src, dest, None)
     assert not dest.exists()
 
 
-def test_merge_and_move_lockfile_handles_exception(tmp_path):
+def testmerge_and_move_lockfile_handles_exception(tmp_path):
     src = tmp_path / "src.json"
     src.write_text('{"skills": {"a": 1}}')
     with patch("builtins.open", side_effect=OSError("Locked")):
-        _merge_and_move_lockfile(src, tmp_path / "dest.json", None)
+        merge_and_move_lockfile(src, tmp_path / "dest.json", None)
 
 
 def test_relocate_packages_from_output_no_target(tmp_path):
@@ -260,7 +260,7 @@ def test_relocate_packages_from_output_container_move(tmp_path):
     assert (dest / "skill1").is_dir()
 
 
-@patch("skill_manager.core.skill_packages.updater._run_shell_command")
+@patch("skill_manager.core.skill_packages.updater.run_shell_command")
 def test_run_skill_package_update_verify_command(mock_shell, tmp_path):
     source = {
         "name": "pkg",

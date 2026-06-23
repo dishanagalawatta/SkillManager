@@ -24,6 +24,7 @@ FrostOverlay 1.0 FrostOverlay.qml
 SmoothListView 1.0 SmoothListView.qml
 SmoothScrollView 1.0 SmoothScrollView.qml
 AppScrollBar 1.0 AppScrollBar.qml
+SleekProgressBar 1.0 SleekProgressBar.qml
 ShortcutsSettings 1.0 views/ShortcutsSettings.qml
 DiagnosticsPane 1.0 views/DiagnosticsPane.qml
 KeySequenceCapture 1.0 KeySequenceCapture.qml
@@ -34,5 +35,6 @@ ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml
 DeleteConfirmDialog 1.0 dialogs/DeleteConfirmDialog.qml
 ArchiveConfirmDialog 1.0 dialogs/ArchiveConfirmDialog.qml
+ProjectReorderDialog 1.0 dialogs/ProjectReorderDialog.qml
 GlassCheckBox 1.0 GlassCheckBox.qml
 ScreenshotOverlay 1.0 ScreenshotOverlay.qml

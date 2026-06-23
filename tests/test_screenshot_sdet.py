@@ -35,7 +35,7 @@ def controller(mock_app):
     # Provide a dummy pixmap
     pixmap = QPixmap(100, 100)
     pixmap.fill(QColor("white"))
-    ctrl._current_full_pixmap = pixmap
+    ctrl.current_full_pixmap = pixmap
     return ctrl
 
 
@@ -85,7 +85,7 @@ class TestScreenshotControllerSDET:
         )
 
     def test_save_screenshot_null_pixmap(self, controller, mock_app):
-        controller._current_full_pixmap = None
+        controller.current_full_pixmap = None
 
         controller.saveScreenshot(QRect(0, 0, 10, 10), [])
 

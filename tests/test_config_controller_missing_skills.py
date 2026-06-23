@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -375,6 +376,8 @@ def test_check_missing_skills_logs_resolution_trace_at_info(config_controller, t
     from skill_manager.core.diagnostics import get_diagnostic_logger
 
     logger = get_diagnostic_logger()
+    logger.initialize()
+    logger.set_enabled(True)
     before = logger.get_recent_events(50)
 
     config_controller.checkMissingSkills("LogSkills")
@@ -391,6 +394,7 @@ def test_check_missing_skills_logs_per_skill_at_debug(config_controller, tmp_pat
 
     logger = get_diagnostic_logger()
     logger.initialize(log_level="DEBUG")
+    logger.set_enabled(True)
 
     project_dir = tmp_path / "debugtest"
     skills_dir = project_dir / ".agents" / "skills"
@@ -438,32 +442,32 @@ def test_get_project_resolution_table_includes_resolved_skills_dir(config_contro
     assert proj["skills_dir_exists"] is True
 
 
-# --- Command path filtering ---
+# --- Command path handling ---
 
 
-def test_save_collection_filters_command_paths(config_controller):
-    """saveCustomCollection must exclude .agents/commands/ paths."""
+def test_save_collection_keeps_command_paths(config_controller):
+    """saveCustomCollection must keep .agents/commands/ paths (commands are first-class items)."""
     config_controller.app._custom_collections = {}
     skill_path = "/proj/.agents/skills/my-skill"
     cmd_path = "/proj/.agents/commands/Test.md"
     config_controller.saveCustomCollection("Coll", [skill_path, cmd_path], [])
     stored = config_controller.app._custom_collections["Coll"]
-    assert cmd_path not in stored["paths"]
+    assert cmd_path in stored["paths"]
     assert skill_path in stored["paths"]
 
 
-def test_save_collection_handles_backslash_command_paths(config_controller):
-    """Filter must normalize backslashes (Windows paths)."""
+def test_save_collection_keeps_backslash_command_paths(config_controller):
+    """Windows backslash command paths must be preserved."""
     config_controller.app._custom_collections = {}
     skill_path = "C:\\proj\\.agents\\skills\\Skill"
     cmd_path = "C:\\proj\\.agents\\commands\\Cmd.Antigravity.md"
     config_controller.saveCustomCollection("C", [skill_path, cmd_path], [])
     stored = config_controller.app._custom_collections["C"]
-    assert stored["paths"] == [skill_path]
+    assert stored["paths"] == [skill_path, cmd_path]
 
 
-def test_save_collection_mixed_paths_filters_commands(config_controller):
-    """Mix of skills + commands: only skills survive."""
+def test_save_collection_mixed_paths_keeps_all(config_controller):
+    """Mix of skills + commands: all items are kept."""
     config_controller.app._custom_collections = {}
     paths = [
         "/proj/.agents/skills/A",
@@ -474,38 +478,84 @@ def test_save_collection_mixed_paths_filters_commands(config_controller):
     ]
     config_controller.saveCustomCollection("M", paths, [])
     stored = config_controller.app._custom_collections["M"]
-    assert len(stored["paths"]) == 3
-    assert all("/.agents/commands/" not in p for p in stored["paths"])
+    assert len(stored["paths"]) == 5
+    assert stored["paths"] == paths
 
 
-def test_save_collection_no_paths_remains_empty(config_controller):
-    """When all paths are commands, collection should be saved empty."""
+def test_save_collection_all_commands_kept(config_controller):
+    """Command-only collection should save with all entries."""
     config_controller.app._custom_collections = {}
     paths = ["/proj/.agents/commands/X.md", "/proj/.agents/commands/Y.md"]
     config_controller.saveCustomCollection("AllCmd", paths, [])
     stored = config_controller.app._custom_collections["AllCmd"]
-    assert stored["paths"] == []
+    assert stored["paths"] == paths
 
 
-def test_check_missing_skills_skips_command_paths(config_controller):
-    """checkMissingSkills must not report command paths as missing."""
+def test_check_missing_skills_reports_missing_command(config_controller, tmp_path):
+    """Command absent from target project's .agents/commands/ is reported missing."""
+    project_root = tmp_path / "ProjA"
+    project_root.mkdir()
+    config_controller.app._projects = [str(project_root)]
+
     config_controller.app._custom_collections = {
         "Coll": {
-            "paths": ["/proj/.agents/commands/Test.md"],
-            "projects": ["P"],
+            "paths": ["/other/.agents/commands/MyCmd.md"],
+            "projects": ["ProjA"],
+        }
+    }
+    result = json.loads(config_controller.checkMissingSkills("Coll"))
+    assert "ProjA" in result
+    assert any("MyCmd.md" in p for p in result["ProjA"])
+
+
+def test_check_missing_skills_skips_present_command(config_controller, tmp_path):
+    """Command already present in target project is not reported missing."""
+    project_root = tmp_path / "ProjA"
+    commands_dir = project_root / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
+    (commands_dir / "MyCmd.md").write_text("---\nname: MyCmd\n---\nbody", encoding="utf-8")
+
+    config_controller.app._projects = [str(project_root)]
+
+    config_controller.app._custom_collections = {
+        "Coll": {
+            "paths": ["/any/.agents/commands/MyCmd.md"],
+            "projects": ["ProjA"],
         }
     }
     result = json.loads(config_controller.checkMissingSkills("Coll"))
     assert result == {}
 
 
-def test_check_missing_skills_skips_backslash_command_paths(config_controller):
-    """checkMissingSkills must handle Windows-style backslash command paths."""
+def test_check_missing_skills_mixed_skills_and_commands(config_controller, tmp_path):
+    """Both skills and commands are evaluated correctly in one call."""
+    project_root = tmp_path / "ProjA"
+    skills_dir = project_root / ".agents" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "my-skill").mkdir()
+    (skills_dir / "my-skill" / "SKILL.md").touch()
+
+    commands_dir = project_root / ".agents" / "commands"
+    commands_dir.mkdir(parents=True)
+    (commands_dir / "CmdA.md").write_text("---\nname: CmdA\n---\nbody", encoding="utf-8")
+
+    config_controller.app._projects = [str(project_root)]
+
     config_controller.app._custom_collections = {
         "Coll": {
-            "paths": ["C:\\proj\\.agents\\commands\\Test.md"],
-            "projects": ["P"],
+            "paths": [
+                str(skills_dir / "my-skill"),
+                str(project_root / ".agents" / "commands" / "CmdA.md"),
+                "/other/.agents/commands/CmdB.md",
+                "/other/.agents/skills/missing-skill",
+            ],
+            "projects": ["ProjA"],
         }
     }
     result = json.loads(config_controller.checkMissingSkills("Coll"))
-    assert result == {}
+    assert "ProjA" in result
+    missing_names = [Path(p).name for p in result["ProjA"]]
+    assert "CmdB.md" in missing_names
+    assert "missing-skill" in missing_names
+    assert "CmdA.md" not in missing_names
+    assert "my-skill" not in missing_names

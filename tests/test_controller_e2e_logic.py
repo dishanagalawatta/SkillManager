@@ -61,7 +61,16 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     # Force a refresh
     controller.refreshSkills()
 
-    return controller
+    yield controller
+
+    # Teardown: stop timers, flush pending events, and destroy the controller
+    # to prevent access violations in pytestqt._process_events.
+    controller.on_quit()
+    from PySide6.QtCore import QCoreApplication
+
+    QCoreApplication.processEvents()  # Flush pending QTimer.singleShot events
+    controller.deleteLater()  # Schedule controller for deletion
+    QCoreApplication.processEvents()  # Process the deletion event
 
 
 def test_controller_navigation_workflow(app_controller):

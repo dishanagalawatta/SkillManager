@@ -254,15 +254,43 @@ Item {
                                         // Update Button / Status
                                         ActionButton {
                                             id: uv_itemUpdateBtn
-                                            property bool isLatest: Boolean(!modelData.latest_version || modelData.latest_version === modelData.current_version)
+                                            property bool isLatest: Boolean(
+                                                modelData.latest_version && modelData.latest_version !== "" &&
+                                                modelData.latest_version === modelData.current_version
+                                            )
                                             labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
-                                            role: isLatest ? "secondary" : "primary"
+                                            role: modelData.update_error ? "destructive" : (isLatest ? "secondary" : "primary")
                                             buttonHeight: 26
                                             Layout.preferredWidth: 100
                                             Layout.minimumWidth: 100
                                             Layout.maximumWidth: 100
                                             enabled: !isLatest && !modelData.is_updating
-                                            onClicked: (mouse) => AppController.update_controller.runPackageUpdate(index)
+                                            tooltipText: {
+                                                if (modelData.update_error) return "Update failed: " + modelData.update_error
+                                                if (modelData.is_updating) return "Update in progress..."
+                                                if (isLatest) return "Already up to date"
+                                                return "Update " + modelData.name + " to latest version"
+                                            }
+                                            onClicked: (mouse) => {
+                                                AppController.logDiagnosticEvent("INFO", "update_click", "User clicked Update for package: " + modelData.name + " (index=" + index + ")")
+                                                AppController.update_controller.runPackageUpdate(index)
+                                            }
+                                        }
+
+                                        // Error icon
+                                        Rectangle {
+                                            visible: Boolean(modelData.update_error)
+                                            width: 18
+                                            height: 18
+                                            radius: 9
+                                            color: Theme.danger
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "!"
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: "white"
+                                            }
                                         }
 
 
@@ -296,22 +324,24 @@ Item {
                                     }
                                 }
 
-                                ProgressBar {
+                                SleekProgressBar {
                                     anchors.bottom: parent.bottom
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    height: 3
-                                    indeterminate: true
-                                    visible: Boolean(modelData && modelData.is_updating)
-                                    background: Item {}
-                                    contentItem: Item {
-                                        Rectangle {
-                                            width: parent.width
-                                            height: parent.height
-                                            color: Theme.accent
-                                            radius: 1.5
-                                        }
-                                    }
+                                    anchors.leftMargin: 16
+                                    anchors.rightMargin: 16
+                                    anchors.bottomMargin: 2
+                                    barHeight: 3
+                                    running: Boolean(modelData && modelData.is_updating)
+                                    color: Theme.accent
+                                }
+                            }
+
+                            Connections {
+                                target: AppController
+                                function onUpdatePackagesChanged() {
+                                    uv_packagesList.model = null
+                                    uv_packagesList.model = AppController.updatePackages
                                 }
                             }
                         }
@@ -455,22 +485,24 @@ Item {
                                     }
                                 }
 
-                                ProgressBar {
+                                SleekProgressBar {
                                     anchors.bottom: parent.bottom
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    height: 3
-                                    indeterminate: true
-                                    visible: Boolean(modelData && modelData.is_updating)
-                                    background: Item {}
-                                    contentItem: Item {
-                                        Rectangle {
-                                            width: parent.width
-                                            height: parent.height
-                                            color: Theme.accent
-                                            radius: 1.5
-                                        }
-                                    }
+                                    anchors.leftMargin: 16
+                                    anchors.rightMargin: 16
+                                    anchors.bottomMargin: 2
+                                    barHeight: 3
+                                    running: Boolean(modelData && modelData.is_updating)
+                                    color: Theme.accent
+                                }
+                            }
+
+                            Connections {
+                                target: AppController
+                                function onProjectsChanged() {
+                                    uv_projectsList.model = null
+                                    uv_projectsList.model = AppController.config_controller.updateProjects
                                 }
                             }
                         }

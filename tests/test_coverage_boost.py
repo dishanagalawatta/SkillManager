@@ -1,10 +1,10 @@
 """Targeted tests to boost coverage for discovery.py and diagnostics.py.
 
 Covers uncovered paths:
-- diagnostics: _log_dir fallback, _platform_info, _qt_version exception,
-  _app_version exception, initialize with context, _rotate_if_needed,
+- diagnostics: log_dir fallback, platform_info, qt_version exception,
+  app_version exception, initialize with context, rotate_if_needed,
   log_event file write failure, clear_logs, export_bundle
-- discovery: discover_all cache loading exception, _discover_packages_incremental cache hit,
+- discovery: discover_all cache loading exception, discover_packages_incremental cache hit,
   command file discovery
 """
 
@@ -28,15 +28,15 @@ from skill_manager.core.discovery import (
 
 class TestDiagnosticsHelpers:
     def test_log_dir_localappdata_set(self):
-        from skill_manager.core.diagnostics import _log_dir
+        from skill_manager.core.diagnostics import log_dir
 
         with patch.dict(os.environ, {"LOCALAPPDATA": "/tmp/fake_data"}):
-            result = _log_dir()
+            result = log_dir()
             assert "SkillManager" in str(result)
             assert "logs" in str(result)
 
     def test_log_dir_localappdata_unset(self):
-        from skill_manager.core.diagnostics import _log_dir
+        from skill_manager.core.diagnostics import log_dir
 
         env = os.environ.copy()
         env.pop("LOCALAPPDATA", None)
@@ -44,11 +44,11 @@ class TestDiagnosticsHelpers:
             patch.dict(os.environ, env, clear=True),
             patch("skill_manager.core.diagnostics.sys.platform", "win32"),
         ):
-            result = _log_dir()
+            result = log_dir()
             assert "SkillManager" in str(result)
 
     def test_log_dir_xdg_linux(self):
-        from skill_manager.core.diagnostics import _log_dir
+        from skill_manager.core.diagnostics import log_dir
 
         env = os.environ.copy()
         env.pop("LOCALAPPDATA", None)
@@ -57,14 +57,14 @@ class TestDiagnosticsHelpers:
             patch.dict(os.environ, env, clear=True),
             patch("skill_manager.core.diagnostics.sys.platform", "linux"),
         ):
-            result = _log_dir()
+            result = log_dir()
             assert "xdg_data" in str(result)
             assert "SkillManager" in str(result)
 
     def test_platform_info(self):
-        from skill_manager.core.diagnostics import _platform_info
+        from skill_manager.core.diagnostics import platform_info
 
-        info = _platform_info()
+        info = platform_info()
         assert "platform" in info
         assert "os" in info
         assert "os_version" in info
@@ -72,23 +72,23 @@ class TestDiagnosticsHelpers:
         assert isinstance(info["platform"], str)
 
     def test_qt_version_returns_string(self):
-        from skill_manager.core.diagnostics import _qt_version
+        from skill_manager.core.diagnostics import qt_version
 
-        result = _qt_version()
+        result = qt_version()
         assert isinstance(result, str)
 
     def test_qt_version_exception_returns_unknown(self):
-        from skill_manager.core.diagnostics import _qt_version
+        from skill_manager.core.diagnostics import qt_version
 
         with patch("builtins.__import__", side_effect=ImportError("no PySide6")):
-            result = _qt_version()
+            result = qt_version()
             assert result == "unknown"
 
     def test_app_version_exception_returns_unknown(self):
-        from skill_manager.core.diagnostics import _app_version
+        from skill_manager.core.diagnostics import app_version
 
         with patch.dict("sys.modules", {"skill_manager": None}):
-            result = _app_version()
+            result = app_version()
             assert result == "unknown"
 
 
@@ -98,14 +98,15 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize(log_level="DEBUG", context={"custom_key": "custom_value"})
-        assert logger._log_level == "DEBUG"
-        assert logger._context["custom_key"] == "custom_value"
+        assert logger.log_level == "DEBUG"
+        assert logger.context["custom_key"] == "custom_value"
 
     def test_log_event_writes_to_file(self, tmp_path):
         from skill_manager.core.diagnostics import DiagnosticLogger
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test_category", "test message")
 
         log_file = tmp_path / "diagnostic.log"
@@ -119,6 +120,7 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "msg", data={"key": "val"})
 
         log_file = tmp_path / "diagnostic.log"
@@ -131,8 +133,9 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         # Simulate file write failure by making log file a directory
-        logger._log_file.mkdir()
+        logger.log_file.mkdir()
         logger.log_event("INFO", "test", "should not crash")
         # Should not raise - error is logged to stderr
 
@@ -141,29 +144,29 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
-        logger._rotate_if_needed()  # Should not raise when no log file exists
+        logger.rotate_if_needed()  # Should not raise when no log file exists
 
     def test_rotate_if_needed_small_file(self, tmp_path):
         from skill_manager.core.diagnostics import DiagnosticLogger
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
-        logger._log_file.write_text("small content")
-        logger._rotate_if_needed()  # File is small, no rotation
-        assert logger._log_file.exists()
+        logger.log_file.write_text("small content")
+        logger.rotate_if_needed()  # File is small, no rotation
+        assert logger.log_file.exists()
 
     def test_rotate_if_needed_large_file(self, tmp_path):
         from skill_manager.core.diagnostics import (
-            _MAX_ROTATION_BYTES,
+            MAX_ROTATION_BYTES,
             DiagnosticLogger,
         )
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
         # Create a file larger than rotation threshold
-        large_content = "x" * (_MAX_ROTATION_BYTES + 1024)
-        logger._log_file.write_text(large_content)
-        logger._rotate_if_needed()
+        large_content = "x" * (MAX_ROTATION_BYTES + 1024)
+        logger.log_file.write_text(large_content)
+        logger.rotate_if_needed()
         # Should have rotated
         rotated = tmp_path / "diagnostic.log.1"
         assert rotated.exists()
@@ -173,16 +176,18 @@ class TestDiagnosticLogger:
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "msg")
         logger.clear_logs()
-        assert len(logger._ring) == 0
-        assert not logger._log_file.exists()
+        assert len(logger.ring) == 0
+        assert not logger.log_file.exists()
 
     def test_export_bundle(self, tmp_path):
         from skill_manager.core.diagnostics import DiagnosticLogger
 
         logger = DiagnosticLogger(log_dir=tmp_path)
         logger.initialize()
+        logger.set_enabled(True)
         logger.log_event("INFO", "test", "test event")
 
         bundle_path = logger.export_bundle()
@@ -246,11 +251,11 @@ class TestDiscoveryCacheHit:
 
         with Cache(str(tmp_path / "cache")) as disk_cache:
             # First scan - populates cache
-            skills1 = service._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+            skills1 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills1) == 1
 
             # Second scan - should hit cache (no re-scan)
-            skills2 = service._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+            skills2 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills2) == 1
             assert skills2[0]["name"] == "Skill One"
 
@@ -281,7 +286,7 @@ class TestDiscoveryCacheHit:
             return {"main_category": "Cat", "sub_category": "Sub"}
 
         with Cache(str(tmp_path / "cache")) as disk_cache:
-            skills1 = service._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+            skills1 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills1) == 1
 
             # Modify a skill file to change the source dir mtime
@@ -290,7 +295,7 @@ class TestDiscoveryCacheHit:
             # Touch the parent dir to update mtime
             source_lib.touch()
 
-            skills2 = service._discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+            skills2 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills2) == 1
             assert call_count == 2  # parse_fn called twice = cache miss
 
@@ -336,7 +341,7 @@ class TestDiscoveryProjects:
             return {"main_category": "Dev", "sub_category": "Sub"}
 
         with Cache(str(tmp_path / "cache")) as disk_cache:
-            projects = service._discover_projects_incremental(disk_cache, parse_fn, cat_fn)
+            projects = service.discover_projects_incremental(disk_cache, parse_fn, cat_fn)
             assert len(projects) == 1
             assert projects[0]["skills"][0]["name"] == "Proj Skill"
 
@@ -514,10 +519,10 @@ class TestCommands:
 
 class TestAnalytics:
     def test_init_posthog_exception_returns_none(self):
-        from skill_manager.core.analytics import _init_posthog
+        from skill_manager.core.analytics import init_posthog
 
         with patch.dict("sys.modules", {"posthog": None}):
-            result = _init_posthog()
+            result = init_posthog()
             assert result is None
 
     def test_shutdown_when_posthog_exists(self):
@@ -613,12 +618,10 @@ class TestFilterEngineCategorizer:
         with (
             patch("skill_manager.utils.win32.WINDOWPLACEMENT", return_value=mock_placement),
             patch("skill_manager.utils.win32.ctypes.sizeof", return_value=44),
-            patch(
-                "skill_manager.utils.win32.ctypes.windll.user32.GetWindowPlacement",
-                return_value=True,
-            ),
+            patch("skill_manager.utils.win32.ctypes", create=True) as mock_ctypes,
             patch("skill_manager.utils.win32.ctypes.byref", side_effect=lambda x: x),
         ):
+            mock_ctypes.windll.user32.GetWindowPlacement.return_value = True
             result = get_window_placement(12345)
             assert isinstance(result, tuple)
             assert len(result) == 5

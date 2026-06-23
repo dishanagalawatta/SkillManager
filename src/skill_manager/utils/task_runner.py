@@ -16,16 +16,16 @@ except Exception:  # pragma: no cover - depends on installed PySide6 build
 class TaskRunner:
     """Base class for task execution strategies."""
 
-    def run(self, target: Callable, args: tuple = (), kwargs: dict = None) -> Any:
+    def run(self, target: Callable, args: tuple = (), kwargs: dict | None = None) -> Any:
         """Executes the target with provided arguments."""
         raise NotImplementedError
 
     def submit(
         self,
         target: Callable,
-        callback: Callable[[Any], None] = None,
+        callback: Callable[[Any], None] | None = None,
         args: tuple = (),
-        kwargs: dict = None,
+        kwargs: dict | None = None,
     ) -> None:
         """Executes the target and optionally receives its result."""
 
@@ -41,7 +41,7 @@ class TaskRunner:
 class BackgroundTaskRunner(TaskRunner):
     """Executes tasks in a background daemon thread."""
 
-    def run(self, target: Callable, args: tuple = (), kwargs: dict = None) -> None:
+    def run(self, target: Callable, args: tuple = (), kwargs: dict | None = None) -> None:
         kwargs = kwargs or {}
         threading.Thread(target=target, args=args, kwargs=kwargs, daemon=True).start()
 
@@ -49,7 +49,7 @@ class BackgroundTaskRunner(TaskRunner):
 class QtAsyncioTaskRunner(TaskRunner):
     """Runs coroutine tasks on QtAsyncio when the Qt event loop owns async work."""
 
-    def run(self, target: Callable, args: tuple = (), kwargs: dict = None) -> Any:
+    def run(self, target: Callable, args: tuple = (), kwargs: dict | None = None) -> Any:
         kwargs = kwargs or {}
         result = target(*args, **kwargs)
         if asyncio.iscoroutine(result):
@@ -62,6 +62,6 @@ class QtAsyncioTaskRunner(TaskRunner):
 class SynchronousTaskRunner(TaskRunner):
     """Executes tasks synchronously in the current thread. Useful for testing."""
 
-    def run(self, target: Callable, args: tuple = (), kwargs: dict = None) -> Any:
+    def run(self, target: Callable, args: tuple = (), kwargs: dict | None = None) -> Any:
         kwargs = kwargs or {}
         return target(*args, **kwargs)

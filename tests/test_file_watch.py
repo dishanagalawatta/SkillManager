@@ -41,17 +41,17 @@ def test_skill_folder_watcher(tmp_path: Path):
 
     watcher = SkillFolderWatcher([str(test_dir)], mock_callback)
 
-    assert not watcher._started
+    assert not watcher.started
     watcher.start()
-    assert watcher._started
+    assert watcher.started
 
     # Start again should be a no-op
     watcher.start()
-    assert watcher._started
+    assert watcher.started
 
     watcher.stop()
-    assert not watcher._started
+    assert not watcher.started
 
     # Stop again should be a no-op
     watcher.stop()
-    assert not watcher._started
+    assert not watcher.started
