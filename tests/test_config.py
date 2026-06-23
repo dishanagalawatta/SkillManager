@@ -189,6 +189,88 @@ class ConfigManagerTests(unittest.TestCase):
 
             self.assertEqual(resolved, legacy_file)
 
+    def test_get_app_data_dir_fallback_to_user_data_dir(self):
+        import importlib
+
+        import skill_manager.core.config as cfg
+
+        with temporary_directory():
+            env = {
+                "SKILL_MANAGER_DATA_DIR": "",
+                "LOCALAPPDATA": "",
+                "APPDATA": "",
+            }
+            with mock.patch.dict(os.environ, env, clear=False):
+                importlib.reload(cfg)
+                app_dir = cfg.get_app_data_dir()
+                self.assertTrue(app_dir.exists())
+                self.assertEqual(app_dir.name, "SkillManager")
+
+    def test_legacy_config_fallback_merges_targets_into_projects(self):
+        """When app-data config has no projects but legacy has targets, merge them."""
+        with temporary_directory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            legacy_dir = root / "legacy"
+            data_dir.mkdir()
+            legacy_dir.mkdir()
+
+            # App-data config exists but has no projects key
+            app_data_config = data_dir / "config.json"
+            app_data_config.write_text(
+                json.dumps({"sources": ["src1"], "shortcuts": {}}),
+                encoding="utf-8",
+            )
+
+            # Legacy config has targets
+            legacy_config = legacy_dir / "data" / "config.json"
+            legacy_config.parent.mkdir(parents=True, exist_ok=True)
+            legacy_config.write_text(
+                json.dumps({"targets": ["legacy-proj-a", "legacy-proj-b"]}),
+                encoding="utf-8",
+            )
+
+            os.chdir(legacy_dir)
+            # Mock Path.cwd() to return legacy_dir so the fallback finds data/config.json
+            with mock.patch("skill_manager.core.config.Path.cwd", return_value=legacy_dir):
+                config = self._reload_config(data_dir)
+                manager = config.ConfigManager()
+
+            # Should have merged targets into projects
+            self.assertEqual(manager.get("projects"), ["legacy-proj-a", "legacy-proj-b"])
+
+    def test_legacy_config_fallback_does_not_overwrite_existing_projects(self):
+        """If app-data config already has projects, do not overwrite from legacy."""
+        with temporary_directory() as tmp:
+            root = Path(tmp)
+            data_dir = root / "data"
+            legacy_dir = root / "legacy"
+            data_dir.mkdir()
+            legacy_dir.mkdir()
+
+            # App-data config already has projects
+            app_data_config = data_dir / "config.json"
+            app_data_config.write_text(
+                json.dumps({"projects": ["existing-proj"], "shortcuts": {}}),
+                encoding="utf-8",
+            )
+
+            # Legacy config has targets
+            legacy_config = legacy_dir / "data" / "config.json"
+            legacy_config.parent.mkdir(parents=True, exist_ok=True)
+            legacy_config.write_text(
+                json.dumps({"targets": ["legacy-proj"]}),
+                encoding="utf-8",
+            )
+
+            os.chdir(legacy_dir)
+            with mock.patch("skill_manager.core.config.Path.cwd", return_value=legacy_dir):
+                config = self._reload_config(data_dir)
+                manager = config.ConfigManager()
+
+            # Should keep existing projects, not overwrite with legacy targets
+            self.assertEqual(manager.get("projects"), ["existing-proj"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,10 +12,10 @@ Welcome to the SkillManager development engine room. This guide covers environme
 - **Linting & Formatting**: `ruff`
 - **Packaging**: PyInstaller & Inno Setup
 - **Testing**: `pytest` with `pytest-xdist` for parallel execution
-- **CI/CD**: GitHub Actions with `python-semantic-release`
+- **CI/CD**: GitHub Actions with `release-please`
 - **Error Tracking**: Sentry
 - **Analytics**: PostHog
-- **Secure Updates**: TUF (The Update Framework)
+
 
 ---
 
@@ -99,7 +99,7 @@ SkillManager maintains a strict parity between the Python categorization logic a
 ## Building Executables
 
 ### Automated Builds
-The GitHub Action `release.yml` automatically builds installers for Windows, macOS, and Linux on version bumps.
+The GitHub Action `release.yml` automatically builds installers for Windows on version bumps.
 
 ### Manual Builds
 To build locally for testing:
@@ -118,58 +118,25 @@ To build locally for testing:
 3. **Windows Installer**:
    Compile `packaging/windows/installer.iss` using Inno Setup to generate `SkillManager_Setup.exe`.
 
-### Auto-Update Releases (Tufup)
-We use `tufup` (The Update Framework) for secure background updates.
-
-1. **Initialize Repository** (First time only):
-   ```bash
-   uv run python scripts/publish_tuf_release.py --version 1.0.0 --bundle dist/SkillManager --init
-   ```
-   **CRITICAL SECURITY:** This generates private keys in `tuf_keys/`.
-   - **DO NOT** commit these keys to Git (they are ignored by `.gitignore`).
-   - **BACKUP** this folder to a secure location. If lost, you cannot update your users.
-
-2. **Publish a New Version**:
-   ```bash
-   uv run python scripts/publish_tuf_release.py --version 1.0.1 --bundle dist/SkillManager
-   ```
-
-3. **Deploy to GitHub Pages**:
-   - Updates are served via the `gh-pages` branch.
-   - Push `tuf_repo/metadata` to `gh-pages:/metadata/`.
-   - Push `tuf_repo/targets` to `gh-pages:/targets/`.
-
 ---
 
 ## Release & CI/CD Strategy
 
-SkillManager uses a strictly **Opt-in Release Strategy**. Versions are only bumped when explicit trigger words are included in the commit message.
+SkillManager uses [release-please](https://github.com/googleapis/release-please-action) for automated releases from Conventional Commits. See `docs/CI_CD.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
 
-### 1. Release Triggers
+### 1. How Releases Work
 
-| Trigger | Release Type | Example |
-|---|---|---|
-| `[major]` | Stable Major Bump | `feat: final release [major]` |
-| `[minor]` | Stable Minor Bump | `feat: add new view [minor]` |
-| `[patch]` | Stable Patch Bump | `fix: ui alignment [patch]` |
-| `[dev]` | Development Release | `feat: experimental icons [dev]` |
-| `[preminor]` | Pivot to Minor Pre-release | `feat: scope change [preminor]` |
-| `[premajor]` | Pivot to Major Pre-release | `feat: breaking change [premajor]` |
+1. Push commits to `main` or `develop` following [Conventional Commits](https://www.conventionalcommits.org/)
+2. Release-please automatically opens/updates a Release PR
+3. Reviewer merges the Release PR → creates a git tag + GitHub Release
+4. CI builds artifacts and attaches them to the release
 
 ### 2. Branch Strategy
 
-- **`develop` branch**: Merges with any trigger create a Development pre-release (e.g., `v1.0.0-dev.1`).
-- **`main` branch**: Merges with `[major/minor/patch]` create a Stable release (e.g., `v1.0.0`).
+- **`develop` branch**: Development pre-releases (e.g., `v1.5.1-dev.1`)
+- **`main` branch**: Stable releases (e.g., `v1.5.0`)
 
-### 3. Version Bump Logic
-
-The `scripts/version_bump_calculator.py` script handles edge cases:
-- **Cross-grade detection**: Prevents graduating minor/major prerelease via `[patch]`.
-- **Dev cycle continuation**: `[dev]` from dev state increments prerelease counter.
-- **Dev cycle start**: `[dev]` from stable state initializes a new dev cycle.
-- **Scope pivot**: `[preminor]`/`[premajor]` from dev state pivots the target version.
-
-### 4. Commit Convention (Strict)
+### 3. Commit Convention (Strict)
 
 All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -179,7 +146,7 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 | `fix:` | Bug fix | Patch |
 | `perf:` | Performance improvement | Patch |
 | `feat!:` | Breaking change | Major |
-| `chore:`, `docs:`, `test:` | Maintenance | None |
+| `chore:`, `docs:`, `test:`, `ci:` | Maintenance | None |
 
 ---
 
@@ -193,5 +160,4 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 | `uv run ruff format src` | Format code |
 | `uv run pytest` | Run unit tests |
 | `uv run python scripts/build_app.py` | Build executable locally |
-| `uv run python scripts/publish_tuf_release.py` | Publish TUF update |
-| `uv run python scripts/version_bump_calculator.py` | Test version bump logic |
+

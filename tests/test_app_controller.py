@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from skill_manager.app import AppController
+from skill_manager.core.schemas import CacheState, SkillRecord
 from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
@@ -53,7 +54,7 @@ def test_controller_set_current_view(controller):
     controller.currentView = "QuickCopy"
     assert controller.currentView == "QuickCopy"
     # Library defaults to isPackageOnly=True in __init__
-    assert controller.isPackageOnly == Qt.Checked
+    assert controller.isPackageOnly == Qt.CheckState.Checked
 
 
 def test_controller_add_remove_source(controller):
@@ -71,10 +72,15 @@ def test_controller_status_message(controller):
 
 def test_controller_load_initial_data_logic(controller):
     # Test _finalize_loading directly to avoid threads
-    skills = [{"name": "Skill A", "category": "Dev", "is_package": True}]
-    controller.discovery._finalize_loading(
-        all_skills=skills, _projects_state=[], cats=["Dev"], proj_labels=[], status="Success"
+    state = CacheState(
+        skills=[
+            SkillRecord(name="Skill A", local_path="/test/skill_a", category="Dev", is_package=True)
+        ],
+        categories=["Dev"],
+        project_labels=[],
+        status="Success",
     )
+    controller.discovery._finalize_loading(state)
 
     assert controller.skillModel.rowCount() == 1
     assert "Dev" in controller.categories
@@ -168,8 +174,8 @@ def test_controller_setters(controller):
 
 
 def test_controller_toggle_package_only(controller):
-    controller.isPackageOnly = Qt.Unchecked
-    assert controller.isPackageOnly == Qt.Unchecked
+    controller.isPackageOnly = Qt.CheckState.Unchecked
+    assert controller.isPackageOnly == Qt.CheckState.Unchecked
 
 
 def test_controller_logo_and_category_delegate(controller):
@@ -199,18 +205,18 @@ def test_controller_window_and_theme_setters_emit(controller):
 
     controller.windowWidth = 900
     # setter prevents values < 1050
-    assert controller.ui._window_width != 900
+    assert controller.ui.windowWidth != 900
 
     controller.windowWidth = 1500
     controller.windowHeight = 800
     controller.windowX = 22
     controller.windowY = 33
-    controller.darkMode = not controller.ui._dark_mode
+    controller.darkMode = not controller.ui.darkMode
 
-    assert controller.ui._window_width == 1500
-    assert controller.ui._window_height == 800
-    assert controller.ui._window_x == 22
-    assert controller.ui._window_y == 33
+    assert controller.ui.windowWidth == 1500
+    assert controller.ui.windowHeight == 800
+    assert controller.ui.windowX == 22
+    assert controller.ui.windowY == 33
     assert controller.ui.triggerSave.call_count >= 5
 
 
@@ -249,7 +255,7 @@ def test_controller_small_branch_slots(controller):
     assert controller.statusMessage == "Refreshing library..."
     controller.loadInitialData.assert_called_once()
 
-    controller.saveCustomCollection("", ["/p1"])
+    controller.saveCustomCollection("", ["/p1"], [])
     assert "" not in controller.customCollections
 
     controller.syncProject("/not-a-project")
@@ -280,7 +286,7 @@ def test_controller_custom_collections(controller):
     controller.skillModel.clearSelection = MagicMock()
     controller.skillModel.selectByPaths = MagicMock()
 
-    controller.saveCustomCollection("Core", ["/a", "/b"])
+    controller.saveCustomCollection("Core", ["/a", "/b"], ["ProjectA"])
     assert "Core" in controller.customCollections
     assert controller.getCollectionPaths("Core") == ["/a", "/b"]
 
@@ -295,21 +301,22 @@ def test_controller_custom_collections(controller):
 def test_controller_create_custom_command_delegates(controller, temp_dir):
     project_path = temp_dir / "proj"
     project_path.mkdir(parents=True, exist_ok=True)
-    # create_custom_command_file uses project_paths to find targets
     controller._projects = [str(project_path)]
 
     with (
         patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
-        patch("skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None),
+        patch(
+            "skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None
+        ),
     ):
         from skill_manager.core.commands import CommandCreateResult
 
         mock_create.return_value = CommandCreateResult(
-            ok=True, message="Created command: Deploy.Codex.md"
+            ok=True, message="Created command: Deploy.md"
         )
-        controller.createCustomCommand("Deploy", "Codex", "body", "proj", "Ops")
+        controller.createCustomCommand("Deploy", "body", "proj", "Ops")
 
-    assert controller.statusMessage == "Created 1 command(s)"
+    assert controller.statusMessage == "Created command: Deploy.md"
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -339,11 +346,24 @@ def test_controller_config_and_update_source_slots(controller):
     with (
         patch(
             "skill_manager.core.skill_packages.normalize_skill_package_config",
-            return_value={"name": "Repo", "source_type": "git", "package_id": "repo"},
+            return_value={
+                "name": "Repo",
+                "source_type": "git",
+                "package_id": "repo",
+                "repository_url": "https://example.test/repo.git",
+                "github_token": "",
+                "package_args": "",
+                "update_command": "",
+                "current_version_command": "",
+                "latest_version_command": "",
+                "package_path": "",
+                "clone_path": "",
+                "package_name": "",
+            },
         ),
         patch(
             "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda source: {**source, "latest_version": "v1"},
+            side_effect=lambda source, **kw: {**source, "latest_version": "v1"},
         ),
         patch("skill_manager.controllers.update_controller.capture_event") as capture,
     ):
@@ -472,13 +492,13 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
 
     # Success case - we'll test _finalize_loading separately for correctness
     # as the async loop is mocked away here.
-    controller.discovery._finalize_loading(
-        all_skills=[{"name": "A", "is_package": True}],
-        _projects_state=[],
-        cats=["Dev"],
-        proj_labels=["P"],
+    state = CacheState(
+        skills=[SkillRecord(name="A", local_path="/test/a", is_package=True)],
+        categories=["Dev"],
+        project_labels=["P"],
         status="Done",
     )
+    controller.discovery._finalize_loading(state)
     assert controller.categories == ["Dev"]
     assert controller.statusMessage == "Done"
 
@@ -505,7 +525,16 @@ def test_controller_cache_save_load_and_corruption(controller, tmp_path):
 
     with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
         controller.config_mgr.save_cache(
-            {"skills": [{"name": "A", "raw_content": "large", "body_content": "body"}]}
+            {
+                "skills": [
+                    {
+                        "name": "A",
+                        "local_path": "/test",
+                        "raw_content": "large",
+                        "body_content": "body",
+                    }
+                ]
+            }
         )
         saved = cache_file.read_text(encoding="utf-8")
         assert "raw_content" not in saved
@@ -563,7 +592,7 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
         if method is None and callable(receiver)
         else method()
         if callable(method)
-        else method.call()
+        else method.call()  # type: ignore[union-attr]
     )
 
     controller.loadInitialData = MagicMock()
@@ -644,3 +673,151 @@ def test_client_format_change_syncs_model_filters(qapp, controller):
 
     assert controller.quickCopyModel.clientFilter == "Antigravity"
     assert controller.libraryModel.clientFilter == "Antigravity"
+
+
+def test_copy_collection_to_clipboard_delegates_to_ops(controller):
+    controller._custom_collections = {
+        "TestColl": {
+            "paths": ["/skill/a"],
+            "projects": [],
+            "shortcut": "",
+            "shortcut_enabled": True,
+        }
+    }
+    controller._clipboard = MagicMock()
+    controller._client_format = "Gemini"
+
+    with patch.object(controller.ops, "copyCollectionToClipboard") as mock_ops:
+        controller.copyCollectionToClipboard("TestColl")
+        mock_ops.assert_called_once_with("TestColl")
+
+
+# ---------------------------------------------------------------------------
+# Selection refresh integration (real DiscoveryService)
+# ---------------------------------------------------------------------------
+
+
+def _write_command_file(path, name, body, category="Commands"):
+    """Write a valid command file with YAML frontmatter."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        f"---\nname: {name}\ncategory: {category}\ntype: command\ndate: 2026-01-01\n---\n\n{body}"
+    )
+    path.write_text(content, encoding="utf-8")
+
+
+def _load_command_into_model(controller, cmd_path, name, body):
+    """Load a command into both models so _refresh_selected_skill can find it."""
+    skill_data = {
+        "local_path": str(cmd_path),
+        "name": name,
+        "body_content": body,
+        "category": "Custom Commands",
+        "main_category": "\u2699\ufe0f System & Workflow",
+        "is_command": True,
+        "is_starred": False,
+        "is_bundle": False,
+        "is_archived": False,
+        "is_selected": False,
+        "is_package": False,
+        "is_source": False,
+        "project_label": "test-project",
+        "source": "Custom",
+        "risk": "Low",
+        "description": "",
+        "raw_content": "",
+    }
+    controller._library_model.addOrUpdateSkills([skill_data])
+    controller._quick_copy_model.addOrUpdateSkills([skill_data])
+    for model in (controller._library_model, controller._quick_copy_model):
+        model.showCommands = True
+        model.state.is_package_only = None
+        model._apply_filter()
+    return skill_data
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_update_custom_command_refreshes_selected_skill_real_discovery(
+    mock_patch_cache,
+    controller,
+    temp_dir,
+):
+    """updateCustomCommandFull refreshes _selected_skill using real DiscoveryService.
+
+    On main (pre-fix), this fails because discover_single returns
+    None for bare .md command files.
+    """
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    controller._projects = [str(project_path)]
+
+    cmd_file = commands_dir / "Cmd.md"
+    _write_command_file(cmd_file, "Cmd", "old body")
+
+    _load_command_into_model(controller, cmd_file, "Cmd", "old body")
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
+
+    emissions = []
+    controller.selectedSkillChanged.connect(lambda: emissions.append(True))
+
+    proj_label = compute_project_label(project_path)
+    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label, "")
+
+    assert emissions, (
+        "selectedSkillChanged was not emitted — "
+        "discover_single likely returned None for the command file"
+    )
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_create_custom_command_refreshes_selected_skill_real_discovery(
+    mock_patch_cache,
+    controller,
+    temp_dir,
+):
+    """createCustomCommand refreshes _selected_skill using real DiscoveryService.
+
+    On main (pre-fix), this fails because discover_single returns
+    None for bare .md command files.
+    """
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    label = compute_project_label(project_path)
+
+    # Pre-create the command file so discover_single can parse it
+    cmd_file = project_path / ".agents" / "commands" / "NewCmd.md"
+    _write_command_file(cmd_file, "NewCmd", "echo hello")
+
+    _load_command_into_model(controller, cmd_file, "NewCmd", "echo hello")
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "NewCmd"}
+
+    emissions = []
+    controller.selectedSkillChanged.connect(lambda: emissions.append(True))
+
+    controller.createCustomCommand("NewCmd2", "echo hello", label, "Commands")
+
+    # Verify the new command file was created and discover_single works
+    new_cmd_file = project_path / ".agents" / "commands" / "NewCmd2.md"
+    assert new_cmd_file.exists(), "New command file should exist on disk"
+
+    from skill_manager.core.discovery import DiscoveryService
+
+    svc = DiscoveryService(
+        sources=list(controller._sources),
+        projects=controller._projects,
+        archive_paths=controller._archive_paths,
+        starred_paths=controller._starred_paths,
+        project_aliases=controller._project_aliases,
+    )
+    skill_data = svc.discover_single(new_cmd_file, new_cmd_file.parent)
+    assert skill_data is not None, (
+        "discover_single returned None for newly created command — "
+        "the command file parser should handle bare .md files"
+    )

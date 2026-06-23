@@ -1,11 +1,9 @@
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from skill_manager.core.config import (
     DEFAULT_SHORTCUTS,
     ConfigManager,
-    get_app_data_dir,
     resolve_data_file,
 )
 from skill_manager.core.updater import update_projects
@@ -64,28 +62,6 @@ def test_update_projects_error_handling(tmp_path, caplog):
         update_projects([str(proj)], [str(src)])
 
     assert "Error updating 'item': Copy failed" in caplog.text
-
-
-def test_get_app_data_dir_fallbacks(monkeypatch):
-    monkeypatch.delenv("SKILL_MANAGER_DATA_DIR", raising=False)
-    monkeypatch.setattr(os, "name", "posix")
-    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
-
-    # Use PurePath or just mock the entire return of Path.home()
-    mock_home = MagicMock(spec=Path)
-    # Mock the / operator behavior: mock_home / ".local" -> another mock
-    mock_local = MagicMock(spec=Path)
-    mock_share = MagicMock(spec=Path)
-    mock_app = MagicMock(spec=Path)
-
-    mock_home.__truediv__.return_value = mock_local
-    mock_local.__truediv__.return_value = mock_share
-    mock_share.__truediv__.return_value = mock_app
-
-    with patch("pathlib.Path.home", return_value=mock_home):
-        app_dir = get_app_data_dir()
-        # It should have called home() / ".local" / "share" / APP_NAME
-        assert app_dir == mock_app
 
 
 def test_resolve_data_file_copy_error(tmp_path):

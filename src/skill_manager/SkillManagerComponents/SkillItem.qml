@@ -92,13 +92,15 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
 
-                ToolTip.text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
-                ToolTip.visible: containsMouse
-                ToolTip.delay: 400
+                SleekToolTip {
+                    id: subCatToolTip
+                    text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
+                    visible: mouseAreaSub.containsMouse
+                }
 
                 Accessible.role: Accessible.Button
                 Accessible.name: root.subCat
-                Accessible.description: ToolTip.text
+                Accessible.description: subCatToolTip.text
             }
         }
 
@@ -141,40 +143,51 @@ Item {
                     Accessible.name: (model && model.name ? model.name : "Item")
                     Accessible.description: "Skill item"
 
-                    ToolTip {
-                        id: screenshotTooltip
-                        visible: mouseArea.containsMouse && model && model.isScreenshot && model.path
-                        delay: 450
-                        timeout: 8000
-                        padding: 8
-                        x: mouseArea.mouseX + 15
-                        y: mouseArea.mouseY + 15
+                    Loader {
+                        active: mouseArea.containsMouse && model && model.isScreenshot && model.path
+                        asynchronous: false
+                        sourceComponent: ToolTip {
+                            id: screenshotTooltip
+                            visible: true
+                            delay: 450
+                            timeout: 8000
+                            padding: 8
+                            x: mouseArea.mouseX + 15
+                            y: mouseArea.mouseY + 15
 
-                        background: Rectangle {
-                            color: Theme.glassActive
-                            radius: Theme.radiusSmall
-                            border.color: Theme.glassOuterBorder
-                            border.width: 1
-                        }
+                            background: Rectangle {
+                                color: Theme.glassActive
+                                radius: Theme.radiusSmall
+                                border.color: Theme.glassOuterBorder
+                                border.width: 1
+                            }
 
-                        contentItem: Item {
-                            implicitWidth: Math.min(300, previewImg.implicitWidth)
-                            implicitHeight: Math.min(300, previewImg.implicitHeight)
-                            
-                            Image {
-                                id: previewImg
-                                anchors.fill: parent
-                                source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                                sourceSize.width: 600 // High enough for detail, but limited for perf
-                                sourceSize.height: 600
+                            contentItem: Item {
+                                property real maxW: 400
+                                property real maxH: 400
+                                property real minW: 100
+                                property real minH: 100
+                                
+                                property real scaleFactor: previewImg.status === Image.Ready ? Math.min(1.0, maxW / Math.max(1, previewImg.implicitWidth), maxH / Math.max(1, previewImg.implicitHeight)) : 1.0
+                                
+                                implicitWidth: previewImg.status === Image.Ready ? Math.max(minW, previewImg.implicitWidth * scaleFactor) : minW
+                                implicitHeight: previewImg.status === Image.Ready ? Math.max(minH, previewImg.implicitHeight * scaleFactor) : minH
+                                
+                                Image {
+                                    id: previewImg
+                                    anchors.fill: parent
+                                    source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: false
+                                    // Setting only width preserves the original aspect ratio for the pixmap
+                                    sourceSize.width: 600 
+                                }
                             }
                         }
                     }
 
-                    ToolTip {
-                        id: textPreviewTooltip
+                    Loader {
+                        id: textPreviewLoader
                         property string previewText: {
                             if (!model) return "";
                             if (model.isCommand && model.bodyContent) {
@@ -193,30 +206,35 @@ Item {
                             return "";
                         }
                         
-                        visible: mouseArea.containsMouse && previewText.length > 0
-                        delay: 450
-                        timeout: 8000
-                        padding: 8
-                        x: mouseArea.mouseX + 15
-                        y: mouseArea.mouseY + 15
+                        active: mouseArea.containsMouse && previewText.length > 0
+                        asynchronous: false
+                        sourceComponent: ToolTip {
+                            id: textPreviewTooltip
+                            visible: true
+                            delay: 450
+                            timeout: 8000
+                            padding: 8
+                            x: mouseArea.mouseX + 15
+                            y: mouseArea.mouseY + 15
 
-                        background: Rectangle {
-                            color: Theme.glassActive
-                            radius: Theme.radiusSmall
-                            border.color: Theme.glassOuterBorder
-                            border.width: 1
-                        }
+                            background: Rectangle {
+                                color: Theme.glassActive
+                                radius: Theme.radiusSmall
+                                border.color: Theme.glassOuterBorder
+                                border.width: 1
+                            }
 
-                        contentItem: Text {
-                            id: textItem
-                            text: textPreviewTooltip.previewText
-                            font.family: (model && model.isCommand) ? "Consolas, Monaco, Courier New, monospace" : Theme.fontFamily
-                            font.pixelSize: 12
-                            color: Theme.label
-                            wrapMode: Text.Wrap
-                            width: Math.min(implicitWidth, 280)
-                            maximumLineCount: 8
-                            elide: Text.ElideRight
+                            contentItem: Text {
+                                id: textItem
+                                text: textPreviewLoader.previewText
+                                font.family: (model && model.isCommand) ? "Consolas, Monaco, Courier New, monospace" : Theme.fontFamily
+                                font.pixelSize: 12
+                                color: Theme.label
+                                wrapMode: Text.Wrap
+                                width: Math.min(implicitWidth, 280)
+                                maximumLineCount: 8
+                                elide: Text.ElideRight
+                            }
                         }
                     }
                 }
@@ -251,9 +269,11 @@ Item {
                             onClicked: (mouse) => AppController.skillModel.toggleSelection(index)
                             cursorShape: Qt.PointingHandCursor
 
-                            ToolTip.text: (model && model.isSelected) ? "Deselect" : "Select"
-                            ToolTip.visible: containsMouse
-                            ToolTip.delay: 400
+                            SleekToolTip {
+                                id: selToolTip
+                                text: (model && model.isSelected) ? "Deselect" : "Select"
+                                visible: checkboxMouseArea.containsMouse
+                            }
 
                             Accessible.role: Accessible.CheckBox
                             Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
@@ -335,8 +355,10 @@ Item {
                             border.width: deleteBtn.hovered ? 1 : 0
                             border.color: Theme.glassBorder
                         }
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
+                        SleekToolTip {
+                            visible: parent.hovered
+                            text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
+                        }
                     }
                 }
             }

@@ -84,9 +84,10 @@ Rectangle {
                     selectByMouse: true
                     readOnly: true
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = nameField
                             inspectorContextMenu.popup()
                         }
@@ -102,13 +103,15 @@ Rectangle {
                         }
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Edit settings"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: editCmdToolTip
+                        text: "Edit settings"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Edit settings"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: editCmdToolTip.text
                 }
 
                 IconButton {
@@ -123,13 +126,15 @@ Rectangle {
                         root.closed()
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Delete command"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: delCmdToolTip
+                        text: "Delete command"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Delete command"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: delCmdToolTip.text
                 }
 
                 IconButton {
@@ -137,36 +142,26 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Close Inspector"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: closeCmdToolTip
+                        text: "Close Inspector"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Close Inspector"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: closeCmdToolTip.text
                 }
             }
 
-            // Body Content (editable)
+            // Command Details Section (editable)
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 8
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "Command Body"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        color: Theme.secondaryLabel
-                    }
-                }
-
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 400
                     Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
@@ -182,9 +177,9 @@ Rectangle {
 
                         TextArea {
                             id: bodyArea
-                            width: parent.availableWidth
+                            width: parent.width - parent.leftPadding - parent.rightPadding
                             Accessible.role: Accessible.EditableText
-                            Accessible.name: "Command Body"
+                            Accessible.name: "Command Details"
                             text: root.skill.body_content || ""
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
@@ -196,9 +191,10 @@ Rectangle {
                             padding: 12
                             verticalAlignment: TextArea.AlignTop
 
-                            TapHandler {
+                            MouseArea {
+                                anchors.fill: parent
                                 acceptedButtons: Qt.RightButton
-                                onTapped: {
+                                onClicked: (mouse) => {
                                     inspectorContextMenu.targetControl = bodyArea
                                     inspectorContextMenu.popup()
                                 }
@@ -207,8 +203,6 @@ Rectangle {
                     }
                 }
             }
-
-            Item { Layout.preferredHeight: 12 }
         }
     }
 
@@ -235,9 +229,11 @@ Rectangle {
             onClicked: (mouse) => root.isCollapsed = false
             cursorShape: Qt.PointingHandCursor
 
-            ToolTip.text: "Expand Inspector"
-            ToolTip.visible: containsMouse
-            ToolTip.delay: 400
+            SleekToolTip {
+                id: expCmdToolTip
+                text: "Expand Inspector"
+                visible: parent.containsMouse
+            }
 
             Accessible.role: Accessible.Button
             Accessible.name: "Expand Inspector"

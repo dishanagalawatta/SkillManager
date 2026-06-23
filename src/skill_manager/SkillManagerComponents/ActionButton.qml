@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 
 Button {
     id: control
@@ -113,9 +112,10 @@ Button {
         opacity: control.enabled ? 1.0 : 0.65
     }
 
-    ToolTip.visible: hovered && tooltipText !== ""
-    ToolTip.delay: 400
-    ToolTip.text: tooltipText
+    SleekToolTip {
+        visible: control.hovered && control.tooltipText !== ""
+        text: control.tooltipText
+    }
     Accessible.role: Accessible.Button
     Accessible.name: accessibleName
     Accessible.description: tooltipText

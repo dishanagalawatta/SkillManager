@@ -9,7 +9,7 @@ from skill_manager.core.parsing import (
 
 def test_normalize_description_types():
     assert normalize_description(None) == ""
-    assert normalize_description(["a", "b"]) == "a b"
+    assert normalize_description(["a", "b"]) == "a\nb"
     assert normalize_description(123) == "123"
     assert normalize_description("  extra   spaces  ") == "extra spaces"
 
@@ -72,11 +72,11 @@ def test_categorize_skill_metadata_exact_match():
 
 
 def test_get_category_patterns_caching():
-    from skill_manager.core.parsing.categorizer import _get_category_patterns
+    from skill_manager.core.parsing.categorizer import get_category_patterns
 
-    patterns = _get_category_patterns()
+    patterns = get_category_patterns()
     assert "Testing" in patterns or "Web Development" in patterns
-    patterns2 = _get_category_patterns()
+    patterns2 = get_category_patterns()
     assert patterns2 is patterns
 
 

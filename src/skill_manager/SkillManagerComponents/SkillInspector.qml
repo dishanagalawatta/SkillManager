@@ -83,18 +83,14 @@ Rectangle {
     border.color: Theme.glassBorder
     clip: true // Ensure content doesn't bleed out when collapsed
     
-    SmoothScrollView {
-        id: mainScroll
+    Item {
+        id: mainContainer
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.margins: 16
         clip: true
-        ScrollBar.vertical.policy: ScrollBar.AsNeeded
         
         ColumnLayout {
-            width: mainScroll.width - 24
-            height: Math.max(implicitHeight, mainScroll.height - 24)
-            x: 12
-            y: 12
+            anchors.fill: parent
             spacing: 16
             visible: !root.isCollapsed && root.skill.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
@@ -118,9 +114,10 @@ Rectangle {
                     cursorVisible: false
                     wrapMode: TextEdit.Wrap
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = skillNameEdit
                             inspectorContextMenu.popup()
                         }
@@ -145,15 +142,18 @@ Rectangle {
                         border.color: Theme.glassBorder
                     }
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = argField
                             inspectorContextMenu.popup()
                         }
                     }
-                    ToolTip.text: "Argument (e.g. ultra)"
-                    ToolTip.visible: hovered
+                    SleekToolTip {
+                        text: "Argument (e.g. ultra)"
+                        visible: parent.hovered
+                    }
                 }
                 IconButton {
                     id: starButton
@@ -181,12 +181,15 @@ Rectangle {
                         radius: Theme.radiusPill
                     }
                     
-                    ToolTip.visible: hovered
-                    ToolTip.text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    SleekToolTip {
+                        id: starToolTip
+                        visible: parent.hovered
+                        text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
-                    Accessible.description: ToolTip.text
+                    Accessible.description: starToolTip.text
                 }
 
                 IconButton {
@@ -194,62 +197,15 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    ToolTip.text: "Close Inspector"
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: closeToolTip
+                        text: "Close Inspector"
+                        visible: parent.hovered
+                    }
 
                     Accessible.role: Accessible.Button
                     Accessible.name: "Close Inspector"
-                    Accessible.description: ToolTip.text
-                }
-            }
-
-            // Metadata Section
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: metaColumn.implicitHeight + 24
-                radius: Theme.radiusCard
-                color: Theme.glassPill
-                border.color: Theme.glassBorder
-                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
-
-                ColumnLayout {
-                    id: metaColumn
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 4
-                    
-                    Repeater {
-                        model: root.skill.local_path ? [
-                            { label: "Location", value: root.skill.project_label || "Unknown" },
-                            { label: "Type", value: root.skill.category || "Unknown" },
-                            { label: "Risk", value: root.skill.risk || "Unknown" },
-                            { label: "Source", value: root.skill.source || "Unknown" },
-                            { label: "Date", value: root.skill.date || "Unknown" }
-                        ] : []
-                        
-                        TextEdit {
-                            id: metaEdit
-                            text: "<b>" + modelData.label + ":</b> " + modelData.value
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            color: Theme.secondaryLabel
-                            Layout.fillWidth: true
-                            readOnly: true
-                            selectByMouse: true
-                            cursorVisible: false
-                            wrapMode: TextEdit.Wrap
-                            textFormat: TextEdit.RichText
-
-                            TapHandler {
-                                acceptedButtons: Qt.RightButton
-                                onTapped: {
-                                    inspectorContextMenu.targetControl = metaEdit
-                                    inspectorContextMenu.popup()
-                                }
-                            }
-                        }
-                    }
+                    Accessible.description: closeToolTip.text
                 }
             }
 
@@ -280,11 +236,76 @@ Rectangle {
                     selectByMouse: true
                     cursorVisible: false
 
-                    TapHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         acceptedButtons: Qt.RightButton
-                        onTapped: {
+                        onClicked: (mouse) => {
                             inspectorContextMenu.targetControl = descriptionEdit
                             inspectorContextMenu.popup()
+                        }
+                    }
+                }
+            }
+
+            // Metadata Section
+            Flow {
+                id: metaFlow
+                Layout.fillWidth: true
+                spacing: 8
+                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
+
+                Repeater {
+                    model: root.skill.local_path ? [
+                        { label: "Location", value: root.skill.project_label || "Unknown" },
+                        { label: "Type", value: root.skill.category || "Unknown" },
+                        { label: "Risk", value: root.skill.risk || "Unknown" },
+                        { label: "Source", value: root.skill.source || "Unknown" },
+                        { label: "Date", value: root.skill.date || "Unknown" }
+                    ] : []
+                    
+                    Rectangle {
+                        height: 26
+                        width: rowLayout.implicitWidth + 16
+                        radius: Theme.radiusSmall
+                        color: Theme.glassPill
+                        border.color: Theme.glassBorder
+                        border.width: 1
+                        visible: modelData.value && modelData.value.toLowerCase() !== "unknown"
+                        
+                        Row {
+                            id: rowLayout
+                            anchors.centerIn: parent
+                            spacing: 4
+                            
+                            Text {
+                                text: modelData.label + ":"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeMetadata
+                                font.weight: Font.DemiBold
+                                color: Theme.secondaryLabel
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            
+                            TextEdit {
+                                id: metaValEdit
+                                text: modelData.value
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeMetadata
+                                color: Theme.label
+                                readOnly: true
+                                selectByMouse: true
+                                cursorVisible: false
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.RightButton
+                                    onClicked: (mouse) => {
+                                        inspectorContextMenu.targetControl = metaValEdit
+                                        inspectorContextMenu.popup()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -385,27 +406,15 @@ Rectangle {
                 }
             }
 
-            // Implementation / Raw Content Section
+            // Skill Details / Raw Content Section
             ColumnLayout {
                 Layout.fillWidth: true
                 visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
                 spacing: 8
                 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: "Implementation Details"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        color: Theme.secondaryLabel
-                    }
-                }
-                
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 400
                     Layout.minimumHeight: 100
                     radius: Theme.radiusSmall
                     color: Qt.rgba(0,0,0,0.2)
@@ -422,9 +431,9 @@ Rectangle {
 
                         TextArea {
                             id: rawContentArea
-                            width: rawContentScroll.availableWidth
+                            width: rawContentScroll.width - rawContentScroll.leftPadding - rawContentScroll.rightPadding
                             Accessible.role: Accessible.EditableText
-                            Accessible.name: "Implementation Details"
+                            Accessible.name: "Skill Details"
                             text: cleanBodyContent((root.skill && root.skill.body_content) || "")
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
@@ -439,9 +448,10 @@ Rectangle {
                             // Ensure text is correctly aligned
                             verticalAlignment: TextArea.AlignTop
 
-                            TapHandler {
+                            MouseArea {
+                                anchors.fill: parent
                                 acceptedButtons: Qt.RightButton
-                                onTapped: {
+                                onClicked: (mouse) => {
                                     inspectorContextMenu.targetControl = rawContentArea
                                     inspectorContextMenu.popup()
                                 }
@@ -451,9 +461,11 @@ Rectangle {
                 }
             }
 
-
-
-            Item { Layout.preferredHeight: 12 } // Bottom padding
+            // Flexible spacer for screenshot mode to prevent vertical stretching
+            Item {
+                Layout.fillHeight: true
+                visible: root.skill.is_screenshot === true
+            }
         }
     }
 
@@ -481,9 +493,10 @@ Rectangle {
             onClicked: (mouse) => root.isCollapsed = false
             cursorShape: Qt.PointingHandCursor
 
-            ToolTip.text: "Expand Inspector"
-            ToolTip.visible: containsMouse
-            ToolTip.delay: 400
+            SleekToolTip {
+                text: "Expand Inspector"
+                visible: parent.containsMouse
+            }
 
             Accessible.role: Accessible.Button
             Accessible.name: "Expand Inspector"

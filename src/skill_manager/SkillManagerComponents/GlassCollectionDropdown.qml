@@ -5,17 +5,49 @@ import App 1.0
 
 ComboBox {
     id: control
+    property bool keyboardNavigated: false
     
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            keyboardNavigated = true
+        }
+        event.accepted = false
+    }
+
     signal collectionSelected(string name)
     signal editCollectionClicked(string name)
 
-    model: ["All Collections"].concat(AppController.customCollections)
-    
+    function getFilteredCollections() {
+        return AppController.customCollections || []
+    }
+
+    model: ["All Collections"].concat(getFilteredCollections())
+
+    Connections {
+        target: AppController
+        function onCustomCollectionsChanged() {
+            control.model = ["All Collections"].concat(control.getFilteredCollections())
+        }
+    }
+
     delegate: ItemDelegate {
-        width: control.width
+        width: dropdownList.width
+        height: 32 // FIX: Fixed height prevents list implicitHeight jitter which causes Flickable out-of-bounds jump
+        padding: 0 // FIX: Remove default Qt padding which clips contentItem in fixed-height delegates
+        hoverEnabled: true
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered) {
+                    control.keyboardNavigated = false
+                }
+            }
+        }
+
         contentItem: RowLayout {
             spacing: 8
             Text {
+                leftPadding: 10
                 text: modelData !== undefined ? modelData : ""
                 color: Theme.label
                 font.family: Theme.fontFamily
@@ -23,7 +55,7 @@ ComboBox {
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
             }
-            
+
             // Edit Button
             IconButton {
                 id: editBtn
@@ -33,7 +65,8 @@ ComboBox {
                 role: "ghost"
                 tooltipText: "Edit Collection"
                 visible: index > 0 // Only for custom collections
-                
+                Layout.rightMargin: 10
+
                 onClicked: {
                     control.popup.close()
                     control.editCollectionClicked(modelData !== undefined ? modelData : "")
@@ -41,14 +74,15 @@ ComboBox {
             }
         }
         background: Rectangle {
-            color: highlighted ? Theme.glassHover : "transparent"
+            radius: 6
+            color: (hovered || (control.keyboardNavigated && control.highlightedIndex === index)) ? Theme.glassHover : "transparent"
         }
     }
 
     indicator: Canvas {
         id: canvas
         x: control.width - width - control.rightPadding
-        y: control.topPadding + (control.availableHeight - height) / 2
+        y: control.topPadding + ((control.height - control.topPadding - control.bottomPadding) - height) / 2
         width: 12
         height: 8
         contextType: "2d"
@@ -95,14 +129,40 @@ ComboBox {
     popup: Popup {
         y: control.height + 4
         width: control.width
-        padding: 5
-        implicitHeight: Math.min(dropdownList.contentHeight + 10, 250)
+        padding: 6
+        implicitHeight: Math.min(dropdownList.implicitHeight + topPadding + bottomPadding, 250)
 
         contentItem: SmoothListView {
             id: dropdownList
             clip: true
+            implicitHeight: contentHeight
             model: control.delegateModel
-            currentIndex: control.highlightedIndex
+            boundsBehavior: Flickable.StopAtBounds
+            highlightRangeMode: ListView.NoHighlightRange
+            highlightFollowsCurrentItem: false
+
+            onContentYChanged: {
+                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassCollectionDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")
+            }
+            onContentHeightChanged: {
+                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassCollectionDropdown contentHeight changed: " + contentHeight)
+            }
+
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                    control.keyboardNavigated = true
+                }
+                event.accepted = false
+            }
+
+            Connections {
+                target: control
+                function onHighlightedIndexChanged() {
+                    if (control.popup.opened && control.keyboardNavigated) {
+                        dropdownList.positionViewAtIndex(control.highlightedIndex, ListView.Contain)
+                    }
+                }
+            }
         }
 
         background: Rectangle {

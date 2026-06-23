@@ -1,0 +1,99 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --only-group dev
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Decode signing cert
+        if: ${{ env.WIN_PFX_B64 != '' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "${{ github.workspace }}\packaging\windows\certs" -Force | Out-Null
+          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_PFX_B64 }}")
+          [IO.File]::WriteAllBytes("${{ github.workspace }}\packaging\windows\certs\code-signing.pfx", $bytes)
+        env:
+          WIN_PFX_B64: ${{ secrets.WIN_PFX_B64 }}
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          if ("${{ secrets.WIN_PFX_B64 }}" -ne "") {
+            .\packaging\windows\build.ps1
+          } else {
+            .\packaging\windows\build.ps1 -SkipSign
+          }
+        env:
+          WIN_PFX_PASS: ${{ secrets.WIN_PFX_PASS }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkillManager_Setup
+          path: dist/SkillManager_Setup.exe
+
+  publish-release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: SkillManager_Setup
+          path: dist/
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Compute SHA256
+        id: sha256
+        run: |
+          HASH=$(sha256sum dist/SkillManager_Setup.exe | cut -d' ' -f1)
+          echo "HASH=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: SkillManager ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: dist/SkillManager_Setup.exe
+          generate_release_notes: true
+
+      - name: Echo SHA256
+        run: |
+          echo "Installer SHA256: ${{ steps.sha256.outputs.HASH }}"
+          echo "Use this hash in winget manifest installer.yaml"

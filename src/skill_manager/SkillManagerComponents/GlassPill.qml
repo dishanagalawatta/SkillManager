@@ -3,41 +3,24 @@ import QtQuick.Controls
 import QtQuick.Effects
 import App 1.0
 
-Item {
+Rectangle {
     id: root
-    
-    property alias color: rect.color
-    property alias radius: rect.radius
-    default property alias content: container.data
 
-    Rectangle {
-        id: rect
-        anchors.fill: parent
-        color: Theme.glassPill
-        radius: Theme.radiusPill
-        
-        // Outer defining border
-        border.width: 1
-        border.color: Theme.glassOuterBorder
+    property alias color: root.color
+    property alias radius: root.radius
+    default property alias content: root.data
 
-        // Inner highlight border (Removed for solid matte look, kept empty for layout)
-        Item {
-            anchors.fill: parent
-        }
+    color: Theme.glassPill
+    radius: Theme.radiusPill
+    border.width: 1
+    border.color: Theme.glassOuterBorder
 
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowBlur: 2.0
-            shadowColor: Theme.glassShadow
-            shadowVerticalOffset: 4
-            shadowHorizontalOffset: 0
-        }
-        
-        Item {
-            id: container
-            anchors.fill: parent
-            anchors.margins: 1
-        }
+    layer.enabled: true
+    layer.effect: MultiEffect {
+        shadowEnabled: true
+        shadowBlur: 2.0
+        shadowColor: Theme.glassShadow
+        shadowVerticalOffset: 4
+        shadowHorizontalOffset: 0
     }
 }

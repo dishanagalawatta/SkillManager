@@ -3,6 +3,7 @@ Purpose: Manages UI state, window geometry, themes, and system shell actions.
 Usage: Accessed via AppController.ui
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -12,6 +13,9 @@ from PySide6.QtCore import Property, QTimer, Signal, Slot
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.resources import logo_asset_for_client
+from skill_manager.core.schemas import UIStateRecord
+
+logger = logging.getLogger(__name__)
 
 
 class UIController(BaseController):
@@ -32,22 +36,26 @@ class UIController(BaseController):
     def __init__(self, app):
         super().__init__(app)
 
-        ui_state = self.config.get("ui_state", {})
-        self._window_width = max(1050, ui_state.get("window_width", 1300))
-        self._window_height = max(650, ui_state.get("window_height", 650))
-        self._window_x = ui_state.get("window_x", 100)
-        self._window_y = ui_state.get("window_y", 100)
-        self._dark_mode = ui_state.get("dark_mode", False)
-        self._current_view = ui_state.get("current_view", "Library")
-        self._startup_view = ui_state.get("startup_view", self._current_view)
-        self._remember_filters = ui_state.get("remember_filters", True)
-        self._reduced_motion = ui_state.get("reduced_motion", False)
-        self._compact_list_rows = ui_state.get("compact_list_rows", False)
-        self._inspector_width = ui_state.get("inspector_width", 0)
+        # Initialize state using Pydantic for strict validation
+        raw_state = self.config.get("ui_state", {})
+        try:
+            # If current_view is provided but startup_view is not,
+            # make startup_view match it (legacy behavior parity)
+            if "current_view" in raw_state and "startup_view" not in raw_state:
+                raw_state["startup_view"] = raw_state["current_view"]
 
-        # Normalize view names
-        self._startup_view = self._normalizeViewName(self._startup_view)
-        self._current_view = self._startup_view
+            self.state = UIStateRecord.model_validate(raw_state)
+        except Exception as e:
+            logger.warning("Invalid UI state in config, using defaults. Error: %s", e)
+            self.state = UIStateRecord()
+
+        # Normalize view names in the record
+        if self.state.startup_view == "Last Selected":
+            # If "Last Selected", we don't normalize it, and we keep current_view as is
+            self.state.current_view = self._normalizeViewName(self.state.current_view)
+        else:
+            self.state.startup_view = self._normalizeViewName(self.state.startup_view)
+            self.state.current_view = self.state.startup_view
 
         # Debounce timer for UI state saves
         self._save_timer = QTimer()
@@ -55,131 +63,149 @@ class UIController(BaseController):
         self._save_timer.timeout.connect(self.saveUiState)
 
     @Property(str, notify=currentViewChanged)
-    def currentView(self):
-        return self._current_view
+    def currentView(self):  # type: ignore[reportRedeclaration]
+        return self.state.current_view
 
-    @currentView.setter
+    @currentView.setter  # type: ignore[func-attr]
     def currentView(self, value):
         normalized = self._normalizeViewName(value)
-        if self._current_view != normalized:
-            self._current_view = normalized
+        if self.state.current_view != normalized:
+            self.state.current_view = normalized
             self.saveUiState()
             self.currentViewChanged.emit()
             self.app.skillModelChanged.emit()
 
     @Property(int, notify=windowWidthChanged)
-    def windowWidth(self):
-        return self._window_width
+    def windowWidth(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_width
 
-    @windowWidth.setter
+    @windowWidth.setter  # type: ignore[func-attr]
     def windowWidth(self, value):
-        if self._window_width != value and value >= 1050:
-            self._window_width = value
-            self.triggerSave()
-            self.windowWidthChanged.emit()
+        if self.state.window_width != value:
+            # Pydantic validation will handle bounds in a real setter,
+            # but here we update the record and let it validate.
+            try:
+                # We create a temporary copy to validate the single field update
+                update = self.state.model_dump()
+                update["window_width"] = value
+                self.state = UIStateRecord.model_validate(update)
+                self.triggerSave()
+                self.windowWidthChanged.emit()
+            except Exception:
+                pass
 
     @Property(int, notify=windowHeightChanged)
-    def windowHeight(self):
-        return self._window_height
+    def windowHeight(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_height
 
-    @windowHeight.setter
+    @windowHeight.setter  # type: ignore[func-attr]
     def windowHeight(self, value):
-        if self._window_height != value and value >= 650:
-            self._window_height = value
-            self.triggerSave()
-            self.windowHeightChanged.emit()
+        if self.state.window_height != value:
+            try:
+                update = self.state.model_dump()
+                update["window_height"] = value
+                self.state = UIStateRecord.model_validate(update)
+                self.triggerSave()
+                self.windowHeightChanged.emit()
+            except Exception:
+                pass
 
     @Property(int, notify=windowXChanged)
-    def windowX(self):
-        return self._window_x
+    def windowX(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_x
 
-    @windowX.setter
+    @windowX.setter  # type: ignore[func-attr]
     def windowX(self, value):
-        if self._window_x != value:
-            self._window_x = value
+        if self.state.window_x != value:
+            self.state.window_x = value
             self.triggerSave()
             self.windowXChanged.emit()
 
     @Property(int, notify=windowYChanged)
-    def windowY(self):
-        return self._window_y
+    def windowY(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_y
 
-    @windowY.setter
+    @windowY.setter  # type: ignore[func-attr]
     def windowY(self, value):
-        if self._window_y != value:
-            self._window_y = value
+        if self.state.window_y != value:
+            self.state.window_y = value
             self.triggerSave()
             self.windowYChanged.emit()
 
     @Property(bool, notify=darkModeChanged)
-    def darkMode(self):
-        return self._dark_mode
+    def darkMode(self):  # type: ignore[reportRedeclaration]
+        return self.state.dark_mode
 
-    @darkMode.setter
+    @darkMode.setter  # type: ignore[func-attr]
     def darkMode(self, value):
-        if self._dark_mode != value:
-            self._dark_mode = value
+        if self.state.dark_mode != value:
+            self.state.dark_mode = value
             self.triggerSave()
             self.darkModeChanged.emit()
 
     @Property(str, notify=startupViewChanged)
-    def startupView(self):
-        return self._startup_view
+    def startupView(self):  # type: ignore[reportRedeclaration]
+        return self.state.startup_view
 
-    @startupView.setter
+    @startupView.setter  # type: ignore[func-attr]
     def startupView(self, value):
         normalized = self._normalizeViewName(value)
-        if self._startup_view != normalized:
-            self._startup_view = normalized
+        if self.state.startup_view != normalized:
+            self.state.startup_view = normalized
             self.triggerSave()
             self.startupViewChanged.emit()
 
     @Property(bool, notify=rememberFiltersChanged)
-    def rememberFilters(self):
-        return self._remember_filters
+    def rememberFilters(self):  # type: ignore[reportRedeclaration]
+        return self.state.remember_filters
 
-    @rememberFilters.setter
+    @rememberFilters.setter  # type: ignore[func-attr]
     def rememberFilters(self, value):
-        if self._remember_filters != value:
-            self._remember_filters = value
+        if self.state.remember_filters != value:
+            self.state.remember_filters = value
             if not value:
                 self.clearViewFilters()
             self.triggerSave()
             self.rememberFiltersChanged.emit()
 
     @Property(bool, notify=reducedMotionChanged)
-    def reducedMotion(self):
-        return self._reduced_motion
+    def reducedMotion(self):  # type: ignore[reportRedeclaration]
+        return self.state.reduced_motion
 
-    @reducedMotion.setter
+    @reducedMotion.setter  # type: ignore[func-attr]
     def reducedMotion(self, value):
-        if self._reduced_motion != value:
-            self._reduced_motion = value
+        if self.state.reduced_motion != value:
+            self.state.reduced_motion = value
             self.triggerSave()
             self.reducedMotionChanged.emit()
 
     @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):
-        return self._compact_list_rows
+    def compactListRows(self):  # type: ignore[reportRedeclaration]
+        return self.state.compact_list_rows
 
-    @compactListRows.setter
+    @compactListRows.setter  # type: ignore[func-attr]
     def compactListRows(self, value):
-        if self._compact_list_rows != value:
-            self._compact_list_rows = value
+        if self.state.compact_list_rows != value:
+            self.state.compact_list_rows = value
             self.triggerSave()
             self.compactListRowsChanged.emit()
 
     @Property(int, notify=inspectorWidthChanged)
-    def inspectorWidth(self):
-        return self._inspector_width
+    def inspectorWidth(self):  # type: ignore[reportRedeclaration]
+        return self.state.inspector_width
 
-    @inspectorWidth.setter
+    @inspectorWidth.setter  # type: ignore[func-attr]
     def inspectorWidth(self, value):
         value = int(value)
-        if self._inspector_width != value and value >= 0:
-            self._inspector_width = value
-            self.triggerSave()
-            self.inspectorWidthChanged.emit()
+        if self.state.inspector_width != value:
+            try:
+                update = self.state.model_dump()
+                update["inspector_width"] = value
+                self.state = UIStateRecord.model_validate(update)
+                self.triggerSave()
+                self.inspectorWidthChanged.emit()
+            except Exception:
+                pass
 
     @Slot(int)
     def setInspectorWidth(self, value):
@@ -199,6 +225,7 @@ class UIController(BaseController):
             self.app._client_format = f
             self.app.clientFormatChanged.emit()
             self.currentViewChanged.emit()  # Logo depends on it
+            self.config.set("client_format", f)
             self.triggerSave()
 
     @Slot(str)
@@ -225,39 +252,14 @@ class UIController(BaseController):
 
     def saveUiState(self):
         """Saves current window geometry and UI preferences to config."""
-        ui_state = self.config.get("ui_state", {})
-        ui_state.update(
-            {
-                "window_width": self._window_width,
-                "window_height": self._window_height,
-                "window_x": self._window_x,
-                "window_y": self._window_y,
-                "dark_mode": self._dark_mode,
-                "current_view": self._current_view,
-                "startup_view": self._startup_view,
-                "remember_filters": self._remember_filters,
-                "reduced_motion": self._reduced_motion,
-                "compact_list_rows": self._compact_list_rows,
-                "inspector_width": self._inspector_width,
-            }
-        )
-        self.config.set("ui_state", ui_state)
+        self.config.set("ui_state", self.state.model_dump())
 
     @Slot()
     def resetUiState(self):
         """Restores UI preferences and geometry to stable defaults."""
         self.blockSignals(True)
         try:
-            self._window_width = 1300
-            self._window_height = 650
-            self._window_x = 100
-            self._window_y = 100
-            self._current_view = "Library"
-            self._startup_view = "Library"
-            self._remember_filters = True
-            self._reduced_motion = False
-            self._compact_list_rows = False
-            self._inspector_width = 0
+            self.state = UIStateRecord()
             self._clearAllViewFilters()
             self.saveUiState()
         finally:
@@ -282,6 +284,7 @@ class UIController(BaseController):
             "library": "Library",
             "updates": "Updates",
             "settings": "Settings",
+            "lastselected": "Last Selected",
         }
         return view_map.get(view.lower(), "Library")
 
@@ -289,7 +292,11 @@ class UIController(BaseController):
     def getAssetUri(self, path: str) -> str:
         """Returns the absolute URI for an asset path."""
         if getattr(sys, "frozen", False):
-            base = Path(sys._MEIPASS) / "assets"
+            # PyInstaller sets ``sys._MEIPASS`` at runtime; the type-checker
+            # stub doesn't know about it, so guard the attribute access the
+            # same way we guard ``sys.frozen`` above.
+            meipass = getattr(sys, "_MEIPASS", "")
+            base = Path(meipass) / "assets"
         else:
             base = Path(__file__).resolve().parent.parent.parent.parent / "assets"
 
@@ -305,21 +312,7 @@ class UIController(BaseController):
         if not path:
             return
         try:
-            if sys.platform == "win32":
-                os.startfile(path)
-            elif sys.platform == "darwin":
-                import subprocess
-
-                subprocess.run(["open", "--", path])
-            else:
-                import subprocess
-
-                # xdg-open doesn't support '--' reliably; prevent argument injection
-                # by making sure paths starting with '-' become relative or absolute.
-                safe_path = path
-                if safe_path.startswith("-"):
-                    safe_path = f"./{safe_path}"
-                subprocess.run(["xdg-open", safe_path])
+            os.startfile(path)
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
@@ -377,7 +370,7 @@ class UIController(BaseController):
 
     def _setViewFilterForModel(self, model, filter_type: str, value: str):
         """Core filtering logic shared across views."""
-        if not self._remember_filters:
+        if not self.state.remember_filters:
             model.filterText = ""
 
         if filter_type == "category":

@@ -272,7 +272,7 @@ Window {
     }
 
     Shortcut {
-        enabled: overlay.visible
+        enabled: overlay.visible && AppController.config_controller.shortcutClearSelectionEnabled
         sequence: AppController.config_controller.shortcutClearSelection
         context: Qt.ApplicationShortcut
         onActivated: {

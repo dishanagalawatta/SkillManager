@@ -1,84 +1,75 @@
 # SkillManager
 
-<p align="center">
-  <img src="assets/brand/logo.png" width="128" height="128" alt="SkillManager Logo">
-  <br>
-  <b>A professional workspace to manage, sync, and deploy your AI agent skills.</b>
-</p>
+> A professional workspace to manage, sync, and deploy AI agent skills
+> across multiple project repositories. Windows desktop · PySide6 /
+> QML · Python 3.12+.
 
----
+## Features
 
-## Overview & Demo
+- **Quick Copy** — browse project skills, copy formatted references.
+- **Surgical Sync** — update only outdated skills across repos.
+- **App Update** — background version checks via GitHub Releases API.
+- **Screenshot & Redact** — capture screenshots with PII redaction.
+- **Central Library** — single, searchable hub for skill metadata.
+- **Liquid Glass UI** — hardware-accelerated, native Windows 11 shell.
 
-<video src="https://github.com/user-attachments/assets/29541600-3647-474d-8a3e-98160cdd37ff" controls="controls" muted="muted" style="max-height:640px;"></video>
-*Watch the 3-minute overview of SkillManager directly inline.*
+## Quick Start
 
----
+```bash
+uv sync
+uv run skill-manager
+python run_tests.py
+```
 
-## Key Features
+## End-User Install
 
-SkillManager is designed for developers who need to manage growing libraries of AI skills across dozens of project repositories.
+**winget** (recommended — no SmartScreen warning):
 
-- **Quick Copy Workflow**: Instantly browse project-specific skills and copy formatted references directly to your clipboard.
-- **Surgical Sync**: Intelligent synchronization that updates outdated skills across multiple repositories without full rescans.
-- **Secure Auto-Update**: Background application updates powered by TUF (The Update Framework) for robust and secure delivery.
-- **Screenshot & Redaction**: Capture screenshots with PII redaction capabilities for AI context.
-- **Centralized Library**: A single, searchable hub for all your markdown-based AI skills.
-- **Modern UI**: Hardware-accelerated "Solid Matte & Liquid Glass" interface built with PySide6/QML.
-- **Zero-Config Entry**: Professional installers for Windows, macOS, and Linux.
+```powershell
+winget install --id dishanagalawatta.SkillManager -e
+```
 
----
+**Direct download**: grab `SkillManager_Setup.exe` from
+[Releases](https://github.com/dishanagalawatta/SkillManager/releases).
+Click **More info → Run anyway** if SmartScreen appears.
+No Python required.
 
-## Visual Showcase
-
-### The Central Library
-
-Manage thousands of skills with ease. Filter by category, search instantly, and preview content in a high-fidelity editor.
-![Library View](assets/readme/SkillManager_Library.png)
-
-### Quick Copy Integration
-
-The ultimate developer companion. Keep your most-used skills just a click away while working in your IDE.
-![Quick Copy](assets/readme/SkillManager_QuickCopy.png)
-
-### Premium Design
-
-Native Windows 11 integration (Mica/Acrylic) and a custom "Liquid Glass" design system provide a focused, distraction-free environment.
-![UI Mockup](assets/readme/SkillManager_UI_mockup.jpeg)
-
----
-
-## Getting Started
-
-### For End Users
-
-You don't need Python or any developer tools to use SkillManager.
-
-1. Visit the **[Releases](https://github.com/dishanagalawatta/SkillManager/releases)** page.
-2. Download the installer for your OS:
-   - **Windows**: `SkillManager_Setup.exe`
-   - **macOS**: `SkillManager_Portable_macos.zip`
-   - **Linux**: `SkillManager_Portable_linux.zip`
-3. Install and launch!
-
-### For Developers
-
-If you want to contribute or build from source, see our **[Development Guide](docs/DEVELOPMENT.md)**.
-
----
+See [docs/INSTALL.md](docs/INSTALL.md) for full details.
 
 ## Documentation
 
-- **[User Guide](docs/USER_GUIDE.md)**: Detailed instructions on using every feature.
-- **[Architecture](docs/ARCHITECTURE.md)**: How the app is built (Hub & Spoke).
-- **[Design Philosophy](DESIGN.md)**: The "Solid Matte & Liquid Glass" guide.
-- **[Categories](docs/CATEGORIES.md)**: How skills are auto-classified.
-- **[Versioning &amp; Releases](docs/VERSIONING.md)**: Our `x.y.z-dev.n` automation strategy and commit trigger words (e.g., `[patch]`, `[dev]`)..
+| Audience | Document | Purpose |
+|----------|----------|---------|
+| Everyone | [README.md](README.md) | This file. |
+| User | [docs/INSTALL.md](docs/INSTALL.md) | Installation guide (winget, direct download). |
+| User | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | End-user manual. |
+| Engineer | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map, lifecycle. |
+| Engineer | [docs/API.md](docs/API.md) | `AppController` surface. |
+| Engineer | [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) | Every env var. |
+| Engineer | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local-dev loop. |
+| Engineer | [docs/CATEGORIES.md](docs/CATEGORIES.md) | Skill taxonomy. |
+| Engineer | [docs/VERSIONING.md](docs/VERSIONING.md) | Release triggers. |
+| Engineer | [docs/RELEASING.md](docs/RELEASING.md) | Release lifecycle. |
+| Engineer | [docs/CI_CD.md](docs/CI_CD.md) | Pipelines. |
+| Contributor | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | PR + commit rules. |
+| Ops | [docs/HOUSEKEEPING.md](docs/HOUSEKEEPING.md) | Workspace cleanup rules. |
+| Decision | [ADR_INDEX.md](ADR_INDEX.md) | Architecture decisions (ADR-0001–0016). |
+| Agent | [AGENTS.md](AGENTS.md) | Agent instructions. |
+| Designer | [DESIGN.md](DESIGN.md) | Design system. |
+| Planner | [conductor/workflow.md](conductor/workflow.md) | Track lifecycle (local-only). |
 
----
+## Quality Gates
+
+| Gate | Command |
+|------|---------|
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Test | `uv run pytest` |
+| Full Suite | `python run_tests.py` |
+| QML Diagnostic | `uv run pytest tests/test_qml_comprehensive_diagnostic.py` |
+
+A PR is mergeable only when all five pass.
 
 ## License
 
-[**MIT License**](LICENSE)
-
-Copyright (c) 2026 Don Dishan Kanchuka Agalawatta
+[MIT](LICENSE) — Copyright (c) 2026 Don Dishan Kanchuka Agalawatta.

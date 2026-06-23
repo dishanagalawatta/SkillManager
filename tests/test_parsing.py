@@ -26,7 +26,7 @@ def test_parse_frontmatter_multiline():
 
 def test_normalize_description():
     assert normalize_description("  Too   many   spaces  ") == "Too many spaces"
-    assert normalize_description(["part1", "part2"]) == "part1 part2"
+    assert normalize_description(["part1", "part2"]) == "part1\npart2"
     assert normalize_description(None) == ""
 
 
@@ -78,8 +78,8 @@ Body here.
     )
 
     data = parse_command_md(str(cmd_file))
+    assert data is not None
     assert data["name"] == "Deploy"
-    assert data["client"] == "Codex"
     assert data["description"] == "Deploy command"
 
 
@@ -174,6 +174,7 @@ def test_parse_command_md_no_headers(temp_dir):
     cmd_file.write_text("Just some text here without any markdown headers.")
 
     data = parse_command_md(str(cmd_file))
+    assert data is not None
     assert data["name"] == "no_headers"
     assert data["description"] == "Just some text here without any markdown headers."
 

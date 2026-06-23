@@ -10,7 +10,7 @@ import pathspec
 
 logger = logging.getLogger(__name__)
 
-CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text"}
+CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
 
 
 def replace_skill_references_in_command(content: str, client_format: str, all_skills: list) -> str:
@@ -69,11 +69,11 @@ def replace_skill_references_in_command(content: str, client_format: str, all_sk
     # 1. Codex: [$name](path) -> \[\$([^\]]+)\]\([^)]+\)
     # 2. Antigravity: /name -> \/[a-zA-Z0-9_-]+
     # 3. Gemini CLI: @name or @path/to/name -> @[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*
-    pattern = r'\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*'
+    pattern = r"\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*"
     return re.sub(pattern, replacer, str(content))
 
 
-def _resolve_resilient_path(path_str):
+def resolve_resilient_path(path_str):
     """Resolve a skill path and auto-detect .agents/skills for project roots."""
     if not path_str:
         return Path()
@@ -114,7 +114,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
     unique_sources = []
 
     for source in sources:
-        resolved_source = _resolve_resilient_path(source)
+        resolved_source = resolve_resilient_path(source)
         if not resolved_source or not resolved_source.is_dir():
             continue
 
@@ -129,11 +129,11 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
 
     def scan_source(resolved_source):
         source_skills = []
-        ignore_spec = _load_ignore_spec(resolved_source)
+        ignore_spec = load_ignore_spec(resolved_source)
         for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
             if not child.is_dir():
                 continue
-            if _is_ignored(child, resolved_source, ignore_spec):
+            if is_ignored(child, resolved_source, ignore_spec):
                 continue
             skill_md_path = child / "SKILL.md"
             if not skill_md_path.is_file():
@@ -150,7 +150,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
             skill_data["project_path"] = str(resolved_source)
             skill_data["project_label"] = "Master Library"
             skill_data["project_root"] = str(resolved_source)
-            skill_data["skill_base_relative"] = _skill_base_relative(resolved_source)
+            skill_data["skill_base_relative"] = skill_base_relative(resolved_source)
             skill_data["is_package"] = True
             skill_data["is_source"] = True  # Compatibility
 
@@ -159,7 +159,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
                 skill_data.setdefault("metadata", {})
                 cat_info = categorize_skill(
                     skill_data.get("name", ""),
-                    _classification_text(skill_data),
+                    classification_text(skill_data),
                     skill_data.get("metadata", {}),
                 )
                 skill_data["main_category"] = cat_info.get("main_category", "")
@@ -187,7 +187,7 @@ def discover_single_project(
     parse_skill_md: Callable,
     categorize_skill: Callable,
     build_search_text: Callable,
-    project_aliases: dict[str, str] = None,
+    project_aliases: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """Discovers skills in a single project path.
 
@@ -204,18 +204,18 @@ def discover_single_project(
     if project_aliases is None:
         project_aliases = {}
 
-    resolved_project = _resolve_resilient_path(project)
+    resolved_project = resolve_resilient_path(project)
     if not resolved_project or not resolved_project.is_dir():
         return None
 
     project_key = os.path.normcase(str(resolved_project))
     skills = []
-    ignore_spec = _load_ignore_spec(resolved_project)
+    ignore_spec = load_ignore_spec(resolved_project)
 
     for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
         if not child.is_dir():
             continue
-        if _is_ignored(child, resolved_project, ignore_spec):
+        if is_ignored(child, resolved_project, ignore_spec):
             continue
         skill_md_path = child / "SKILL.md"
         if not skill_md_path.is_file():
@@ -229,13 +229,13 @@ def discover_single_project(
         skill_data["skill_md_path"] = str(skill_md_path)
         skill_data["project_key"] = project_key
         skill_data["project_path"] = str(resolved_project)
-        skill_data["project_root"] = str(_project_root_for_project(resolved_project))
-        skill_data["skill_base_relative"] = _skill_base_relative(resolved_project)
+        skill_data["project_root"] = str(project_root_for_project(resolved_project))
+        skill_data["skill_base_relative"] = skill_base_relative(resolved_project)
         skill_data["project_label"] = project_label(resolved_project, project_aliases, str(project))
         skill_data.setdefault("metadata", {})
         cat_info = categorize_skill(
             skill_data.get("name", ""),
-            _classification_text(skill_data),
+            classification_text(skill_data),
             skill_data.get("metadata", {}),
         )
         skill_data["main_category"] = cat_info.get("main_category", "")
@@ -244,7 +244,7 @@ def discover_single_project(
         skills.append(skill_data)
 
     # ── Scan for Screenshots
-    project_root_path = _project_root_for_project(resolved_project)
+    project_root_path = project_root_for_project(resolved_project)
     screenshot_dir = project_root_path / ".agents" / "screenshots"
     if screenshot_dir.is_dir():
         for img in sorted(
@@ -270,12 +270,12 @@ def discover_single_project(
                 skills.append(skill_data)
 
     if skills:
-        project_root = _project_root_for_project(resolved_project)
+        project_root = project_root_for_project(resolved_project)
         return {
             "project_path": str(resolved_project),
             "project_root": str(project_root),
             "project_label": project_label(resolved_project, project_aliases, str(project)),
-            "skill_base_relative": _skill_base_relative(resolved_project),
+            "skill_base_relative": skill_base_relative(resolved_project),
             "project_key": project_key,
             "skills": skills,
         }
@@ -287,7 +287,7 @@ def discover_project_skills(
     parse_skill_md: Callable,
     categorize_skill: Callable,
     build_search_text: Callable,
-    project_aliases: dict[str, str] = None,
+    project_aliases: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Discover skills from multiple project folders in parallel.
 
@@ -308,7 +308,7 @@ def discover_project_skills(
     unique_projects = []
 
     for project in projects:
-        resolved_project = _resolve_resilient_path(project)
+        resolved_project = resolve_resilient_path(project)
         if not resolved_project or not resolved_project.is_dir():
             continue
         project_key = os.path.normcase(str(resolved_project))
@@ -345,13 +345,13 @@ def discover_project_skills(
     return projects_list
 
 
-def _normalize_path(path):
+def normalize_path(path):
     if not path:
         return ""
     return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
 
 
-def _load_ignore_spec(root: Path):
+def load_ignore_spec(root: Path):
     gitignore = root / ".gitignore"
     if not gitignore.is_file():
         return None
@@ -363,7 +363,7 @@ def _load_ignore_spec(root: Path):
         return None
 
 
-def _is_ignored(path: Path, root: Path, spec) -> bool:
+def is_ignored(path: Path, root: Path, spec) -> bool:
     if spec is None:
         return False
     try:
@@ -377,8 +377,8 @@ def project_label(project_path, project_aliases=None, original_project=None):
     if project_aliases is None:
         project_aliases = {}
 
-    norm_project = _normalize_path(project_path)
-    norm_original = _normalize_path(original_project) if original_project else ""
+    norm_project = normalize_path(project_path)
+    norm_original = normalize_path(original_project) if original_project else ""
 
     # Try using original project (exact or normalized)
     if original_project and original_project in project_aliases:
@@ -395,15 +395,15 @@ def project_label(project_path, project_aliases=None, original_project=None):
 
     # Full scan for matching normalized keys
     for k, v in project_aliases.items():
-        if _normalize_path(k) == norm_project or (
-            norm_original and _normalize_path(k) == norm_original
+        if normalize_path(k) == norm_project or (
+            norm_original and normalize_path(k) == norm_original
         ):
             return v
 
     # Use standard format if no alias: "RootName (Base)"
     project_path_obj = Path(project_path)
-    root = _project_root_for_project(project_path_obj)
-    base = _skill_base_relative(project_path_obj)
+    root = project_root_for_project(project_path_obj)
+    base = skill_base_relative(project_path_obj)
 
     # Clean up the .agents/skills suffix if it exists
     if base == ".agents/skills" or base == ".agents\\skills":
@@ -447,7 +447,7 @@ def format_project_skill_reference(skill, client_format, all_skills=None):
         return relative_path
 
     relative_path = project_skill_relative_path(skill)
-    if client_format == "Antigravity":
+    if client_format in ("Antigravity", "OpenCode"):
         name = skill.get("name") or local_path.name
         return f"/{name}"
     if client_format == "Gemini CLI":
@@ -474,7 +474,7 @@ def normalize_command_reference(value):
     reference = str(value or "").strip()
     if not reference:
         return ""
-    if _looks_like_explicit_reference(reference):
+    if looks_like_explicit_reference(reference):
         return reference
     return f"@{reference.lstrip('@')}"
 
@@ -494,7 +494,7 @@ def merge_command_references(existing, additions):
     return merged
 
 
-def _looks_like_explicit_reference(reference):
+def looks_like_explicit_reference(reference):
     lowered = reference.lower()
     if reference.startswith(("@", "[", ".", "/", "~")):
         return True
@@ -562,7 +562,7 @@ def _delete_validation_error(source_path, project_path):
     return ""
 
 
-def _project_root_for_project(project_path):
+def project_root_for_project(project_path):
     parts = project_path.parts
     for marker in (".agents", ".codex", ".gemini"):
         if marker in parts:
@@ -581,15 +581,15 @@ def _project_root_for_project(project_path):
     return project_path
 
 
-def _skill_base_relative(project_path):
-    root = _project_root_for_project(project_path)
+def skill_base_relative(project_path):
+    root = project_root_for_project(project_path)
     try:
         return project_path.relative_to(root).as_posix()
     except ValueError:
         return project_path.name
 
 
-def _classification_text(skill_data):
+def classification_text(skill_data):
     parts = [skill_data.get("description", "")]
     metadata = skill_data.get("metadata") or {}
     for key in ("category", "source", "risk", "tags", "use_cases"):

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
-from PySide6.QtGui import QColor, QGuiApplication, QPainter
+from PySide6.QtGui import QGuiApplication
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,13 @@ class ScreenshotController(QObject):
             self.captureCancelled.emit()
         except Exception:
             logger.warning("Exception during captureCancelled signal emission", exc_info=True)
-        self._current_full_pixmap = None
+        self.current_full_pixmap = None
         logger.info("Screenshot capture cancelled by user.")
 
     def __init__(self, app_controller):
         super().__init__()
         self.app = app_controller
-        self._current_full_pixmap = None
+        self.current_full_pixmap = None
         self._screenshot_version = 0
 
     @Property(int, notify=screenshotVersionChanged)
@@ -55,8 +55,8 @@ class ScreenshotController(QObject):
             logger.error("No primary screen detected for screenshot.")
             return
 
-        self._current_full_pixmap = screen.grabWindow(0)
-        self.app.screenshot_provider.set_pixmap(self._current_full_pixmap)
+        self.current_full_pixmap = screen.grabWindow(0)
+        self.app.screenshot_provider.set_pixmap(self.current_full_pixmap)
         self._screenshot_version += 1
         self.screenshotVersionChanged.emit()
         self.showOverlay.emit()
@@ -74,41 +74,54 @@ class ScreenshotController(QObject):
             screen.name(),
             screen.geometry(),
         )
-        self._current_full_pixmap = screen.grabWindow(0)
+        self.current_full_pixmap = screen.grabWindow(0)
         logger.info(
             "captureScreen: grabbed %dx%d pixmap",
-            self._current_full_pixmap.width(),
-            self._current_full_pixmap.height(),
+            self.current_full_pixmap.width(),
+            self.current_full_pixmap.height(),
         )
-        self.app.screenshot_provider.set_pixmap(self._current_full_pixmap)
+        self.app.screenshot_provider.set_pixmap(self.current_full_pixmap)
         self._screenshot_version += 1
         self.screenshotVersionChanged.emit()
         self.showOverlay.emit()
         logger.info("Screenshot capture initiated via captureScreen().")
 
     @Slot(QRect, list)
-    def saveScreenshot(self, crop_rect: QRect, redactions: list):
+    def saveScreenshot(self, crop_rect: QRect, raw_redactions: list):
         """Crops the image, applies redactions, saves to disk, and copies to clipboard."""
-        if self._current_full_pixmap is None or self._current_full_pixmap.isNull():
+        from skill_manager.core.image_processing import ImageProcessor
+        from skill_manager.core.schemas import ScreenshotParams
+
+        if self.current_full_pixmap is None or self.current_full_pixmap.isNull():
             logger.error("No pixmap available to save.")
             return
 
-        # 1. Create a copy and crop
-        # Note: crop_rect comes from QML, coordinates should match the screen capture
-        final_image = self._current_full_pixmap.copy(crop_rect)
+        # 1. Validate inputs via Pydantic
+        try:
+            params = ScreenshotParams(
+                crop_x=crop_rect.x(),
+                crop_y=crop_rect.y(),
+                crop_width=crop_rect.width(),
+                crop_height=crop_rect.height(),
+                redactions=raw_redactions,
+            )
+        except Exception as e:
+            logger.error("Validation failed for screenshot parameters: %s", e)
+            self.app._set_status("Failed to save: invalid crop or redaction parameters.")
+            return
 
-        # 2. Draw redactions
-        painter = QPainter(final_image)
-        painter.setBrush(QColor("black"))
-        painter.setPen(QColor("black"))
+        validated_crop_rect = QRect(
+            params.crop_x, params.crop_y, params.crop_width, params.crop_height
+        )
 
-        for r in redactions:
-            # redactions list of dicts: {'x': ..., 'y': ..., 'width': ..., 'height': ...}
-            # coordinates are relative to the crop_rect
-            rect = QRect(r["x"], r["y"], r["width"], r["height"])
-            painter.drawRect(rect)
-
-        painter.end()
+        # 2. Process image
+        try:
+            final_image = ImageProcessor.crop_and_redact(
+                self.current_full_pixmap, validated_crop_rect, params.redactions
+            )
+        except ValueError as e:
+            logger.error("Image processing failed: %s", e)
+            return
 
         # 3. Determine save path
         project_label_or_path = self.app.quickCopyModel.projectFilter
@@ -116,7 +129,7 @@ class ScreenshotController(QObject):
         matched_project = None
 
         # Match project label to absolute path
-        from skill_manager.core.quick_copy import _project_root_for_project, project_label
+        from skill_manager.core.quick_copy import project_label, project_root_for_project
 
         aliases = self.app.config_controller.project_aliases
 
@@ -126,13 +139,13 @@ class ScreenshotController(QObject):
                     project_label(p, aliases, p) == project_label_or_path
                     or str(p) == project_label_or_path
                 ):
-                    project_path = str(_project_root_for_project(Path(p)))
+                    project_path = str(project_root_for_project(Path(p)))
                     matched_project = p
                     break
 
         if not project_path and self.app.projects:
             matched_project = self.app.projects[0]
-            project_path = str(_project_root_for_project(Path(matched_project)))
+            project_path = str(project_root_for_project(Path(matched_project)))
 
         if not project_path:
             logger.warning("No active project found, cannot save screenshot.")
@@ -189,6 +202,7 @@ class ScreenshotController(QObject):
 
             self.app._library_model.addOrUpdateSkills([skill_data])
             self.app._quick_copy_model.addOrUpdateSkills([skill_data])
+            self.app.ops._refresh_selected_skill(filepath)
 
             if "Screenshots" not in set(self.app._categories):
                 self.app._categories = sorted(set(self.app._categories) | {"Screenshots"})

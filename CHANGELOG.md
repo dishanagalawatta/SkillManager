@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Chores
+- Workspace cleanup: audit `.gitignore`, archive 24 orphan conductor plans
+- Add ADR-0015 (conductor root plan archival) and ADR-0016 (`.opencode` gitignore policy)
+- Add `docs/HOUSEKEEPING.md` with cleanup rules and exclusion list
+- Add `metadata.json` to 7 conductor tracks missing it
+- Fix `docs/ARCHITECTURE.md` CI/CD section: replace release-please reference with python-semantic-release
+- Update `docs/API.md`: document package add/edit JSON return types (ADR-0013/0014)
+- Update `AGENTS.md`: add housekeeping pointer and `image/TODO` exclusion
+- Update `README.md`: add `docs/HOUSEKEEPING.md` to documentation table
+- Update `DESIGN.md`: add ADR-0003/0004/0008 cross-links
+
+## v1.5.0
+
+### Features
+- Add 7 diagnostic categories for app update flow (app_update_check, app_update_available, app_update_up_to_date, app_update_applied, app_update_failed, app_update_skipped_dev, tuf_client_init, tuf_bundle_validation)
+- Emit structured diagnostic events across check/apply/init paths in AppUpdateController and AppUpdateService
+- Add post-apply bundle version validation
+- Harden progress_hook for tufup signature variants (1-arg, 2-arg, zero-arg)
+
+### Tests
+- Add test_app_update_diagnostic.py (12 cases for diagnostic event emission)
+- Add test_app_update_e2e.py (6 cases with local TUF repo + HTTP server)
+- Add test_app_update_progress_hook.py (5 cases for hook signature variants)
+- Extend test_app_update_sdet.py (+6 cases for edge cases and error paths)
+
+### Bug Fixes
+- Fix silent dev-mode skip in checkForUpdates (now emits diagnostic event)
+- Fix progress_hook crash on unexpected tufup signature
+
 ## v1.1.1
 
 ### Features

@@ -72,9 +72,9 @@ def test_installer_iss_icon_path():
     assert os.path.exists(resolved_icon_path), f"Icon file does not exist at: {resolved_icon_path}"
 
 
-def test_spec_logging_filter_logic():
+def test_spec_logging_filter_removed():
+    """Verify that the PyInstallerQtQmlLogFilter hack has been removed from the spec file."""
     import ast
-    import logging
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     spec_path = os.path.join(project_root, "packaging", "skill_manager.spec")
@@ -82,7 +82,6 @@ def test_spec_logging_filter_logic():
     with open(spec_path, encoding="utf-8") as f:
         spec_content = f.read()
 
-    # We extract the class definition and execute it to verify its logic
     parsed = ast.parse(spec_content)
     filter_class_node = None
     for node in parsed.body:
@@ -90,37 +89,10 @@ def test_spec_logging_filter_logic():
             filter_class_node = node
             break
 
-    assert filter_class_node is not None, "PyInstallerQtQmlLogFilter class not found in spec file."
-
-    # Compile and execute just the class definition to get the class
-    module_code = compile(ast.Module(body=[filter_class_node], type_ignores=[]), "<string>", "exec")
-    module_namespace = {"logging": logging}
-    exec(module_code, module_namespace)
-    filter_class = module_namespace["PyInstallerQtQmlLogFilter"]
-
-    # Test the filter logic
-    log_filter = filter_class()
-
-    # Test case: malformed log with single tuple argument
-    logger = logging.getLogger("test_spec_filter")
-    record = logger.makeRecord(
-        name="test_spec_filter",
-        level=logging.WARNING,
-        fn="some_fn.py",
-        lno=10,
-        msg="%s: QML plugin binary %r does not exist!",
-        args=("some_plugin.dll",),
-        exc_info=None,
+    assert filter_class_node is None, (
+        "PyInstallerQtQmlLogFilter should have been removed from spec file "
+        "(the QML assetdownloader warning is benign and the plugin is unused)."
     )
-
-    # Apply filter
-    assert log_filter.filter(record) is True
-
-    # Format and verify it does not crash
-    formatter = logging.Formatter("%(message)s")
-    formatted = formatter.format(record)
-    assert "some_plugin.dll" in formatted
-    assert "unknown" in formatted
 
 
 def test_spec_file_exclusions_and_hiddenimports():
@@ -156,8 +128,14 @@ def test_spec_file_exclusions_and_hiddenimports():
             assert isinstance(keyword.value, ast.List)
             excludes = [el.value for el in keyword.value.elts if isinstance(el, ast.Constant)]
 
-    # Check for collections.abc
-    assert "collections.abc" in hiddenimports, "collections.abc should be in hiddenimports"
+    # collections.abc is a stdlib submodule; listing it as a hiddenimport
+    # causes PyInstaller to emit "ERROR: Hidden import 'collections.abc' not found"
+    # because PyInstaller treats each entry as a top-level module name.
+    # stdlib auto-imports it when needed, so it must NOT be in hiddenimports.
+    assert "collections.abc" not in hiddenimports, (
+        "collections.abc should NOT be in hiddenimports (it is a submodule, not top-level; "
+        "stdlib auto-imports it, and listing it causes a PyInstaller ERROR)"
+    )
 
     # Check for PyInstaller exclusions
     expected_excludes = [

@@ -10,7 +10,13 @@ import traceback
 from PySide6.QtCore import Signal, Slot
 
 from skill_manager.controllers.base import BaseController
+from skill_manager.core.diagnostics import (
+    CATEGORY_CACHE_PRESERVED,
+    CATEGORY_DISCOVERY_EMPTY_RESULT,
+    get_diagnostic_logger,
+)
 from skill_manager.core.discovery import DiscoveryService
+from skill_manager.core.schemas import CacheState, SkillRecord
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +24,15 @@ logger = logging.getLogger(__name__)
 class DiscoveryController(BaseController):
     """Controller for background skill discovery and cache handling."""
 
-    _discoverySuccess = Signal(list, list, list, list, str, bool)
+    # Simplified signal using the CacheState Pydantic model and a finality flag
+    _discoverySuccess = Signal(object, bool)
     _discoveryError = Signal(str)
 
     def __init__(self, app):
         super().__init__(app)
         self._discoverySuccess.connect(self._finalize_loading)
         self._discoveryError.connect(self._handle_loading_error)
-        self._previous_skills: dict[str, dict] = {}  # path -> skill dict
+        self._previous_skills: dict[str, SkillRecord] = {}  # path -> SkillRecord
 
     @Slot()
     def loadInitialData(self):
@@ -43,7 +50,7 @@ class DiscoveryController(BaseController):
                 target=lambda: self._on_discovery_done(self._run_discovery_sync())
             ).start()
 
-    def _run_discovery_sync(self):
+    def _run_discovery_sync(self) -> dict | CacheState:
         """Internal synchronous discovery implementation run in a background thread."""
         discovery_sources = list(self.app._sources)
         for src in self.app._update_packages:
@@ -61,81 +68,109 @@ class DiscoveryController(BaseController):
 
         try:
 
-            def cache_callback(cached_data):
-                logger.info(
-                    "[CACHE] Loading %d skills from cache...",
-                    len(cached_data.get("skills", [])),
-                )
-                # Dispatch UI update safely to the main thread via Signal
-                self._discoverySuccess.emit(
-                    cached_data.get("skills", []),
-                    cached_data.get("projects", []),
-                    cached_data.get("categories", []),
-                    cached_data.get("project_labels", []),
-                    f"Loaded {len(cached_data.get('skills', []))} skills from cache (Refreshing...)",
-                    False,
-                )
+            def cache_callback(cached_data_dict):
+                try:
+                    # Validate cache data through Pydantic
+                    cache_state = CacheState.model_validate(cached_data_dict)
+                    logger.info(
+                        "[CACHE] Loading %d skills from cache...",
+                        len(cache_state.skills),
+                    )
+                    # Dispatch UI update safely to the main thread via Signal
+                    self._discoverySuccess.emit(cache_state, False)
+                except Exception as ve:
+                    logger.error("[CACHE] Validation failed: %s", ve)
 
-            result = service.discover_all(cache_callback=cache_callback)
+            result_dict = service.discover_all(cache_callback=cache_callback)
 
-            if not self.app.isTesting:
-                import time
+            # Final validation
+            if "error" in result_dict:
+                return result_dict
 
-                time.sleep(0.2)
+            return CacheState.model_validate(result_dict)
 
-            return result
         except Exception as e:
             traceback.print_exc()
             return {"error": str(e)}
 
-    def _on_discovery_done(self, result):
+    def _on_discovery_done(self, result: dict | CacheState):
         if not result:
             return
-        if "error" in result:
+        if isinstance(result, dict) and "error" in result:
             self._discoveryError.emit(f"Error scanning skills: {result['error']}")
             return
 
-        self._discoverySuccess.emit(
-            result["skills"],
-            result["projects"],
-            result["categories"],
-            result["project_labels"],
-            result["status"],
-            True,
-        )
+        # result is a validated CacheState
+        self._discoverySuccess.emit(result, True)
 
-    @Slot(list, list, list, list, str, bool)
-    def _finalize_loading(
-        self, all_skills, _projects_state, cats, proj_labels, status, is_final=True
-    ):
+    @Slot(object, bool)
+    def _finalize_loading(self, state: CacheState, is_final: bool = True):
         """Updates model and UI state on the main thread after discovery completes.
 
         Uses incremental model updates when possible: only changed skills are
         re-indexed, avoiding a full SearchEngine rebuild.
         """
-        del proj_labels
-
-        if self.app._categories != cats:
-            self.app._categories = cats
+        if self.app._categories != state.categories:
+            self.app._categories = state.categories
             self.app.categoriesChanged.emit()
 
         # Build a lookup of new skills by path
-        new_skills_map = {s["local_path"]: s for s in all_skills if s.get("local_path")}
+        new_skills_map = {s.local_path: s for s in state.skills if s.local_path}
 
         # Determine which skills changed since last scan
         added_or_updated: list[dict] = []
         for path, skill in new_skills_map.items():
             prev = self._previous_skills.get(path)
             if prev is None or prev != skill:
-                added_or_updated.append(skill)
+                added_or_updated.append(skill.model_dump())
 
         removed_paths = set(self._previous_skills.keys()) - set(new_skills_map.keys())
+
+        # SAFETY NET: When final discovery returns zero skills but the
+        # previous scan had skills, the source directories are likely
+        # missing (moved, unmounted, permission error).  Wiping the
+        # entire model would cause catastrophic data loss.  Instead,
+        # skip the removal and preserve existing skills.
+        if is_final and not new_skills_map and self._previous_skills:
+            diag = get_diagnostic_logger()
+            diag.log_event(
+                "WARNING",
+                CATEGORY_DISCOVERY_EMPTY_RESULT,
+                "Discovery returned 0 skills but cache had skills — "
+                "source directories may be missing. Preserving cached skills.",
+                data={
+                    "previous_skill_count": len(self._previous_skills),
+                    "removed_count": len(removed_paths),
+                },
+            )
+            diag.log_event(
+                "INFO",
+                CATEGORY_CACHE_PRESERVED,
+                f"Preserved {len(self._previous_skills)} cached skills "
+                f"(discovery safety net triggered)",
+            )
+            logger.warning(
+                "[DISCOVERY] Safety net: skipping removal of %d cached skills "
+                "because discovery returned 0 results (source dirs likely missing)",
+                len(removed_paths),
+            )
+            # Still update status/categories but keep existing skills
+            self.app._set_status(
+                f"Warning: source directories may be missing. "
+                f"Keeping {len(self._previous_skills)} cached skills."
+            )
+            if is_final:
+                self.app._is_loading = False
+                self.app.isLoadingChanged.emit()
+            return
 
         if self._previous_skills and (added_or_updated or removed_paths):
             # Incremental update — only touch changed skills
             if added_or_updated:
                 self.app._library_model.addOrUpdateSkills(added_or_updated)
                 self.app._quick_copy_model.addOrUpdateSkills(added_or_updated)
+                for skill_dict in added_or_updated:
+                    self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
             if removed_paths:
                 self.app._library_model.removeSkillsByPath(list(removed_paths))
                 self.app._quick_copy_model.removeSkillsByPath(list(removed_paths))
@@ -146,8 +181,9 @@ class DiscoveryController(BaseController):
             )
         else:
             # First load or full replacement needed
-            self.app._library_model.setSkills(all_skills)
-            self.app._quick_copy_model.setSkills(all_skills)
+            skills_dump = [s.model_dump() for s in state.skills]
+            self.app._library_model.setSkills(skills_dump)
+            self.app._quick_copy_model.setSkills(skills_dump)
 
         # Snapshot current state for next diff
         self._previous_skills = new_skills_map
@@ -160,7 +196,7 @@ class DiscoveryController(BaseController):
         if self.app._current_project_label:
             self.app._quick_copy_model.projectFilter = self.app._current_project_label
 
-        self.app._set_status(status)
+        self.app._set_status(state.status)
 
         if is_final:
             self.app._is_loading = False

@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 import App 1.0
 
 /**
@@ -119,9 +118,11 @@ Button {
         cursorShape: Qt.PointingHandCursor
     }
 
-    ToolTip.visible: hovered && tooltipText !== ""
-    ToolTip.delay: 400
-    ToolTip.text: tooltipText
+    SleekToolTip {
+        id: btnToolTip
+        visible: control.hovered && control.tooltipText !== ""
+        text: control.tooltipText
+    }
     Accessible.role: Accessible.Button
     Accessible.name: text
     Accessible.description: tooltipText

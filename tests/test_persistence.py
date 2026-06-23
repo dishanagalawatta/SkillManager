@@ -87,6 +87,7 @@ def test_cache_persistence(temp_files):
     with patch_config(temp_files):
         save_cache(data)
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert loaded["skills"][0]["name"] == "S1"
         assert loaded["skills"][0]["raw_content"] == ""
 
@@ -139,19 +140,20 @@ def test_save_project_skill_ownership_failure(temp_files):
 
 
 def test_patch_cache_remove(temp_files):
-    data = {"skills": [{"local_path": "/p1"}, {"local_path": "/p2"}]}
+    data = {"skills": [{"name": "S1", "local_path": "/p1"}, {"name": "S2", "local_path": "/p2"}]}
     with patch_config(temp_files):
         save_cache(data)
         removed_count = patch_cache_remove(["/p1"])
         assert removed_count == 1
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert len(loaded["skills"]) == 1
         assert loaded["skills"][0]["local_path"] == "/p2"
 
 
 def test_patch_cache_remove_failure(temp_files):
     with patch_config(temp_files):
-        save_cache({"skills": [{"local_path": "/p1"}]})
+        save_cache({"skills": [{"name": "S1", "local_path": "/p1"}]})
         with patch("builtins.open", side_effect=OSError("Lock Error")):
             count = patch_cache_remove(["/p1"])
             assert count == 0
@@ -175,12 +177,12 @@ def test_temp_registry_failure(temp_files):
 def test_patch_cache_add(temp_files):
     from skill_manager.core.persistence import patch_cache_add
 
-    data = {"skills": [{"local_path": "/p1", "category": "Cat1"}]}
+    data = {"skills": [{"name": "S1", "local_path": "/p1", "category": "Cat1"}]}
     with patch_config(temp_files):
         save_cache(data)
         new_skills = [
-            {"local_path": "/p1", "category": "Cat2", "raw_content": "strip-me"},
-            {"local_path": "/p2", "category": "Cat3"},
+            {"name": "S1", "local_path": "/p1", "category": "Cat2", "raw_content": "strip-me"},
+            {"name": "S2", "local_path": "/p2", "category": "Cat3"},
         ]
         projects_state = [
             {
@@ -192,6 +194,7 @@ def test_patch_cache_add(temp_files):
         added_count = patch_cache_add(new_skills, projects_state)
         assert added_count == 2
         loaded = load_cache()
+        assert loaded is not None, "load_cache() returned None"
         assert len(loaded["skills"]) == 2
         # Check update
         s1 = next(s for s in loaded["skills"] if s["local_path"] == "/p1")

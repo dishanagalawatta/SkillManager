@@ -8,10 +8,12 @@ Item {
 
     property var model: []
     property var selectedValues: []
+    property string placeholderText: "Select clients..."
+    property string allLabel: "All Clients"
 
     property string displayText: {
-        if (selectedValues.length === 0) return "Select clients..."
-        if (selectedValues.length === model.length) return "All Clients"
+        if (selectedValues.length === 0) return placeholderText
+        if (selectedValues.length === model.length) return allLabel
         return selectedValues.join(", ")
     }
 
@@ -106,9 +108,16 @@ Item {
 
         implicitHeight: Math.min(listContent.implicitHeight + topPadding + bottomPadding, 300)
 
-        contentItem: ColumnLayout {
-            id: listContent
-            spacing: 0
+        contentItem: ScrollView {
+            id: scrollView
+            clip: true
+            contentWidth: availableWidth
+            ScrollBar.vertical: AppScrollBar { }
+
+            ColumnLayout {
+                id: listContent
+                width: scrollView.width
+                spacing: 0
 
             Rectangle {
                 Layout.fillWidth: true
@@ -132,7 +141,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "All Clients"
+                        text: root.allLabel
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         color: Theme.label
@@ -202,6 +211,8 @@ Item {
             }
         }
 
+        }
+        
         background: Rectangle {
             radius: Theme.radiusCard
             color: Theme.glassPill

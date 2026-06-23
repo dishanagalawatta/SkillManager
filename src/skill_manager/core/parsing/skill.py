@@ -25,7 +25,6 @@ def parse_skill_md(filepath: str) -> dict[str, Any]:
         if not data["description"]:
             data["description"] = extract_markdown_description(content)
 
-        # Commands are now at project-level .agents/commands/ — no per-skill lookup
         data["commands"] = []
     except Exception as e:
         logger.warning("Error parsing %s: %s", filepath, e)

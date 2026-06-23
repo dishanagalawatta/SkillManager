@@ -7,6 +7,19 @@ import uuid
 from pathlib import Path
 from unittest.mock import MagicMock
 
+# Pre-inject a mock pynput module so the real C extension never loads.
+# Pynput's Windows keyboard hook thread can cause access violations
+# when the process exits while the thread is still iterating the
+# message queue.  By intercepting the import at the module level,
+# we guarantee no real keyboard hook is ever created during testing.
+if "pynput" not in sys.modules:
+    _mock_pynput = MagicMock()
+    _mock_pynput.keyboard = MagicMock()
+    _mock_pynput.keyboard.HotKey = MagicMock()
+    _mock_pynput.keyboard.Listener = MagicMock()
+    sys.modules["pynput"] = _mock_pynput
+    sys.modules["pynput.keyboard"] = _mock_pynput.keyboard
+
 # Force QML style before ANY Qt imports to prevent initialization errors
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 # Use offscreen platform for headless environments by default in tests
@@ -69,6 +82,27 @@ def setup_qml_style(qapp):
     yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def block_real_pynput(request):
+    """Prevent any test from starting a real pynput keyboard listener.
+
+    Pynput's Windows listener thread can crash with an access violation
+    when the process exits before the thread finishes iterating the
+    message queue.  By forcing ``_ensure_pynput`` to return ``False``
+    for the entire session, we guarantee no real keyboard hook is
+    ever created during testing.
+
+    Tests decorated with ``@pytest.mark.allow_pynput`` skip this
+    block so their own mock keyboard module is used instead.
+    """
+    from skill_manager.core.global_hotkey import GlobalHotkeyManager
+
+    original = GlobalHotkeyManager._ensure_pynput
+    GlobalHotkeyManager._ensure_pynput = staticmethod(lambda: False)
+    yield
+    GlobalHotkeyManager._ensure_pynput = original
+
+
 @pytest.fixture
 def temp_dir():
     """Provides a temporary directory that is automatically cleaned up."""
@@ -98,7 +132,9 @@ def session_mock_config(session_temp_dir):
     os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
     config = ConfigManager()
     yield config
-    os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+    # Do NOT pop SKILL_MANAGER_DATA_DIR — the session-level env var
+    # must persist so that every subsequent test uses the test-specific
+    # data dir instead of falling back to the real app-data directory.
 
 
 @pytest.fixture
@@ -106,10 +142,16 @@ def mock_config(temp_dir):
     """Provides a function-scoped mock config."""
     data_dir = temp_dir / "data"
     data_dir.mkdir(exist_ok=True)
+    previous = os.environ.get("SKILL_MANAGER_DATA_DIR")
     os.environ["SKILL_MANAGER_DATA_DIR"] = str(data_dir)
     config = ConfigManager()
     yield config
-    os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
+    # Restore the previous value instead of popping — prevents leakage
+    # to tests that don't use this fixture.
+    if previous is not None:
+        os.environ["SKILL_MANAGER_DATA_DIR"] = previous
+    else:
+        os.environ.pop("SKILL_MANAGER_DATA_DIR", None)
 
 
 @pytest.fixture
@@ -180,3 +222,72 @@ def source_factory():
         return base
 
     return _make_source
+
+
+@pytest.fixture(scope="session")
+def app_controller(session_mock_config, session_temp_dir):
+    """Provides an AppController initialized for testing (session-scoped)."""
+    import skill_manager.app
+    from skill_manager.app import AppController
+
+    # We use SynchronousTaskRunner to avoid threading issues in tests
+    controller = AppController(skip_initial_load=True, config=session_mock_config)
+    controller.task_runner = SynchronousTaskRunner()
+
+    skill_manager.app.current_test_controller = controller  # type: ignore[attr-defined]
+
+    def controller_factory(qml_engine):
+        from PySide6.QtQml import QQmlEngine
+
+        ctrl = skill_manager.app.current_test_controller  # type: ignore[attr-defined]
+        if ctrl:
+            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)  # type: ignore[attr-defined]
+        return ctrl
+
+    from contextlib import suppress
+
+    with suppress(Exception):
+        from PySide6.QtQml import qmlRegisterSingletonType
+
+        # This registration is process-wide. PySide6 6.11.0's stub claims
+        # ``qml_name`` must be bytes but the runtime requires str.
+        qmlRegisterSingletonType(
+            AppController,
+            "App",
+            1,
+            0,
+            "AppController",
+            controller_factory,  # type: ignore[arg-type]
+        )
+
+    yield controller
+    controller.on_quit()
+
+
+@pytest.fixture
+def qml_engine(qapp, app_controller, qtbot):
+    """Provides a QQmlApplicationEngine with the AppController already registered."""
+    from PySide6.QtQml import QQmlApplicationEngine
+
+    import skill_manager
+    from skill_manager.core.resources import qml_components_dir
+
+    engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("appController", app_controller)
+
+    qml_dir = qml_components_dir(package_file=skill_manager.__file__)
+    engine.addImportPath(str(qml_dir.parent))
+
+    qml_file = qml_dir / "Main.qml"
+    engine.load(str(qml_file))
+
+    if not engine.rootObjects():
+        pytest.fail("Failed to load Main.qml")
+
+    yield engine
+
+    engine.clearComponentCache()
+    engine.deleteLater()
+    for _ in range(5):
+        qapp.processEvents()
+        qtbot.wait(20)

@@ -14,7 +14,7 @@ from .config import normalize_skill_package_config
 logger = logging.getLogger(__name__)
 
 
-def detect_git_remote(package_path: str) -> str:
+def detect_git_remote(package_path: str | None) -> str:
     if not package_path:
         return ""
 
@@ -49,8 +49,7 @@ def run_version_command(command: str) -> str:
             command_list[0] = executable
 
         kwargs = {"shell": False, "capture_output": True, "text": True, "timeout": 30}
-        if os.name == "nt":
-            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
         result = subprocess.run(command_list, **kwargs)
     except (OSError, subprocess.SubprocessError, ValueError) as e:
@@ -62,7 +61,7 @@ def run_version_command(command: str) -> str:
     return result.stdout.strip()
 
 
-def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) -> str:
+def get_git_tag(path_or_url: str, is_remote: bool = False, token: str | None = None) -> str:
     """Fetches the latest semantic tag or fallback to commit hash using GitPython."""
     try:
         if is_remote:
@@ -86,13 +85,17 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
             # Fetch tags
             try:
                 # Use raw git command via GitPython to have full control over arguments
-                output = g.execute(
+                output = g.execute(  # type: ignore[arg-type]
                     ["git"]
                     + config_args
                     + ["ls-remote", "--tags", "--sort=-v:refname", "--", path_or_url]
                 )
                 if output:
-                    lines = output.strip().split("\n")
+                    # ``Git.execute`` returns ``Tuple[int, bytes, str]`` (subprocess
+                    # result) when called via subprocess; the git Python API exposes
+                    # only the bytes body. Cast through ``str`` for parsing.
+                    output_str = output.decode() if isinstance(output, bytes) else str(output)
+                    lines = output_str.strip().split("\n")
                     for line in lines:
                         if "^{}" in line:
                             continue
@@ -105,9 +108,10 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
             # Fallback to HEAD hash
             try:
-                output = g.execute(["git"] + config_args + ["ls-remote", "--", path_or_url, "HEAD"])
+                output = g.execute(["git"] + config_args + ["ls-remote", "--", path_or_url, "HEAD"])  # type: ignore[arg-type]
                 if output:
-                    return output.split("\t")[0][:7]
+                    output_str = output.decode() if isinstance(output, bytes) else str(output)
+                    return output_str.split("\t")[0][:7]  # type: ignore[return-value]
             except Exception as e:
                 logger.warning("Remote HEAD fetch failed: %s", e)
         else:
@@ -130,17 +134,39 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str = None) ->
 
 
 async def check_skill_package_versions_async(
-    source: dict[str, Any], force_refresh: bool = False
+    source: dict[str, Any], force_refresh: bool = False, sync_current_to_latest: bool = False
 ) -> dict[str, Any]:
     """Async version of check_skill_package_versions for non-blocking UI."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
-        None, lambda: check_skill_package_versions(source, force_refresh)
+        None,
+        lambda: check_skill_package_versions(source, force_refresh, sync_current_to_latest),
     )
 
 
+def _sync_current_to_latest_if_applicable(
+    current_version: str,
+    latest_version: str,
+    source: dict[str, Any],
+) -> str:
+    """Snap current_version to latest_version when detection is unreliable.
+
+    When ``current_version`` is empty and ``latest_version`` is available,
+    snap to latest.  This covers git sources whose local clone path was
+    not detected (e.g. user entered the install path instead of the
+    clone path) and non-git sources without a reliable local version
+    detection mechanism.  The snap is skipped when a
+    ``current_version_command`` is set, giving the user explicit control.
+    """
+    if latest_version and not current_version and not source.get("current_version_command"):
+        return latest_version
+    return current_version
+
+
 def check_skill_package_versions(
-    source: dict[str, Any], force_refresh: bool = False
+    source: dict[str, Any],
+    force_refresh: bool = False,
+    sync_current_to_latest: bool = False,
 ) -> dict[str, Any]:
     source = normalize_skill_package_config(source)
 
@@ -153,12 +179,16 @@ def check_skill_package_versions(
         return v
 
     if source.get("current_version_command"):
-        detected_current = run_version_command(source.get("current_version_command"))
+        detected_current = run_version_command(
+            source.get("current_version_command")  # type: ignore[arg-type]
+        )
         if detected_current:
             current_version = clean_v(detected_current)
 
     if source.get("latest_version_command"):
-        detected_latest = run_version_command(source.get("latest_version_command"))
+        detected_latest = run_version_command(
+            source.get("latest_version_command")  # type: ignore[arg-type]
+        )
         if detected_latest:
             latest_version = clean_v(detected_latest)
 
@@ -190,16 +220,13 @@ def check_skill_package_versions(
             if detected_latest:
                 latest_version = clean_v(detected_latest)
 
-    # After a successful update (indicated by force_refresh=True),
-    # we should assume current_version is now latest_version
-    # for packages that don't have a reliable local version detection mechanism.
-    if (
-        force_refresh
-        and latest_version
-        and source.get("source_type") != "git"
-        and not source.get("current_version_command")
-    ):
-        current_version = latest_version
+    # After a successful update (force_refresh) or on initial add
+    # (sync_current_to_latest), snap current_version to latest_version
+    # for packages without a reliable local version detection mechanism.
+    if force_refresh or sync_current_to_latest:
+        current_version = _sync_current_to_latest_if_applicable(
+            current_version, latest_version, source
+        )
 
     if current_version:
         source["current_version"] = clean_v(current_version)

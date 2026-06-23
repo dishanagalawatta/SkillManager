@@ -7,6 +7,10 @@ from typing import Any
 import orjson
 from platformdirs import user_data_dir
 
+from skill_manager.core.diagnostics import (
+    CATEGORY_CONFIG_MIGRATION,
+    get_diagnostic_logger,
+)
 from skill_manager.core.schemas import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -47,15 +51,8 @@ def get_app_data_dir() -> Path:
     if override:
         return Path(override).expanduser()
 
-    if os.name == "nt" and (
-        base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    ):
+    if base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA"):
         app_dir = Path(base_dir) / APP_NAME
-    elif os.name != "nt":
-        if xdg_data_home := os.environ.get("XDG_DATA_HOME"):
-            app_dir = Path(xdg_data_home) / APP_NAME
-        else:
-            app_dir = Path.home() / ".local" / "share" / APP_NAME
     else:
         app_dir = Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
 
@@ -63,13 +60,15 @@ def get_app_data_dir() -> Path:
     return app_dir
 
 
-def migrate_legacy_data_files(data_dir: Path = None, legacy_dir: Path = None) -> None:
+def migrate_legacy_data_files(data_dir: Path | None = None, legacy_dir: Path | None = None) -> None:
     """Copies old root-level JSON data into the app-data folder when missing."""
     for filename in DATA_FILENAMES:
         resolve_data_file(filename, data_dir, legacy_dir)
 
 
-def resolve_data_file(filename: str, data_dir: Path = None, legacy_dir: Path = None) -> Path:
+def resolve_data_file(
+    filename: str, data_dir: Path | None = None, legacy_dir: Path | None = None
+) -> Path:
     """Returns the app-data path, falling back to a legacy root file if migration is blocked."""
     target_dir = data_dir or get_app_data_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -130,32 +129,54 @@ TEMP_SCREENSHOTS_FILE = resolve_data_file(TEMP_SCREENSHOTS_FILENAME)
 SKILL_LIBRARY_CACHE_VERSION = 8
 
 DEFAULT_SHORTCUTS = {
+    # Find & Select
     "search": "Ctrl+F",
+    "select_all": "Ctrl+A",
+    "clear_selection": "Esc",
+    # Clipboard
     "copy": "Ctrl+C",
+    # Skill Ops
+    "refresh": "F5",
     "archive": "Ctrl+Shift+X",
     "delete": "Delete",
-    "refresh": "F5",
+    # Tree View
     "expand_all": "Ctrl+E",
     "collapse_all": "Ctrl+Shift+E",
     "top_of_list": "Home",
-    "clear_selection": "Esc",
-    "theme_toggle": "Ctrl+T",
+    # Navigate
     "quick_copy_view": "Alt+1",
     "library_view": "Alt+2",
     "updates_view": "Alt+3",
     "settings_view": "Alt+4",
+    # Tools
+    "theme_toggle": "Ctrl+T",
     "screenshot": "Ctrl+Shift+S",
 }
+
+DEFAULT_DISABLED_SHORTCUTS: list[str] = []
 
 
 class ConfigManager:
     def __init__(self, filename: str = CONFIG_FILENAME):
         self.config_path = resolve_data_file(filename)
         self.data: dict[str, Any] = {}
+        # Safety guard: prevent test code from writing to production data dir
+        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+
+            real_prod = str(Path(os.environ.get("LOCALAPPDATA", "")) / APP_NAME)
+            if str(self.config_path).startswith(real_prod) and not str(
+                self.config_path
+            ).startswith(str(Path(os.environ.get("SKILL_MANAGER_DATA_DIR", "")))):
+                raise RuntimeError(
+                    f"ConfigManager in test mode must not write to production "
+                    f"data dir: {self.config_path}. Set SKILL_MANAGER_DATA_DIR "
+                    f"to a test-specific path."
+                )
         self.load()
 
     def load(self) -> dict[str, Any]:
         """Loads configuration. Migrates from root if needed."""
+        diag = get_diagnostic_logger()
         root_config = Path.cwd() / self.config_path.name
 
         if not self.config_path.exists() and root_config.is_file():
@@ -163,6 +184,11 @@ class ConfigManager:
                 with open(root_config, "rb") as f:
                     self.data = orjson.loads(f.read())
                 self.save()  # Migrate to new location
+                diag.log_event(
+                    "INFO",
+                    CATEGORY_CONFIG_MIGRATION,
+                    f"Migrated config from {root_config} to {self.config_path}",
+                )
                 # Continue loading to handle potential secondary migrations (e.g. targets -> projects)
             except Exception as e:
                 logger.warning("Error migrating config: %s", e)
@@ -176,6 +202,46 @@ class ConfigManager:
                 self.data = AppConfig.from_legacy(self.data).model_dump(by_alias=True)
                 if self.data != old_data:
                     self.save()
+                    diag.log_event(
+                        "INFO",
+                        CATEGORY_CONFIG_MIGRATION,
+                        "Applied legacy field migration (targets→projects, etc.)",
+                    )
+
+                # LEGACY FALLBACK: If app-data config has no projects but
+                # the legacy data/config.json has targets, merge them.
+                # This handles the case where the app-data file was created
+                # by an older version that never ran the targets→projects migration.
+                if not self.data.get("projects"):
+                    legacy_data_dir = Path.cwd() / "data"
+                    legacy_config_path = legacy_data_dir / CONFIG_FILENAME
+                    if legacy_config_path.is_file():
+                        try:
+                            with open(legacy_config_path, "rb") as f:
+                                legacy_data = orjson.loads(f.read())
+                            legacy_targets = legacy_data.get("targets", [])
+                            if legacy_targets:
+                                self.data["projects"] = legacy_targets
+                                self.save()
+                                diag.log_event(
+                                    "INFO",
+                                    CATEGORY_CONFIG_MIGRATION,
+                                    f"Merged {len(legacy_targets)} targets from "
+                                    f"legacy config into app-data config",
+                                    data={
+                                        "legacy_path": str(legacy_config_path),
+                                        "targets": legacy_targets,
+                                    },
+                                )
+                                logger.info(
+                                    "[CONFIG] Legacy fallback: merged %d targets from %s",
+                                    len(legacy_targets),
+                                    legacy_config_path,
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                "Error reading legacy config for fallback: %s", e
+                            )
 
                 # Ensure default shortcuts are present
                 if "shortcuts" not in self.data:
@@ -191,11 +257,17 @@ class ConfigManager:
                     if changed:
                         self.save()
 
+                # Ensure disabled_shortcuts list is present
+                if "disabled_shortcuts" not in self.data:
+                    self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
+                    self.save()
+
             except Exception as e:
                 logger.warning("Error loading config: %s", e)
         else:
             # New config
             self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+            self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
             self.save()
 
         return self.data

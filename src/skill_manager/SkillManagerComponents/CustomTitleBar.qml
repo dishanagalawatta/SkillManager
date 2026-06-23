@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Rectangle {
@@ -37,13 +36,27 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
-        Image {
-            source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
+        Item {
             Layout.preferredWidth: 18
             Layout.preferredHeight: 18
-            fillMode: Image.PreserveAspectFit
-            opacity: 0.9
             Layout.alignment: Qt.AlignVCenter
+            
+            Image {
+                id: titleLogoImg
+                anchors.fill: parent
+                source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.9
+                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+            }
+
+            ColorOverlay {
+                anchors.fill: titleLogoImg
+                source: titleLogoImg
+                color: Theme.label
+                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                opacity: 0.9
+            }
         }
 
         Text {
@@ -69,7 +82,7 @@ Rectangle {
         TitleBarButton {
             iconSource: Theme.darkMode ? AppController.ui_controller.getAssetUri("ui/sun-icon.svg") : AppController.ui_controller.getAssetUri("ui/moon-icon.svg")
             tooltipText: "Toggle Theme"
-            onClicked: Theme.darkMode = !Theme.darkMode
+            onClicked: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode
             hoverColor: Theme.glassHover
         }
 
@@ -163,13 +176,15 @@ Rectangle {
             Behavior on color { ColorAnimation { duration: 150 } }
         }
 
-        ToolTip.text: btn.tooltipText
-        ToolTip.visible: btn.hovered && btn.tooltipText !== ""
-        ToolTip.delay: 400
+        SleekToolTip {
+            id: btnToolTip
+            text: btn.tooltipText
+            visible: btn.hovered && btn.tooltipText !== ""
+        }
 
         Accessible.role: Accessible.Button
         Accessible.name: btn.tooltipText
-        Accessible.description: btn.tooltipText
+        Accessible.description: btnToolTip.text
     }
 }
 

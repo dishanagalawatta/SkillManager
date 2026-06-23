@@ -28,10 +28,20 @@ ignore = [
 "__init__.py" = ["F401"]
 "src/skill_manager/gui/*" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/core/models/*" = ["N802", "N803", "N806", "N815", "B008"]
+"src/skill_manager/core/schemas.py" = ["N815"]
 "src/skill_manager/controllers/*" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/app.py" = ["N802", "N803", "N806", "N815"]
 "src/skill_manager/utils/win32.py" = ["N806", "N802", "F401", "F403", "F405"]
-"tests/*" = ["ARG001", "ARG005"]
+"tests/*" = ["ARG001", "ARG002", "ARG005"]
+# PySide6/Qt property and signal names follow camelCase per the Qt
+# convention. Type stubs (``.pyi``) must mirror those names verbatim so
+# callers can use the same identifiers in Python and QML. N802 (function
+# name lowercase) and N815 (mixedCase class attribute) are unavoidable
+# here — they describe the external Qt API contract, not a Python style
+# choice. The runtime .py files use the same camelCase identifiers and
+# are exempted above; the .pyi stubs are pure type-mirroring, hence the
+# file-scoped opt-out.
+"**/*.pyi" = ["N802", "N803", "N806", "N815", "N801"]
 
 [lint.isort]
 known-first-party = ["skill_manager"]

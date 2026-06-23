@@ -1,6 +1,6 @@
 # SkillManager Architecture
 
-SkillManager is a cross-platform desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
+SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
 ## System Overview
 
@@ -23,7 +23,7 @@ To prevent the `AppController` from becoming a "God Object," responsibilities ar
 - **`DiscoveryController`**: Handles filesystem scanning for skills, project discovery, and initial data loading.
 - **`ScreenshotController`**: Manages screenshot capture workflow with region selection, PII redaction, and saving.
 - **`ImageInspectorController`**: Handles color isolation and pixel inspection within captured screenshots.
-- **`AppUpdateController`**: Manages application self-update checks, download, and installation via TUF.
+- **`AppUpdateController`**: Manages application self-update checks via GitHub Releases API.
 
 ### 2. Data Models (`core/models/`)
 
@@ -99,7 +99,7 @@ SkillManager follows a **Solid Matte & Liquid Glass** design guide (previously d
 
 ## Distribution & Packaging Architecture
 
-SkillManager is distributed as native standalone executables for Windows, macOS, and Linux. The packaging pipeline is fully automated via GitHub Actions.
+SkillManager is distributed as a native standalone executable for Windows. The packaging pipeline is fully automated via GitHub Actions.
 
 ### 1. Freezing & Compilation (`scripts/build_app.py` / `packaging/skill_manager.spec`)
 - Compilation is orchestrated by `scripts/build_app.py` which:
@@ -110,21 +110,16 @@ SkillManager is distributed as native standalone executables for Windows, macOS,
 
 ### 2. Native OS Wrappers
 - **Windows**: PyInstaller output wrapped into `SkillManager_Setup.exe` via Inno Setup (`packaging/windows/installer.iss`). Portable ZIP also generated.
-- **macOS**: `.app` bundle converted to `.dmg` via `create-dmg`.
-- **Linux**: Output directory packaged as `.tar.gz`.
 
-### 3. CI/CD Pipeline (`.github/workflows/release.yml`)
-The project uses a unified release pipeline handling both pre-releases and stable versions:
-1. **Dual-Branch Strategy**:
-   - `develop` branch: Development pre-releases (e.g., `v1.0.0-dev.1`).
-   - `main` branch: Stable releases (e.g., `v1.0.0`).
-2. **Trigger-Based Versioning**: `scripts/version_bump_calculator.py` parses commit messages for `[dev]`, `[patch]`, `[minor]`, `[major]`, `[preminor]`, `[premajor]` triggers and maps to `python-semantic-release` flags.
-3. **Parallel Build Matrix**: `windows-latest`, `macos-latest`, `ubuntu-latest`.
-4. **Artifact Publishing**: Native installers and portable ZIPs attached to GitHub Release.
+### 3. CI/CD Pipeline
+The project uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in tokens (see ADR-0009):
+1. **Opt-In Version Bumps**: Commits must include `[patch]`, `[minor]`, `[major]`, or `[dev]` to trigger a release.
+2. **Build**: `windows-latest` × Python 3.12 + 3.13.
+3. **Artifact Publishing**: Native installer and portable ZIP attached to GitHub Release.
 
-### 4. TUF Secure Updates
-- `scripts/publish_tuf_release.py` manages the TUF repository for secure background updates.
-- Metadata and targets served via `gh-pages` branch.
+### 4. Application Updates
+- `AppUpdateController` checks the GitHub Releases API for new versions.
+- Users download updates manually from the GitHub Releases page.
 
 ---
 
@@ -134,7 +129,7 @@ The project uses a unified release pipeline handling both pre-releases and stabl
 
 Dependencies are kept behind narrow internal boundaries:
 
-- `platformdirs` for platform-aware data directory resolution.
+- `platformdirs` for data directory resolution.
 - `pydantic`/`pydantic-settings` for tolerant internal schemas.
 - `python-frontmatter` and `markdown-it-py` for parsing skill/command Markdown.
 - `pathspec` for `.gitignore`-style discovery filtering.
@@ -162,7 +157,7 @@ The `AppController` remains thin. New logic goes in specialized controllers and 
 Filesystem operations (deletion, archive) immediately update `SkillModel` for instant feedback, then execute in a background thread.
 
 ### 4. Subprocess Patching (`__main__.py`)
-On Windows, `subprocess.Popen` is patched with `CREATE_NO_WINDOW` to prevent console windows from appearing during background operations.
+`subprocess.Popen` is patched with `CREATE_NO_WINDOW` to prevent console windows from appearing during background operations.
 
 ### 5. Lifecycle Management
 - `on_quit()` ensures clean shutdown: watcher stop, scheduler shutdown, state save, Sentry flush, PostHog shutdown with timeout.

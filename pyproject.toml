@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-manager"
-version = "1.3.1"
+version = "1.8.0"
 description = "A professional tool for managing reusable agent skills across repositories."
 authors = [
     { name = "Don Dishan Kanchuka Agalawatta" }
@@ -22,20 +22,21 @@ dependencies = [
     "platformdirs",
     "posthog>=7.14.2",
     "pydantic>=2",
-    "pydantic-settings",
+    "pydantic-settings>=2.14.2",
     "python-frontmatter",
     "python-dotenv>=1.2.2",
     "rapidfuzz",
     "packaging",
+    "cryptography>=48.0.1",
     "tenacity",
     "watchdog",
     "orjson",
     "diskcache",
     "sentry-sdk",
-    "tufup>=0.10.0",
     "gitpython>=3.1.50",
     "apscheduler>=3.11.2",
     "pynput>=1.8.2",
+    "msgpack>=1.2.1",
 ]
 
 
@@ -73,7 +74,7 @@ where = ["src"]
 include = ["skill_manager*"]
 
 [tool.setuptools.package-data]
-skill_manager = ["assets/tuf/*", "assets/brand/*", "assets/ui/*", "assets/clients/*"]
+skill_manager = ["assets/brand/*", "assets/ui/*", "assets/clients/*"]
 
 
 [tool.coverage.run]
@@ -84,44 +85,6 @@ omit = ["src/skill_manager/__main__.py"]
 fail_under = 90
 show_missing = true
 skip_covered = false
-
-
-[tool.semantic_release]
-version_variables = [
-    "src/skill_manager/__init__.py:__version__",
-]
-version_toml = [
-    "pyproject.toml:project.version",
-]
-major_on_zero = true
-vcs_release = true
-upload_to_release = false
-upload_to_pypi = false
-remove_dist = false
-patch_without_tag = false
-tag_format = "v{version}"
-
-[tool.semantic_release.branches.main]
-match = "main"
-prerelease = false
-prerelease_token = "rc"
-
-[tool.semantic_release.branches.develop]
-match = "develop"
-prerelease = true
-prerelease_token = "dev"
-
-[tool.semantic_release.commit_parser_options]
-allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"]
-minor_tags = []
-patch_tags = []
-
-[tool.semantic_release.remote]
-name = "origin"
-type = "github"
-
-
-
 
 
 
@@ -141,9 +104,10 @@ dev = [
     "ruff>=0.8.0",
     "pyinstaller>=6.0.0",
     "pillow>=10.0.0",
-    "python-semantic-release>=9.0.0",
     "pytest-xdist",
     "pytest-sugar",
+    "pip-audit",
+    "python-semantic-release>=10.5.3",
 ]
 
 
@@ -151,3 +115,22 @@ dev = [
 filterwarnings = [
     "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
 ]
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/skill_manager/__init__.py:__version__"]
+branch = "main"
+upload_to_pypi = false
+build_command = ""
+changelog_file = "CHANGELOG.md"
+
+commit_parser = "src/skill_manager/commit_parser_optin.py:OptInCommitParser"
+
+changelog.exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''Initial [Cc]ommit.*''',
+]
+
+tag_format = "v{version}"

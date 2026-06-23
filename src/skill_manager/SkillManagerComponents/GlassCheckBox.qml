@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Item {
@@ -91,9 +90,11 @@ Item {
         onClicked: control.toggled()
     }
 
-    ToolTip.visible: mouseArea.containsMouse && tooltipText !== ""
-    ToolTip.delay: 400
-    ToolTip.text: tooltipText
+    SleekToolTip {
+        id: cbToolTip
+        visible: mouseArea.containsMouse && tooltipText !== ""
+        text: tooltipText
+    }
     
     Accessible.role: Accessible.CheckBox
     Accessible.name: tooltipText

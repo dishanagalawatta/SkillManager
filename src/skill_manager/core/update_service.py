@@ -60,14 +60,16 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
 
 
 class UpdateService:
+    """Service for handling background skill updates and project syncing."""
+
     def __init__(
         self,
         sources: list[str],
         projects: list[str],
-        update_packages: list[dict[str, Any]] = None,
-        project_aliases: dict[str, str] = None,
-        update_sources: list[dict[str, Any]] = None,
-        task_runner: TaskRunner = None,
+        update_packages: list[dict[str, Any]] | None = None,
+        project_aliases: dict[str, str] | None = None,
+        update_sources: list[dict[str, Any]] | None = None,
+        task_runner: TaskRunner | None = None,
     ):
         self.sources = sources
         self.projects = projects
@@ -107,7 +109,7 @@ class UpdateService:
             inventory = load_package_skill_inventory()
             self.update_packages = resolve_package_storage(self.update_packages, inventory)
             conflicts = package_project_path_conflicts(self.update_packages, self.projects)
-            unsafe_project_keys = {self._ownership_project_key(path) for path in conflicts}
+            unsafe_project_keys = {self.ownership_project_key(path) for path in conflicts}
             if conflicts:
                 for conflict in conflicts:
                     _log_update(
@@ -130,7 +132,7 @@ class UpdateService:
                     )
                     if (
                         source_path
-                        and self._ownership_project_key(source_path) in unsafe_project_keys
+                        and self.ownership_project_key(source_path) in unsafe_project_keys
                     ):
                         _log_update(
                             "WARN",
@@ -170,7 +172,7 @@ class UpdateService:
                         except Exception:
                             source["local_path"] = potential_path
 
-                    previous_inventory = inventory.get(source.get("package_id"), {})
+                    previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
                     if source.get("storage_mode") == "grouped":
                         promote_result = promote_package_storage(source, previous_inventory)
                         if promote_result.get("skipped"):
@@ -271,7 +273,7 @@ class UpdateService:
                     package_id = package_id_by_folder.get(
                         skill.get("folder_name")
                     ) or package_id_by_source.get(
-                        self._ownership_project_key(skill.get("source_path", ""))
+                        self.ownership_project_key(skill.get("source_path", ""))
                     )
                     if package_id:
                         skill = {**skill, "package_id": package_id}
@@ -282,7 +284,7 @@ class UpdateService:
                 result = copy_skill_folders_to_projects(
                     all_raw_skills, safe_projects, update_only=True
                 )
-                self._record_project_skill_ownership(all_raw_skills, result)
+                self.record_project_skill_ownership(all_raw_skills, result)
             elif all_raw_skills:
                 status_callback("Skipped project sync: no safe project folders to update.")
                 _log_update(
@@ -336,8 +338,7 @@ class UpdateService:
             skill
             for project in projects_state
             for skill in project.get("skills", [])
-            if self._ownership_project_key(skill.get("project_path", ""))
-            not in blocked_project_keys
+            if self.ownership_project_key(skill.get("project_path", "")) not in blocked_project_keys
             and self._is_removed_skill_owned_by_package(
                 skill, removed_map.get(skill.get("folder_name")), ownership
             )
@@ -350,17 +351,17 @@ class UpdateService:
             _log_update("INFO", "update.cleanup.deleted", count=0)
 
     @staticmethod
-    def _ownership_project_key(project_path: str) -> str:
+    def ownership_project_key(project_path: str) -> str:
         return str(Path(project_path).resolve()).casefold()
 
     def _package_discovery_sources(self):
         sources = list(self.sources)
-        seen = {self._ownership_project_key(path) for path in sources if path}
+        seen = {self.ownership_project_key(path) for path in sources if path}
         for package in self.update_packages:
             package_path = package.get("package_path") or package.get("local_path")
             if not package_path:
                 continue
-            key = self._ownership_project_key(package_path)
+            key = self.ownership_project_key(package_path)
             if key not in seen:
                 sources.append(package_path)
                 seen.add(key)
@@ -376,7 +377,7 @@ class UpdateService:
         for project in self.projects:
             project_path, error = normalize_project_skills_path(project)
             candidate = project if error else project_path
-            if self._ownership_project_key(candidate) in unsafe_project_keys:
+            if self.ownership_project_key(candidate) in unsafe_project_keys:
                 _log_update(
                     "WARN",
                     "update.project.skipped",
@@ -393,21 +394,21 @@ class UpdateService:
             package_id = package.get("package_id")
             package_path = package.get("package_path") or package.get("local_path")
             if package_id and package_path:
-                package_map[self._ownership_project_key(package_path)] = package_id
+                package_map[self.ownership_project_key(package_path)] = package_id
         return package_map
 
     def _package_storage_keys(self):
-        keys = {self._ownership_project_key(path) for path in self.sources if path}
+        keys = {self.ownership_project_key(path) for path in self.sources if path}
         for package in self.update_packages:
             package_path = package.get("resolved_package_path") or package.get("package_path")
             if package_path:
-                keys.add(self._ownership_project_key(package_path))
+                keys.add(self.ownership_project_key(package_path))
         return keys
 
     @classmethod
     def _is_removed_skill_owned_by_package(cls, skill, package_id, ownership):
         folder_name = skill.get("folder_name")
-        project_key = cls._ownership_project_key(skill.get("project_path", ""))
+        project_key = cls.ownership_project_key(skill.get("project_path", ""))
         if not folder_name or folder_name not in ownership.get(project_key, {}):
             return False
         if not package_id:
@@ -417,7 +418,7 @@ class UpdateService:
     @classmethod
     def _remove_project_skill_ownership(cls, skills, ownership):
         for skill in skills:
-            project_key = cls._ownership_project_key(skill.get("project_path", ""))
+            project_key = cls.ownership_project_key(skill.get("project_path", ""))
             folder_name = skill.get("folder_name")
             if project_key in ownership and folder_name:
                 ownership[project_key].pop(folder_name, None)
@@ -426,7 +427,7 @@ class UpdateService:
         save_project_skill_ownership(ownership)
 
     @classmethod
-    def _record_project_skill_ownership(cls, source_skills, copy_result):
+    def record_project_skill_ownership(cls, source_skills, copy_result):
         package_by_folder = {
             skill.get("folder_name"): skill.get("package_id")
             for skill in source_skills
@@ -445,7 +446,7 @@ class UpdateService:
             package_id = package_by_folder.get(folder_name)
             if not package_id:
                 continue
-            project_key = cls._ownership_project_key(str(destination.parent))
+            project_key = cls.ownership_project_key(str(destination.parent))
             ownership.setdefault(project_key, {})[folder_name] = package_id
             changed = True
 

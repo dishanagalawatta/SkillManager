@@ -1,36 +1,37 @@
 import contextlib
 import ctypes
 import logging
-import sys
 from ctypes import wintypes
 
+pywinstyles = None
 with contextlib.suppress(ImportError):
-    import pywinstyles
+    import pywinstyles  # type: ignore[no-redef, used-before-def]
 
 logger = logging.getLogger(__name__)
 
-if sys.platform == "win32":
 
-    class POINT(ctypes.Structure):
-        _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+class POINT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
 
-    class RECT(ctypes.Structure):
-        _fields_ = [
-            ("left", wintypes.LONG),
-            ("top", wintypes.LONG),
-            ("right", wintypes.LONG),
-            ("bottom", wintypes.LONG),
-        ]
 
-    class WINDOWPLACEMENT(ctypes.Structure):
-        _fields_ = [
-            ("length", wintypes.UINT),
-            ("flags", wintypes.UINT),
-            ("showCmd", wintypes.UINT),
-            ("ptMinPosition", POINT),
-            ("ptMaxPosition", POINT),
-            ("rcNormalPosition", RECT),
-        ]
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", wintypes.LONG),
+        ("top", wintypes.LONG),
+        ("right", wintypes.LONG),
+        ("bottom", wintypes.LONG),
+    ]
+
+
+class WINDOWPLACEMENT(ctypes.Structure):
+    _fields_ = [
+        ("length", wintypes.UINT),
+        ("flags", wintypes.UINT),
+        ("showCmd", wintypes.UINT),
+        ("ptMinPosition", POINT),
+        ("ptMaxPosition", POINT),
+        ("rcNormalPosition", RECT),
+    ]
 
 
 def apply_native_style(window, style_name: str) -> None:
@@ -42,9 +43,8 @@ def apply_native_style(window, style_name: str) -> None:
         window: The tkinter window object (Tk or Toplevel).
         style_name: The name of the style to apply.
     """
-    if sys.platform != "win32":
+    if pywinstyles is None:
         return
-
     try:
         # Update the window to ensure HWND is available
         window.update()
@@ -58,9 +58,6 @@ def apply_native_style(window, style_name: str) -> None:
 
 def get_window_placement(hwnd: int) -> tuple | None:
     """Returns the placement of the window identified by hwnd."""
-    if sys.platform != "win32":
-        return None
-
     placement = WINDOWPLACEMENT()
     placement.length = ctypes.sizeof(WINDOWPLACEMENT)
     if ctypes.windll.user32.GetWindowPlacement(hwnd, ctypes.byref(placement)):
@@ -81,9 +78,6 @@ def get_window_placement(hwnd: int) -> tuple | None:
 
 def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     """Sets the placement of the window identified by hwnd."""
-    if sys.platform != "win32":
-        return False
-
     placement = WINDOWPLACEMENT()
     placement.length = ctypes.sizeof(WINDOWPLACEMENT)
     placement.flags = placement_data[0]
@@ -98,3 +92,24 @@ def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
     ) = placement_data[4]
 
     return bool(ctypes.windll.user32.SetWindowPlacement(hwnd, ctypes.byref(placement)))
+
+
+def send_paste_to_focused_window() -> bool:
+    """Simulate Ctrl+V keystroke via Win32 keybd_event.
+
+    Returns True on success, False on failure (non-Windows or permission error).
+    """
+    try:
+        user32 = ctypes.windll.user32
+        VK_CONTROL = 0x11
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+        return True
+    except Exception:
+        logger.error("Failed to send paste keystroke", exc_info=True)
+        return False

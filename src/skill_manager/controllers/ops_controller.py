@@ -4,12 +4,20 @@ Usage: Accessed via AppController.ops
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.diagnostics import (
+    CATEGORY_COMMAND_CREATED,
+    CATEGORY_COMMAND_UPDATED,
+    CATEGORY_SELECTION_REFRESHED,
+    get_diagnostic_logger,
+)
 from skill_manager.core.persistence import (
     load_temp_registry,
     load_temp_screenshots_registry,
@@ -23,6 +31,7 @@ from skill_manager.core.persistence import (
 from skill_manager.core.quick_copy import (
     delete_project_skill_folders,
 )
+from skill_manager.core.schemas import SkillRecord
 
 logger = logging.getLogger(__name__)
 
@@ -41,40 +50,20 @@ class OpsController(BaseController):
             self.minimizeAppRequested.emit()
             logger.info("Auto-minimize on Quick Copy triggered.")
 
-    def _updateModelsSource(self, path: str, key: str, value: bool) -> None:
-        """Updates a property for all skills matching the local_path across both models.
-
-        Uses targeted ``dataChanged`` signals instead of full ``_apply_filter()``.
-        """
+    def _updateModelsProperty(self, path: str, key: str, value: Any) -> None:
+        """Updates a property for all skills matching the local_path across both models."""
+        updated = False
         for model in (self.app._library_model, self.app._quick_copy_model):
-            all_skills = getattr(model, "_all_skills", None)
-            if isinstance(all_skills, list):
-                for skill in all_skills:
-                    lp = (
-                        skill.local_path
-                        if hasattr(skill, "local_path")
-                        else skill.get("local_path")
-                    )
-                    if lp == path:
-                        if isinstance(skill, dict):
-                            skill[key] = value
-                        else:
-                            setattr(skill, key, value)
+            if model.updateSkillProperty(path, key, value):
+                updated = True
 
-            # Emit targeted dataChanged for the affected row instead of full rebuild
-            filtered = getattr(model, "_filtered_skills", [])
-            for i, skill in enumerate(filtered):
-                lp = skill.local_path if hasattr(skill, "local_path") else skill.get("local_path")
-                if lp == path:
-                    idx = model.index(i, 0)
-                    model.dataChanged.emit(idx, idx)
-                    break
+        if updated:
+            logger.debug("Updated property '%s' to %s for path: %s", key, value, path)
 
-            model.selectionStateChanged.emit()
-
-    @Slot()
-    def toggleArchive(self):
-        """Toggles archived status for the currently selected skill."""
+    def _toggle_skill_boolean(
+        self, attr_name: str, path_list: list[str], persist_fn: Callable[..., Any], event_name: str
+    ):
+        """Generic helper to toggle a boolean property on a skill."""
         skill = self.app._selected_skill
         if not skill:
             return
@@ -87,33 +76,43 @@ class OpsController(BaseController):
         if not path:
             return
 
-        is_archived = (
-            skill.get("is_archived", False)
+        current_val = (
+            skill.get(attr_name, False)
             if isinstance(skill, dict)
-            else getattr(skill, "is_archived", False)
+            else getattr(skill, attr_name, False)
         )
-        new_state = not is_archived
+        new_state = not current_val
 
+        # Update global list
         if new_state:
-            if path not in self.app._archive_paths:
-                self.app._archive_paths.append(path)
+            if path not in path_list:
+                path_list.append(path)
         else:
-            if path in self.app._archive_paths:
-                self.app._archive_paths.remove(path)
+            if path in path_list:
+                path_list.remove(path)
 
-        self._saveArchive()
-        self._updateModelsSource(path, "is_archived", new_state)
+        # Persist and Sync
+        persist_fn()
+        self._updateModelsProperty(path, attr_name, new_state)
 
-        # Ensure the selected skill object itself is updated
+        # Update the selected object reference
         if isinstance(skill, dict):
-            skill["is_archived"] = new_state
+            skill[attr_name] = new_state
         else:
-            skill.is_archived = new_state
+            setattr(skill, attr_name, new_state)
 
         self.app.selectedSkillChanged.emit()
-        status = "archived" if new_state else "restored"
-        self.app._set_status(f"Skill {status}")
-        capture_event("skill_archived", {"action": status})
+        status_label = attr_name.replace("is_", "") + ("d" if not attr_name.endswith("d") else "")
+        action = status_label if new_state else "un" + status_label
+        self.app._set_status(f"Skill {action}")
+        capture_event(event_name, {"action": action})
+
+    @Slot()
+    def toggleArchive(self):
+        """Toggles archived status for the currently selected skill."""
+        self._toggle_skill_boolean(
+            "is_archived", self.app._archive_paths, self._saveArchive, "skill_archived"
+        )
 
     @Slot()
     def toggleCurrentSkillArchive(self):
@@ -123,45 +122,9 @@ class OpsController(BaseController):
     @Slot()
     def toggleStarred(self):
         """Toggles starred status for the currently selected skill."""
-        skill = self.app._selected_skill
-        if not skill:
-            return
-
-        path = (
-            skill.get("local_path")
-            if isinstance(skill, dict)
-            else getattr(skill, "local_path", None)
+        self._toggle_skill_boolean(
+            "is_starred", self.app._starred_paths, self._saveStarred, "skill_starred"
         )
-        if not path:
-            return
-
-        is_starred = (
-            skill.get("is_starred", False)
-            if isinstance(skill, dict)
-            else getattr(skill, "is_starred", False)
-        )
-        new_state = not is_starred
-
-        if new_state:
-            if path not in self.app._starred_paths:
-                self.app._starred_paths.append(path)
-        else:
-            if path in self.app._starred_paths:
-                self.app._starred_paths.remove(path)
-
-        self._saveStarred()
-        self._updateModelsSource(path, "is_starred", new_state)
-
-        # Ensure the selected skill object itself is updated
-        if isinstance(skill, dict):
-            skill["is_starred"] = new_state
-        else:
-            skill.is_starred = new_state
-
-        self.app.selectedSkillChanged.emit()
-        status = "starred" if new_state else "unstarred"
-        self.app._set_status(f"Skill {status}")
-        capture_event("skill_starred", {"action": status})
 
     @Slot()
     def toggleCurrentSkillStarred(self):
@@ -173,8 +136,28 @@ class OpsController(BaseController):
         if not items:
             return
 
+        validated_records = []
+        for item in items:
+            try:
+                # Handle both dicts and dataclasses (Skill objects)
+                if hasattr(item, "__dataclass_fields__"):
+                    from dataclasses import asdict
+
+                    data = asdict(item)
+                else:
+                    data = item
+
+                # We use model_validate to enforce structure (Zod equivalent)
+                record = SkillRecord.model_validate(data)
+                validated_records.append(record)
+            except Exception as e:
+                logger.warning("Invalid item skipped during deletion: %s. Error: %s", item, e)
+
+        if not validated_records:
+            return
+
         # ── Step 0: Optimistic UI Removal
-        paths_to_delete = [i.get("local_path") for i in items if i.get("local_path")]
+        paths_to_delete = [r.local_path for r in validated_records if r.local_path]
         self.app._library_model.removeSkillsByPath(paths_to_delete)
         self.app._quick_copy_model.removeSkillsByPath(paths_to_delete)
 
@@ -182,11 +165,14 @@ class OpsController(BaseController):
             deleted = 0
             failed = 0
             paths_to_remove = []
+
             skill_items = [
-                i for i in items if not i.get("is_command") and not i.get("is_screenshot")
+                r.model_dump()
+                for r in validated_records
+                if not r.is_command and not r.is_screenshot
             ]
-            command_items = [i for i in items if i.get("is_command")]
-            screenshot_items = [i for i in items if i.get("is_screenshot")]
+            command_items = [r for r in validated_records if r.is_command]
+            screenshot_items = [r for r in validated_records if r.is_screenshot]
 
             # ── Step 1: Delete Skill Folders (FS)
             if skill_items:
@@ -199,14 +185,13 @@ class OpsController(BaseController):
 
             # ── Step 2: Delete Files (Commands + Screenshots) via unlink
             file_items = command_items + screenshot_items
-            for item in file_items:
-                path_str = item.get("local_path", "") if isinstance(item, dict) else item.local_path
-                p = Path(path_str)
+            for record in file_items:
+                p = Path(record.local_path)
                 try:
                     if p.is_file():
                         p.unlink()
                         deleted += 1
-                        paths_to_remove.append(path_str)
+                        paths_to_remove.append(record.local_path)
                 except Exception as exc:
                     logger.error("[DELETE] FAILED %s: %s", p, exc)
                     failed += 1
@@ -218,10 +203,14 @@ class OpsController(BaseController):
             if failed:
                 parts.append(f"{failed} failed")
             status = f"Deletion complete: {', '.join(parts) or 'nothing happened'}"
-            QTimer.singleShot(0, self.app, lambda: self.app._set_status(status))
 
-            # Note: No longer need full refreshSkills here as we were optimistic.
-            # Only need it if we wanted to rollback failures, but for now we just log them.
+            # Use a safer way to call back to the UI, especially for tests
+            if hasattr(self.app, "_set_status"):
+                try:
+                    QTimer.singleShot(0, lambda: self.app._set_status(status))
+                except TypeError:
+                    # Fallback for environments where QTimer.singleShot signature matches fail (like MagicMock context)
+                    self.app._set_status(status)
 
         self.app.task_runner.run(_background_delete)
 
@@ -264,20 +253,8 @@ class OpsController(BaseController):
 
         if count > 0:
             self._saveArchive()
-            paths_set = set(selected_paths)
-            for model in (self.app._library_model, self.app._quick_copy_model):
-                all_skills = getattr(model, "_all_skills", None)
-                if isinstance(all_skills, list):
-                    for skill in all_skills:
-                        lp = (
-                            skill.get("local_path") if isinstance(skill, dict) else skill.local_path
-                        )
-                        if lp in paths_set:
-                            if isinstance(skill, dict):
-                                skill["is_archived"] = True
-                            else:
-                                skill.is_archived = True
-                model._apply_filter()
+            for path in selected_paths:
+                self._updateModelsProperty(path, "is_archived", True)
             self.app.skillModel.clearSelection()
             self.app._set_status(f"{count} skills archived")
         else:
@@ -289,7 +266,7 @@ class OpsController(BaseController):
         if skill_local_path and skill_local_path not in self.app._archive_paths:
             self.app._archive_paths.append(skill_local_path)
             self._saveArchive()
-            self._updateModelsSource(skill_local_path, "is_archived", True)
+            self._updateModelsProperty(skill_local_path, "is_archived", True)
             self.app._set_status(f"Skill archived: {skill_local_path}")
 
     def cleanup_temp_copies(self):
@@ -400,6 +377,7 @@ class OpsController(BaseController):
 
                 discovered_skills = []
                 if result["details"]:
+                    diag = get_diagnostic_logger()
                     service = DiscoveryService(
                         sources=list(self.app._sources),
                         projects=self.app._projects,
@@ -412,9 +390,15 @@ class OpsController(BaseController):
                             skill_path = Path(detail["message"])
                             proj_path = Path(detail["project"])
                             try:
-                                skill_data = service.discover_single_skill(skill_path, proj_path)
+                                skill_data = service.discover_single(skill_path, proj_path)
                                 if skill_data:
                                     discovered_skills.append(skill_data)
+                                else:
+                                    diag.log_event(
+                                        "WARNING",
+                                        CATEGORY_SELECTION_REFRESHED,
+                                        f"discover_single returned None for skill: {skill_path}",
+                                    )
                             except Exception as exc:
                                 logger.error(
                                     "[TARGETED SCAN] Failed scanning %s: %s", skill_path, exc
@@ -452,7 +436,7 @@ class OpsController(BaseController):
             (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
         )
         if skill:
-            self.copySkillReference(skill)
+            self.copySkillReference(skill)  # type: ignore[arg-type]
         else:
             self.copyTextToClipboard(path)
 
@@ -521,46 +505,76 @@ class OpsController(BaseController):
         self.app._set_status(f"Copied reference: {ref}")
         self._maybeMinimizeOnCopy()
 
-    @Slot(str, str, str, str, str)
-    def createCustomCommand(
-        self, name: str, clients_str: str, body: str, project_label: str, category: str
-    ):
-        """Creates Custom Command .md files for each selected client."""
-        from skill_manager.core.commands import create_custom_command_file
+    @Slot(str)
+    def copyCollectionToClipboard(self, name: str):
+        """Copies a collection's skill references to clipboard and auto-pastes."""
+        from skill_manager.core.quick_copy import format_project_skill_reference
 
-        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
-        if not clients:
-            self.app._set_status("Error: No client selected")
+        entry = self.app._custom_collections.get(name, {})
+        if not isinstance(entry, dict):
             return
 
-        results = [
-            create_custom_command_file(
-                name=name,
-                client=client,
-                body=body,
-                project_label_name=project_label,
-                category=category,
-                project_paths=self.app._projects,
-            )
-            for client in clients
-        ]
+        paths = entry.get("paths", [])
+        if not paths:
+            self.app._set_status(f"Collection '{name}' has no skills")
+            return
 
-        ok_results = [r for r in results if r.ok]
-        fail_results = [r for r in results if not r.ok]
+        references = []
+        for path in paths:
+            skill = next((s for s in self.app.skillModel._all_skills if s.local_path == path), None)
+            if skill:
+                references.append(
+                    format_project_skill_reference(
+                        skill,
+                        self.app._client_format,
+                        all_skills=self.app.skillModel._all_skills,
+                    )
+                )
+            else:
+                references.append(path)
 
-        if fail_results:
-            errors = "; ".join(r.message for r in fail_results)
-            self.app._set_status(
-                f"Created {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
-            )
-        else:
-            self.app._set_status(f"Created {len(results)} command(s)")
+        content = " ".join(references)
+        self.app._clipboard.setText(content)
+        self.app._set_status(f"Copied collection '{name}' ({len(references)} skills)")
 
-        if ok_results:
+        # Auto-paste after a short delay to allow focus to settle
+        delay = 120 if self.app.config_controller.autoMinimizeOnQuickCopy else 50
+        if self.app.config_controller.autoMinimizeOnQuickCopy:
+            self.minimizeAppRequested.emit()
+        QTimer.singleShot(delay, self._send_paste_to_focused_window)
+
+    def _send_paste_to_focused_window(self):
+        """Helper that calls the Win32 paste function."""
+        from skill_manager.utils.win32 import send_paste_to_focused_window
+
+        if not send_paste_to_focused_window():
+            self.app._set_status("Copied, but could not paste automatically")
+
+    @Slot(str, str, str, str)
+    def createCustomCommand(self, name: str, body: str, project_label: str, category: str):
+        """Creates a Custom Command .md file."""
+        diag = get_diagnostic_logger()
+        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, project={project_label}")
+        from skill_manager.core.commands import create_custom_command_file
+
+        result = create_custom_command_file(
+            name=name,
+            body=body,
+            project_label_name=project_label,
+            category=category,
+            project_paths=self.app._projects,
+        )
+
+        if not result.ok:
+            self.app._set_status(result.message)
+            return
+
+        self.app._set_status(result.message)
+
+        if result.path:
             from skill_manager.core.discovery import DiscoveryService
             from skill_manager.core.persistence import patch_cache_add
 
-            discovered = []
             service = DiscoveryService(
                 sources=list(self.app._sources),
                 projects=self.app._projects,
@@ -568,118 +582,68 @@ class OpsController(BaseController):
                 starred_paths=self.app._starred_paths,
                 project_aliases=self.app._project_aliases,
             )
-            for r in ok_results:
-                if r.path:
-                    try:
-                        skill_data = service.discover_single_skill(r.path, r.path.parent)
-                        if skill_data:
-                            discovered.append(skill_data)
-                    except Exception as exc:
-                        logger.error("[CREATE COMMAND] Failed scanning %s: %s", r.path, exc)
-
-            if discovered:
-                patch_cache_add(discovered)
-                self._merge_discovered_skills(discovered)
+            try:
+                skill_data = service.discover_single(result.path, result.path.parent)
+                if skill_data:
+                    patch_cache_add([skill_data])
+                    self._merge_discovered_skills([skill_data])
+                    self._refresh_selected_skill(str(result.path))
+                else:
+                    diag.log_event(
+                        "WARNING",
+                        CATEGORY_SELECTION_REFRESHED,
+                        f"discover_single returned None for command: {result.path}",
+                    )
+            except Exception as exc:
+                logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
     @Slot(str, str, str, str, str, str)
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
-        clients_str: str,
         body: str,
-        project_label: str,
         category: str,
+        project_label: str,
+        on_conflict: str = "",
     ):
-        """Full update: update/create command files for all selected clients.
+        """Updates an existing Custom Command .md file."""
+        diag = get_diagnostic_logger()
+        diag.log_event(
+            "INFO",
+            CATEGORY_COMMAND_UPDATED,
+            f"path={local_path}, name={name}, project={project_label}, on_conflict={on_conflict}",
+        )
+        from skill_manager.core.commands import update_custom_command_file
 
-        - Existing client files are updated in place.
-        - New clients get a file created.
-        - Excluded clients' files are left untouched.
-        """
-        from pathlib import Path
-
-        from skill_manager.core.commands import (
-            build_command_filename,
-            create_custom_command_file,
-            resolve_commands_dir,
-            update_custom_command_file_full,
+        result = update_custom_command_file(
+            local_path=local_path,
+            name=name,
+            body=body,
+            category=category,
+            project_label_name=project_label,
+            project_paths=self.app._projects,
+            on_conflict=on_conflict or None,
         )
 
-        clients = [c.strip() for c in clients_str.split(",") if c.strip()]
-        if not clients:
-            self.app._set_status("Error: No client selected")
+        if result.needs_conflict_resolution and result.conflicting_path:
+            self.app.commandUpdateConflict.emit(
+                local_path,
+                str(result.conflicting_path),
+                result.suggested_rename or "",
+            )
             return
 
-        commands_dir = resolve_commands_dir(project_label, self.app._projects)
+        if not result.ok:
+            self.app._set_status(result.message)
+            return
 
-        original_client = None
-        path = Path(local_path)
-        if path.is_file():
-            try:
-                from skill_manager.core.parsing.base import split_frontmatter
+        self.app._set_status(result.message)
 
-                content = path.read_text(encoding="utf-8-sig")
-                metadata, _ = split_frontmatter(content)
-                original_client = metadata.get("client", "") if metadata else ""
-            except Exception:
-                pass
-
-        primary_client = original_client if original_client in clients else clients[0]
-
-        results = []
-        for client in clients:
-            if client == primary_client:
-                result = update_custom_command_file_full(
-                    local_path=local_path,
-                    name=name,
-                    client=client,
-                    body=body,
-                    category=category,
-                    project_label_name=project_label,
-                    project_paths=self.app._projects,
-                )
-            else:
-                existing_path = (
-                    commands_dir / build_command_filename(name, client) if commands_dir else None
-                )
-                if existing_path and existing_path.is_file():
-                    result = update_custom_command_file_full(
-                        local_path=str(existing_path),
-                        name=name,
-                        client=client,
-                        body=body,
-                        category=category,
-                        project_label_name=project_label,
-                        project_paths=self.app._projects,
-                    )
-                else:
-                    result = create_custom_command_file(
-                        name=name,
-                        client=client,
-                        body=body,
-                        project_label_name=project_label,
-                        category=category,
-                        project_paths=self.app._projects,
-                    )
-            results.append(result)
-
-        ok_results = [r for r in results if r.ok]
-        fail_results = [r for r in results if not r.ok]
-
-        if fail_results:
-            errors = "; ".join(r.message for r in fail_results)
-            self.app._set_status(
-                f"Updated {len(ok_results)}/{len(results)} command(s). Errors: {errors}"
-            )
-        else:
-            self.app._set_status(f"Updated {len(results)} command(s)")
-
-        if ok_results:
+        if result.path:
             from skill_manager.core.discovery import DiscoveryService
             from skill_manager.core.persistence import patch_cache_add
 
-            discovered = []
             service = DiscoveryService(
                 sources=list(self.app._sources),
                 projects=self.app._projects,
@@ -687,18 +651,22 @@ class OpsController(BaseController):
                 starred_paths=self.app._starred_paths,
                 project_aliases=self.app._project_aliases,
             )
-            for r in ok_results:
-                if r.path:
-                    try:
-                        skill_data = service.discover_single_skill(r.path, r.path.parent)
-                        if skill_data:
-                            discovered.append(skill_data)
-                    except Exception as exc:
-                        logger.error("[UPDATE COMMAND] Failed scanning %s: %s", r.path, exc)
-
-            if discovered:
-                patch_cache_add(discovered)
-                self._merge_discovered_skills(discovered)
+            try:
+                skill_data = service.discover_single(result.path, result.path.parent)
+                if skill_data:
+                    patch_cache_add([skill_data])
+                    self._merge_discovered_skills([skill_data])
+                    # For renames AND project moves, local_path is the OLD path but result.path is NEW.
+                    self._refresh_selected_skill(local_path, rename_path=str(result.path))
+                    self.app.notify_command_updated(local_path, str(result.path))
+                else:
+                    diag.log_event(
+                        "WARNING",
+                        CATEGORY_SELECTION_REFRESHED,
+                        f"discover_single returned None for command: {result.path}",
+                    )
+            except Exception as exc:
+                logger.error("[UPDATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
     def _saveArchive(self):
         """Internal helper to persist archive state."""
@@ -708,14 +676,19 @@ class OpsController(BaseController):
         """Internal helper to persist starred state."""
         save_starred(self.app._starred_paths)
 
-    def _merge_discovered_skills(self, discovered_skills):
-        """Internal helper to merge newly discovered skills into both models."""
-        self.app._library_model.addOrUpdateSkills(discovered_skills)
-        self.app._quick_copy_model.addOrUpdateSkills(discovered_skills)
+    def _merge_discovered_skills(self, discovered: list):
+        """Internal helper to merge newly discovered skills into both models.
+
+        Parameter name matches :py:meth:`BaseController._merge_discovered_skills`
+        so subclasses with the same method override without an incompatible
+        signature warning.
+        """
+        self.app._library_model.addOrUpdateSkills(discovered)
+        self.app._quick_copy_model.addOrUpdateSkills(discovered)
 
         # Update categories if new ones appeared
         new_cats = False
-        for s in discovered_skills:
+        for s in discovered:
             cat = s.get("category")
             if cat and cat not in self.app._categories:
                 self.app._categories.append(cat)
@@ -724,3 +697,60 @@ class OpsController(BaseController):
         if new_cats:
             self.app._categories.sort()
             self.app.categoriesChanged.emit()
+
+    def _refresh_selected_skill(self, local_path: str, rename_path: str | None = None) -> None:
+        """Refresh ``_selected_skill`` after a model mutation.
+
+        If the mutated skill matches the currently selected one, replace
+        the stale snapshot with a fresh dict from the model and emit
+        ``selectedSkillChanged`` so QML re-binds.
+
+        For renames, pass ``rename_path`` (the new path) when
+        ``local_path`` is the old path that no longer exists in the model.
+
+        Called from ``createCustomCommand``, ``updateCustomCommandFull``,
+        and any other site that calls ``addOrUpdateSkills`` (or
+        ``setSkills``) after a mutation that may change the selected
+        skill's data.
+
+        See ``docs/adr/0011-selection-refresh-invariant.md``.
+        """
+        diag = get_diagnostic_logger()
+        selected = self.app._selected_skill
+        selected_path = selected.get("local_path") if isinstance(selected, dict) else None
+
+        if not selected_path:
+            diag.log_event("INFO", CATEGORY_SELECTION_REFRESHED, "noop: nothing selected")
+            return
+
+        if selected_path != local_path:
+            diag.log_event(
+                "INFO",
+                CATEGORY_SELECTION_REFRESHED,
+                f"not_selected: mutated {local_path}, selected is {selected_path}",
+            )
+            return
+
+        # For renames, the old path no longer exists. Try the new path.
+        lookup_path = rename_path or local_path
+
+        # Find the row in the active model
+        model = self.app.skillModel
+        for i in range(len(model._filtered_skills)):
+            skill = model._filtered_skills[i]
+            if skill.local_path == lookup_path:
+                self.app._selected_skill = model.get_skill_at(i)
+                self.app.selectedSkillChanged.emit()
+                diag.log_event(
+                    "INFO",
+                    CATEGORY_SELECTION_REFRESHED,
+                    f"refreshed: {lookup_path}"
+                    + (f" (renamed from {local_path})" if rename_path else ""),
+                )
+                return
+
+        diag.log_event(
+            "WARNING",
+            CATEGORY_SELECTION_REFRESHED,
+            f"not_in_view: {lookup_path} not found in active model",
+        )

@@ -1,18 +1,26 @@
 import argparse
 import logging
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-def update_projects(project_paths, source_paths, progress_callback=None):
+def update_projects(
+    project_paths: list[str],
+    source_paths: list[str],
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> tuple[int, int] | None:
     """
     Iterates through subfolders in each project path.
     For each subfolder, it checks the source paths in the order they were provided.
     The first source path containing a matching subfolder is considered the highest priority.
     It copies the contents of that prioritized source subfolder to the project subfolder,
     overwriting existing files.
+
+    Returns ``(updated_count, skipped_count)`` on success, or ``None`` if no valid
+    project or source directories were provided.
     """
 
     projects = []
@@ -82,7 +90,7 @@ def update_projects(project_paths, source_paths, progress_callback=None):
                     selected_source_dir = source_dir
                     break  # Stop at the first (highest priority) match
 
-            if selected_source_subfolder:
+            if selected_source_subfolder and selected_source_dir is not None:
                 msg = f"Updating '{folder_name}'..."
                 logger.info("[*] %s (using source: '%s')", msg, selected_source_dir.name)
                 if progress_callback:

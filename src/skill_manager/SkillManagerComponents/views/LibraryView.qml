@@ -206,7 +206,7 @@ Item {
                         labelText: "Add"
                         iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
                         role: "secondary"
-                        onClicked: (mouse) => lv_commandDialog.openWithContext(AppController.clientFormat)
+                        onClicked: (mouse) => lv_commandDialog.openWithContext()
                     }
 
                     // Selection-specific actions
@@ -230,7 +230,7 @@ Item {
                                 }
                             }
                         }
-                        
+
                         ActionButton {
                             id: lv_tempCopyBtn
                             buttonHeight: 32
@@ -508,4 +508,5 @@ Item {
     ArchiveConfirmDialog {
         id: lv_archiveConfirmDialog
     }
+
 }

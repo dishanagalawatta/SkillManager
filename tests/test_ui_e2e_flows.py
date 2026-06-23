@@ -1,46 +1,8 @@
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtWidgets import QApplication
-
-from skill_manager.app import AppController
-from skill_manager.core.resources import qml_components_dir
-from skill_manager.utils.task_runner import SynchronousTaskRunner
-
-
-@pytest.fixture(scope="session")
-def app_controller(session_mock_config, session_temp_dir):
-    """Provides an AppController initialized for testing (session-scoped)."""
-    # We use SynchronousTaskRunner to avoid threading issues in tests
-    controller = AppController(skip_initial_load=True, config=session_mock_config)
-    controller.task_runner = SynchronousTaskRunner()
-
-    from contextlib import suppress
-
-    import skill_manager.app
-
-    skill_manager.app.current_test_controller = controller
-
-    def controller_factory(qml_engine):
-        from PySide6.QtQml import QQmlEngine
-
-        ctrl = skill_manager.app.current_test_controller
-        if ctrl:
-            QQmlEngine.setObjectOwnership(ctrl, QQmlEngine.CppOwnership)
-        return ctrl
-
-    with suppress(Exception):
-        from PySide6.QtQml import qmlRegisterSingletonType
-
-        # This registration is process-wide
-        qmlRegisterSingletonType(AppController, "App", 1, 0, "AppController", controller_factory)
-
-    yield controller
-
-    # Cleanup session-scoped resources
-    controller.on_quit()
 
 
 @pytest.fixture
@@ -58,7 +20,13 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     proj_dir = temp_dir / "proj"
     proj_dir.mkdir(exist_ok=True)
 
-    # Clear previous state
+    # Clear previous state. The session-scoped ``app_controller`` fixture
+    # accumulates model data across tests (e.g. ``test_ui_discovery_flow``
+    # injects ``Skill Alpha``/``Skill Beta``). Without a model reset here,
+    # ``quickCopyModel`` row 0 may still point at leftover data, and the
+    # "copy to clipboard" assertion picks up the wrong skill.
+    app_controller.libraryModel.setSkills([])
+    app_controller.quickCopyModel.setSkills([])
     while app_controller.sources:
         app_controller.config_mgr.removeSource(app_controller.sources[0])
     while app_controller.projects:
@@ -92,47 +60,11 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     qapp.processEvents()
 
 
-@pytest.fixture
-def qml_engine(qapp, app_controller, qtbot):
-    """Provides a QQmlApplicationEngine with the AppController already registered."""
-    engine = QQmlApplicationEngine()
-
-    engine.warnings.connect(lambda msg: print(f"QML Warning: {msg}"))
-    engine.rootContext().setContextProperty("appController", app_controller)
-
-    # Resolve QML directory relative to the src/ directory
-    import skill_manager
-
-    qml_dir = qml_components_dir(package_file=skill_manager.__file__)
-    engine.addImportPath(str(qml_dir.parent))
-
-    qml_file = qml_dir / "Main.qml"
-    if not qml_file.exists():
-        pytest.fail(f"Main.qml not found at {qml_file}")
-
-    engine.load(str(qml_file))
-
-    if not engine.rootObjects():
-        pytest.fail("Failed to load Main.qml")
-
-    yield engine
-
-    # Clean up engine to prevent crashes and hangs
-    engine.clearComponentCache()
-    # Delete later schedules deletion in the next event loop iteration
-    engine.deleteLater()
-
-    # Process events to ensure deletion is processed
-    # Using a small wait loop is more robust for QML cleanup
-    for _ in range(5):
-        qapp.processEvents()
-        qtbot.wait(20)
-
-
 def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controller_data):
     """Verify navigation, search filtering, and quick copy flow in a single sequence."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     # Force a known starting view
@@ -210,6 +142,7 @@ def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_dat
     """Verify navigation to Updates view and interaction with scan/lists."""
     root = qml_engine.rootObjects()[0]
     qapp = QApplication.instance()
+    assert qapp is not None, "QApplication.instance() returned None"
 
     # --- 1. Navigation ---
     nav_updates = root.findChild(QQuickItem, "navUpdates")

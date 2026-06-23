@@ -38,11 +38,24 @@ Rectangle {
             Layout.preferredHeight: 50
             spacing: 12
             
-            Image {
-                source: AppController.ui_controller.logoSource
+            Item {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
-                fillMode: Image.PreserveAspectFit
+
+                Image {
+                    id: sidebarLogoImg
+                    anchors.fill: parent
+                    source: AppController.ui_controller.logoSource
+                    fillMode: Image.PreserveAspectFit
+                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+                }
+                
+                ColorOverlay {
+                    anchors.fill: sidebarLogoImg
+                    source: sidebarLogoImg
+                    color: Theme.label
+                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                }
                 
                 MouseArea {
                     id: logoMouseArea
@@ -51,13 +64,15 @@ Rectangle {
                     onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
                     cursorShape: Qt.PointingHandCursor
 
-                    ToolTip.text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                    ToolTip.visible: containsMouse
-                    ToolTip.delay: 400
+                    SleekToolTip {
+                        id: sidebarToolTip
+                        text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
+                        visible: parent.containsMouse
+                    }
 
                     Accessible.role: Accessible.Button
-                    Accessible.name: ToolTip.text
-                    Accessible.description: ToolTip.text
+                    Accessible.name: sidebarToolTip.text
+                    Accessible.description: sidebarToolTip.text
                 }
             }
             

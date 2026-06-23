@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Button {
@@ -17,9 +16,11 @@ Button {
     Layout.preferredHeight: 40
     padding: 0
 
-    ToolTip.visible: control.hovered && control.collapsed
-    ToolTip.text: control.labelText
-    ToolTip.delay: 400
+    SleekToolTip {
+        id: btnToolTip
+        visible: control.hovered && control.collapsed
+        text: control.labelText
+    }
 
     contentItem: Item {
         implicitHeight: 40
