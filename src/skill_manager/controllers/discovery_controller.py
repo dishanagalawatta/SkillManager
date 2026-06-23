@@ -182,19 +182,31 @@ class DiscoveryController(BaseController):
         else:
             # First load or full replacement needed
             skills_dump = [s.model_dump() for s in state.skills]
-            self.app._library_model.setSkills(skills_dump)
-            self.app._quick_copy_model.setSkills(skills_dump)
+            self.app._library_model._begin_batch()
+            self.app._quick_copy_model._begin_batch()
+            try:
+                self.app._library_model.setSkills(skills_dump)
+                self.app._quick_copy_model.setSkills(skills_dump)
+            finally:
+                self.app._library_model._end_batch()
+                self.app._quick_copy_model._end_batch()
 
         # Snapshot current state for next diff
         self._previous_skills = new_skills_map
 
         # Ensure client filters are set
-        self.app._library_model.clientFilter = self.app._client_format
-        self.app._quick_copy_model.clientFilter = self.app._client_format
+        self.app._library_model._begin_batch()
+        self.app._quick_copy_model._begin_batch()
+        try:
+            self.app._library_model.clientFilter = self.app._client_format
+            self.app._quick_copy_model.clientFilter = self.app._client_format
 
-        # Apply the shared current project filter to QuickCopy model
-        if self.app._current_project_label:
-            self.app._quick_copy_model.projectFilter = self.app._current_project_label
+            # Apply the shared current project filter to QuickCopy model
+            if self.app._current_project_label:
+                self.app._quick_copy_model.projectFilter = self.app._current_project_label
+        finally:
+            self.app._library_model._end_batch()
+            self.app._quick_copy_model._end_batch()
 
         self.app._set_status(state.status)
 

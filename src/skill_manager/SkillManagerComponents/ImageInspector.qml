@@ -67,6 +67,8 @@ Rectangle {
         if (p.startsWith("/")) return "file://" + p;
         return "file:///" + p;
     }
+    property bool imageLoadFailed: false
+    onImagePathChanged: { imageLoadFailed = false }
     property string imageFileName: {
         if (!root.skill || !root.skill.local_path) return "";
         let parts = root.skill.local_path.replace(/\\/g, "/").split("/");
@@ -571,7 +573,10 @@ Rectangle {
 
                     onStatusChanged: {
                         if (status === Image.Ready) {
+                            root.imageLoadFailed = false
                             zoomToFit()
+                        } else if (status === Image.Error) {
+                            root.imageLoadFailed = true
                         }
                     }
 
@@ -587,7 +592,42 @@ Rectangle {
                         target: AppController.image_inspector_controller
                         function onImageSaved(savedPath) {
                             imageItem.source = ""
+                            root.imageLoadFailed = false
                             imageReloadTimer.restart()
+                        }
+                    }
+                }
+
+                // Placeholder shown when screenshot file is missing
+                Rectangle {
+                    visible: root.imageLoadFailed && root.skill && root.skill.is_screenshot
+                    anchors.centerIn: parent
+                    width: 320
+                    height: 120
+                    radius: 8
+                    color: "#20FFFFFF"
+                    border.color: "#40FFFFFF"
+                    border.width: 1
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 8
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Screenshot file not found"
+                            color: "#AAFFFFFF"
+                            font.pixelSize: 14
+                            font.bold: true
+                        }
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: root.skill ? (root.skill.local_path || "") : ""
+                            color: "#66FFFFFF"
+                            font.pixelSize: 11
+                            width: 290
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
                 }

@@ -330,7 +330,7 @@ Item {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
-                model: AppController.libraryModel
+                model: AppController.isLoading ? null : AppController.libraryModel
                 clip: true
                 spacing: 0
                 
