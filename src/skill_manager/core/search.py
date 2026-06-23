@@ -159,8 +159,9 @@ class SearchEngine:
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
+                    unique_doc_tokens = dict.fromkeys(all_doc_tokens)
                     for qt in query_tokens:
-                        for dt in all_doc_tokens:
+                        for dt in unique_doc_tokens:
                             score = fuzz.ratio(qt, dt)
                             if score > max_token_match:
                                 max_token_match = score
