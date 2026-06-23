@@ -89,7 +89,7 @@ def run_process(
         "bufsize": 1,
     }
     if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
     process = subprocess.Popen(command, **kwargs)
     lastemit_time = 0
