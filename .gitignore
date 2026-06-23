@@ -40,6 +40,9 @@ Thumbs.db
 .vscode/
 *.code-workspace
 
+# Agent tooling (local config)
+.opencode/
+
 # Secrets
 .env
 .env.*

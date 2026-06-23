@@ -125,7 +125,39 @@ def run_pyinstaller(spec_path: str) -> int:
     print(f"Running PyInstaller for spec: {spec_path}...")
     cmd: list[str] = [sys.executable, "-m", "PyInstaller", "--noconfirm", spec_path]
 
-    result = subprocess.run(cmd, check=True)
+    # Capture stderr to filter known, harmless PyInstaller noise:
+    #   1. PyInstaller 6.20.0 format-string bug in hook-PySide6.QtQml.py
+    #      logs "%s: QML plugin binary %r does not exist!" with one arg,
+    #      which triggers a Logging error traceback. The plugin is unused.
+    import tempfile
+
+    with tempfile.TemporaryFile(mode="w+", suffix=".log", encoding="utf-8") as tmp:
+        result = subprocess.run(cmd, check=True, stderr=tmp)
+        tmp.seek(0)
+        stderr_text = tmp.read()
+
+    # Strip ANSI escape codes, then filter known noise
+    import re
+
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    stderr_text = ansi_escape.sub("", stderr_text)
+
+    # Remove the Logging error traceback
+    if "Logging error" in stderr_text:
+        stderr_text = re.sub(
+            r"--- Logging error ---.*?TypeError: not enough arguments for format string\n",
+            "",
+            stderr_text,
+            flags=re.DOTALL,
+        )
+    # Remove the specific hidden-import warning
+    stderr_text = stderr_text.replace(
+        'WARNING: Hidden import "importlib_resources.trees" not found!\n', ""
+    )
+
+    if stderr_text.strip():
+        print(stderr_text, file=sys.stderr, end="")
+
     return result.returncode
 
 

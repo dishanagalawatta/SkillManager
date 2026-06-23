@@ -62,4 +62,7 @@ See [`src/skill_manager/SkillManagerComponents/Theme.qml`](src/skill_manager/Ski
 
 - API: [`docs/API.md`](docs/API.md)
 - ADRs: [`ADR_INDEX.md`](ADR_INDEX.md)
+  - ADR-0003: Qt 6.11.1 strict `data` list property (QML constraints)
+  - ADR-0004: QML diagnostic via `QQmlApplicationEngine`
+  - ADR-0008: Windows-only distribution
 - Agent instructions: [`AGENTS.md`](AGENTS.md)

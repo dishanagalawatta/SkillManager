@@ -58,6 +58,17 @@ CATEGORY_APP_UPDATE_UP_TO_DATE = "app_update_up_to_date"
 CATEGORY_APP_UPDATE_SKIPPED_DEV = "app_update_skipped_dev"
 CATEGORY_APP_UPDATE_FAILED = "app_update_failed"
 CATEGORY_RELEASE_CHECK = "release_check"
+CATEGORY_UPDATE_CLICK = "update_click"
+CATEGORY_UPDATE_SLOT = "update_slot"
+CATEGORY_UPDATE_RESULT = "update_result"
+CATEGORY_COMMAND_CREATED = "command_created"
+CATEGORY_COMMAND_UPDATED = "command_updated"
+CATEGORY_SELECTION_REFRESHED = "selection_refreshed"
+CATEGORY_CONFIG_MIGRATION = "config_migration"
+CATEGORY_SOURCE_MISSING = "source_missing"
+CATEGORY_DISCOVERY_EMPTY_RESULT = "discovery_empty_result"
+CATEGORY_CACHE_PRESERVED = "cache_preserved"
+CATEGORY_WINDOW_STATE = "window_state"
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -3,6 +3,7 @@ Purpose: Main entry point for Skill Manager (PySide6 version).
 Usage: python run.py
 """
 
+import contextlib
 import ctypes
 import logging
 import os
@@ -16,16 +17,6 @@ from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
 
-try:
-    from sentry_sdk.integrations.pyside6 import (  # type: ignore[reportMissingImports]
-        PySide6Integration,
-    )
-
-    HAS_SENTRY_PYSIDE6 = True
-except ImportError:
-    pywinstyles = None  # type: ignore[assignment]
-    HAS_SENTRY_PYSIDE6 = False
-
 import skill_manager
 
 # Try to import pywinstyles for Mica/Acrylic
@@ -37,42 +28,71 @@ except ImportError:
     pywinstyles = None  # type: ignore[assignment]
     HAS_PYWINSTYLES = False
 
+# DWM attribute for immersive dark mode title bar
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 
-from skill_manager.controllers.app_update_controller import AppUpdateController
-from skill_manager.controllers.config_controller import ConfigController
-from skill_manager.controllers.discovery_controller import DiscoveryController
-from skill_manager.controllers.font_database_bridge import FontDatabaseBridge
-from skill_manager.controllers.image_inspector_controller import ImageInspectorController
-from skill_manager.controllers.ops_controller import OpsController
-from skill_manager.controllers.screenshot_controller import ScreenshotController
-from skill_manager.controllers.ui_controller import UIController
-from skill_manager.controllers.update_controller import UpdateController
-from skill_manager.core.analytics import (
+
+def _apply_immersive_dark(hwnd: int, enabled: bool) -> None:
+    """Set the DWM immersive-dark-mode attribute on the window.
+
+    ``enabled=True`` tells the OS to render the title bar and system
+    buttons in dark style; ``enabled=False`` reverts to light.
+    """
+    with contextlib.suppress(Exception):
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(ctypes.c_int(1 if enabled else 0)),
+            4,
+        )
+
+
+# The ``_apply_immersive_dark`` helper above is intentionally defined
+# before these imports so the constant and helper sit next to the
+# ``pywinstyles`` try/except that depends on the same DWM surface.
+# ruff flags module-level imports that follow executable code as E402;
+# suppress per-line so the import order remains readable.
+from skill_manager.controllers.app_update_controller import AppUpdateController  # noqa: E402
+from skill_manager.controllers.config_controller import ConfigController  # noqa: E402
+from skill_manager.controllers.discovery_controller import DiscoveryController  # noqa: E402
+from skill_manager.controllers.font_database_bridge import FontDatabaseBridge  # noqa: E402
+from skill_manager.controllers.image_inspector_controller import (  # noqa: E402
+    ImageInspectorController,
+)
+from skill_manager.controllers.ops_controller import OpsController  # noqa: E402
+from skill_manager.controllers.screenshot_controller import ScreenshotController  # noqa: E402
+from skill_manager.controllers.ui_controller import UIController  # noqa: E402
+from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
+from skill_manager.core.analytics import (  # noqa: E402
     capture_event,
     shutdown as posthog_shutdown,
 )
-from skill_manager.core.categories import get_category_emoji
-from skill_manager.core.config import (
+from skill_manager.core.categories import get_category_emoji  # noqa: E402
+from skill_manager.core.config import (  # noqa: E402
     ConfigManager,
 )
-from skill_manager.core.diagnostics import get_diagnostic_logger
-from skill_manager.core.file_watch import SkillFolderWatcher
-from skill_manager.core.global_hotkey import GlobalHotkeyManager
-from skill_manager.core.image_provider import ScreenshotImageProvider
-from skill_manager.core.models import SkillModel
-from skill_manager.core.persistence import (
+from skill_manager.core.diagnostics import (  # noqa: E402
+    CATEGORY_SOURCE_MISSING,
+    get_diagnostic_logger,
+)
+from skill_manager.core.file_watch import SkillFolderWatcher  # noqa: E402
+from skill_manager.core.global_hotkey import GlobalHotkeyManager  # noqa: E402
+from skill_manager.core.image_provider import ScreenshotImageProvider  # noqa: E402
+from skill_manager.core.models import SkillModel  # noqa: E402
+from skill_manager.core.persistence import (  # noqa: E402
     load_archive,
     load_starred,
 )
-from skill_manager.core.resources import (
+from skill_manager.core.resources import (  # noqa: E402
     invalidate_qml_disk_cache_if_stale,
     qml_components_dir,
     resource_path as resolve_resource_path,
 )
-from skill_manager.core.schemas import UpdatePackageRecord
-from skill_manager.utils.task_runner import BackgroundTaskRunner
+from skill_manager.core.schemas import UpdatePackageRecord  # noqa: E402
+from skill_manager.utils.task_runner import BackgroundTaskRunner  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
 
 def _handle_qml_warning(msg):
     """Filter benign QML warnings, such as component destruction during incubation."""
@@ -81,7 +101,6 @@ def _handle_qml_warning(msg):
         logger.debug(f"QML Warning (suppressed): {msg_str}")
     else:
         logger.warning(f"QML Warning: {msg_str}")
-
 
 
 class AppController(QObject):
@@ -125,6 +144,10 @@ class AppController(QObject):
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
+
+    # Command update signals (cross-controller notification)
+    commandUpdateConflict = Signal(str, str, str)  # oldPath, conflictPath, suggestedRename
+    commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
@@ -266,6 +289,10 @@ class AppController(QObject):
         # In tests, we often want to skip the initial background discovery
         skip_initial = skip_initial_load or os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1"
 
+        # Validate source paths at startup — warn early if directories are missing
+        if not skip_initial:
+            self._validate_source_paths()
+
         if not skip_initial:
             self._watcher.start()
             QTimer.singleShot(100, self.loadInitialData)
@@ -333,7 +360,7 @@ class AppController(QObject):
     def currentProject(self):  # type: ignore[reportRedeclaration]
         return self._current_project_label
 
-    @currentProject.setter
+    @currentProject.setter  # type: ignore[func-attr]
     def currentProject(self, label):
         self.setCurrentProject(label)
 
@@ -437,7 +464,7 @@ class AppController(QObject):
     def currentView(self):  # type: ignore[reportRedeclaration]
         return self.ui.currentView
 
-    @currentView.setter
+    @currentView.setter  # type: ignore[func-attr]
     def currentView(self, v):
         self.ui.currentView = v
 
@@ -445,7 +472,7 @@ class AppController(QObject):
     def windowWidth(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowWidth
 
-    @windowWidth.setter
+    @windowWidth.setter  # type: ignore[func-attr]
     def windowWidth(self, v):
         self.ui.windowWidth = v
 
@@ -453,7 +480,7 @@ class AppController(QObject):
     def windowHeight(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowHeight
 
-    @windowHeight.setter
+    @windowHeight.setter  # type: ignore[func-attr]
     def windowHeight(self, v):
         self.ui.windowHeight = v
 
@@ -461,7 +488,7 @@ class AppController(QObject):
     def windowX(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowX
 
-    @windowX.setter
+    @windowX.setter  # type: ignore[func-attr]
     def windowX(self, v):
         self.ui.windowX = v
 
@@ -469,7 +496,7 @@ class AppController(QObject):
     def windowY(self):  # type: ignore[reportRedeclaration]
         return self.ui.windowY
 
-    @windowY.setter
+    @windowY.setter  # type: ignore[func-attr]
     def windowY(self, v):
         self.ui.windowY = v
 
@@ -477,7 +504,7 @@ class AppController(QObject):
     def darkMode(self):  # type: ignore[reportRedeclaration]
         return self.ui.darkMode
 
-    @darkMode.setter
+    @darkMode.setter  # type: ignore[func-attr]
     def darkMode(self, v):
         self.ui.darkMode = v
 
@@ -485,7 +512,7 @@ class AppController(QObject):
     def startupView(self):  # type: ignore[reportRedeclaration]
         return self.ui.startupView
 
-    @startupView.setter
+    @startupView.setter  # type: ignore[func-attr]
     def startupView(self, v):
         self.ui.startupView = v
 
@@ -493,7 +520,7 @@ class AppController(QObject):
     def rememberFilters(self):  # type: ignore[reportRedeclaration]
         return self.ui.rememberFilters
 
-    @rememberFilters.setter
+    @rememberFilters.setter  # type: ignore[func-attr]
     def rememberFilters(self, v):
         self.ui.rememberFilters = v
 
@@ -501,7 +528,7 @@ class AppController(QObject):
     def reducedMotion(self):  # type: ignore[reportRedeclaration]
         return self.ui.reducedMotion
 
-    @reducedMotion.setter
+    @reducedMotion.setter  # type: ignore[func-attr]
     def reducedMotion(self, v):
         self.ui.reducedMotion = v
 
@@ -509,7 +536,7 @@ class AppController(QObject):
     def compactListRows(self):  # type: ignore[reportRedeclaration]
         return self.ui.compactListRows
 
-    @compactListRows.setter
+    @compactListRows.setter  # type: ignore[func-attr]
     def compactListRows(self, v):
         self.ui.compactListRows = v
 
@@ -795,9 +822,13 @@ class AppController(QObject):
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
-    @Slot(str, str, str)
-    def updateCustomCommandFull(self, lp, n, b):
-        self.ops.updateCustomCommandFull(lp, n, b)
+    @Slot(str, str, str, str, str, str)
+    def updateCustomCommandFull(self, lp, n, b, cat, proj, on_conflict=""):
+        self.ops.updateCustomCommandFull(lp, n, b, cat, proj, on_conflict)
+
+    @Slot(str, str)
+    def notify_command_updated(self, old_path: str, new_path: str) -> None:
+        self.commandUpdateCompleted.emit(old_path, new_path)
 
     @Slot(str, str, str, str)
     def createCustomCommand(self, n, b, pl, cat):
@@ -835,13 +866,13 @@ class AppController(QObject):
     def addUpdatePackage(self, n):
         self.updates.addUpdatePackage(n)
 
-    @Slot(dict)
+    @Slot(dict, result=str)
     def addSkillPackage(self, d):
-        self.updates.addSkillPackage(d)
+        return self.updates.addSkillPackage(d)
 
-    @Slot(int, dict)
+    @Slot(int, dict, result=str)
     def updateUpdatePackage(self, i, d):
-        self.updates.updateUpdatePackage(i, d)
+        return self.updates.updateUpdatePackage(i, d)
 
     @Slot(int)
     def removeUpdatePackage(self, i):
@@ -851,13 +882,18 @@ class AppController(QObject):
     def clearPackageJustFinished(self, i):
         self.updates.clearPackageJustFinished(i)
 
+    @Slot(str, str, str)
+    def logDiagnostic(self, level: str, category: str, msg: str):
+        """QML-callable diagnostic logger — emits to the structured ring buffer."""
+        get_diagnostic_logger().log_event(level, category, msg)
+
     # --- Slots ---
 
     @Property(Qt.CheckState, notify=isPackageOnlyChanged)
     def isPackageOnly(self):  # type: ignore[reportRedeclaration]
         return self._library_model.isPackageOnly
 
-    @isPackageOnly.setter
+    @isPackageOnly.setter  # type: ignore[func-attr]
     def isPackageOnly(self, value):
         self._library_model.isPackageOnly = value
         self._quick_copy_model.isPackageOnly = value
@@ -930,6 +966,40 @@ class AppController(QObject):
         # Start the listener thread
         self.global_hotkey.start()
 
+    def _validate_source_paths(self):
+        """Check configured source/project paths exist at startup.
+
+        Logs warnings for missing directories so that users see early
+        feedback instead of a silent cache-wipe on next discovery.
+        """
+        diag = get_diagnostic_logger()
+        missing: list[str] = []
+        for src in self._sources:
+            if not os.path.isdir(src):
+                missing.append(src)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Source directory not found at startup: {src}",
+                    data={"source_path": src},
+                )
+        for proj in self._projects:
+            if not os.path.isdir(proj):
+                missing.append(proj)
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Project directory not found at startup: {proj}",
+                    data={"source_path": proj},
+                )
+        if missing:
+            logger.warning(
+                "[APP] %d configured source/project directories not found: %s",
+                len(missing),
+                missing,
+            )
+            self._set_status(f"Warning: {len(missing)} configured directory(ies) not found")
+
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
         """Handle global hotkey press."""
@@ -979,11 +1049,11 @@ def main():  # pragma: no cover
     # Initialize Sentry as early as possible
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN", ""),  # Placeholder for user's DSN
-        integrations=[PySide6Integration()] if HAS_SENTRY_PYSIDE6 else [],  # type: ignore[name-defined]
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
         environment="production" if getattr(sys, "frozen", False) else "development",
         release=f"skill-manager@{skill_manager.__version__}",
+        default_integrations=False,
     )
 
     # Acquire mutex so Inno Setup installer can cleanly close the app
@@ -1066,8 +1136,8 @@ def main():  # pragma: no cover
         "App",
         1,
         0,
-        "AppController",
-        controller,  # type: ignore[arg-type]
+        "AppController",  # type: ignore[arg-type]
+        controller,
     )
     app.aboutToQuit.connect(controller.on_quit)
 
@@ -1093,12 +1163,45 @@ def main():  # pragma: no cover
     if not engine.rootObjects():
         logger.error("CRITICAL: Failed to load QML root objects!")
         sys.exit(-1)
+    diag = get_diagnostic_logger()
+    diag.log_event(
+        "INFO", "window_state", f"QML loaded, {len(engine.rootObjects())} root object(s)"
+    )
     capture_event("app_opened")
+
+    # Clamp window geometry to visible screen area to prevent off-screen windows.
+    # Saved coordinates from a previous multi-monitor setup may be invalid if
+    # the monitor was disconnected.
+    screen = app.primaryScreen()
+    if screen:
+        geo = screen.availableGeometry()
+        screen_x, screen_y = geo.x(), geo.y()
+        screen_w, screen_h = geo.width(), geo.height()
+        diag.log_event(
+            "INFO",
+            "window_state",
+            f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h})",
+        )
+        for root in engine.rootObjects():
+            r: Any = root
+            win_x, win_y = r.x(), r.y()
+            win_w, win_h = r.width(), r.height()
+            # Clamp so the window is at least partially visible
+            new_x = max(screen_x, min(win_x, screen_x + screen_w - max(win_w, 100)))
+            new_y = max(screen_y, min(win_y, screen_y + screen_h - max(win_h, 100)))
+            if new_x != win_x or new_y != win_y:
+                diag.log_event(
+                    "WARN",
+                    "window_state",
+                    f"Window off-screen at ({win_x}, {win_y}) — clamping to ({new_x}, {new_y})",
+                )
+                r.setX(new_x)
+                r.setY(new_y)
 
     # Explicitly set icon on each QML window — QGuiApplication.setWindowIcon()
     # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
     if not app_icon.isNull():
-        for root in engine.rootObjects():
+        for i, root in enumerate(engine.rootObjects()):
             # ``engine.rootObjects()`` returns ``list[QObject]`` per the stub,
             # but QML roots are actually ``QWindow``/``QQuickWindow`` which
             # expose ``setIcon``/``show``/``winId``. Cast through ``Any`` so
@@ -1107,16 +1210,25 @@ def main():  # pragma: no cover
             root_any.setIcon(app_icon)
             if hasattr(root, "show"):
                 root_any.show()
+                diag.log_event(
+                    "INFO",
+                    "window_state",
+                    f"Called root.show() on root {i} (visible={getattr(root, 'isVisible', lambda: 'unknown')()})",
+                )
 
     def apply_native_styles():
+        diag.log_event(
+            "INFO",
+            "window_state",
+            f"apply_native_styles: processing {len(engine.rootObjects())} root object(s)",
+        )
+        dark = bool(controller.ui.darkMode)
         for root in engine.rootObjects():
             try:
                 hwnd = int(root.winId())  # type: ignore[attr-defined]
                 if HAS_PYWINSTYLES and pywinstyles is not None:
                     pywinstyles.apply_style(hwnd, "mica")
-                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                        hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4
-                    )
+                    _apply_immersive_dark(hwnd, dark)
                     ctypes.windll.dwmapi.DwmSetWindowAttribute(
                         hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4
                     )
@@ -1145,6 +1257,48 @@ def main():  # pragma: no cover
                 logger.error(f"Failed to apply native style/icon: {e}")
 
     QTimer.singleShot(0, apply_native_styles)
+
+    def _reapply_immersive_dark_from_dark_mode() -> None:
+        """Re-apply the DWM immersive-dark attribute when darkMode changes."""
+        dark = bool(controller.ui.darkMode)
+        for root in engine.rootObjects():
+            try:
+                hwnd = int(root.winId())  # type: ignore[attr-defined]
+                _apply_immersive_dark(hwnd, dark)
+            except Exception as e:
+                diag.log_event(
+                    "WARN",
+                    "window_state",
+                    f"Immersive-dark re-apply skipped for root: {e}",
+                )
+
+    controller.ui.darkModeChanged.connect(_reapply_immersive_dark_from_dark_mode)
+
+    def _check_window_visible():
+        for i, root in enumerate(engine.rootObjects()):
+            try:
+                r: Any = root
+                vis = r.isVisible()
+                x, y, w, h = r.x(), r.y(), r.width(), r.height()
+                diag.log_event(
+                    "INFO",
+                    "window_state",
+                    f"Watchdog: root {i} visible={vis}, geometry=({x}, {y}, {w}, {h})",
+                )
+                if not vis:
+                    diag.log_event(
+                        "WARN",
+                        "window_state",
+                        f"Watchdog: root {i} NOT VISIBLE after 5s — forcing show",
+                    )
+                    r.show()
+                    r.raise_()
+                    r.requestActivate()
+            except Exception as e:
+                diag.log_event("ERROR", "window_state", f"Watchdog error: {e}")
+
+    QTimer.singleShot(5000, _check_window_visible)
+
     ret = app.exec()
     # Force exit to prevent background threads (like concurrent.futures or watchdog) from hanging shutdown
     os._exit(ret)

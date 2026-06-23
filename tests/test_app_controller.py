@@ -305,9 +305,7 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
 
     with (
         patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
-        patch(
-            "skill_manager.core.discovery.DiscoveryService.discover_single_skill", return_value=None
-        ),
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None),
     ):
         from skill_manager.core.commands import CommandCreateResult
 
@@ -346,11 +344,24 @@ def test_controller_config_and_update_source_slots(controller):
     with (
         patch(
             "skill_manager.core.skill_packages.normalize_skill_package_config",
-            return_value={"name": "Repo", "source_type": "git", "package_id": "repo"},
+            return_value={
+                "name": "Repo",
+                "source_type": "git",
+                "package_id": "repo",
+                "repository_url": "https://example.test/repo.git",
+                "github_token": "",
+                "package_args": "",
+                "update_command": "",
+                "current_version_command": "",
+                "latest_version_command": "",
+                "package_path": "",
+                "clone_path": "",
+                "package_name": "",
+            },
         ),
         patch(
             "skill_manager.core.skill_packages.check_skill_package_versions",
-            side_effect=lambda source: {**source, "latest_version": "v1"},
+            side_effect=lambda source, **kw: {**source, "latest_version": "v1"},
         ),
         patch("skill_manager.controllers.update_controller.capture_event") as capture,
     ):
@@ -677,3 +688,134 @@ def test_copy_collection_to_clipboard_delegates_to_ops(controller):
     with patch.object(controller.ops, "copyCollectionToClipboard") as mock_ops:
         controller.copyCollectionToClipboard("TestColl")
         mock_ops.assert_called_once_with("TestColl")
+
+
+# ---------------------------------------------------------------------------
+# Selection refresh integration (real DiscoveryService)
+# ---------------------------------------------------------------------------
+
+
+def _write_command_file(path, name, body, category="Commands"):
+    """Write a valid command file with YAML frontmatter."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        f"---\nname: {name}\ncategory: {category}\ntype: command\ndate: 2026-01-01\n---\n\n{body}"
+    )
+    path.write_text(content, encoding="utf-8")
+
+
+def _load_command_into_model(controller, cmd_path, name, body):
+    """Load a command into both models so _refresh_selected_skill can find it."""
+    skill_data = {
+        "local_path": str(cmd_path),
+        "name": name,
+        "body_content": body,
+        "category": "Custom Commands",
+        "main_category": "\u2699\ufe0f System & Workflow",
+        "is_command": True,
+        "is_starred": False,
+        "is_bundle": False,
+        "is_archived": False,
+        "is_selected": False,
+        "is_package": False,
+        "is_source": False,
+        "project_label": "test-project",
+        "source": "Custom",
+        "risk": "Low",
+        "description": "",
+        "raw_content": "",
+    }
+    controller._library_model.addOrUpdateSkills([skill_data])
+    controller._quick_copy_model.addOrUpdateSkills([skill_data])
+    for model in (controller._library_model, controller._quick_copy_model):
+        model.showCommands = True
+        model.state.is_package_only = None
+        model._apply_filter()
+    return skill_data
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_update_custom_command_refreshes_selected_skill_real_discovery(
+    mock_patch_cache,
+    controller,
+    temp_dir,
+):
+    """updateCustomCommandFull refreshes _selected_skill using real DiscoveryService.
+
+    On main (pre-fix), this fails because discover_single returns
+    None for bare .md command files.
+    """
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+    commands_dir = project_path / ".agents" / "commands"
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    controller._projects = [str(project_path)]
+
+    cmd_file = commands_dir / "Cmd.md"
+    _write_command_file(cmd_file, "Cmd", "old body")
+
+    _load_command_into_model(controller, cmd_file, "Cmd", "old body")
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
+
+    emissions = []
+    controller.selectedSkillChanged.connect(lambda: emissions.append(True))
+
+    proj_label = compute_project_label(project_path)
+    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label, "")
+
+    assert emissions, (
+        "selectedSkillChanged was not emitted — "
+        "discover_single likely returned None for the command file"
+    )
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_create_custom_command_refreshes_selected_skill_real_discovery(
+    mock_patch_cache,
+    controller,
+    temp_dir,
+):
+    """createCustomCommand refreshes _selected_skill using real DiscoveryService.
+
+    On main (pre-fix), this fails because discover_single returns
+    None for bare .md command files.
+    """
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+
+    from skill_manager.core.quick_copy import project_label as compute_project_label
+
+    label = compute_project_label(project_path)
+
+    # Pre-create the command file so discover_single can parse it
+    cmd_file = project_path / ".agents" / "commands" / "NewCmd.md"
+    _write_command_file(cmd_file, "NewCmd", "echo hello")
+
+    _load_command_into_model(controller, cmd_file, "NewCmd", "echo hello")
+    controller._selected_skill = {"local_path": str(cmd_file), "name": "NewCmd"}
+
+    emissions = []
+    controller.selectedSkillChanged.connect(lambda: emissions.append(True))
+
+    controller.createCustomCommand("NewCmd2", "echo hello", label, "Commands")
+
+    # Verify the new command file was created and discover_single works
+    new_cmd_file = project_path / ".agents" / "commands" / "NewCmd2.md"
+    assert new_cmd_file.exists(), "New command file should exist on disk"
+
+    from skill_manager.core.discovery import DiscoveryService
+
+    svc = DiscoveryService(
+        sources=list(controller._sources),
+        projects=controller._projects,
+        archive_paths=controller._archive_paths,
+        starred_paths=controller._starred_paths,
+        project_aliases=controller._project_aliases,
+    )
+    skill_data = svc.discover_single(new_cmd_file, new_cmd_file.parent)
+    assert skill_data is not None, (
+        "discover_single returned None for newly created command — "
+        "the command file parser should handle bare .md files"
+    )

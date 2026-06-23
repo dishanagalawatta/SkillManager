@@ -66,7 +66,7 @@ class UIController(BaseController):
     def currentView(self):  # type: ignore[reportRedeclaration]
         return self.state.current_view
 
-    @currentView.setter
+    @currentView.setter  # type: ignore[func-attr]
     def currentView(self, value):
         normalized = self._normalizeViewName(value)
         if self.state.current_view != normalized:
@@ -79,7 +79,7 @@ class UIController(BaseController):
     def windowWidth(self):  # type: ignore[reportRedeclaration]
         return self.state.window_width
 
-    @windowWidth.setter
+    @windowWidth.setter  # type: ignore[func-attr]
     def windowWidth(self, value):
         if self.state.window_width != value:
             # Pydantic validation will handle bounds in a real setter,
@@ -98,7 +98,7 @@ class UIController(BaseController):
     def windowHeight(self):  # type: ignore[reportRedeclaration]
         return self.state.window_height
 
-    @windowHeight.setter
+    @windowHeight.setter  # type: ignore[func-attr]
     def windowHeight(self, value):
         if self.state.window_height != value:
             try:
@@ -114,7 +114,7 @@ class UIController(BaseController):
     def windowX(self):  # type: ignore[reportRedeclaration]
         return self.state.window_x
 
-    @windowX.setter
+    @windowX.setter  # type: ignore[func-attr]
     def windowX(self, value):
         if self.state.window_x != value:
             self.state.window_x = value
@@ -125,7 +125,7 @@ class UIController(BaseController):
     def windowY(self):  # type: ignore[reportRedeclaration]
         return self.state.window_y
 
-    @windowY.setter
+    @windowY.setter  # type: ignore[func-attr]
     def windowY(self, value):
         if self.state.window_y != value:
             self.state.window_y = value
@@ -136,7 +136,7 @@ class UIController(BaseController):
     def darkMode(self):  # type: ignore[reportRedeclaration]
         return self.state.dark_mode
 
-    @darkMode.setter
+    @darkMode.setter  # type: ignore[func-attr]
     def darkMode(self, value):
         if self.state.dark_mode != value:
             self.state.dark_mode = value
@@ -147,7 +147,7 @@ class UIController(BaseController):
     def startupView(self):  # type: ignore[reportRedeclaration]
         return self.state.startup_view
 
-    @startupView.setter
+    @startupView.setter  # type: ignore[func-attr]
     def startupView(self, value):
         normalized = self._normalizeViewName(value)
         if self.state.startup_view != normalized:
@@ -159,7 +159,7 @@ class UIController(BaseController):
     def rememberFilters(self):  # type: ignore[reportRedeclaration]
         return self.state.remember_filters
 
-    @rememberFilters.setter
+    @rememberFilters.setter  # type: ignore[func-attr]
     def rememberFilters(self, value):
         if self.state.remember_filters != value:
             self.state.remember_filters = value
@@ -172,7 +172,7 @@ class UIController(BaseController):
     def reducedMotion(self):  # type: ignore[reportRedeclaration]
         return self.state.reduced_motion
 
-    @reducedMotion.setter
+    @reducedMotion.setter  # type: ignore[func-attr]
     def reducedMotion(self, value):
         if self.state.reduced_motion != value:
             self.state.reduced_motion = value
@@ -183,7 +183,7 @@ class UIController(BaseController):
     def compactListRows(self):  # type: ignore[reportRedeclaration]
         return self.state.compact_list_rows
 
-    @compactListRows.setter
+    @compactListRows.setter  # type: ignore[func-attr]
     def compactListRows(self, value):
         if self.state.compact_list_rows != value:
             self.state.compact_list_rows = value
@@ -194,7 +194,7 @@ class UIController(BaseController):
     def inspectorWidth(self):  # type: ignore[reportRedeclaration]
         return self.state.inspector_width
 
-    @inspectorWidth.setter
+    @inspectorWidth.setter  # type: ignore[func-attr]
     def inspectorWidth(self, value):
         value = int(value)
         if self.state.inspector_width != value:

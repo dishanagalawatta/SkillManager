@@ -331,3 +331,19 @@ def test_collection_shortcut_fires_copy_collection_to_clipboard(qtbot, app_contr
     app_controller.copyCollectionToClipboard.assert_called_once_with("Snippets")
 
     engine.deleteLater()
+
+
+# ----- Dark mode binding regression ----------------------------------------
+
+
+def test_main_qml_has_theme_darkmode_binding():
+    """Main.qml must contain the Binding that syncs Theme.darkMode from Python.
+
+    Regression guard: the fix for the title-bar immersive-dark re-apply must
+    not remove the content-area re-theme path.
+    """
+    content = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+    assert 'Binding { target: Theme; property: "darkMode"' in content, (
+        "Main.qml is missing the Theme.darkMode binding. "
+        "Content-area dark-mode re-theming will break."
+    )

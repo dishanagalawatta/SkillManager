@@ -82,7 +82,7 @@ Rectangle {
         TitleBarButton {
             iconSource: Theme.darkMode ? AppController.ui_controller.getAssetUri("ui/sun-icon.svg") : AppController.ui_controller.getAssetUri("ui/moon-icon.svg")
             tooltipText: "Toggle Theme"
-            onClicked: Theme.darkMode = !Theme.darkMode
+            onClicked: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode
             hoverColor: Theme.glassHover
         }
 
@@ -176,13 +176,15 @@ Rectangle {
             Behavior on color { ColorAnimation { duration: 150 } }
         }
 
-        ToolTip.text: btn.tooltipText
-        ToolTip.visible: btn.hovered && btn.tooltipText !== ""
-        ToolTip.delay: 400
+        SleekToolTip {
+            id: btnToolTip
+            text: btn.tooltipText
+            visible: btn.hovered && btn.tooltipText !== ""
+        }
 
         Accessible.role: Accessible.Button
         Accessible.name: btn.tooltipText
-        Accessible.description: btn.tooltipText
+        Accessible.description: btnToolTip.text
     }
 }
 

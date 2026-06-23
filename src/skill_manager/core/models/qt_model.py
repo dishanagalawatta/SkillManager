@@ -58,6 +58,35 @@ class SkillModel(QAbstractListModel):
     IsPackageRole = Qt.ItemDataRole.UserRole + 25
     IsScreenshotRole = Qt.ItemDataRole.UserRole + 26
 
+    _ALL_ROLES = [
+        NameRole,
+        CategoryRole,
+        DescriptionRole,
+        PathRole,
+        ProjectRole,
+        IsStarredRole,
+        IsSelectedRole,
+        SearchTextRole,
+        IsArchivedRole,
+        IsCollectionRole,
+        SectionRole,
+        RawContentRole,
+        BodyContentRole,
+        RiskRole,
+        SourceRole,
+        DateRole,
+        IsCollapsedRole,
+        IsCommandRole,
+        ClientRole,
+        MainCategoryNameRole,
+        IsFirstInSubcategoryRole,
+        IsMainCollapsedRole,
+        IsSubCollapsedRole,
+        SubCategoryNameRole,
+        IsPackageRole,
+        IsScreenshotRole,
+    ]
+
     filterChanged = Signal()
     showArchivedChanged = Signal()
     categoryFilterChanged = Signal()
@@ -213,7 +242,7 @@ class SkillModel(QAbstractListModel):
     def filterText(self):  # type: ignore[reportRedeclaration]
         return self.state.filter_text
 
-    @filterText.setter
+    @filterText.setter  # type: ignore[func-attr]
     def filterText(self, value):
         if self.state.filter_text != value:
             self.state.filter_text = value
@@ -224,7 +253,7 @@ class SkillModel(QAbstractListModel):
     def showArchived(self):  # type: ignore[reportRedeclaration]
         return self.state.show_archived
 
-    @showArchived.setter
+    @showArchived.setter  # type: ignore[func-attr]
     def showArchived(self, value):
         if self.state.show_archived != value:
             self.state.show_archived = value
@@ -236,7 +265,7 @@ class SkillModel(QAbstractListModel):
     def categoryFilter(self):  # type: ignore[reportRedeclaration]
         return self.state.category_filter
 
-    @categoryFilter.setter
+    @categoryFilter.setter  # type: ignore[func-attr]
     def categoryFilter(self, value):
         if self.state.category_filter != value:
             self.state.category_filter = value
@@ -248,7 +277,7 @@ class SkillModel(QAbstractListModel):
     def collectionFilter(self):  # type: ignore[reportRedeclaration]
         return self.state.collection_filter
 
-    @collectionFilter.setter
+    @collectionFilter.setter  # type: ignore[func-attr]
     def collectionFilter(self, value):
         if self.state.collection_filter != value:
             self.state.collection_filter = value
@@ -260,7 +289,7 @@ class SkillModel(QAbstractListModel):
     def projectFilter(self):  # type: ignore[reportRedeclaration]
         return self.state.project_filter
 
-    @projectFilter.setter
+    @projectFilter.setter  # type: ignore[func-attr]
     def projectFilter(self, value):
         if self.state.project_filter != value:
             old_project = self.state.project_filter
@@ -280,7 +309,7 @@ class SkillModel(QAbstractListModel):
     def clientFilter(self):  # type: ignore[reportRedeclaration]
         return self.state.client_filter
 
-    @clientFilter.setter
+    @clientFilter.setter  # type: ignore[func-attr]
     def clientFilter(self, value):
         if self.state.client_filter != value:
             self.state.client_filter = value
@@ -294,7 +323,7 @@ class SkillModel(QAbstractListModel):
     def filterByClient(self):  # type: ignore[reportRedeclaration]
         return self.state.filter_by_client
 
-    @filterByClient.setter
+    @filterByClient.setter  # type: ignore[func-attr]
     def filterByClient(self, value):
         if self.state.filter_by_client != value:
             self.state.filter_by_client = value
@@ -305,7 +334,7 @@ class SkillModel(QAbstractListModel):
     def showCommands(self):  # type: ignore[reportRedeclaration]
         return self.state.show_commands
 
-    @showCommands.setter
+    @showCommands.setter  # type: ignore[func-attr]
     def showCommands(self, value):
         if self.state.show_commands != value:
             self.state.show_commands = value
@@ -317,7 +346,7 @@ class SkillModel(QAbstractListModel):
     def showStarred(self):  # type: ignore[reportRedeclaration]
         return self.state.show_starred
 
-    @showStarred.setter
+    @showStarred.setter  # type: ignore[func-attr]
     def showStarred(self, value):
         if self.state.show_starred != value:
             self.state.show_starred = value
@@ -331,7 +360,7 @@ class SkillModel(QAbstractListModel):
             return Qt.CheckState.PartiallyChecked
         return Qt.CheckState.Checked if self.state.is_package_only else Qt.CheckState.Unchecked
 
-    @isPackageOnly.setter
+    @isPackageOnly.setter  # type: ignore[func-attr]
     def isPackageOnly(self, value):
         new_val = None
         if value == Qt.CheckState.Checked or value is True:
@@ -622,6 +651,7 @@ class SkillModel(QAbstractListModel):
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]):
         was_empty = len(self._all_skills) == 0
+        updated_paths = {s_dict.get("local_path", "") for s_dict in new_skills}
         skills_dict = {s.local_path: s for s in self._all_skills}
         for s_dict in new_skills:
             skill = Skill.from_dict_fast(s_dict)
@@ -635,6 +665,12 @@ class SkillModel(QAbstractListModel):
             self._search_engine = SearchEngine(new_skills)
 
         self._apply_filter(reset=was_empty)
+
+        if updated_paths and not was_empty:
+            for row, skill in enumerate(self._filtered_skills):
+                if skill.local_path in updated_paths:
+                    idx = self.index(row, 0)
+                    self.dataChanged.emit(idx, idx, self._ALL_ROLES)
 
     @Slot(int, bool)
     def setSelected(self, row, selected):

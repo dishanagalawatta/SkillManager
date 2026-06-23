@@ -67,7 +67,7 @@ class ConfigController(BaseController):
     def scrollSpeedMultiplier(self):  # type: ignore[reportRedeclaration]
         return self.config.get("scroll_speed_multiplier", 1.0)
 
-    @scrollSpeedMultiplier.setter
+    @scrollSpeedMultiplier.setter  # type: ignore[func-attr]
     def scrollSpeedMultiplier(self, value):
         self._set_config_value("scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged)
 
@@ -75,7 +75,7 @@ class ConfigController(BaseController):
     def skillPackageAutoUpdateMode(self):  # type: ignore[reportRedeclaration]
         return self.config.get("skill_package_auto_update_mode", "prompt")
 
-    @skillPackageAutoUpdateMode.setter
+    @skillPackageAutoUpdateMode.setter  # type: ignore[func-attr]
     def skillPackageAutoUpdateMode(self, value):
         self._set_config_value(
             "skill_package_auto_update_mode", value, self.skillPackageAutoUpdateModeChanged
@@ -85,7 +85,7 @@ class ConfigController(BaseController):
     def autoMinimizeOnScreenshot(self):  # type: ignore[reportRedeclaration]
         return self.config.get("auto_minimize_on_screenshot", False)
 
-    @autoMinimizeOnScreenshot.setter
+    @autoMinimizeOnScreenshot.setter  # type: ignore[func-attr]
     def autoMinimizeOnScreenshot(self, value):
         self._set_config_value(
             "auto_minimize_on_screenshot", value, self.autoMinimizeOnScreenshotChanged
@@ -95,7 +95,7 @@ class ConfigController(BaseController):
     def autoMinimizeOnQuickCopy(self):  # type: ignore[reportRedeclaration]
         return self.config.get("auto_minimize_on_quick_copy", False)
 
-    @autoMinimizeOnQuickCopy.setter
+    @autoMinimizeOnQuickCopy.setter  # type: ignore[func-attr]
     def autoMinimizeOnQuickCopy(self, value):
         self._set_config_value(
             "auto_minimize_on_quick_copy", value, self.autoMinimizeOnQuickCopyChanged
@@ -105,7 +105,7 @@ class ConfigController(BaseController):
     def temporaryScreenshots(self):  # type: ignore[reportRedeclaration]
         return self.config.get("temporary_screenshots", False)
 
-    @temporaryScreenshots.setter
+    @temporaryScreenshots.setter  # type: ignore[func-attr]
     def temporaryScreenshots(self, value):
         self._set_config_value("temporary_screenshots", value, self.temporaryScreenshotsChanged)
 
@@ -113,7 +113,7 @@ class ConfigController(BaseController):
     def diagnosticLogging(self):  # type: ignore[reportRedeclaration]
         return self.config.get("diagnostic_logging", False)
 
-    @diagnosticLogging.setter
+    @diagnosticLogging.setter  # type: ignore[func-attr]
     def diagnosticLogging(self, value):
         if self._set_config_value("diagnostic_logging", value, self.diagnosticLoggingChanged):
             # Apply immediately at runtime — no restart required
@@ -257,7 +257,7 @@ class ConfigController(BaseController):
     def isRecordingShortcut(self):  # type: ignore[reportRedeclaration]
         return self.app._is_recording_shortcut
 
-    @isRecordingShortcut.setter
+    @isRecordingShortcut.setter  # type: ignore[func-attr]
     def isRecordingShortcut(self, value):
         if self.app._is_recording_shortcut != value:
             self.app._is_recording_shortcut = value
@@ -392,7 +392,7 @@ class ConfigController(BaseController):
             "top_bar_clients", ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
         )
 
-    @topBarClients.setter
+    @topBarClients.setter  # type: ignore[func-attr]
     def topBarClients(self, value):
         self._set_config_value("top_bar_clients", value, self.clientFormatsChanged)
 

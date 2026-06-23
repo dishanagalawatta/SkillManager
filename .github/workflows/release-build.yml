@@ -27,10 +27,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --only-group dev
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Decode signing cert
         if: ${{ env.WIN_PFX_B64 != '' }}
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Path "${{ github.workspace }}\packaging\windows\certs" -Force | Out-Null
           $bytes = [Convert]::FromBase64String("${{ secrets.WIN_PFX_B64 }}")
           [IO.File]::WriteAllBytes("${{ github.workspace }}\packaging\windows\certs\code-signing.pfx", $bytes)
         env:
@@ -38,7 +45,12 @@ jobs:
 
       - name: Build installer
         shell: pwsh
-        run: .\packaging\windows\build.ps1 -SkipSign:${{ env.WIN_PFX_B64 == '' }}
+        run: |
+          if ("${{ secrets.WIN_PFX_B64 }}" -ne "") {
+            .\packaging\windows\build.ps1
+          } else {
+            .\packaging\windows\build.ps1 -SkipSign
+          }
         env:
           WIN_PFX_PASS: ${{ secrets.WIN_PFX_PASS }}
 

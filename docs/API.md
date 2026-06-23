@@ -80,6 +80,19 @@ a property on `AppController` and is independently testable.
 | `deleteSkill(skillId)` | `None` | Permanent delete. Asks for confirmation via the UI. |
 | `syncProject(projectId)` | `None` | Pull latest from the project's update source. |
 
+**Side effect.** `updateCustomCommandFull` and `createCustomCommand` may
+emit `selectedSkillChanged` as a side effect of refreshing the
+`selectedSkill` snapshot after model mutation.
+
+**Package add/edit returns.** `addSkillPackage` and
+`updateUpdatePackage` now return `result=str` (JSON) instead of
+`void`. QML callers MUST parse the return value; on failure the
+controller returns `{"ok": false, "error": "..."}` and does not
+append/overwrite the record. See
+[`ADR-0013`](../ADR_INDEX.md#adr-0013-package-add-snap-to-latest-policy)
+and
+[`ADR-0014`](../ADR_INDEX.md#adr-0014-package-edit-snap-to-latest-policy).
+
 ## 5. Signals (selected)
 
 | Signal | Payload | Emitted when |
@@ -89,6 +102,12 @@ a property on `AppController` and is independently testable.
 | `statusMessageChanged()` | — | `statusMessage` property changed. |
 | `isLoadingChanged()` | — | `isLoading` property changed. |
 | `projectSynced(projectId, ok)` | `str, bool` | A background sync completed. |
+
+**Invariant.** Any mutation that calls `addOrUpdateSkills` (or
+`setSkills`) after changing a skill's data MUST call
+`OpsController._refresh_selected_skill(local_path)` if the mutation may
+affect the currently selected skill. See
+[`ADR-0011`](../ADR_INDEX.md#adr-0011-selection-refresh-invariant).
 
 ## 6. Lifecycles
 
