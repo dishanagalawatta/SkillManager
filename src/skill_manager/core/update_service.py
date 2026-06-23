@@ -338,8 +338,7 @@ class UpdateService:
             skill
             for project in projects_state
             for skill in project.get("skills", [])
-            if self.ownership_project_key(skill.get("project_path", ""))
-            not in blocked_project_keys
+            if self.ownership_project_key(skill.get("project_path", "")) not in blocked_project_keys
             and self._is_removed_skill_owned_by_package(
                 skill, removed_map.get(skill.get("folder_name")), ownership
             )
