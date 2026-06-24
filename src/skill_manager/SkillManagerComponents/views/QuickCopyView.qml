@@ -8,7 +8,8 @@ import "../dialogs"
 
 Item {
     id: qcv_root
-    
+    objectName: "QuickCopyView"
+
     property bool isEditingCollection: false
     property string editingCollectionName: ""
     property bool _isInternalSelectionChange: false
@@ -23,6 +24,15 @@ Item {
 
     function scrollToTop() {
         qcv_skillList.positionViewAtBeginning()
+    }
+
+    function cleanup() {
+        qcv_skillList.cacheBuffer = 0
+        qcv_skillList.model = null
+    }
+
+    Component.onDestruction: {
+        cleanup()
     }
 
     Component.onCompleted: {
@@ -257,7 +267,7 @@ Item {
                 // LEFT: Toggle All
                 IconButton {
                     id: qcv_toggleAllBtn
-                    buttonSize: 28
+                    buttonSize: 24
                     role: "ghost"
                     tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
@@ -286,8 +296,8 @@ Item {
 
                 GlassCheckBox {
                     id: qcv_selectCheck
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
                     
                     checkState: {
                         let count = AppController.quickCopyModel.visibleSelectedCount;
@@ -313,13 +323,14 @@ Item {
                     visible: AppController.quickCopyModel.selectedCount > 0
                     
                     Rectangle {
-                        width: 24
-                        height: 24
-                        radius: Theme.radiusPill
+                        Layout.preferredWidth: Math.max(24, qcvCountText.implicitWidth + 16)
+                        Layout.preferredHeight: 24
+                        radius: height / 2
                         color: Theme.accent
                         Text {
+                            id: qcvCountText
                             anchors.centerIn: parent
-                            text: AppController.quickCopyModel.selectedCount
+                            text: AppController.quickCopyModel.selectedCount.toString()
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
@@ -549,7 +560,9 @@ Item {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
-                model: AppController.isLoading ? null : AppController.quickCopyModel
+
+                model: AppController.quickCopyModel
+
                 clip: true
                 spacing: 0
                 
@@ -580,21 +593,35 @@ Item {
                 }
 
                 Connections {
-                    target: qcv_skillList.model
+                    target: AppController.quickCopyModel
                     function onLayoutAboutToBeChanged() {
                         if (AppController.isLoading) {
                             qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                            qcv_skillList.cacheBuffer = 0
                         }
                     }
                     function onLayoutChanged() {
+                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                         qcv_skillList._restoreScroll()
                     }
                     function onModelAboutToBeReset() {
                         if (AppController.isLoading) {
                             qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                            qcv_skillList.cacheBuffer = 0
                         }
                     }
                     function onModelReset() {
+                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                        qcv_skillList._restoreScroll()
+                    }
+                    function onAboutToMutateStructure() {
+                        if (AppController.isLoading) {
+                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                            qcv_skillList.cacheBuffer = 0
+                        }
+                    }
+                    function onStructureMutated() {
+                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                         qcv_skillList._restoreScroll()
                     }
                 }
@@ -728,5 +755,25 @@ Item {
 
     MissingSkillsDialog {
         id: qcv_missingSkillsDialog
+    }
+
+    CommandCarrySkillsDialog {
+        id: qcv_carrySkillsDialog
+        onCarryConfirmed: (confirmedSkills) => {
+            AppController.confirmCommandSkillsCarry(
+                qcv_carrySkillsDialog.projectPath,
+                JSON.stringify(qcv_carrySkillsDialog.commandPaths),
+                JSON.stringify(confirmedSkills)
+            )
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onCommandSkillsCarryPrompt(commandPathsJson, projectPath, missingSkillsJson) {
+            var cmdPaths = JSON.parse(commandPathsJson || "[]")
+            var skills = JSON.parse(missingSkillsJson || "[]")
+            qcv_carrySkillsDialog.openWithContext(cmdPaths, projectPath, skills)
+        }
     }
 }

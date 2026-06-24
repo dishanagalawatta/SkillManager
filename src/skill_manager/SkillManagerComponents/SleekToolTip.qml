@@ -14,6 +14,14 @@ ToolTip {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }
 
+    Timer {
+        id: delayTimer
+        interval: control.delay
+        running: typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered
+    }
+
+    visible: typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered && control.text !== "" && !delayTimer.running
+
     x: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered ? hoverHandler.point.position.x : 0) + 15
     y: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered ? hoverHandler.point.position.y : 0) + 15
 

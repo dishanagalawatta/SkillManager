@@ -164,49 +164,50 @@ class DiscoveryController(BaseController):
                 self.app.isLoadingChanged.emit()
             return
 
-        if self._previous_skills and (added_or_updated or removed_paths):
-            # Incremental update — only touch changed skills
-            if added_or_updated:
-                self.app._library_model.addOrUpdateSkills(added_or_updated)
-                self.app._quick_copy_model.addOrUpdateSkills(added_or_updated)
-                for skill_dict in added_or_updated:
-                    self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
-            if removed_paths:
-                self.app._library_model.removeSkillsByPath(list(removed_paths))
-                self.app._quick_copy_model.removeSkillsByPath(list(removed_paths))
-            logger.info(
-                "[DISCOVERY] Incremental update: %d added/updated, %d removed",
-                len(added_or_updated),
-                len(removed_paths),
-            )
-        else:
-            # First load or full replacement needed
-            skills_dump = [s.model_dump() for s in state.skills]
-            self.app._library_model._begin_batch()
-            self.app._quick_copy_model._begin_batch()
-            try:
-                self.app._library_model.setSkills(skills_dump)
-                self.app._quick_copy_model.setSkills(skills_dump)
-            finally:
-                self.app._library_model._end_batch()
-                self.app._quick_copy_model._end_batch()
-
-        # Snapshot current state for next diff
-        self._previous_skills = new_skills_map
-
-        # Ensure client filters are set
+        # Merge all model mutations + client filter setup into a single
+        # batch per model to fire only ONE layout signal total.  Two
+        # separate batches fire two layout signals in quick succession,
+        # causing 'Object or context destroyed during incubation' warnings.
         self.app._library_model._begin_batch()
         self.app._quick_copy_model._begin_batch()
         try:
+            if self._previous_skills and (added_or_updated or removed_paths):
+                # Incremental update — only touch changed skills
+                if added_or_updated:
+                    self.app._library_model.addOrUpdateSkills(added_or_updated)
+                    self.app._quick_copy_model.addOrUpdateSkills(added_or_updated)
+                    for skill_dict in added_or_updated:
+                        self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
+                if removed_paths:
+                    self.app._library_model.removeSkillsByPath(list(removed_paths))
+                    self.app._quick_copy_model.removeSkillsByPath(list(removed_paths))
+                logger.info(
+                    "[DISCOVERY] Incremental update: %d added/updated, %d removed",
+                    len(added_or_updated),
+                    len(removed_paths),
+                )
+            elif not self._previous_skills:
+                # First load — models are empty, populate from scratch
+                skills_dump = [s.model_dump() for s in state.skills]
+                self.app._library_model.setSkills(skills_dump)
+                self.app._quick_copy_model.setSkills(skills_dump)
+            else:
+                # _previous_skills is populated but no changes detected.
+                # Skip redundant model update to avoid layoutChanged
+                # during QML delegate incubation.
+                logger.debug("[DISCOVERY] No changes detected, skipping model update")
+
+            # Ensure client filters are set
             self.app._library_model.clientFilter = self.app._client_format
             self.app._quick_copy_model.clientFilter = self.app._client_format
-
-            # Apply the shared current project filter to QuickCopy model
             if self.app._current_project_label:
                 self.app._quick_copy_model.projectFilter = self.app._current_project_label
         finally:
             self.app._library_model._end_batch()
             self.app._quick_copy_model._end_batch()
+
+        # Snapshot current state for next diff
+        self._previous_skills = new_skills_map
 
         self.app._set_status(state.status)
 

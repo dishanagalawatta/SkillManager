@@ -15,7 +15,7 @@
 
 # 2. High-Level Milestones
 
-* **Goal A:** 
+* **Goal A:**
 * **Goal B:**
 
 ---
@@ -33,6 +33,10 @@
 ---
 
 # 4. Bug Tracker
+
+test command copy to other projects.
+
+![1782231392537](image/TODO/1782231392537.png)
 
 ---
 

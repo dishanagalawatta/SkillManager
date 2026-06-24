@@ -1,0 +1,7 @@
+{
+  "slug": "app_update_fixes",
+  "completed": "2026-06-20",
+  "created": "2026-06-20",
+  "description": "AppUpdateController thread-blocking fix and error feedback",
+  "status": "completed"
+}

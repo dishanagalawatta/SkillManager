@@ -312,9 +312,9 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
         mock_create.return_value = CommandCreateResult(
             ok=True, message="Created command: Deploy.md"
         )
-        controller.createCustomCommand("Deploy", "body", "proj", "Ops")
+        controller.createCustomCommand("Deploy", "body", ["proj"], "Ops")
 
-    assert controller.statusMessage == "Created command: Deploy.md"
+    assert controller.statusMessage == "Created command in 1 project(s)"
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -763,7 +763,10 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     proj_label = compute_project_label(project_path)
-    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", proj_label, "")
+    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", [proj_label], "")
+
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
 
     assert emissions, (
         "selectedSkillChanged was not emitted — "
@@ -799,7 +802,7 @@ def test_create_custom_command_refreshes_selected_skill_real_discovery(
     emissions = []
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    controller.createCustomCommand("NewCmd2", "echo hello", label, "Commands")
+    controller.createCustomCommand("NewCmd2", "echo hello", [label], "Commands")
 
     # Verify the new command file was created and discover_single works
     new_cmd_file = project_path / ".agents" / "commands" / "NewCmd2.md"

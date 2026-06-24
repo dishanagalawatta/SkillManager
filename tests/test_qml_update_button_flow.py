@@ -500,24 +500,22 @@ class TestQmlConnectionsHandler:
         return qml_path.read_text(encoding="utf-8")
 
     def test_packages_list_connections_handler_exists(self, qml_source):
-        """UpdatesView must have a Connections handler that resets uv_packagesList.model."""
-        assert "uv_packagesList.model = null" in qml_source
-        assert "uv_packagesList.model = AppController.updatePackages" in qml_source
+        """UpdatesView must bind uv_packagesList.model to AppController.updatePackages."""
+        assert "model: AppController.updatePackages" in qml_source
 
     def test_projects_list_connections_handler_exists(self, qml_source):
-        """UpdatesView must have a Connections handler that resets uv_projectsList.model."""
-        assert "uv_projectsList.model = null" in qml_source
+        """UpdatesView must bind uv_projectsList.model to AppController.config_controller.updateProjects."""
         assert (
-            "uv_projectsList.model = AppController.config_controller.updateProjects" in qml_source
+            "model: AppController.config_controller.updateProjects" in qml_source
         )
 
     def test_connections_handler_uses_correct_signal(self, qml_source):
-        """The packages handler must listen to updatePackagesChanged."""
-        assert "function onUpdatePackagesChanged()" in qml_source
+        """UpdatesView uses direct model binding — no Connections reset guard needed."""
+        assert "model: AppController.updatePackages" in qml_source
 
     def test_projects_connections_handler_uses_correct_signal(self, qml_source):
-        """The projects handler must listen to projectsChanged."""
-        assert "function onProjectsChanged()" in qml_source
+        """UpdatesView uses direct model binding — no Connections reset guard needed."""
+        assert "model: AppController.config_controller.updateProjects" in qml_source
 
 
 # ===========================================================================

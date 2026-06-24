@@ -41,6 +41,7 @@ Rectangle {
 
             currentIndex: {
                 var mdl = styleList.model
+                if (!mdl) return 0
                 for (var i = 0; i < mdl.length; i++) {
                     if (mdl[i] === root.currentStyle) return i
                 }

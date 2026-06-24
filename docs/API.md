@@ -79,6 +79,12 @@ a property on `AppController` and is independently testable.
 | `archiveSkill(skillId)` | `None` | Move a skill to the archive. |
 | `deleteSkill(skillId)` | `None` | Permanent delete. Asks for confirmation via the UI. |
 | `syncProject(projectId)` | `None` | Pull latest from the project's update source. |
+| `confirmCommandSkillsCarry(projectPath, cmdJson, skillsJson)` | `None` | Carry confirmed skills alongside commands to a project. |
+| `copyCommandsToProjectWithCarry(projectPath, cmdJson)` | `None` | Copy commands; prompt if skills are missing. |
+| `createCustomCommand(n: str, b: str, project_labels: QStringList, cat: str)` | `str` | Create a custom command deployed to all listed projects. |
+| `updateCustomCommandFull(lp: str, n: str, b: str, cat: str, project_labels: QStringList, on_conflict: str)` | `str` | Update a custom command; rewrites every project copy. |
+| `commandProjectsForPath(local_path: str) → QStringList` | `QStringList` | Returns project labels that hold a copy of the command. |
+| `deleteCustomCommand(command_name: str, project_labels: QStringList)` | `None` | Removes command from all listed projects. |
 
 **Side effect.** `updateCustomCommandFull` and `createCustomCommand` may
 emit `selectedSkillChanged` as a side effect of refreshing the
@@ -102,6 +108,7 @@ and
 | `statusMessageChanged()` | — | `statusMessage` property changed. |
 | `isLoadingChanged()` | — | `isLoading` property changed. |
 | `projectSynced(projectId, ok)` | `str, bool` | A background sync completed. |
+| `commandSkillsCarryPrompt(cmdJson, projPath, skillsJson)` | `str, str, str` | Commands copied; skills missing in target. Show carry dialog. |
 
 **Invariant.** Any mutation that calls `addOrUpdateSkills` (or
 `setSkills`) after changing a skill's data MUST call
@@ -128,4 +135,5 @@ Internal controllers may change without notice.
 
 - ADRs: [`ADR_INDEX.md`](../ADR_INDEX.md)
 - Environment: [`docs/ENVIRONMENT.md`](ENVIRONMENT.md)
+- Environments tiers: [`environments/README.md`](../environments/README.md)
 - Design: [`DESIGN.md`](../DESIGN.md)

@@ -80,11 +80,8 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     assert app_controller.ui.currentView == "Library"
 
     # --- 2. Search Filtering ---
-    # Give Loader time to settle
-    qtbot.wait(100)
-    qapp.processEvents()
-
-    # Find search input
+    # Wait for async Loader to finish creating LibraryView
+    qtbot.waitUntil(lambda: root.findChild(QQuickItem, "librarySearchInput") is not None, timeout=3000)
     search_input = root.findChild(QQuickItem, "librarySearchInput")
     assert search_input is not None
 
@@ -122,7 +119,8 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     qapp.processEvents()
     assert app_controller.quickCopyModel.selectedCount == 1
 
-    # Find and click copy button
+    # Find and click copy button (wait for async Loader)
+    qtbot.waitUntil(lambda: root.findChild(QQuickItem, "copySelectedBtn") is not None, timeout=3000)
     copy_btn = root.findChild(QQuickItem, "copySelectedBtn")
     assert copy_btn is not None
     copy_btn.clicked.emit()
@@ -152,10 +150,8 @@ def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_dat
     assert app_controller.ui.currentView == "Updates"
 
     # --- 2. Check Lists ---
-    # Wait for view to load
-    qtbot.wait(200)
-    qapp.processEvents()
-
+    # Wait for async Loader to finish creating UpdatesView
+    qtbot.waitUntil(lambda: root.findChild(QQuickItem, "uv_packagesList") is not None, timeout=3000)
     packages_list = root.findChild(QQuickItem, "uv_packagesList")
     assert packages_list is not None
     # We added one source via addSource in setup_controller_data

@@ -1,0 +1,19 @@
+{
+  "id": "auto-update_20260603",
+  "title": "Robust Auto Update with Tufup",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-03T10:00:00Z",
+  "updated": "2026-06-03T11:00:00Z",
+  "current_phase": 1,
+  "current_task": "1.7",
+  "phases": {
+    "total": 1,
+    "completed": 1
+  },
+  "tasks": {
+    "total": 7,
+    "completed": 7
+  },
+  "commits": []
+}

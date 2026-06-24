@@ -1,0 +1,10 @@
+{
+  "slug": "command_skill_carry_20260623",
+  "title": "Command–skill carry on copy",
+  "status": "active",
+  "owner": "DIKKA",
+  "created": "2026-06-23",
+  "updated": "2026-06-23",
+  "related_adrs": ["ADR-0017"],
+  "description": "Formalize the in-flight command-skill carry feature implementing ADR-0017. Tracks the untracked files in the working tree."
+}

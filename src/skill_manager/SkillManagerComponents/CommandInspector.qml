@@ -119,11 +119,12 @@ Rectangle {
                     role: "destructive"
                     flat: true
                     onClicked: (mouse) => {
-                        AppController.ops_controller.deleteSkills([{
-                            "local_path": root.skill.local_path,
-                            "is_command": true
-                        }])
-                        root.closed()
+                        let holders = AppController.commandProjectsForPath(root.skill.local_path || "")
+                        if (holders.length === 0) {
+                            holders = [AppController.currentProject || ""]
+                        }
+                        deleteConfirmDialog.holderProjects = holders
+                        deleteConfirmDialog.open()
                     }
                     visible: root.skill && root.skill.local_path !== undefined
                     SleekToolTip {
@@ -246,5 +247,112 @@ Rectangle {
 
     Behavior on anchors.leftMargin {
         NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
+    }
+
+    // Delete confirmation with project checklist
+    Dialog {
+        id: deleteConfirmDialog
+        title: "Delete Command"
+        modal: true
+        anchors.centerIn: parent
+        width: 400
+        standardButtons: Dialog.NoButton
+
+        property var holderProjects: []
+        property var checkedProjects: []
+
+        onOpened: {
+            checkedProjects = holderProjects.slice()
+        }
+
+        background: Rectangle {
+            color: Theme.glassPill
+            radius: Theme.radiusCard
+            border.color: Theme.glassBorder
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Text {
+                text: "Delete \"" + (root.skill.name || "") + "\" from which projects?"
+                wrapMode: Text.Wrap
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeBody
+                color: Theme.label
+                Layout.margins: 16
+                Layout.fillWidth: true
+            }
+
+            GlassMultiSelect {
+                id: deleteProjectSelect
+                Layout.fillWidth: true
+                Layout.margins: 16
+                Layout.preferredHeight: 36
+                model: deleteConfirmDialog.holderProjects
+                selectedValues: deleteConfirmDialog.checkedProjects
+                placeholderText: "Select projects..."
+                allLabel: "All Projects"
+                onSelectionChanged: deleteConfirmDialog.checkedProjects = selectedValues
+            }
+        }
+
+        footer: RowLayout {
+            spacing: 8
+            Layout.margins: 12
+
+            ActionButton {
+                text: "Cancel"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 36
+                onClicked: deleteConfirmDialog.close()
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.glassBorder
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Medium
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            ActionButton {
+                text: "Delete"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 36
+                enabled: deleteConfirmDialog.checkedProjects.length > 0
+                onClicked: {
+                    AppController.deleteCustomCommand(root.skill.name, deleteConfirmDialog.checkedProjects)
+                    deleteConfirmDialog.close()
+                    root.closed()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: !parent.enabled ? Theme.secondaryLabel : (parent.hovered ? Theme.alpha(Theme.danger, 0.93) : Theme.danger)
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+        }
     }
 }

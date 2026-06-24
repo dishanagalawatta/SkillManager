@@ -148,6 +148,8 @@ class AppController(QObject):
     # Command update signals (cross-controller notification)
     commandUpdateConflict = Signal(str, str, str)  # oldPath, conflictPath, suggestedRename
     commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
+    commandSkillsCarryPrompt = Signal(str, str, str)
+    commandPendingRemovals = Signal(str, list)
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
@@ -234,6 +236,9 @@ class AppController(QObject):
         self.projectsChanged.connect(self._on_projects_changed)
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
+
+        self.ops.commandPendingRemovals.connect(self.commandPendingRemovals.emit)
+        self.ops.commandSkillsCarryPrompt.connect(self.commandSkillsCarryPrompt.emit)
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -336,7 +341,7 @@ class AppController(QObject):
     def config_controller(self):
         return self.config_mgr
 
-    @Property(QObject, constant=True)
+    @Property(OpsController, constant=True)
     def ops_controller(self):
         return self.ops
 
@@ -1304,9 +1309,17 @@ def main():  # pragma: no cover
     QTimer.singleShot(5000, _check_window_visible)
 
     ret = app.exec()
-    # Force exit to prevent background threads (like concurrent.futures or watchdog) from hanging shutdown
-    os._exit(ret)
-
+    
+    # Clean up joblib loky workers and memory-mapped temp files before forcing exit
+    try:
+        from joblib.externals.loky import get_reusable_executor
+        get_reusable_executor().shutdown(wait=True)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Error shutting down joblib executor: %s", e)
+        
+    # Allow standard Python garbage collection and atexit handlers to run so that
+    # C++ QObjects, ThreadStorage, and joblib temp folders are gracefully destroyed.
+    sys.exit(ret)
 
 if __name__ == "__main__":
     main()

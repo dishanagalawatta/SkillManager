@@ -15,7 +15,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: mouseAreaMain.containsMouse ? Theme.glassHover : "transparent"
+        color: headerHover.hovered ? Theme.glassHover : "transparent"
         radius: Theme.radiusSmall
         anchors.margins: 2
     }
@@ -97,21 +97,21 @@ Item {
         }
     }
 
-    MouseArea {
-        id: mouseAreaMain
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
-
-        SleekToolTip {
-            id: headerToolTip
-            text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
-            visible: mouseAreaMain.containsMouse
-        }
-
-        Accessible.role: Accessible.Button
-        Accessible.name: root.mainCatName
-        Accessible.description: headerToolTip.text
+    TapHandler {
+        onTapped: Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
     }
+    
+    HoverHandler {
+        id: headerHover
+        cursorShape: Qt.PointingHandCursor
+    }
+
+    SleekToolTip {
+        id: headerToolTip
+        text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
+    }
+
+    Accessible.role: Accessible.Button
+    Accessible.name: root.mainCatName
+    Accessible.description: headerToolTip.text
 }

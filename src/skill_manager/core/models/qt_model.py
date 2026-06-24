@@ -31,6 +31,9 @@ class SkillModel(QAbstractListModel):
     Qt List Model for skills, delegating logic to FilterEngine.
     """
 
+    aboutToMutateStructure = Signal()
+    structureMutated = Signal()
+
     NameRole = Qt.ItemDataRole.UserRole + 1
     CategoryRole = Qt.ItemDataRole.UserRole + 2
     DescriptionRole = Qt.ItemDataRole.UserRole + 3
@@ -513,7 +516,11 @@ class SkillModel(QAbstractListModel):
         """
         if self._suppress_layout:
             self._batch_apply_needed = True
+            if reset:
+                self._batch_reset_needed = True
             return
+
+        self.aboutToMutateStructure.emit()
 
         if reset:
             self.beginResetModel()
@@ -533,6 +540,8 @@ class SkillModel(QAbstractListModel):
                 self.endResetModel()
             else:
                 self.layoutChanged.emit()
+
+            self.structureMutated.emit()
             self._update_selection_counts()
             self.selectionStateChanged.emit()
             self.totalSelectableCountChanged.emit()
@@ -557,6 +566,8 @@ class SkillModel(QAbstractListModel):
 
         matcher = difflib.SequenceMatcher(None, old_keys, new_keys)
 
+        self.aboutToMutateStructure.emit()
+
         for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
             if tag == "replace":
                 self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
@@ -579,6 +590,8 @@ class SkillModel(QAbstractListModel):
                 if i2 > i1:
                     self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
 
+        self.structureMutated.emit()
+
         self._update_selection_counts()
         self.selectionStateChanged.emit()
         self.totalSelectableCountChanged.emit()
@@ -587,13 +600,17 @@ class SkillModel(QAbstractListModel):
         """Suppress layout signals and filter work until _end_batch()."""
         self._suppress_layout = True
         self._batch_apply_needed = False
+        self._batch_reset_needed = False
 
     def _end_batch(self):
-        """Re-enable layout signals and emit a single layoutChanged."""
+        """Re-enable layout signals and emit a single layoutChanged or modelReset."""
         self._suppress_layout = False
         if self._batch_apply_needed:
             self._batch_apply_needed = False
-            self._apply_filter()
+            if self._batch_reset_needed:
+                self._apply_filter(reset=True)
+            else:
+                self._apply_filter_with_diff()
 
     def _execute_filter_logic(self) -> list[Skill]:
         """Internal synchronous logic for filtering and searching."""

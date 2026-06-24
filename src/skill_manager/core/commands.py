@@ -1,6 +1,6 @@
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +22,8 @@ class CommandUpdateResult:
     needs_conflict_resolution: bool = False
     conflicting_path: Path | None = None
     suggested_rename: str | None = None
+    needs_confirm: bool = False
+    pending_removals: list[str] = field(default_factory=list)
 
 
 def find_project_path_by_label(project_label_name: str, project_paths: list[str]) -> Path | None:
@@ -184,3 +186,202 @@ def create_custom_command_file(
         return CommandCreateResult(False, f"Error creating command: {exc}", file_path)
 
     return CommandCreateResult(True, f"Created command: {filename}", file_path)
+
+
+def find_command_holder_projects(command_name: str, project_paths: list[str]) -> list[str]:
+    """Return the list of project labels whose .agents/commands/ contains ``command_name``.
+
+    ``command_name`` is the stem (no extension). Each project is checked
+    for ``<root>/.agents/commands/<safe_name>.md``.
+    """
+    safe_name = build_command_filename(command_name)
+    holders: list[str] = []
+    for pp in project_paths:
+        project_path = Path(pp)
+        commands_dir = project_root_for_project(project_path) / ".agents" / "commands"
+        if (commands_dir / safe_name).exists():
+            holders.append(project_label(project_path))
+    return holders
+
+
+def create_custom_command_files_multi(
+    *,
+    name: str,
+    body: str,
+    project_labels: list[str],
+    category: str,
+    project_paths: list[str],
+    created_on: date | None = None,
+) -> list[CommandCreateResult]:
+    """Create one command file per selected project.
+
+    Delegates to ``create_custom_command_file`` for each label.
+    Returns a list of results — one per project. Callers aggregate.
+    """
+    return [
+        create_custom_command_file(
+            name=name,
+            body=body,
+            project_label_name=label,
+            category=category,
+            project_paths=project_paths,
+            created_on=created_on,
+        )
+        for label in project_labels
+    ]
+
+
+def update_custom_command_file_multi(
+    *,
+    local_path: str,
+    name: str,
+    body: str,
+    category: str | None = None,
+    project_labels: list[str],
+    project_paths: list[str],
+    on_conflict: str | None = None,
+    confirmed_removals: list[str] | None = None,
+) -> list[CommandUpdateResult]:
+    """Update a command across multiple projects.
+
+    - Computes which projects currently hold the command and determines
+      ``add_set``, ``keep_set``, and ``remove_set``.
+    - Canonical project is chosen from ``keep_set`` (first label) or,
+      if empty, from ``add_set`` (first label).
+    - If ``remove_set`` is non-empty and ``confirmed_removals`` is None,
+      returns early with ``needs_confirm=True`` and ``pending_removals``
+      set — no files are deleted.
+    - If ``confirmed_removals`` is provided, deletes files for the
+      intersection ``remove_set ∩ confirmed_removals``.
+    - Fan-out copies go to ``add_set`` only; ``keep_set`` labels are
+      skipped.
+
+    Returns a list of results — one per project.
+    """
+    results: list[CommandUpdateResult] = []
+
+    if not project_labels:
+        return [CommandUpdateResult(False, "No projects selected")]
+
+    stem = Path(local_path).stem
+    current_holders = find_command_holder_projects(stem, project_paths)
+    add_set = sorted(set(project_labels) - set(current_holders))
+    keep_set = sorted(set(current_holders) & set(project_labels))
+    remove_set = sorted(set(current_holders) - set(project_labels))
+
+    # Guard: need confirmation before any deletions
+    if remove_set and confirmed_removals is None:
+        return [
+            CommandUpdateResult(
+                ok=True,
+                message="Confirmation required for project removals",
+                needs_confirm=True,
+                pending_removals=list(remove_set),
+            )
+        ]
+
+    # Determine canonical label: prefer keep_set, fall back to add_set
+    if keep_set:
+        canonical_label = keep_set[0]
+    elif add_set:
+        canonical_label = add_set[0]
+    else:
+        # Nothing to add and nothing to keep — only removals remain
+        canonical_label = project_labels[0]
+
+    # Phase 1: canonical move/update
+    canonical = update_custom_command_file(
+        local_path=local_path,
+        name=name,
+        body=body,
+        category=category,
+        project_label_name=canonical_label,
+        project_paths=project_paths,
+        on_conflict=on_conflict,
+    )
+    results.append(canonical)
+
+    # Phase 2: fan-out to add_set (skip keep_set labels)
+    if canonical.ok and canonical.path and canonical.path.is_file():
+        new_content = canonical.path.read_text(encoding="utf-8")
+        for label in add_set:
+            # Skip the canonical label — already handled above
+            if label == canonical_label:
+                continue
+            target = find_project_path_by_label(label, project_paths)
+            if not target:
+                results.append(
+                    CommandUpdateResult(
+                        False, f"Error: Could not find project directory for {label}"
+                    )
+                )
+                continue
+            target_dir = project_root_for_project(target) / ".agents" / "commands"
+            target_file = target_dir / canonical.path.name
+            try:
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_file.write_text(new_content, encoding="utf-8")
+                results.append(
+                    CommandUpdateResult(True, f"Updated command: {target_file.name}", target_file)
+                )
+            except Exception as exc:
+                results.append(
+                    CommandUpdateResult(False, f"Error updating command in {label}: {exc}")
+                )
+
+    # Phase 3: confirmed removals
+    if remove_set and confirmed_removals is not None:
+        actual_removals = sorted(set(remove_set) & set(confirmed_removals))
+        for label in actual_removals:
+            target = find_project_path_by_label(label, project_paths)
+            if not target:
+                results.append(
+                    CommandUpdateResult(
+                        False, f"Error: Could not find project directory for {label}"
+                    )
+                )
+                continue
+            commands_dir = project_root_for_project(target) / ".agents" / "commands"
+            removal_target = commands_dir / build_command_filename(name)
+            try:
+                if removal_target.is_file():
+                    removal_target.unlink()
+                    results.append(
+                        CommandUpdateResult(
+                            True, f"Removed command from {label}: {removal_target.name}"
+                        )
+                    )
+                else:
+                    results.append(
+                        CommandUpdateResult(True, f"No command file to remove in {label}")
+                    )
+            except Exception as exc:
+                results.append(
+                    CommandUpdateResult(False, f"Error removing command from {label}: {exc}")
+                )
+
+    return results
+
+
+def find_referenced_skills_in_command(
+    local_path: str,
+    all_skills: list,
+) -> list:
+    """Parse a command ``.md`` file and return the skills it references.
+
+    Returns an empty list if the file is missing, unreadable, or has no
+    skill references.  Order is stable; duplicates are removed.
+    """
+    path = Path(local_path)
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return []
+    from skill_manager.core.parsing.base import split_frontmatter
+
+    _, body = split_frontmatter(text)
+    from skill_manager.core.skill_references import resolve_referenced_skills
+
+    return resolve_referenced_skills(body, all_skills)

@@ -2,15 +2,21 @@ import logging
 import os
 import shutil
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import pathspec
+from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
 
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
+
+# Re-exported for convenience; canonical impl lives in skill_references.
+from skill_manager.core.skill_references import (  # noqa: E402, F401
+    extract_skill_names,
+    resolve_referenced_skills,
+)
 
 
 def replace_skill_references_in_command(content: str, client_format: str, all_skills: list) -> str:
@@ -171,13 +177,15 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
             source_skills.append(skill_data)
         return source_skills
 
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(scan_source, src) for src in unique_sources]
-        for future in futures:
-            try:
-                skills.extend(future.result())
-            except Exception as e:
-                logger.warning("[DISCOVERY] Error scanning source: %s", e)
+    parallel_results = Parallel(n_jobs=-1, prefer="processes")(
+        delayed(scan_source)(src) for src in unique_sources
+    )
+
+    for new_skills in parallel_results:
+        try:
+            skills.extend(new_skills)
+        except Exception as e:
+            logger.warning("[DISCOVERY] Error scanning source: %s", e)
 
     return skills
 
@@ -322,25 +330,17 @@ def discover_project_skills(
 
     # Parallelize project discovery
     projects_list = []
-    with ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(
-                discover_single_project,
-                project,
-                parse_skill_md,
-                categorize_skill,
-                build_search_text,
-                project_aliases,
-            )
-            for project in unique_projects
-        ]
-        for future in futures:
-            try:
-                res = future.result()
-                if res:
-                    projects_list.append(res)
-            except Exception as e:
-                logger.warning("[DISCOVERY] Error scanning project: %s", e)
+    parallel_results = Parallel(n_jobs=-1, prefer="processes")(
+        delayed(discover_single_project)(proj, parse_skill_md, categorize_skill, build_search_text, project_aliases)
+        for proj in unique_projects
+    )
+
+    for res in parallel_results:
+        try:
+            if res:
+                projects_list.append(res)
+        except Exception as e:
+            logger.warning("[DISCOVERY] Error scanning project: %s", e)
 
     return projects_list
 

@@ -34,9 +34,34 @@ changes. `.env` overrides process environment.
 | `POSTHOG_HOST` | optional | empty | PostHog host URL. |
 | `SENTRY_DSN` | optional | empty | Empty disables Sentry. |
 
+## Tier Matrix
+
+Each tier selects only the variables relevant to its use case.
+See [`environments/README.md`](../environments/README.md) for full
+details and file paths.
+
+| Variable | Dev | Staging | Prod |
+|----------|-----|---------|------|
+| `QT_QUICK_CONTROLS_STYLE` | `Basic` | `Basic` | `Basic` |
+| `QML_DISABLE_DISK_CACHE` | `1` | `1` | `1` |
+| `QT_QPA_PLATFORM` | `offscreen` | `offscreen` | (unset) |
+| `SKILL_MANAGER_TESTING` | `1` | `1` | (unset) |
+| `SKILL_MANAGER_SKIP_INITIAL_LOAD` | `1` | `1` | (unset) |
+| `SKILL_MANAGER_DATA_DIR` | (unset) | (unset) | (unset) |
+| `SKILL_MANAGER_LOG_LEVEL` | `DEBUG` | `WARNING` | `ERROR` |
+| `POSTHOG_PROJECT_TOKEN` | (empty) | (empty) | (required) |
+| `POSTHOG_HOST` | (empty) | (empty) | (required) |
+| `SENTRY_DSN` | (empty) | (empty) | (required) |
+
 ## Conventions
 
 - `.env` is git-ignored.
 - All variables are read at process start.
 - CI sets `QT_QPA_PLATFORM=offscreen` and `SKILL_MANAGER_TESTING=1` automatically.
 - Test runs set `SKILL_MANAGER_DATA_DIR` to a per-run tempdir.
+- Tier-specific overrides live in [`environments/`](../environments/README.md).
+
+## Deprecated
+
+The following variables were removed in ADR-0010 (Drop TUF):
+`TUF_KEY_*`, `TUF_REPO_*`. They are no longer read by the application.

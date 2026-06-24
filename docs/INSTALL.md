@@ -60,6 +60,12 @@ uv sync
 uv run skill-manager
 ```
 
+## Environment Configuration
+
+For tiered environment overrides (dev, staging, prod), see
+[`environments/README.md`](../environments/README.md). Copy the
+appropriate `.env.*.example` to `.env` in the project root.
+
 ## Building the Installer Locally
 
 Requires: Python 3.12+, uv, [Inno Setup](https://jrsoftware.org/isinfo.php).

@@ -43,6 +43,7 @@ Rectangle {
 
             currentIndex: {
                 var mdl = familyList.model
+                if (!mdl) return -1
                 for (var i = 0; i < mdl.length; i++) {
                     if (mdl[i] === root.currentFamily) return i
                 }

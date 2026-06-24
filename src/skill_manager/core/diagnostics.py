@@ -69,6 +69,17 @@ CATEGORY_SOURCE_MISSING = "source_missing"
 CATEGORY_DISCOVERY_EMPTY_RESULT = "discovery_empty_result"
 CATEGORY_CACHE_PRESERVED = "cache_preserved"
 CATEGORY_WINDOW_STATE = "window_state"
+CATEGORY_SKILL_REF_DETECTED = "skill_ref_detected"
+CATEGORY_COMMAND_CARRY_PROMPTED = "command_carry_prompted"
+CATEGORY_COMMAND_CARRY_COPIED = "command_carry_copied"
+CATEGORY_COMMAND_CARRY_SKIPPED = "command_carry_skipped"
+CATEGORY_INCUBATION_STARTED = "incubation_started"
+CATEGORY_INCUBATION_CLEARED = "incubation_cleared"
+CATEGORY_INCUBATION_FORCED = "incubation_forced"
+CATEGORY_INCUBATION_REPLAY = "incubation_replay"
+CATEGORY_INCUBATION_SIGNAL_QUEUED = "incubation_signal_queued"
+CATEGORY_INCUBATION_READY = "incubation_ready"
+CATEGORY_LOADER_READY = "loader_ready"
 
 # ---------------------------------------------------------------------------
 # Helpers

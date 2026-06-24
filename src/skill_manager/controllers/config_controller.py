@@ -874,6 +874,25 @@ class ConfigController(BaseController):
                     },
                 )
 
+    @Slot(str, list)
+    def copyCollectionCommandsWithCarry(self, name: str, project_labels: list):
+        """Copy command-only collections to projects, carrying missing skills."""
+        import json
+
+        entry = self.app._custom_collections.get(name, {})
+        paths = entry.get("paths", []) if isinstance(entry, dict) else []
+        command_paths = [p for p in paths if _is_command_path(p)]
+        if not command_paths:
+            return
+
+        for project_label in project_labels:
+            project_path = self.getProjectPath(project_label)
+            if not project_path:
+                continue
+            self.app.ops_controller.copyCommandsToProjectWithCarry(
+                project_path, json.dumps(command_paths)
+            )
+
     # --- Per-collection shortcuts ---
 
     def _claim_sequence(self, seq: str, owner_name: str) -> list[str]:

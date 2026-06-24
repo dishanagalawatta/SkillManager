@@ -1,78 +1,29 @@
-# Bytecode & caches
+# .gitignore
+> Generated via /brainstorming
+
+# Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
 .pytest_cache/
-.mypy_cache/
 .ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+coverage.json
+build/
+dist/
+*.egg-info/
+
+# Qt / PySide6
 .qmlcache/
 .qmltypes/
 *.qmlc
 *.jsc
-.cache
 
-# Distribution & packaging
-build/
-dist/
-data/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-artifacts/
-wheelhouse/
-*.spec
-*.manifest
-
-# Virtual environments
-.venv/
-venv/
-env/
-ENV/
-
-# OS & editor
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
-.idea/
-.vscode/
-*.code-workspace
-
-# Agent tooling (local config)
+# Custom / Runtime
 .opencode/
-
-# Secrets
-.env
-.env.*
-!.env.example
-packaging/windows/certs/
-
-# TUF legacy artefacts
+src/data/
 tuf_keys/
 tuf_repo/
 .tufup-repo-config
-
-# Coverage
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-coverage.json
-
-# PySide6 / Qt build artefacts
-*.pyd
-designer/
-moc_*.cpp
-qrc_*.cpp
-ui_*.h
-build-*/
-
-# Work-planner (locally managed, not shipped)
-conductor/
-.agents/
-.agent/
-.claude/
-_references/
-TODO.md

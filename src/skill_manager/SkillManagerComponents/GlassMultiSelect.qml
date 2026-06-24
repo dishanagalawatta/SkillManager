@@ -93,7 +93,12 @@ Item {
                 Layout.preferredHeight: 8
                 contextType: "2d"
 
+                onAvailableChanged: {
+                    if (available) requestPaint()
+                }
+
                 onPaint: {
+                    if (!context) return
                     context.reset()
                     context.moveTo(0, 0)
                     context.lineTo(width, 0)

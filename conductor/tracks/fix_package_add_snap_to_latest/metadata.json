@@ -1,0 +1,19 @@
+{
+  "id": "fix_package_add_snap_to_latest",
+  "title": "Fix newly-added package showing as outdated",
+  "type": "bugfix",
+  "status": "in_progress",
+  "created": "2026-06-22T13:33:00Z",
+  "updated": "2026-06-22T13:33:00Z",
+  "current_phase": 1,
+  "current_task": "1",
+  "phases": {
+    "total": 1,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 7,
+    "completed": 0
+  },
+  "commits": []
+}

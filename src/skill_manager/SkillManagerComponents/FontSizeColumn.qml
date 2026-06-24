@@ -72,6 +72,7 @@ Rectangle {
 
             currentIndex: {
                 var mdl = sizeList.model
+                if (!mdl) return -1
                 for (var i = 0; i < mdl.length; i++) {
                     if (mdl[i] === root.currentSize) return i
                 }

@@ -70,8 +70,11 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
 
     proj_label = compute_project_label(project_path)
     app_controller.ops.updateCustomCommandFull(
-        str(cmd_file), "Cmd", "new body", "Commands", proj_label
+        str(cmd_file), "Cmd", "new body", "Commands", [proj_label]
     )
+
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
 
     # Signal should fire
     assert emissions, "selectedSkillChanged was not emitted"

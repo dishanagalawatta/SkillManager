@@ -1,0 +1,7 @@
+{
+  "slug": "qml_reference_errors",
+  "completed": "2026-06-20",
+  "created": "2026-06-20",
+  "description": "Fix QML reference errors in PackageEditDialog and UpdatesView",
+  "status": "completed"
+}

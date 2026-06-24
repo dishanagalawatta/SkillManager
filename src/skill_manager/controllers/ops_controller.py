@@ -40,6 +40,10 @@ class OpsController(BaseController):
     """Controller for skill-related operations."""
 
     minimizeAppRequested = Signal()
+    commandSkillsCarryPrompt = Signal(str, str, str)
+    commandPendingRemovals = Signal(str, list)
+
+    _pending_command_update: dict | None = None
 
     def _maybeMinimizeOnCopy(self):
         """Requests app minimization if the setting is enabled and current view is QuickCopy."""
@@ -550,123 +554,224 @@ class OpsController(BaseController):
         if not send_paste_to_focused_window():
             self.app._set_status("Copied, but could not paste automatically")
 
-    @Slot(str, str, str, str)
-    def createCustomCommand(self, name: str, body: str, project_label: str, category: str):
-        """Creates a Custom Command .md file."""
+    @Slot(str, str, "QStringList", str)
+    def createCustomCommand(self, name: str, body: str, project_labels: "list[str]", category: str):
+        """Creates Custom Command .md files in one or more projects."""
         diag = get_diagnostic_logger()
-        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, project={project_label}")
-        from skill_manager.core.commands import create_custom_command_file
+        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, projects={project_labels}")
+        from skill_manager.core.commands import create_custom_command_files_multi
 
-        result = create_custom_command_file(
+        results = create_custom_command_files_multi(
             name=name,
             body=body,
-            project_label_name=project_label,
+            project_labels=list(project_labels),
             category=category,
             project_paths=self.app._projects,
         )
 
-        if not result.ok:
-            self.app._set_status(result.message)
+        created = [r for r in results if r.ok]
+        failed = [r for r in results if not r.ok]
+
+        if not created:
+            msg = failed[0].message if failed else "Error: No projects selected"
+            self.app._set_status(msg)
             return
 
-        self.app._set_status(result.message)
+        self.app._set_status(f"Created command in {len(created)} project(s)")
 
-        if result.path:
-            from skill_manager.core.discovery import DiscoveryService
-            from skill_manager.core.persistence import patch_cache_add
+        for result in created:
+            if result.path:
+                from skill_manager.core.discovery import DiscoveryService
+                from skill_manager.core.persistence import patch_cache_add
 
-            service = DiscoveryService(
-                sources=list(self.app._sources),
-                projects=self.app._projects,
-                archive_paths=self.app._archive_paths,
-                starred_paths=self.app._starred_paths,
-                project_aliases=self.app._project_aliases,
-            )
-            try:
-                skill_data = service.discover_single(result.path, result.path.parent)
-                if skill_data:
-                    patch_cache_add([skill_data])
-                    self._merge_discovered_skills([skill_data])
-                    self._refresh_selected_skill(str(result.path))
-                else:
-                    diag.log_event(
-                        "WARNING",
-                        CATEGORY_SELECTION_REFRESHED,
-                        f"discover_single returned None for command: {result.path}",
-                    )
-            except Exception as exc:
-                logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
+                service = DiscoveryService(
+                    sources=list(self.app._sources),
+                    projects=self.app._projects,
+                    archive_paths=self.app._archive_paths,
+                    starred_paths=self.app._starred_paths,
+                    project_aliases=self.app._project_aliases,
+                )
+                try:
+                    skill_data = service.discover_single(result.path, result.path.parent)
+                    if skill_data:
+                        patch_cache_add([skill_data])
+                        self._merge_discovered_skills([skill_data])
+                        self._refresh_selected_skill(str(result.path))
+                    else:
+                        diag.log_event(
+                            "WARNING",
+                            CATEGORY_SELECTION_REFRESHED,
+                            f"discover_single returned None for command: {result.path}",
+                        )
+                except Exception as exc:
+                    logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
-    @Slot(str, str, str, str, str, str)
+    @Slot(str, str, str, str, "QStringList", str)
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
         body: str,
         category: str,
-        project_label: str,
+        project_labels: "list[str]",
         on_conflict: str = "",
+        confirmed_removals: list[str] | None = None,
     ):
-        """Updates an existing Custom Command .md file."""
+        """Updates an existing Custom Command .md file across projects."""
         diag = get_diagnostic_logger()
         diag.log_event(
             "INFO",
             CATEGORY_COMMAND_UPDATED,
-            f"path={local_path}, name={name}, project={project_label}, on_conflict={on_conflict}",
+            f"path={local_path}, name={name}, projects={project_labels}, on_conflict={on_conflict}",
         )
-        from skill_manager.core.commands import update_custom_command_file
+        from skill_manager.core.commands import update_custom_command_file_multi
 
-        result = update_custom_command_file(
+        results = update_custom_command_file_multi(
             local_path=local_path,
             name=name,
             body=body,
             category=category,
-            project_label_name=project_label,
+            project_labels=list(project_labels),
             project_paths=self.app._projects,
             on_conflict=on_conflict or None,
+            confirmed_removals=confirmed_removals,
         )
 
-        if result.needs_conflict_resolution and result.conflicting_path:
+        canonical = results[0] if results else None
+        if canonical and canonical.needs_conflict_resolution and canonical.conflicting_path:
             self.app.commandUpdateConflict.emit(
                 local_path,
-                str(result.conflicting_path),
-                result.suggested_rename or "",
+                str(canonical.conflicting_path),
+                canonical.suggested_rename or "",
             )
             return
 
-        if not result.ok:
-            self.app._set_status(result.message)
+        # Check if confirmation is needed for project removals
+        confirm_results = [r for r in results if r.needs_confirm]
+        if confirm_results:
+            pending: list[str] = []
+            for r in confirm_results:
+                pending.extend(r.pending_removals)
+            # Store args so confirmCommandRemovals can re-invoke
+            self._pending_command_update = {
+                "local_path": local_path,
+                "name": name,
+                "body": body,
+                "category": category,
+                "project_labels": list(project_labels),
+                "on_conflict": on_conflict,
+            }
+            self.commandPendingRemovals.emit(local_path, pending)
             return
 
-        self.app._set_status(result.message)
+        updated = [r for r in results if r.ok]
+        failed = [r for r in results if not r.ok]
 
-        if result.path:
-            from skill_manager.core.discovery import DiscoveryService
-            from skill_manager.core.persistence import patch_cache_add
+        if not updated:
+            msg = failed[0].message if failed else "Error: No projects updated"
+            self.app._set_status(msg)
+            return
 
-            service = DiscoveryService(
-                sources=list(self.app._sources),
-                projects=self.app._projects,
-                archive_paths=self.app._archive_paths,
-                starred_paths=self.app._starred_paths,
-                project_aliases=self.app._project_aliases,
-            )
+        self.app._set_status(f"Updated command in {len(updated)} project(s)")
+
+        # ── Targeted rescan: collect unique affected project paths
+        from skill_manager.core.commands import find_project_path_by_label
+        from skill_manager.core.discovery import DiscoveryService
+        from skill_manager.core.persistence import patch_cache_add
+        from skill_manager.core.quick_copy import project_root_for_project
+
+        service = DiscoveryService(
+            sources=list(self.app._sources),
+            projects=self.app._projects,
+            archive_paths=self.app._archive_paths,
+            starred_paths=self.app._starred_paths,
+            project_aliases=self.app._project_aliases,
+        )
+
+        affected_project_paths: set[Path] = set()
+
+        for result in updated:
+            if result.path:
+                # Walk up from result.path.parent to find project root
+                proj_path = project_root_for_project(result.path.parent)
+                affected_project_paths.add(proj_path)
+
+        # Include paths of any removed projects
+        if canonical and canonical.pending_removals:
+            for label in canonical.pending_removals:
+                target = find_project_path_by_label(label, self.app._projects)
+                if target:
+                    affected_project_paths.add(project_root_for_project(target))
+
+        all_discovered: list[dict] = []
+        for proj_path in affected_project_paths:
             try:
-                skill_data = service.discover_single(result.path, result.path.parent)
-                if skill_data:
-                    patch_cache_add([skill_data])
-                    self._merge_discovered_skills([skill_data])
-                    # For renames AND project moves, local_path is the OLD path but result.path is NEW.
-                    self._refresh_selected_skill(local_path, rename_path=str(result.path))
-                    self.app.notify_command_updated(local_path, str(result.path))
-                else:
-                    diag.log_event(
-                        "WARNING",
-                        CATEGORY_SELECTION_REFRESHED,
-                        f"discover_single returned None for command: {result.path}",
-                    )
+                discovered = service.discover_project(proj_path)
+                all_discovered.extend(discovered)
             except Exception as exc:
-                logger.error("[UPDATE COMMAND] Failed scanning %s: %s", result.path, exc)
+                logger.error("[UPDATE COMMAND] Failed rescan of %s: %s", proj_path, exc)
+
+        # Defer merge to avoid blocking UI
+        def _apply_merge():
+            if all_discovered:
+                patch_cache_add(all_discovered)
+                self._merge_discovered_skills(all_discovered)
+            if updated and updated[0].path:
+                self._refresh_selected_skill(local_path, rename_path=str(updated[0].path))
+                self.app.notify_command_updated(local_path, str(updated[0].path))
+
+        QTimer.singleShot(0, _apply_merge)
+
+    def confirmCommandRemovals(self, local_path: str, confirmed_labels: list[str]):
+        """Re-invoke updateCustomCommandFull with confirmed removals."""
+        pending = self._pending_command_update
+        if not pending or pending.get("local_path") != local_path:
+            logger.warning("[UPDATE COMMAND] No pending command update for %s", local_path)
+            return
+        self._pending_command_update = None
+        self.updateCustomCommandFull(
+            local_path=pending["local_path"],
+            name=pending["name"],
+            body=pending["body"],
+            category=pending["category"],
+            project_labels=pending["project_labels"],
+            on_conflict=pending["on_conflict"],
+            confirmed_removals=confirmed_labels,
+        )
+
+    @Slot(str, result="QStringList")
+    def commandProjectsForPath(self, local_path: str) -> "list[str]":
+        """Return project labels that hold a copy of this command."""
+        from skill_manager.core.commands import find_command_holder_projects
+
+        path = Path(local_path)
+        if not path.is_file():
+            return []
+
+        stem = path.stem
+        return find_command_holder_projects(stem, self.app._projects)
+
+    @Slot(str, "QStringList")
+    def deleteCustomCommand(self, command_name: str, project_labels: "list[str]"):
+        """Delete a command from the listed projects."""
+        from skill_manager.core.commands import build_command_filename, find_project_path_by_label
+        from skill_manager.core.quick_copy import project_root_for_project
+
+        safe_name = build_command_filename(command_name)
+        items = []
+        for label in project_labels:
+            target = find_project_path_by_label(label, self.app._projects)
+            if not target:
+                continue
+            commands_dir = project_root_for_project(target) / ".agents" / "commands"
+            file_path = commands_dir / safe_name
+            if file_path.is_file():
+                items.append({"local_path": str(file_path), "is_command": True})
+
+        if items:
+            self.deleteSkills(items)
+        else:
+            self.app._set_status("Command not found in selected projects")
 
     def _saveArchive(self):
         """Internal helper to persist archive state."""
@@ -754,3 +859,48 @@ class OpsController(BaseController):
             CATEGORY_SELECTION_REFRESHED,
             f"not_in_view: {lookup_path} not found in active model",
         )
+
+    # -----------------------------------------------------------------
+    # Carry: copy commands with skill dependency detection
+    # -----------------------------------------------------------------
+
+    @Slot(str, str)
+    def copyCommandsToProjectWithCarry(self, project_path: str, command_paths_json: str):
+        """Copy commands to *project_path*; if skills are missing, prompt carry."""
+        import json
+        from pathlib import Path
+
+        command_paths = json.loads(command_paths_json or "[]")
+        if not command_paths or not project_path:
+            return
+
+        from skill_manager.core.copier import copy_commands_with_skill_carry
+
+        commands = [{"local_path": p, "name": Path(p).stem} for p in command_paths]
+
+        def _run():
+            result = copy_commands_with_skill_carry(
+                commands,
+                project_path,
+                self.app._library_model._all_skills,  # type: ignore[attr-defined]
+                confirmed_skills=None,
+            )
+            missing = result.get("missing_skills") or []
+            if missing:
+                QTimer.singleShot(
+                    0,
+                    self,
+                    lambda: self.commandSkillsCarryPrompt.emit(
+                        json.dumps(command_paths), project_path, json.dumps(missing)
+                    ),
+                )
+            else:
+                QTimer.singleShot(
+                    0,
+                    self.app,
+                    lambda: self.app._set_status(
+                        f"Copied {len(command_paths)} command(s); no skills to carry."
+                    ),
+                )
+
+        self.app.task_runner.run(_run)
