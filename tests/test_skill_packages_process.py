@@ -26,8 +26,7 @@ def test_sanitize_token():
     # Inline multiple statements
     assert sanitize_token("echo password=secret; echo next") == "echo password=***; echo next"
     assert (
-        sanitize_token("echo password='secret\nmore'; echo next")
-        == "echo password=***; echo next"
+        sanitize_token("echo password='secret\nmore'; echo next") == "echo password=***; echo next"
     )
 
     # Token with single quotes (shlex.quote style)
