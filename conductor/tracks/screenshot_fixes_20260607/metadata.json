@@ -1,0 +1,19 @@
+{
+  "id": "screenshot_fixes_20260607",
+  "title": "Screenshot Feature Fixes",
+  "type": "bugfix",
+  "status": "complete",
+  "created": "2026-06-07T00:00:00Z",
+  "updated": "2026-06-07T00:00:00Z",
+  "current_phase": 3,
+  "current_task": "3.3",
+  "phases": {
+    "total": 3,
+    "completed": 3
+  },
+  "tasks": {
+    "total": 9,
+    "completed": 9
+  },
+  "commits": []
+}

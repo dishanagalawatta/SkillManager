@@ -9,63 +9,18 @@ ListView {
         interactive: true
     }
 
-    // Pre-render items outside viewport to prevent lag during fast scrolling
     cacheBuffer: Math.max(height * 2, 1000)
 
-    NumberAnimation {
-        id: scrollAnim
-        target: root
-        property: "contentY"
-        duration: 150
-        easing.type: Easing.OutCubic
+    // Optimization: defer heavy layout generation while scrolling fast
+    property bool isScrollingFast: false
+    
+    onMovementStarted: {
+        isScrollingFast = true
+    }
+    
+    onMovementEnded: {
+        isScrollingFast = false
     }
 
-    WheelHandler {
-        target: root
-        enabled: {
-            let config = AppController.config_controller
-            let multiplier = config ? config.scrollSpeedMultiplier : 1.0
-            multiplier !== 1.0
-        }
-        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-        onWheel: (event) => {
-            let config = AppController.config_controller
-            let multiplier = config ? config.scrollSpeedMultiplier : 1.0
-
-            event.accepted = true
-
-            // High-resolution trackpad or precision mouse
-            if (event.pixelDelta.y !== 0) {
-                let scrollAmount = event.pixelDelta.y * multiplier
-                root.contentY = Math.max(root.originY,
-                                         Math.min(root.contentY - scrollAmount,
-                                                  root.originY + Math.max(0, root.contentHeight - root.height)))
-                return
-            }
-
-            // Standard discrete mouse wheel (requires smoothing)
-            let scrollAmount = event.angleDelta.y * multiplier * 0.5
-            let base = scrollAnim.running ? scrollAnim.to : root.contentY
-            let newY = Math.max(root.originY, 
-                                Math.min(base - scrollAmount, 
-                                         root.originY + Math.max(0, root.contentHeight - root.height)))
-
-            scrollAnim.stop()
-            scrollAnim.to = newY
-            scrollAnim.start()
-        }
-    }
-
-    add: Transition {
-        NumberAnimation { property: "opacity"; from: 0; to: 1.0; duration: 250; easing.type: Easing.OutCubic }
-    }
-    remove: Transition {
-        NumberAnimation { property: "opacity"; to: 0; duration: 250; easing.type: Easing.OutCubic }
-    }
-    move: Transition {
-        NumberAnimation { properties: "x,y"; duration: 250; easing.type: Easing.OutCubic }
-    }
-    displaced: Transition {
-        NumberAnimation { properties: "x,y"; duration: 250; easing.type: Easing.OutCubic }
-    }
+    // Ensure initial scroll position is top if desired, handled by caller
 }

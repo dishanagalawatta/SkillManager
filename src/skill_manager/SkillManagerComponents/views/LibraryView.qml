@@ -7,6 +7,7 @@ import ".."
 
 Item {
     id: lv_root
+    objectName: "LibraryView"
 
     property bool showImageInspector: false
     property bool showCommandInspector: false
@@ -18,6 +19,15 @@ Item {
     
     function scrollToTop() {
         lv_listView.positionViewAtBeginning()
+    }
+
+    function cleanup() {
+        lv_listView.cacheBuffer = 0
+        lv_listView.model = null
+    }
+    
+    Component.onDestruction: {
+        cleanup()
     }
     
     Component.onCompleted: {
@@ -114,7 +124,7 @@ Item {
                 // LEFT: Toggle All
                 IconButton {
                     id: lv_toggleAllBtn
-                    buttonSize: 28
+                    buttonSize: 24
                     role: "ghost"
                     tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.libraryModel.toggleAll()
@@ -143,8 +153,8 @@ Item {
 
                 GlassCheckBox {
                     id: lv_selectCheck
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
 
                     checkState: {
                         let count = AppController.libraryModel.visibleSelectedCount;
@@ -170,13 +180,14 @@ Item {
                     visible: AppController.libraryModel.selectedCount > 0
                     
                     Rectangle {
-                        width: 24
-                        height: 24
-                        radius: Theme.radiusPill
+                        Layout.preferredWidth: Math.max(24, libCountText.implicitWidth + 16)
+                        Layout.preferredHeight: 24
+                        radius: height / 2
                         color: Theme.accent
                         Text {
+                            id: libCountText
                             anchors.centerIn: parent
-                            text: AppController.libraryModel.selectedCount
+                            text: AppController.libraryModel.selectedCount.toString()
                             color: "white"
                             font.family: Theme.fontFamily
                             font.weight: Font.Bold
@@ -330,7 +341,7 @@ Item {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
-                model: AppController.isLoading ? null : AppController.libraryModel
+                model: AppController.libraryModel
                 clip: true
                 spacing: 0
                 
@@ -361,21 +372,35 @@ Item {
                 }
 
                 Connections {
-                    target: lv_listView.model
+                    target: AppController.libraryModel
                     function onLayoutAboutToBeChanged() {
                         if (AppController.isLoading) {
                             lv_listView.savedScrollPos = lv_listView.contentY
+                            lv_listView.cacheBuffer = 0 // Safely abort active incubators
                         }
                     }
                     function onLayoutChanged() {
+                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                         lv_listView._restoreScroll()
                     }
                     function onModelAboutToBeReset() {
                         if (AppController.isLoading) {
                             lv_listView.savedScrollPos = lv_listView.contentY
+                            lv_listView.cacheBuffer = 0
                         }
                     }
                     function onModelReset() {
+                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                        lv_listView._restoreScroll()
+                    }
+                    function onAboutToMutateStructure() {
+                        if (AppController.isLoading) {
+                            lv_listView.savedScrollPos = lv_listView.contentY
+                            lv_listView.cacheBuffer = 0
+                        }
+                    }
+                    function onStructureMutated() {
+                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                         lv_listView._restoreScroll()
                     }
                 }

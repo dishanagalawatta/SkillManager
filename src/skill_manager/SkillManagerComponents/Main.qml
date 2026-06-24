@@ -24,6 +24,22 @@ Window {
     onHeightChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
     onXChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
     onYChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
+    
+    onClosing: (close) => {
+        // Clean up the active view to ensure models are detached BEFORE context tear down
+        if (viewLoader && viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+            viewLoader.item.cleanup()
+        }
+        
+        // Clear the viewLoader upon application shutdown.
+        // Delay context destruction to next event loop tick so incubators cleanly abort.
+        Qt.callLater(() => {
+            if (viewLoader) {
+                viewLoader.sourceComponent = null
+                viewLoader.source = ""
+            }
+        })
+    }
     minimumWidth: 1050
     minimumHeight: 650
 
@@ -137,10 +153,17 @@ Window {
     }
 
     function navigateTo(view) {
-        window.currentView = view
         let source = "views/" + view.replace(" ", "") + "View.qml"
         if (viewLoader.source.toString().indexOf(source) === -1) {
-            viewLoader.source = source
+            if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+                viewLoader.item.cleanup()
+            }
+            AppController.ui_controller.currentView = view
+            window.currentView = view
+            // Delay context destruction to next event loop tick so incubators cleanly abort
+            Qt.callLater(() => {
+                viewLoader.source = source
+            })
         }
     }
 

@@ -1,0 +1,19 @@
+{
+  "id": "script_and_docs_update_20260604",
+  "title": "Update Test Script and Documentation",
+  "type": "chore",
+  "status": "complete",
+  "created": "2026-06-04T12:00:00Z",
+  "updated": "2026-06-04T12:00:00Z",
+  "current_task": "1.5",
+  "phases": {
+    "total": 1,
+    "completed": 1
+  },
+  "tasks": {
+    "total": 5,
+    "completed": 5
+  },
+  },
+  "commits": []
+}

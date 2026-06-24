@@ -23,6 +23,8 @@ Run a full cleanup before any of the following:
 | `__pycache__/` (all subtrees) | `uv sync` / Python import |
 | `.pytest_cache/` | `uv run pytest` |
 | `.ruff_cache/` | `uv run ruff check` |
+| `.mypy_cache/` | `uv run mypy` |
+| `.qmlcache/`, `.qmltypes/`, `*.qmlc`, `*.jsc` | PySide6 / Qt |
 | `.coverage`, `.coverage.*` | `uv run pytest --cov` |
 | `coverage.xml`, `coverage.json` | `uv run pytest --cov` |
 | `src/skill_manager.egg-info/` | `uv sync` |
@@ -42,6 +44,7 @@ Run a full cleanup before any of the following:
 | Path | Action |
 |------|--------|
 | `conductor/` root `*.md` plans | Archive to `conductor/_archive/<date>/` if idle ≥ 30 days (ADR-0015) |
+| `*.py` at repo root | One-off migration scripts → archive to `conductor/_archive/<date>/` or move to `scripts/` (ADR-0018) |
 | `.env` | Never commit. Verify `.env.example` is up to date. |
 
 ## Exclusions (never clean)
@@ -66,13 +69,18 @@ export QML_DISABLE_DISK_CACHE=1
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest
+python run_tests.py
 ```
 
-All five gates must pass before committing.
+All gates must pass before committing. Also verify `git status` shows
+no unexpected untracked files (caches reappearing indicate missing
+`.gitignore` rules).
 
 ## Cross-references
 
 - ADR-0010: Drop TUF (removed legacy artefacts)
 - ADR-0015: Conductor root plan archival
 - ADR-0016: `.opencode` gitignore policy
+- ADR-0018: Workspace standardization
 - [`conductor/workflow.md`](../conductor/workflow.md) § 4a: Archival rules
+- [`environments/README.md`](../environments/README.md): Tiered environment configs

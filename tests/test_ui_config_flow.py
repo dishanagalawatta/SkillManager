@@ -40,7 +40,7 @@ class TestUIConfigFlow:
         expected_project = str(Path(test_project).resolve())
         assert any(expected_project == p for p in app_controller._projects)
 
-    def test_project_alias_ui_update(self, qml_engine, app_controller, qtbot):
+    def test_project_alias_ui_update(self, qml_engine, app_controller, qtbot, clean_models):
         """Verify that renaming a project updates the model labels."""
         config_mgr = app_controller.config_mgr
 

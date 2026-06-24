@@ -21,6 +21,12 @@ The Library is where you manage your source skills.
 - **Multi-Select**: Use checkboxes or selection shortcuts to select multiple skills for batch operations.
 - **Skill Inspector**: Clicking on any skill opens the Inspector pane on the right. Here you can read the full documentation, view raw Markdown, and manage metadata.
 - **Creating Commands**: From the Inspector, create custom `.md` commands based on the skill for specific projects.
+
+> **Multi-project deployment.** You can now deploy a custom command to
+> multiple projects at once. The Create/Edit dialog shows a multi-select
+> dropdown — click individual projects or use "All Projects" to select
+> every repository. Edits update every copy; the delete confirmation
+> lets you choose which projects to remove the command from.
 - **Copying to Projects**: Select one or multiple skills and use the "Copy to Projects" button to deploy them into specific project folders.
 - **Archive/Unarchive**: Archive skills you don't need while keeping them available for restoration.
 - **Star/Favorite**: Star important skills to pin them to the top of the list.
@@ -39,6 +45,7 @@ The Quick Copy view is designed for daily workflow efficiency when working withi
 - **Custom Collections**: Create custom groups of skills for quick batch reference copying.
 - **Manual Input**: Add raw text references or notes alongside your skill references.
 - **Starred Items**: Starred skills and commands are shown as first-class items in the Quick Copy workflow.
+- **Command Skill Carry**: When you copy a command to another project, SkillManager automatically detects which skills the command references (e.g., `/git-pr`, `@cavecrew`). If any of those skills are missing in the target project, a carry dialog appears listing them. You can toggle individual skills, carry all, or skip and copy commands only. This ensures commands work in every project without manual dependency tracking.
 
 ---
 
@@ -107,6 +114,25 @@ SkillManager includes a powerful screenshots and redaction feature.
 | `Ctrl+Shift+S` | Take screenshot |
 | *Customizable* | All shortcuts can be remapped in Settings |
 | *Per-collection* | Each collection can have its own shortcut; pressing it copies the collection's skill references and pastes them into the focused field |
+
+---
+
+## Environment Variables
+
+SkillManager reads environment variables from `.env` at startup.
+Override defaults by setting variables in your shell or in `.env`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `QML_DISABLE_DISK_CACHE` | `0` | Set to `1` to disable QML bytecode cache. |
+| `SKILL_MANAGER_LOG_LEVEL` | `INFO` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+| `SKILL_MANAGER_DATA_DIR` | (platformdirs) | Override the user data directory. |
+| `POSTHOG_PROJECT_TOKEN` | (empty) | PostHog analytics token. Empty disables. |
+| `SENTRY_DSN` | (empty) | Sentry error reporting DSN. Empty disables. |
+
+For tiered environment configurations (dev, staging, prod), see
+[`environments/README.md`](../environments/README.md) and
+[`docs/ENVIRONMENT.md`](ENVIRONMENT.md).
 
 ---
 

@@ -45,7 +45,8 @@ To prevent the `AppController` from becoming a "God Object," responsibilities ar
 - **`config.py`**: `ConfigManager` - Low-level persistence for `config.json`.
 - **`analytics.py`**: PostHog analytics event capture and shutdown.
 - **`categories.py`**: Emoji resolution and category display utilities.
-- **`copier.py`**: File copy operations for deploying skills to projects.
+- **`copier.py`**: File copy operations for deploying skills to projects, including command–skill carry.
+- **`skill_references.py`**: Detects which skills a command body depends on (extract + resolve).
 - **`commands.py`**: Custom command integration.
 - **`file_watch.py`**: `SkillFolderWatcher` - Watchdog-based filesystem monitoring for live refresh.
 - **`image_provider.py`**: `ScreenshotImageProvider` - QML image provider for screenshot previews.
@@ -120,6 +121,35 @@ The project uses [python-semantic-release](https://python-semantic-release.readt
 ### 4. Application Updates
 - `AppUpdateController` checks the GitHub Releases API for new versions.
 - Users download updates manually from the GitHub Releases page.
+
+---
+
+## Environment Tiers
+
+SkillManager supports three environment tiers via `environments/`:
+
+| Tier | Use Case | Key Settings |
+|------|----------|--------------|
+| **Dev** | Local development, headless tests | `QT_QPA_PLATFORM=offscreen`, `DEBUG` logging |
+| **Staging** | CI builds, staging deployments | `WARNING` logging, telemetry slots |
+| **Prod** | Production builds | `ERROR` logging, telemetry required |
+
+See [`environments/README.md`](../environments/README.md) for full
+details and [`docs/ENVIRONMENT.md`](ENVIRONMENT.md) for the variable
+contract.
+
+---
+
+## Diagnostic Ring Buffer
+
+The application uses a ring-buffer diagnostic logger
+(`core/diagnostics.py`) instead of the standard `logging` module.
+Events are categorized via `CATEGORY_*` constants and emitted to the
+QML console bridge. Key categories:
+
+- `CATEGORY_SELECTION_REFRESHED` — selection invariant guard (ADR-0011)
+- `CATEGORY_WINDOW_STATE` — window visibility/position tracking (ADR-0012)
+- `CATEGORY_COMMAND_CARRY_PROMPTED` / `_COPIED` / `_SKIPPED` — command-skill carry decisions (ADR-0017)
 
 ---
 

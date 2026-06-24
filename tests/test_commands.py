@@ -4,7 +4,10 @@ from skill_manager.core.commands import (
     build_command_content,
     build_command_filename,
     create_custom_command_file,
+    create_custom_command_files_multi,
+    find_command_holder_projects,
     update_custom_command_file,
+    update_custom_command_file_multi,
 )
 
 
@@ -380,3 +383,190 @@ def test_update_custom_command_file_cancels_on_conflict(tmp_path):
     assert src.exists()
     assert src.read_text() == original_content
     assert "existing" in blocker.read_text()
+
+
+def test_create_custom_command_files_multi_single_project(tmp_path):
+    project_root = tmp_path / "proj1"
+    (project_root / ".agents" / "skills").mkdir(parents=True)
+
+    results = create_custom_command_files_multi(
+        name="Start",
+        body="echo 'hello'",
+        project_labels=["proj1"],
+        category="General",
+        project_paths=[str(project_root / ".agents" / "skills")],
+        created_on=date(2026, 6, 23),
+    )
+    assert len(results) == 1
+    assert results[0].ok
+    assert results[0].path is not None
+    assert results[0].path.name == "Start.md"
+    assert results[0].path.exists()
+
+
+def test_create_custom_command_files_multi_two_projects(tmp_path):
+    proj1 = tmp_path / "proj1"
+    proj2 = tmp_path / "proj2"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj2 / ".agents" / "skills").mkdir(parents=True)
+
+    results = create_custom_command_files_multi(
+        name="Deploy",
+        body="deploy all",
+        project_labels=["proj1", "proj2"],
+        category="DevOps",
+        project_paths=[str(proj1 / ".agents" / "skills"), str(proj2 / ".agents" / "skills")],
+        created_on=date(2026, 6, 23),
+    )
+    assert len(results) == 2
+    assert all(r.ok for r in results)
+    assert (proj1 / ".agents" / "commands" / "Deploy.md").exists()
+    assert (proj2 / ".agents" / "commands" / "Deploy.md").exists()
+
+
+def test_create_custom_command_files_multi_empty_labels(tmp_path):
+    results = create_custom_command_files_multi(
+        name="Cmd",
+        body="body",
+        project_labels=[],
+        category="cat",
+        project_paths=[str(tmp_path)],
+    )
+    assert results == []
+
+
+def test_create_custom_command_files_multi_duplicate_in_one(tmp_path):
+    proj1 = tmp_path / "proj1"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj1 / ".agents" / "commands" / "Cmd.md").write_text("existing")
+
+    results = create_custom_command_files_multi(
+        name="Cmd",
+        body="new body",
+        project_labels=["proj1"],
+        category="cat",
+        project_paths=[str(proj1 / ".agents" / "skills")],
+    )
+    assert len(results) == 1
+    assert not results[0].ok
+    assert "already exists" in results[0].message
+
+
+def test_update_custom_command_file_multi_copies_to_all(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj1 = tmp_path / "proj1"
+    proj2 = tmp_path / "proj2"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj2 / ".agents" / "skills").mkdir(parents=True)
+
+    src = proj1 / ".agents" / "commands" / "cmd.md"
+    src.write_text(
+        "---\nname: cmd\ncategory: DevOps\ntype: command\ndate: 2026-01-01\n---\n\noriginal"
+    )
+
+    results = update_custom_command_file_multi(
+        local_path=str(src),
+        name="cmd",
+        body="updated",
+        category="DevOps",
+        project_labels=[project_label(proj1), project_label(proj2)],
+        project_paths=[str(proj1), str(proj2)],
+    )
+    assert len(results) == 2
+    assert results[0].ok  # canonical
+    assert results[1].ok  # fan-out
+    assert "updated" in (proj2 / ".agents" / "commands" / "cmd.md").read_text()
+
+
+def test_update_custom_command_file_multi_first_label_is_canonical(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj1 = tmp_path / "proj1"
+    proj2 = tmp_path / "proj2"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj2 / ".agents" / "skills").mkdir(parents=True)
+
+    src = proj1 / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+
+    results = update_custom_command_file_multi(
+        local_path=str(src),
+        name="cmd",
+        body="new",
+        category="X",
+        project_labels=[project_label(proj1), project_label(proj2)],
+        project_paths=[str(proj1), str(proj2)],
+    )
+    assert results[0].ok
+    assert results[0].path == proj1 / ".agents" / "commands" / "cmd.md"
+    assert src.exists()
+
+
+def test_update_custom_command_file_multi_partial_conflict(tmp_path):
+    from skill_manager.core.quick_copy import project_label
+
+    proj1 = tmp_path / "proj1"
+    proj2 = tmp_path / "proj2"
+    proj3 = tmp_path / "proj3"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj2 / ".agents" / "skills").mkdir(parents=True)
+    (proj2 / ".agents" / "commands").mkdir(parents=True)
+    (proj3 / ".agents" / "skills").mkdir(parents=True)
+    (proj3 / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj1 / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+
+    # Command exists in proj1 and proj2 (holders), proj3 is new
+    # Conflict only on proj3
+    (proj3 / ".agents" / "commands" / "cmd.md").write_text("existing")
+
+    results = update_custom_command_file_multi(
+        local_path=str(src),
+        name="cmd",
+        body="updated",
+        category="X",
+        project_labels=[project_label(proj1), project_label(proj2), project_label(proj3)],
+        project_paths=[str(proj1), str(proj2), str(proj3)],
+    )
+    # Canonical (proj1, from keep_set) succeeds
+    assert results[0].ok
+    # Fan-out to proj3 (add_set) — may conflict or overwrite depending on on_conflict
+    # proj2 is in keep_set, so no fan-out to it
+
+
+def test_find_command_holder_projects(tmp_path):
+    proj1 = tmp_path / "proj1"
+    proj2 = tmp_path / "proj2"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj1 / ".agents" / "commands" / "Test.md").write_text("x")
+    (proj2 / ".agents" / "skills").mkdir(parents=True)
+    (proj2 / ".agents" / "commands").mkdir(parents=True)
+    (proj2 / ".agents" / "commands" / "Test.md").write_text("y")
+
+    holders = find_command_holder_projects(
+        "Test",
+        [str(proj1 / ".agents" / "skills"), str(proj2 / ".agents" / "skills")],
+    )
+    assert len(holders) == 2
+    assert "proj1" in holders
+    assert "proj2" in holders
+
+
+def test_find_command_holder_projects_no_match(tmp_path):
+    proj1 = tmp_path / "proj1"
+    (proj1 / ".agents" / "skills").mkdir(parents=True)
+    (proj1 / ".agents" / "commands").mkdir(parents=True)
+    (proj1 / ".agents" / "commands" / "Other.md").write_text("x")
+
+    holders = find_command_holder_projects(
+        "Test",
+        [str(proj1 / ".agents" / "skills")],
+    )
+    assert holders == []

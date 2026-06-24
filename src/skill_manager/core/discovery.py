@@ -6,11 +6,11 @@ import hashlib
 import logging
 import os
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 from diskcache import Cache
+from joblib import Parallel, delayed
 
 from skill_manager.core.config import DATA_DIR
 from skill_manager.core.diagnostics import (
@@ -270,18 +270,20 @@ class DiscoveryService:
                     logger.error("[DISCOVERY] Error scanning source %s: %s", resolved_source, e)
                 return source_skills
 
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(_scan_one, src): src for src in changed_sources}
-                for future in futures:
-                    src = futures[future]
-                    try:
-                        new_skills = future.result()
-                        skills.extend(new_skills)
-                        fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
-                        disk_cache.set(fp_key, compute_dir_fingerprint(src))
-                        disk_cache.set(f"pkg_skills:{fp_key}", new_skills)
-                    except Exception as e:
-                        logger.warning("[DISCOVERY] Scan failed for %s: %s", src, e)
+            # Offload heavy parsing to separate processes to keep the PySide6 UI thread responsive.
+            # Using loky (joblib's backend) correctly serializes nested closures like _scan_one.
+            parallel_results = Parallel(n_jobs=-1, prefer="processes")(
+                delayed(_scan_one)(src) for src in changed_sources
+            )
+
+            for src, new_skills in zip(changed_sources, parallel_results, strict=False):
+                try:
+                    skills.extend(new_skills)
+                    fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+                    disk_cache.set(fp_key, compute_dir_fingerprint(src))
+                    disk_cache.set(f"pkg_skills:{fp_key}", new_skills)
+                except Exception as e:
+                    logger.warning("[DISCOVERY] Scan failed for %s: %s", src, e)
 
         return cached_skills + skills
 
@@ -598,6 +600,71 @@ class DiscoveryService:
             return self._discover_single_skill_folder(path, project_path)
 
         return None
+
+    def discover_project(self, project_path: Path) -> list[dict]:
+        """Discover all skills and commands in a project's ``.agents`` directory.
+
+        Walks ``<project_path>/.agents/skills/`` and
+        ``<project_path>/.agents/commands/``, skipping ``.git``,
+        ``__pycache__``, and hidden directories.  Returns a list of
+        non-``None`` skill/command dicts; returns ``[]`` on error.
+        """
+        diag = get_diagnostic_logger()
+        results: list[dict] = []
+
+        agents_dir = project_path / ".agents"
+        if not agents_dir.is_dir():
+            return results
+
+        # --- Commands ---
+        commands_dir = agents_dir / "commands"
+        if commands_dir.is_dir():
+            try:
+                with os.scandir(commands_dir) as entries:
+                    for entry in entries:
+                        if not entry.is_file():
+                            continue
+                        if not entry.name.endswith(".md"):
+                            continue
+                        if entry.name.startswith("."):
+                            continue
+                        cmd_file = Path(entry.path)
+                        result = self._discover_single_command(cmd_file, project_path)
+                        if result is not None:
+                            results.append(result)
+            except OSError as e:
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Error scanning commands in {commands_dir}: {e}",
+                    data={"commands_dir": str(commands_dir), "error": str(e)},
+                )
+
+        # --- Skills ---
+        skills_dir = agents_dir / "skills"
+        if skills_dir.is_dir():
+            try:
+                with os.scandir(skills_dir) as entries:
+                    for entry in entries:
+                        if not entry.is_dir():
+                            continue
+                        if entry.name.startswith(".") or entry.name == "__pycache__":
+                            continue
+                        skill_dir = Path(entry.path)
+                        skill_md = skill_dir / "SKILL.md"
+                        if skill_md.is_file():
+                            result = self._discover_single_skill_folder(skill_dir, project_path)
+                            if result is not None:
+                                results.append(result)
+            except OSError as e:
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SOURCE_MISSING,
+                    f"Error scanning skills in {skills_dir}: {e}",
+                    data={"skills_dir": str(skills_dir), "error": str(e)},
+                )
+
+        return results
 
     def _discover_single_command(self, cmd_file: Path, project_path: Path) -> dict[str, Any] | None:
         """Parse a single command ``.md`` file into a normalized dict."""

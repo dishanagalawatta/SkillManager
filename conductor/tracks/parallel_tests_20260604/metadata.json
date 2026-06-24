@@ -1,0 +1,19 @@
+{
+  "id": "parallel_tests_20260604",
+  "title": "Parallel Test Runner",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-04T12:00:00Z",
+  "updated": "2026-06-04T12:00:00Z",
+  "current_phase": 1,
+  "current_task": "1.4",
+  "phases": {
+    "total": 1,
+    "completed": 1
+  },
+  "tasks": {
+    "total": 4,
+    "completed": 4
+  },
+  "commits": []
+}

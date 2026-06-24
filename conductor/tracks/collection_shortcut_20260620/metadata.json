@@ -1,0 +1,13 @@
+{
+  "id": "collection_shortcut_20260620",
+  "title": "Per-Collection Quick-Copy Shortcuts (auto-paste)",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-20T22:30:00Z",
+  "updated": "2026-06-21T00:45:00Z",
+  "current_phase": 5,
+  "current_task": null,
+  "phases": { "total": 5, "completed": 5 },
+  "tasks": { "total": 21, "completed": 21 },
+  "commits": []
+}

@@ -1,0 +1,19 @@
+{
+  "id": "scroll_amount_20260603",
+  "title": "Adjust Scroll Amount",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-03T00:00:00Z",
+  "updated": "2026-06-03T14:30:00Z",
+  "current_phase": 5,
+  "current_task": "5.1",
+  "phases": {
+    "total": 5,
+    "completed": 5
+  },
+  "tasks": {
+    "total": 8,
+    "completed": 8
+  },
+  "commits": []
+}

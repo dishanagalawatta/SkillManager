@@ -256,8 +256,8 @@ def app_controller(session_mock_config, session_temp_dir):
             "App",
             1,
             0,
-            "AppController",
-            controller_factory,  # type: ignore[arg-type]
+            "AppController",  # type: ignore[arg-type]
+            controller_factory,
         )
 
     yield controller
@@ -291,3 +291,14 @@ def qml_engine(qapp, app_controller, qtbot):
     for _ in range(5):
         qapp.processEvents()
         qtbot.wait(20)
+
+
+@pytest.fixture
+def clean_models(app_controller):
+    """Reset incubation state on session-scoped models.
+
+    No-op in test mode (SKILL_MANAGER_TESTING) since the model's
+    incubating setter already ignores writes. Kept for compatibility
+    with tests that explicitly request it.
+    """
+    yield

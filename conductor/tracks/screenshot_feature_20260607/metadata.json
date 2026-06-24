@@ -1,0 +1,19 @@
+{
+  "id": "screenshot_feature_20260607",
+  "title": "Screenshot and Redaction Feature",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-07T00:00:00Z",
+  "updated": "2026-06-07T00:00:00Z",
+  "current_phase": 5,
+  "current_task": "5.3",
+  "phases": {
+    "total": 5,
+    "completed": 5
+  },
+  "tasks": {
+    "total": 16,
+    "completed": 16
+  },
+  "commits": []
+}

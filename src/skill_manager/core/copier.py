@@ -325,3 +325,108 @@ def _normalize_project_path(project):
             return project_path, error_msg
 
     return project_path, ""
+
+
+# ---------------------------------------------------------------------------
+# Carry: detect + copy skill dependencies alongside commands
+# ---------------------------------------------------------------------------
+
+
+def get_installed_skill_folder_names(project_path: str | Path) -> set[str]:
+    """Return the set of folder names already present in *project_path*'s skills dir."""
+    skills_dir = get_skills_dir(project_path)
+    if not skills_dir.is_dir():
+        return set()
+    return {p.name for p in skills_dir.iterdir() if p.is_dir()}
+
+
+def find_missing_skills_for_commands(
+    commands: list[dict],
+    project_path: str | Path,
+    all_skills: list,
+) -> list[dict]:
+    """Find skills referenced by *commands* that are absent from *project_path*.
+
+    Returns the **union** of missing skills across all commands, de-duped
+    by ``local_path``.  Each entry is a full skill dict (ready to feed
+    into :func:`copy_skill_folders_to_projects`).
+    """
+    installed = get_installed_skill_folder_names(project_path)
+    from skill_manager.core.commands import find_referenced_skills_in_command
+    from skill_manager.core.skill_references import resolve_referenced_skills
+
+    needed: dict[str, dict] = {}
+    for cmd in commands:
+        cmd_path = cmd.get("local_path")
+        if cmd_path:
+            referenced = find_referenced_skills_in_command(cmd_path, all_skills)
+        else:
+            # New command — body is in the dict (not yet on disk).
+            referenced = resolve_referenced_skills(cmd.get("body", ""), all_skills)
+        for skill in referenced:
+            folder = (skill.get("folder_name") or "").lower()
+            if not folder or folder in installed:
+                continue
+            lp = skill.get("local_path")
+            if lp and lp not in needed:
+                needed[lp] = skill
+    return list(needed.values())
+
+
+def copy_commands_with_skill_carry(
+    commands: list[dict],
+    project_path: str | Path,
+    all_skills: list,
+    *,
+    confirmed_skills: list[dict] | None = None,
+) -> dict:
+    """Copy commands + (optionally) their referenced skills to *project_path*.
+
+    Two-phase approach:
+
+    1. Copy commands via :func:`copy_command_files_to_projects`.
+    2. If *confirmed_skills* is ``None``, return the ``missing_skills``
+       list so the caller can prompt the user.  If it is provided (the
+       user-approved carry set), copy those skills via
+       :func:`copy_skill_folders_to_projects` (which uses
+       ``dirs_exist_ok=True`` → always overwrites to source version,
+       matching the user's chosen overwrite policy).
+
+    Returns::
+
+        {
+            "copied": <int>,          # commands copied
+            "skipped": <int>,
+            "failed": <int>,
+            "details": [...],         # command copy details
+            "skills_copied": <int>,   # skills deployed
+            "skills_failed": <int>,
+            "missing_skills": [...],  # skills needed but not yet confirmed
+        }
+    """
+    cmd_result = copy_command_files_to_projects(commands, [project_path])
+
+    if confirmed_skills is None:
+        missing = find_missing_skills_for_commands(commands, project_path, all_skills)
+        return {
+            **cmd_result,
+            "skills_copied": 0,
+            "skills_failed": 0,
+            "missing_skills": missing,
+        }
+
+    if not confirmed_skills:
+        return {
+            **cmd_result,
+            "skills_copied": 0,
+            "skills_failed": 0,
+            "missing_skills": [],
+        }
+
+    skill_result = copy_skill_folders_to_projects(confirmed_skills, [project_path])
+    return {
+        **cmd_result,
+        "skills_copied": skill_result.get("copied", 0) + skill_result.get("merged", 0),
+        "skills_failed": skill_result.get("failed", 0),
+        "missing_skills": [],
+    }

@@ -38,16 +38,17 @@ Dialog {
 
     property bool editMode: false
     property string editLocalPath: ""
-    property string editProjectLabel: ""
+    property var editProjectLabels: []
     property string editCategoryValue: ""
     property string orphanCategory: ""
     property bool awaitingConflictResolution: false
     property var pendingArgs: ({})
+    property var removalDialog: null
 
     function openWithContext() {
         editMode = false
         editLocalPath = ""
-        editProjectLabel = AppController.currentProject || ""
+        editProjectLabels = AppController.currentProject ? [AppController.currentProject] : (AppController.projectLabels.length > 0 ? [AppController.projectLabels[0]] : [])
         editCategoryValue = ""
         orphanCategory = ""
         awaitingConflictResolution = false
@@ -59,7 +60,10 @@ Dialog {
     function openForEdit(skill) {
         editMode = true
         editLocalPath = skill.local_path || ""
-        editProjectLabel = skill.project_label || AppController.currentProject || ""
+        editProjectLabels = AppController.commandProjectsForPath(skill.local_path || "")
+        if (editProjectLabels.length === 0) {
+            editProjectLabels = AppController.currentProject ? [AppController.currentProject] : []
+        }
         editCategoryValue = skill.category || ""
         orphanCategory = (skill.category
                           && AppController.categories.indexOf(skill.category) === -1)
@@ -202,7 +206,7 @@ Dialog {
                 }
             }
 
-            // Project
+            // Projects (multi-select)
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 16
@@ -210,19 +214,16 @@ Dialog {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
-                    Text { text: "Project"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    GlassDropdown {
-                        id: projectDrop
+                    Text { text: "Projects"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
+                    GlassMultiSelect {
+                        id: projectMultiSelect
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 36
                         model: AppController.projectLabels
-                        currentIndex: {
-                            let label = root.editProjectLabel || AppController.currentProject
-                            return Math.max(0, model.indexOf(label))
-                        }
-                        onActivated: (index) => {
-                            if (index >= 0 && index < AppController.projectLabels.length)
-                                root.editProjectLabel = AppController.projectLabels[index]
-                        }
+                        selectedValues: root.editProjectLabels
+                        placeholderText: "Select projects..."
+                        allLabel: "All Projects"
+                        onSelectionChanged: root.editProjectLabels = selectedValues
                     }
                 }
             }
@@ -305,7 +306,7 @@ Dialog {
                     text: editMode ? "Update Command" : "Create Command"
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 40
-                    enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== ""
+                    enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== "" && root.editProjectLabels.length > 0
 
                     onClicked: {
                         root.pendingArgs = {
@@ -313,7 +314,7 @@ Dialog {
                             name: cmdNameInput.text,
                             body: cmdBodyInput.text,
                             category: editCategoryValue,
-                            projectLabel: projectDrop.currentText
+                            projectLabels: projectMultiSelect.selectedValues.slice()
                         }
                         root.awaitingConflictResolution = editMode
                         if (editMode) {
@@ -322,14 +323,14 @@ Dialog {
                                 root.pendingArgs.name,
                                 root.pendingArgs.body,
                                 root.pendingArgs.category,
-                                root.pendingArgs.projectLabel,
+                                root.pendingArgs.projectLabels,
                                 ""
                             )
                         } else {
                             AppController.createCustomCommand(
                                 root.pendingArgs.name,
                                 root.pendingArgs.body,
-                                root.pendingArgs.projectLabel,
+                                root.pendingArgs.projectLabels,
                                 root.pendingArgs.category
                             )
                             root.accept()
@@ -353,6 +354,12 @@ Dialog {
                 }
             }
         }
+    }
+
+    // Removal confirmation dialog
+    CommandRemovalConfirmDialog {
+        id: removalConfirmDialog
+        parent: Overlay.overlay
     }
 
     // Conflict resolution dialog
@@ -399,7 +406,7 @@ Dialog {
                         root.pendingArgs.name,
                         root.pendingArgs.body,
                         root.pendingArgs.category,
-                        root.pendingArgs.projectLabel,
+                        root.pendingArgs.projectLabels,
                         "cancel"
                     )
                     conflictDialog.close()
@@ -436,7 +443,7 @@ Dialog {
                         root.pendingArgs.name,
                         root.pendingArgs.body,
                         root.pendingArgs.category,
-                        root.pendingArgs.projectLabel,
+                        root.pendingArgs.projectLabels,
                         "overwrite"
                     )
                     conflictDialog.close()
@@ -470,7 +477,7 @@ Dialog {
                         root.pendingArgs.name,
                         root.pendingArgs.body,
                         root.pendingArgs.category,
-                        root.pendingArgs.projectLabel,
+                        root.pendingArgs.projectLabels,
                         "rename"
                     )
                     conflictDialog.close()
@@ -509,7 +516,7 @@ Dialog {
                 cmdNameInput.text = root.pendingArgs.name
                 cmdBodyInput.text = root.pendingArgs.body
                 root.editCategoryValue = root.pendingArgs.category
-                root.editProjectLabel = root.pendingArgs.projectLabel
+                root.editProjectLabels = root.pendingArgs.projectLabels
                 root.open()
             }
             conflictDialog.open()
@@ -519,6 +526,11 @@ Dialog {
             if (oldPath !== root.pendingArgs.localPath) return
             root.awaitingConflictResolution = false
             root.accept()
+        }
+        function onCommandPendingRemovals(localPath, pendingRemovals) {
+            removalConfirmDialog.localPath = localPath
+            removalConfirmDialog.pendingRemovals = pendingRemovals
+            removalConfirmDialog.open()
         }
     }
 }

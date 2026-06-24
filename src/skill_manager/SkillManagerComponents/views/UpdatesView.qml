@@ -9,6 +9,18 @@ import "../dialogs"
 
 Item {
     id: updatesRoot
+    objectName: "UpdatesView"
+
+    function cleanup() {
+        uv_packagesList.cacheBuffer = 0
+        uv_packagesList.model = null
+        uv_projectsList.cacheBuffer = 0
+        uv_projectsList.model = null
+    }
+
+    Component.onDestruction: {
+        cleanup()
+    }
 
     // --- Dialogs ---
     FolderPickerNative {
@@ -166,7 +178,9 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
+
                             model: AppController.updatePackages
+
                             spacing: 8
                             delegate: Rectangle {
                                 width: uv_packagesList.width
@@ -337,13 +351,7 @@ Item {
                                 }
                             }
 
-                            Connections {
-                                target: AppController
-                                function onUpdatePackagesChanged() {
-                                    uv_packagesList.model = null
-                                    uv_packagesList.model = AppController.updatePackages
-                                }
-                            }
+
                         }
                     }
                 }
@@ -391,7 +399,9 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
+
                             model: AppController.config_controller.updateProjects
+
                             spacing: 8
                             delegate: Rectangle {
                                 width: uv_projectsList.width
@@ -498,13 +508,7 @@ Item {
                                 }
                             }
 
-                            Connections {
-                                target: AppController
-                                function onProjectsChanged() {
-                                    uv_projectsList.model = null
-                                    uv_projectsList.model = AppController.config_controller.updateProjects
-                                }
-                            }
+
                         }
                     }
                 }

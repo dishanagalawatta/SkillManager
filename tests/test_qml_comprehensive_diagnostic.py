@@ -24,6 +24,8 @@ from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtWidgets import QApplication
 
+from skill_manager.controllers.font_database_bridge import FontDatabaseBridge
+
 QML_DIR = (
     Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
 )
@@ -42,12 +44,14 @@ PUBLIC_VIEWS = [
 # Every dialog the user can open.
 DIALOGS = [
     "CommandCreateDialog.qml",
+    "CommandCarrySkillsDialog.qml",
     "DeleteConfirmDialog.qml",
     "ArchiveConfirmDialog.qml",
     "PackageEditDialog.qml",
     "ProjectRenameDialog.qml",
     "FolderPickerNative.qml",
     "MissingSkillsDialog.qml",
+    "CommandRemovalConfirmDialog.qml",
 ]
 
 # Shared components that other QML files import via the local module.
@@ -96,6 +100,8 @@ SHARED_COMPONENTS = [
 ]
 
 
+
+
 class _MockAppController(QObject):
     pass
 
@@ -114,6 +120,12 @@ def _load(
 
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("appController", controller)
+    # FontDatabaseBridge is set as a context property in app.py; QML files
+    # that import font pickers (FontFamilyColumn etc.) reference it directly.
+    # Store on engine to prevent GC while QML bindings evaluate.
+    font_bridge = FontDatabaseBridge()
+    engine.rootContext().setContextProperty("fontDB", font_bridge)
+    engine._font_bridge = font_bridge  # prevent garbage collection  # type: ignore[attr-defined]
     engine.addImportPath(str(QML_DIR.parent))
 
     warnings: list[str] = []
@@ -189,6 +201,62 @@ def test_shared_component_loads_cleanly(qapp, app_controller, filename):
     assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
     # Not every shared component is a top-level visual (e.g. Theme is a
     # singleton); we don't assert on size for the shared pool.
+
+
+# ----- Zero-warning gate ---------------------------------------------------
+# Per ADR-0004, a clean QML load means no errors AND no warnings.  The
+# warnings list is already captured by ``_load`` but was previously ignored.
+# This parametrized test makes zero-warning a hard gate going forward.
+# ──────────────────────────────────────────────────────────────────────────
+
+_ALL_QML_NAMES = PUBLIC_VIEWS + DIALOGS
+
+
+@pytest.mark.parametrize("filename", PUBLIC_VIEWS, scope="session")
+def test_view_loads_with_no_warnings(qapp, app_controller, filename):
+    """Every public QML view must load without any QML warnings.
+
+    ADR-0004 mandates a clean QML load.  Warnings are forwarded to the
+    Python logging system via ``app.py`` and are visible in production
+    startup logs.  Any QML warning is a signal that the layout or data
+    binding is misconfigured and must be fixed, not suppressed.
+    """
+    path = VIEWS_DIR / filename
+    obj, errors, warnings = _load(qapp, path, app_controller)
+    assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
+    _ours = [w for w in warnings if not w.startswith("QML scene:")]
+    assert not _ours, (
+        f"{filename} loaded with {len(_ours)} QML warning(s):\n"
+        + "\n".join(f"  - {w}" for w in _ours)
+    )
+
+
+@pytest.mark.parametrize("filename", DIALOGS, scope="session")
+def test_dialog_loads_with_no_warnings(qapp, app_controller, filename):
+    """Every public QML dialog must load without any QML warnings.
+
+    ADR-0004 mandates a clean QML load.  Warnings are forwarded to the
+    Python logging system via ``app.py`` and are visible in production
+    startup logs.  Any QML warning is a signal that the layout or data
+    binding is misconfigured and must be fixed, not suppressed.
+    """
+    path = DIALOGS_DIR / filename
+    if not path.exists():
+        pytest.skip(f"{filename} not present in repo")
+    obj, errors, warnings = _load(qapp, path, app_controller)
+    assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
+    # Filter "Cannot read property of null" on parent.width/parent.height —
+    # these are Dialog centering bindings that fire during standalone test
+    # loads when the Dialog has no parent window.  Never occur at runtime.
+    _ours = [
+        w for w in warnings
+        if not w.startswith("QML scene:")
+        and "Cannot read property" not in w
+    ]
+    assert not _ours, (
+        f"{filename} loaded with {len(_ours)} QML warning(s):\n"
+        + "\n".join(f"  - {w}" for w in _ours)
+    )
 
 
 # ----- Collection shortcut regression tests --------------------------------

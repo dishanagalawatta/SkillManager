@@ -36,7 +36,7 @@ Item {
 
             Rectangle {
                 anchors.fill: parent
-                color: mouseAreaSub.containsMouse ? Theme.glassHover : "transparent"
+                color: subCatHover.hovered ? Theme.glassHover : "transparent"
                 radius: Theme.radiusSmall
                 anchors.leftMargin: 24 // Start Level 1 Background
                 anchors.rightMargin: 2
@@ -85,23 +85,23 @@ Item {
                 }
             }
 
-            MouseArea {
-                id: mouseAreaSub
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
-
-                SleekToolTip {
-                    id: subCatToolTip
-                    text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
-                    visible: mouseAreaSub.containsMouse
-                }
-
-                Accessible.role: Accessible.Button
-                Accessible.name: root.subCat
-                Accessible.description: subCatToolTip.text
+            TapHandler {
+                onTapped: Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
             }
+
+            HoverHandler {
+                id: subCatHover
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            SleekToolTip {
+                id: subCatToolTip
+                text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
+            }
+
+            Accessible.role: Accessible.Button
+            Accessible.name: root.subCat
+            Accessible.description: subCatToolTip.text
         }
 
         // --- SKILL ITEM CONTENT ---
@@ -262,22 +262,23 @@ Item {
                             visible: model && model.isSelected
                         }
 
-                        MouseArea {
-                            id: checkboxMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: (mouse) => AppController.skillModel.toggleSelection(index)
-                            cursorShape: Qt.PointingHandCursor
-
-                            SleekToolTip {
-                                id: selToolTip
-                                text: (model && model.isSelected) ? "Deselect" : "Select"
-                                visible: checkboxMouseArea.containsMouse
-                            }
-
-                            Accessible.role: Accessible.CheckBox
-                            Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
+                        TapHandler {
+                            onTapped: AppController.skillModel.toggleSelection(index)
                         }
+                        
+                        HoverHandler {
+                            id: checkboxHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        SleekToolTip {
+                            id: selToolTip
+                            text: (model && model.isSelected) ? "Deselect" : "Select"
+                        }
+
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
+                        Accessible.description: selToolTip.text
                     }
 
                     // Icon Section
@@ -356,7 +357,6 @@ Item {
                             border.color: Theme.glassBorder
                         }
                         SleekToolTip {
-                            visible: parent.hovered
                             text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         }
                     }

@@ -1,0 +1,19 @@
+{
+  "id": "selection_consolidation_20260604",
+  "title": "Consolidate Select All and Clear Selection into a Checkbox",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-04T21:26:00Z",
+  "updated": "2026-06-04T22:15:00Z",
+  "current_phase": 9,
+  "current_task": "9.1",
+  "phases": {
+    "total": 9,
+    "completed": 9
+  },
+  "tasks": {
+    "total": 16,
+    "completed": 16
+  },
+  "commits": []
+}

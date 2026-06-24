@@ -7,13 +7,21 @@ from skill_manager.core.schemas import SkillRecord
 
 @pytest.mark.usefixtures("setup_qml_style")
 class TestUIDiscoveryFlow:
-    def test_load_initial_data_flow(self, qml_engine, app_controller, qtbot):
+    def test_load_initial_data_flow(self, qml_engine, app_controller, qtbot, clean_models):
         """Verify the full flow from calling loadInitialData to model update."""
 
         # Reset models and filters for a clean test
         app_controller.libraryModel.setSkills([])
         app_controller.quickCopyModel.setSkills([])
         app_controller.discovery._previous_skills = {}
+
+        # Reset filter state that may be stale from other session-scoped tests
+        app_controller.libraryModel.state.is_package_only = None
+        app_controller.libraryModel.state.filter_by_client = False
+        app_controller.libraryModel.state.client_filter = ""
+        app_controller.quickCopyModel.state.is_package_only = None
+        app_controller.quickCopyModel.state.filter_by_client = False
+        app_controller.quickCopyModel.state.client_filter = ""
 
         # Mock the DiscoveryService.discover_all to return a fixed state
         with patch(
@@ -62,7 +70,7 @@ class TestUIDiscoveryFlow:
             assert "General" in app_controller.categories
             assert "Tests" in app_controller.categories
 
-    def test_incremental_discovery_ui_update(self, qml_engine, app_controller, qtbot):
+    def test_incremental_discovery_ui_update(self, qml_engine, app_controller, qtbot, clean_models):
         """Verify that discovery updates existing models incrementally."""
 
         # 1. Inject initial state into models
