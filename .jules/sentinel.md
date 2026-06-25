@@ -36,3 +36,8 @@
 **Vulnerability:** The `sanitize_token` function used a greedy `.*` regex match for `echo password=`, which failed to correctly bound redaction, potentially leaking secrets if line boundaries failed or causing log data loss by stripping massive portions of text.
 **Learning:** When using Python regex to redact secrets from multiline or unstructured text, greedy matches (`.*`) without newline/boundary constraints (`\r`, `\n`) or escape-aware logic fail catastrophically in logs.
 **Prevention:** Always use explicit matching of known token formats (e.g., GitHub tokens), and for unstructured strings like `echo password=`, use safe escape-aware patterns bounded strictly to quotes or spaces.
+
+## 2024-06-25 - Prevent Mixed-Quote Token Leaks in Log Sanitization
+**Vulnerability:** The regex used to sanitize `echo password=...` tokens in logs was vulnerable to leaks if a shell command used mixed quotes (e.g., `'secret'"more"`). Separate regexes targeted double-quoted, single-quoted, and unquoted strings individually, allowing complex/mixed-quoted inputs to partially or fully escape redaction.
+**Learning:** Shells natively parse consecutive mixed-quoted segments into a single token (e.g., `echo 'a'"b"` is equivalent to `echo ab`). Applying simplistic, single-type quote regexes for redaction fails to account for how git credential helpers or bash evaluate arguments, leading to partial redaction and leaked secrets in debug or process outputs.
+**Prevention:** Always use a single, unified regex pattern that models the shell's tokenization logic by iteratively matching any valid sequence of unquoted characters, single-quoted segments, or double-quoted segments until a delimiter (space, semicolon, newline) is encountered.
