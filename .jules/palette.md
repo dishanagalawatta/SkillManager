@@ -13,3 +13,8 @@
 ## 2025-02-23 - Custom Multi-Select ComboBox A11y
 **Learning:** Custom multi-select or dropdown components built on plain `Item` (like `GlassMultiSelect.qml`) do not inherit native `ComboBox` accessibility. They require explicit `Accessible.role: Accessible.ComboBox`, `activeFocusOnTab: true`, and manual `Keys.onPressed` handling for Space/Enter to emulate standard interactions.
 **Action:** Always check custom dropdown implementations to ensure they define `Accessible.ComboBox`, map `activeFocus` to a visual ring, and handle keyboard events for toggling the popup.
+
+
+## 2026-06-25 - Custom QML Component Accessibility
+**Learning:** In QML, plain `Item` or custom components combining `Item` and `MouseArea` do not natively support keyboard focus or triggering via keyboard events (Space/Enter). Additionally, depending on the structure, linking `Accessible.description` dynamically to a child item's visibility state (like a tooltip) using `visible: parent.containsMouse` fails or behaves unreliably when keyboard focus triggers the change without moving the mouse.
+**Action:** When creating custom interactive controls, always include `activeFocusOnTab: true` at the root, provide an explicit `Keys.onPressed` handler to trap Space/Enter and trigger the corresponding action, and bind an indicator (`Rectangle` border) to `activeFocus`. Also map accessible strings directly to underlying states rather than relying on UI element visibility.

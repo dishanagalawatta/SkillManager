@@ -97,21 +97,41 @@ Item {
         }
     }
 
+    activeFocusOnTab: true
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName);
+            event.accepted = true;
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: "transparent"
+        border.color: parent.activeFocus ? Theme.accent : "transparent"
+        border.width: parent.activeFocus ? 2 : 0
+        radius: Theme.radiusSmall
+        z: 1
+    }
+
     MouseArea {
         id: mouseAreaMain
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+        onClicked: function(mouse) {
+            parent.forceActiveFocus();
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName);
+        }
 
         SleekToolTip {
             id: headerToolTip
             text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
             visible: mouseAreaMain.containsMouse
         }
-
-        Accessible.role: Accessible.Button
-        Accessible.name: root.mainCatName
-        Accessible.description: headerToolTip.text
     }
+
+    Accessible.role: Accessible.Button
+    Accessible.name: root.mainCatName
+    Accessible.description: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
 }

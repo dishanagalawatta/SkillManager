@@ -42,6 +42,22 @@ Rectangle {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
 
+                activeFocusOnTab: true
+                Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.isCollapsed = !root.isCollapsed;
+                        event.accepted = true;
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.color: parent.activeFocus ? Theme.accent : "transparent"
+                    border.width: parent.activeFocus ? 2 : 0
+                    radius: Theme.radiusSmall
+                }
+
                 Image {
                     id: sidebarLogoImg
                     anchors.fill: parent
@@ -61,19 +77,21 @@ Rectangle {
                     id: logoMouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
+                    onClicked: function(mouse) {
+                        parent.forceActiveFocus();
+                        root.isCollapsed = !root.isCollapsed;
+                    }
                     cursorShape: Qt.PointingHandCursor
 
                     SleekToolTip {
                         id: sidebarToolTip
                         text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                        visible: parent.containsMouse
+                        visible: logoMouseArea.containsMouse
                     }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: sidebarToolTip.text
-                    Accessible.description: sidebarToolTip.text
                 }
+
+                Accessible.role: Accessible.Button
+                Accessible.name: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
             }
             
             Text {

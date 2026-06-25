@@ -85,23 +85,47 @@ Item {
                 }
             }
 
+            activeFocusOnTab: true
+            Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "");
+                    event.accepted = true;
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                border.color: parent.activeFocus ? Theme.accent : "transparent"
+                border.width: parent.activeFocus ? 2 : 0
+                radius: Theme.radiusSmall
+                anchors.leftMargin: 24
+                anchors.rightMargin: 2
+                anchors.topMargin: 2
+                anchors.bottomMargin: 2
+                z: 1
+            }
+
             MouseArea {
                 id: mouseAreaSub
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: (mouse) => Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
+                onClicked: function(mouse) {
+                    parent.forceActiveFocus();
+                    Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "");
+                }
 
                 SleekToolTip {
                     id: subCatToolTip
                     text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
                     visible: mouseAreaSub.containsMouse
                 }
-
-                Accessible.role: Accessible.Button
-                Accessible.name: root.subCat
-                Accessible.description: subCatToolTip.text
             }
+
+            Accessible.role: Accessible.Button
+            Accessible.name: root.subCat
+            Accessible.description: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
         }
 
         // --- SKILL ITEM CONTENT ---
