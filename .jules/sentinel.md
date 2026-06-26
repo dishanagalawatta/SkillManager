@@ -36,3 +36,8 @@
 **Vulnerability:** The `sanitize_token` function used a greedy `.*` regex match for `echo password=`, which failed to correctly bound redaction, potentially leaking secrets if line boundaries failed or causing log data loss by stripping massive portions of text.
 **Learning:** When using Python regex to redact secrets from multiline or unstructured text, greedy matches (`.*`) without newline/boundary constraints (`\r`, `\n`) or escape-aware logic fail catastrophically in logs.
 **Prevention:** Always use explicit matching of known token formats (e.g., GitHub tokens), and for unstructured strings like `echo password=`, use safe escape-aware patterns bounded strictly to quotes or spaces.
+
+## 2024-05-20 - Unified Regex for Shell Token Redaction
+**Vulnerability:** The previous regex logic for redacting `echo password=...` tokens in `src/skill_manager/core/skill_packages/process.py` used multiple separate regex replacements for double-quoted, single-quoted, and unquoted passwords. This logic failed to fully redact mixed-quote tokens (e.g., `echo password='secret'"'"'more'`), leading to potential credential leaks.
+**Learning:** Shell tokens can contain a mix of unquoted characters, single-quoted strings, and double-quoted strings. Attempting to parse them with separate regex passes based on the quote type is insufficient and error-prone.
+**Prevention:** Use a unified pattern that matches the entire shell token by combining unquoted characters, single-quoted strings, and double-quoted strings: `(?:[^;\r\n\s'\"]|'[^']*'|\"(?:\\.|[^\"\\])*\")+`. This ensures that the entire token, regardless of internal quoting structure, is captured and redacted.
