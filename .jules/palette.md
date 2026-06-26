@@ -13,3 +13,6 @@
 ## 2025-02-23 - Custom Multi-Select ComboBox A11y
 **Learning:** Custom multi-select or dropdown components built on plain `Item` (like `GlassMultiSelect.qml`) do not inherit native `ComboBox` accessibility. They require explicit `Accessible.role: Accessible.ComboBox`, `activeFocusOnTab: true`, and manual `Keys.onPressed` handling for Space/Enter to emulate standard interactions.
 **Action:** Always check custom dropdown implementations to ensure they define `Accessible.ComboBox`, map `activeFocus` to a visual ring, and handle keyboard events for toggling the popup.
+## 2024-05-18 - Keyboard Accessible Tooltips
+**Learning:** In QML standard controls (like `Button`), binding a tooltip's `visible` property solely to `hovered` breaks keyboard accessibility for screen reader and keyboard-only users, as they cannot hover over elements.
+**Action:** Always include `visualFocus` in the visibility condition (e.g., `visible: control.hovered || control.visualFocus`) to ensure the tooltip is accessible when navigating via the Tab key.
