@@ -102,8 +102,8 @@ Item {
 
     SleekToolTip {
         id: cbToolTip
-        visible: mouseArea.containsMouse && tooltipText !== ""
-        text: tooltipText
+        visible: (mouseArea.containsMouse || control.activeFocus) && control.tooltipText !== ""
+        text: control.tooltipText
     }
     
     Accessible.role: Accessible.CheckBox
