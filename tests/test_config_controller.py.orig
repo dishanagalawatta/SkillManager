@@ -41,7 +41,7 @@ def test_config_controller_remove_source(config_controller, mock_app):
 
 def test_config_controller_add_project(config_controller, mock_app):
     config_controller.addProject("file:///C:/project")
-    assert any(r"C:\project" in p for p in mock_app._projects)
+    assert any("C:\project" in p for p in mock_app._projects)
     mock_app.projectsChanged.emit.assert_called_once()
 
 
