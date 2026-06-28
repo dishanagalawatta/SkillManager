@@ -1,3 +1,7 @@
 ## 2024-06-22 - rapidfuzz process.extractOne early-exit regression
 **Learning:** `rapidfuzz.process.extractOne` evaluates the entire sequence to find the absolute maximum match. If the existing Python loop optimizes large list evaluations with an early exit (e.g. `if max_score > 70: break`), replacing it blindly with `extractOne` can actually cause performance regressions and functional differences.
 **Action:** Always verify if the original looping logic relies on early termination thresholds. If it does, and the list size is significant, avoid `extractOne` and instead optimize the Python loop using fast-path exact substring checks before invoking expensive `fuzz.ratio` operations.
+
+## $(date +%Y-%m-%d) - Optimize fuzz.ratio loop with process.extractOne
+**Learning:** In the `search.py` slow path, iterating through tokens natively in Python and evaluating `fuzz.ratio` is slow (~16.5s for 100 loops of a dense dataset). Replacing it with `rapidfuzz.process.extractOne(..., scorer=fuzz.ratio, score_cutoff=...)` offloads evaluation to optimized C extensions while safely preserving dynamic early-exit behavior, resulting in a >3.5x speedup (~4.5s for the same benchmark).
+**Action:** Whenever applying `fuzz.ratio` across an array of target strings in a performance-critical loop, prefer using `rapidfuzz.process.extractOne` over manual Python iteration loops, and pass the tracking variable dynamically to `score_cutoff` to preserve early short-circuits. Also, ensure target lists are deduplicated at index-time, not query-time.
