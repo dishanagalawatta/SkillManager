@@ -152,7 +152,7 @@ Rectangle {
                     }
                     SleekToolTip {
                         text: "Argument (e.g. ultra)"
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                     }
                 }
                 IconButton {
@@ -183,7 +183,7 @@ Rectangle {
                     
                     SleekToolTip {
                         id: starToolTip
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                         text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
                     }
 
@@ -200,7 +200,7 @@ Rectangle {
                     SleekToolTip {
                         id: closeToolTip
                         text: "Close Inspector"
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                     }
 
                     Accessible.role: Accessible.Button

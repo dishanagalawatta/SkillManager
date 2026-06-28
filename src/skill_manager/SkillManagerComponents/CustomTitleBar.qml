@@ -179,7 +179,7 @@ Rectangle {
         SleekToolTip {
             id: btnToolTip
             text: btn.tooltipText
-            visible: btn.hovered && btn.tooltipText !== ""
+            visible: (btn.hovered || btn.visualFocus) && btn.tooltipText !== ""
         }
 
         Accessible.role: Accessible.Button

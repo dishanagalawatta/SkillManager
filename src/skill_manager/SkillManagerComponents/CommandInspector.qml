@@ -106,7 +106,7 @@ Rectangle {
                     SleekToolTip {
                         id: editCmdToolTip
                         text: "Edit settings"
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                     }
 
                     Accessible.role: Accessible.Button
@@ -129,7 +129,7 @@ Rectangle {
                     SleekToolTip {
                         id: delCmdToolTip
                         text: "Delete command"
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                     }
 
                     Accessible.role: Accessible.Button
@@ -145,7 +145,7 @@ Rectangle {
                     SleekToolTip {
                         id: closeCmdToolTip
                         text: "Close Inspector"
-                        visible: parent.hovered
+                        visible: parent.hovered || parent.visualFocus
                     }
 
                     Accessible.role: Accessible.Button

@@ -356,7 +356,7 @@ Item {
                             border.color: Theme.glassBorder
                         }
                         SleekToolTip {
-                            visible: parent.hovered
+                            visible: parent.hovered || root.activeFocus
                             text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         }
                     }

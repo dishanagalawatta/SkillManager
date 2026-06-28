@@ -89,7 +89,7 @@ Button {
 
     SleekToolTip {
         id: btnToolTip
-        visible: control.hovered && control.tooltipText !== ""
+        visible: (control.hovered || control.visualFocus) && control.tooltipText !== ""
         text: control.tooltipText
     }
     Accessible.role: Accessible.Button

@@ -67,7 +67,7 @@ Rectangle {
                     SleekToolTip {
                         id: sidebarToolTip
                         text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                        visible: parent.containsMouse
+                        visible: parent.containsMouse || logoMouseArea.activeFocus
                     }
 
                     Accessible.role: Accessible.Button

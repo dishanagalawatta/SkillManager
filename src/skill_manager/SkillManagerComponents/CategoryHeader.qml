@@ -107,7 +107,7 @@ Item {
         SleekToolTip {
             id: headerToolTip
             text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
-            visible: mouseAreaMain.containsMouse
+            visible: mouseAreaMain.containsMouse || root.activeFocus
         }
 
         Accessible.role: Accessible.Button
