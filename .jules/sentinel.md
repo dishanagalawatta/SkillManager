@@ -32,7 +32,13 @@
 **Vulnerability:** User-provided repository URLs are passed to `git clone` and `git ls-remote`. If an attacker provides a URL starting with `ext::` (e.g., `ext::sh -c 'malicious_command'`), Git's `ext` transport protocol will execute the specified shell command.
 **Learning:** Git's support for the `ext::` protocol is a well-known command execution vector (similar to CVE-2022-39253). When invoking Git subprocesses against untrusted URLs, it is necessary to disable potentially dangerous features.
 **Prevention:** Always add `-c protocol.ext.allow=never` to `git` subprocess commands before the subcommand (e.g., `["git", "-c", "protocol.ext.allow=never", "clone", ...]`) to strictly prevent this transport layer.
+
 ## 2025-06-15 - [Critical] Greedy Regex in Secret Redaction Allows Multiline Data Loss and Leakage
 **Vulnerability:** The `sanitize_token` function used a greedy `.*` regex match for `echo password=`, which failed to correctly bound redaction, potentially leaking secrets if line boundaries failed or causing log data loss by stripping massive portions of text.
 **Learning:** When using Python regex to redact secrets from multiline or unstructured text, greedy matches (`.*`) without newline/boundary constraints (`\r`, `\n`) or escape-aware logic fail catastrophically in logs.
 **Prevention:** Always use explicit matching of known token formats (e.g., GitHub tokens), and for unstructured strings like `echo password=`, use safe escape-aware patterns bounded strictly to quotes or spaces.
+
+## 2025-06-15 - [Critical] Mixed-Quote Bypass in Subprocess Secret Redaction
+**Vulnerability:** The application attempted to redact credential helper strings using three separate regular expressions targeting double quotes, single quotes, and unquoted strings independently. This approach was vulnerable to mixed-quote bypasses (e.g., `echo password='my'"'"'secret'`) where none of the individual regexes would fully match the shell token, resulting in the password leaking in subprocess logs. Additionally, the unquoted pattern used an over-aggressive lookahead that caused unrelated command parameters to be falsely redacted or the regex to fail.
+**Learning:** Shell interpreters process string concatenation via adjacent quoting (e.g., `'a'"b"`). Parsing these complex token boundaries with disjointed regexes is fundamentally flawed and fails to securely match the true string boundary.
+**Prevention:** Use a single unified regex pattern that matches the entire shell token by combining unquoted characters, single-quoted strings, and double-quoted strings (e.g., `r'(echo password=)(?:[^;\r\n\s\'"]|\'[^\']*\'|"(?:\\.|[^"\\])*")+'`).
