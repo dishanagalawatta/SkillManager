@@ -291,3 +291,93 @@ class ConfigManager:
         """Sets multiple config keys and writes to disk once."""
         self.data.update(updates)
         self.save()
+
+    def delete(self, key: str) -> None:
+        """Removes a key from config and saves."""
+        self.data.pop(key, None)
+        self.save()
+
+
+class ScopedConfigManager:
+    """Wraps a parent ConfigManager and prefixes all keys with a namespace.
+
+    Allows multiple SkillModel instances to share the same config file
+    without their filter state colliding.  For example, ``library``
+    and ``quickcopy`` scopes each get their own ``is_package_only``,
+    ``project_filter``, etc.
+    """
+
+    def __init__(self, parent: ConfigManager, namespace: str):
+        self._parent = parent
+        self._namespace = namespace
+
+    def _scoped(self, key: str) -> str:
+        return f"{self._namespace}.{key}"
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._parent.get(self._scoped(key), default)
+
+    def set(self, key: str, value: Any) -> None:
+        self._parent.set(self._scoped(key), value)
+
+    def set_many(self, updates: dict[str, Any]) -> None:
+        scoped = {self._scoped(k): v for k, v in updates.items()}
+        self._parent.set_many(scoped)
+
+    def delete(self, key: str) -> None:
+        self._parent.delete(self._scoped(key))
+
+    @property
+    def config_path(self):
+        return self._parent.config_path
+
+    @property
+    def data(self):
+        return self._parent.data
+
+
+# Filter keys that are per-model and must be namespaced.
+_SCOPED_FILTER_KEYS = (
+    "show_archived",
+    "category_filter",
+    "collection_filter",
+    "project_filter",
+    "client_format",
+    "show_commands",
+    "show_starred",
+    "is_package_only",
+    "is_source_only",
+    "collapsed_categories",
+    "project_selections",
+)
+
+
+def migrate_scoped_filter_keys(config: ConfigManager) -> None:
+    """Move legacy un-namespaced filter keys to ``library.*`` and ``quickcopy.*``.
+
+    Called once on startup.  Idempotent — skips keys that are already
+    namespaced.
+    """
+    library = ScopedConfigManager(config, "library")
+    quickcopy = ScopedConfigManager(config, "quickcopy")
+
+    migrated = False
+    for key in _SCOPED_FILTER_KEYS:
+        unnamespaced = config.get(key)
+        if unnamespaced is None:
+            continue
+
+        # Only migrate if the namespaced slot is still empty.
+        if library.get(key) is None:
+            library.set(key, unnamespaced)
+            migrated = True
+        if quickcopy.get(key) is None:
+            quickcopy.set(key, unnamespaced)
+            migrated = True
+
+        # Remove the legacy un-namespaced key.
+        del config.data[key]
+        migrated = True
+
+    if migrated:
+        config.save()

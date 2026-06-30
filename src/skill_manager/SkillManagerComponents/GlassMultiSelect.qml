@@ -13,11 +13,11 @@ Item {
 
     property string displayText: {
         if (selectedValues.length === 0) return placeholderText
-        if (selectedValues.length === model.length) return allLabel
+        if (selectedValues.length === model.length && model.length > 1) return allLabel
         return selectedValues.join(", ")
     }
 
-    property bool allSelected: selectedValues.length === model.length && model.length > 0
+    property bool allSelected: selectedValues.length === model.length && model.length > 1
 
     signal selectionChanged()
 
@@ -139,6 +139,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 32
                 color: allHover.containsMouse ? Theme.glassHover : "transparent"
+                visible: root.model.length > 1
 
                 RowLayout {
                     anchors.fill: parent
@@ -178,8 +179,9 @@ Item {
                 Layout.fillWidth: true
                 Layout.leftMargin: 8
                 Layout.rightMargin: 8
-                height: 1
+                Layout.preferredHeight: 1
                 color: Theme.separator
+                visible: root.model.length > 1
             }
 
             Repeater {
@@ -188,7 +190,7 @@ Item {
                 delegate: Rectangle {
                     required property string modelData
                     Layout.fillWidth: true
-                    height: 32
+                    Layout.preferredHeight: 32
                     color: itemHover.containsMouse ? Theme.glassHover : "transparent"
 
                     RowLayout {

@@ -194,92 +194,36 @@ Dialog {
             }
         }
 
-        // Footer
-        Rectangle {
-            Layout.fillWidth: true
-            height: 80
-            color: "transparent"
+    }
 
+    footer: Item {
+        width: parent.width
+        height: 76
+        implicitHeight: height
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            anchors.topMargin: 12
+            anchors.bottomMargin: 24
+            spacing: 12
+            
+            // Select All / None
             RowLayout {
-                anchors.fill: parent
-                anchors.margins: 24
-                spacing: 12
+                spacing: 8
 
-                // Select All / None
-                RowLayout {
-                    spacing: 8
-
-                    ActionButton {
-                        text: "All"
-                        Layout.preferredWidth: 50
-                        Layout.preferredHeight: 32
-                        onClicked: {
-                            var c = {}
-                            for (var i = 0; i < root.missingSkills.length; i++) {
-                                var key = root.missingSkills[i].folder_name || root.missingSkills[i].name
-                                c[key] = true
-                            }
-                            root._checked = c
-                        }
-
-                        background: Rectangle {
-                            radius: Theme.radiusButton
-                            color: parent.hovered ? Theme.glassHover : "transparent"
-                            border.color: Theme.glassBorder
-                        }
-
-                        contentItem: Text {
-                            text: parent.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            font.weight: Font.Medium
-                            color: Theme.label
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    ActionButton {
-                        text: "None"
-                        Layout.preferredWidth: 50
-                        Layout.preferredHeight: 32
-                        onClicked: {
-                            var c = {}
-                            for (var i = 0; i < root.missingSkills.length; i++) {
-                                var key = root.missingSkills[i].folder_name || root.missingSkills[i].name
-                                c[key] = false
-                            }
-                            root._checked = c
-                        }
-
-                        background: Rectangle {
-                            radius: Theme.radiusButton
-                            color: parent.hovered ? Theme.glassHover : "transparent"
-                            border.color: Theme.glassBorder
-                        }
-
-                        contentItem: Text {
-                            text: parent.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                            font.weight: Font.Medium
-                            color: Theme.label
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
-
-                // Skip (copy commands only)
                 ActionButton {
-                    text: "Copy Commands Only"
-                    Layout.preferredWidth: 160
-                    Layout.preferredHeight: 40
+                    text: "All"
+                    Layout.preferredWidth: 50
+                    Layout.preferredHeight: 32
                     onClicked: {
-                        root._carryResult([])
-                        root.accept()
+                        var c = {}
+                        for (var i = 0; i < root.missingSkills.length; i++) {
+                            var key = root.missingSkills[i].folder_name || root.missingSkills[i].name
+                            c[key] = true
+                        }
+                        root._checked = c
                     }
 
                     background: Rectangle {
@@ -291,7 +235,7 @@ Dialog {
                     contentItem: Text {
                         text: parent.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
+                        font.pixelSize: Theme.sizeCaption
                         font.weight: Font.Medium
                         color: Theme.label
                         horizontalAlignment: Text.AlignHCenter
@@ -299,38 +243,97 @@ Dialog {
                     }
                 }
 
-                // Carry + Copy
                 ActionButton {
-                    text: "Carry & Copy"
-                    Layout.preferredWidth: 130
-                    Layout.preferredHeight: 40
+                    text: "None"
+                    Layout.preferredWidth: 50
+                    Layout.preferredHeight: 32
                     onClicked: {
-                        var confirmed = []
+                        var c = {}
                         for (var i = 0; i < root.missingSkills.length; i++) {
-                            var s = root.missingSkills[i]
-                            var key = s.folder_name || s.name
-                            if (root._checked[key] !== false) {
-                                confirmed.push(s)
-                            }
+                            var key = root.missingSkills[i].folder_name || root.missingSkills[i].name
+                            c[key] = false
                         }
-                        root._carryResult(confirmed)
-                        root.accept()
+                        root._checked = c
                     }
 
                     background: Rectangle {
                         radius: Theme.radiusButton
-                        color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
+                        color: parent.hovered ? Theme.glassHover : "transparent"
+                        border.color: Theme.glassBorder
                     }
 
                     contentItem: Text {
                         text: parent.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: "white"
+                        font.pixelSize: Theme.sizeCaption
+                        font.weight: Font.Medium
+                        color: Theme.label
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // Skip (copy commands only)
+            ActionButton {
+                text: "Copy Commands Only"
+                Layout.preferredWidth: 160
+                Layout.preferredHeight: 40
+                onClicked: {
+                    root._carryResult([])
+                    root.accept()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.glassBorder
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Medium
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            // Carry + Copy
+            ActionButton {
+                text: "Carry & Copy"
+                Layout.preferredWidth: 130
+                Layout.preferredHeight: 40
+                onClicked: {
+                    var confirmed = []
+                    for (var i = 0; i < root.missingSkills.length; i++) {
+                        var s = root.missingSkills[i]
+                        var key = s.folder_name || s.name
+                        if (root._checked[key] !== false) {
+                            confirmed.push(s)
+                        }
+                    }
+                    root._carryResult(confirmed)
+                    root.accept()
+                }
+
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }

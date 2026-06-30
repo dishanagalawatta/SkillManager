@@ -5,12 +5,14 @@ Validates that:
 - 5s safety timer sets ``_replay_deferred`` correctly
 - ``_apply_filter`` runs directly when model is empty (no incubation guard)
 - Diagnostic events are emitted for all coordination paths
+- ``replacePreparedState`` defers during incubation (regression: #QML-race)
 """
 
 import os
 
 import pytest
 
+from skill_manager.core.models.entities import PreparedModelState, Skill
 from skill_manager.core.models.qt_model import SkillModel
 
 
@@ -126,3 +128,126 @@ class TestIncubationCoordination:
         finally:
             if old_val is not None:
                 os.environ["SKILL_MANAGER_TESTING"] = old_val
+
+    def test_replace_prepared_state_deferred_when_incubating(self, model):
+        """replacePreparedState queues instead of resetting when incubating."""
+        model._incubating = True
+        model._all_skills = [type("Skill", (), {"local_path": "/x", "name": "X"})()]
+
+        skill = Skill(name="New", local_path="/new", is_package=True, main_category="")
+        state = PreparedModelState(
+            all_skills=[skill],
+            search_engine=None,
+            all_filtered_skills=[skill],
+            visible_rows=[skill],
+            categories=[],
+            status="Done",
+            generation=0,
+            is_final=True,
+        )
+        model.replacePreparedState(state)
+
+        # Model should NOT have changed — state is queued
+        assert model._all_skills != [skill]
+        assert len(model._pending_signals) == 1
+
+    def test_replace_prepared_state_applied_when_not_incubating(self, model):
+        """replacePreparedState applies immediately when not incubating."""
+        model._incubating = False
+
+        skill = Skill(name="New", local_path="/new", is_package=True, main_category="")
+        state = PreparedModelState(
+            all_skills=[skill],
+            search_engine=None,
+            all_filtered_skills=[skill],
+            visible_rows=[skill],
+            categories=["Cat"],
+            status="Done",
+            generation=0,
+            is_final=True,
+        )
+        model.replacePreparedState(state)
+
+        assert model._all_skills == [skill]
+        assert model._filtered_skills == [skill]
+
+    def test_replace_prepared_state_applied_when_empty_model(self, model):
+        """replacePreparedState applies even when incubating if model is empty."""
+        model._incubating = True
+        model._all_skills = []
+
+        skill = Skill(name="New", local_path="/new", is_package=True, main_category="")
+        state = PreparedModelState(
+            all_skills=[skill],
+            search_engine=None,
+            all_filtered_skills=[skill],
+            visible_rows=[skill],
+            categories=[],
+            status="Done",
+            generation=0,
+            is_final=True,
+        )
+        model.replacePreparedState(state)
+
+        # Should apply directly — empty model has nothing to incubate
+        assert model._all_skills == [skill]
+
+    def test_replace_prepared_state_replayed_on_incubation_ready(self, model):
+        """Queued replacePreparedState is applied when onIncubationReady fires."""
+        model._incubating = True
+        model._all_skills = [type("Skill", (), {"local_path": "/x", "name": "X"})()]
+        model._replay_deferred = True
+
+        skill = Skill(name="New", local_path="/new", is_package=True, main_category="")
+        state = PreparedModelState(
+            all_skills=[skill],
+            search_engine=None,
+            all_filtered_skills=[skill],
+            visible_rows=[skill],
+            categories=[],
+            status="Done",
+            generation=0,
+            is_final=True,
+        )
+        model.replacePreparedState(state)
+
+        # State is queued, model unchanged
+        assert model._all_skills != [skill]
+
+        # QML calls onIncubationReady
+        model.onIncubationReady()
+
+        # Now applied
+        assert model._all_skills == [skill]
+        assert model._filtered_skills == [skill]
+
+    def test_replace_prepared_state_replayed_on_force_end(self, model):
+        """Queued replacePreparedState is applied when 5s timer fires."""
+        model._incubating = True
+        model._all_skills = [type("Skill", (), {"local_path": "/x", "name": "X"})()]
+
+        skill = Skill(name="New", local_path="/new", is_package=True, main_category="")
+        state = PreparedModelState(
+            all_skills=[skill],
+            search_engine=None,
+            all_filtered_skills=[skill],
+            visible_rows=[skill],
+            categories=[],
+            status="Done",
+            generation=0,
+            is_final=True,
+        )
+        model.replacePreparedState(state)
+
+        assert model._all_skills != [skill]
+
+        # 5s safety timer fires
+        model._force_end_incubation()
+
+        # Pending signals still need onIncubationReady to replay
+        assert model._replay_deferred is True
+        assert model._all_skills != [skill]
+
+        # onIncubationReady replays
+        model.onIncubationReady()
+        assert model._all_skills == [skill]

@@ -1,0 +1,52 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+import os
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+from PySide6.QtWidgets import QApplication
+from skill_manager.app import AppController
+from skill_manager.core.discovery import DiscoveryService, get_discovery_cache, parse_skill_md, categorize_skill, SkillRecord
+
+app = QApplication([])
+ctrl = AppController()
+
+service = DiscoveryService(
+    sources=ctrl._sources,
+    projects=ctrl._projects,
+    archive_paths=ctrl._archive_paths,
+    starred_paths=ctrl._starred_paths,
+    project_aliases=ctrl._project_aliases,
+)
+    
+with get_discovery_cache() as cache:
+    pkg_raw = service.discover_packages_incremental(cache, parse_skill_md, categorize_skill, False)
+    all_skills = []
+    for s in pkg_raw:
+        transformed = service.transform_skill(s, is_package=True)
+        all_skills.append(SkillRecord.model_validate(transformed))
+
+    proj_raw = service.discover_projects_incremental(cache, parse_skill_md, categorize_skill, False)
+    for p in proj_raw:
+        for s in p.get("skills", []):
+            transformed = service.transform_skill(s, is_package=False, project_label=p.get("project_label"))
+            all_skills.append(SkillRecord.model_validate(transformed))
+
+    print("Before dedup:", len(all_skills))
+    
+    seen_paths = {}
+    for skill in all_skills:
+        lp = skill.local_path
+        if not lp:
+            continue
+        existing = seen_paths.get(lp)
+        if existing is None or (existing.is_package and not skill.is_package):
+            seen_paths[lp] = skill
+            
+    all_skills = list(seen_paths.values())
+    print("After dedup:", len(all_skills))
+
+    for s in all_skills:
+        if "brainstorming" in s.local_path.lower() and "skillmanager" in s.local_path.lower():
+            print(f"DEDUP RESULT: is_package={s.is_package}, path={s.local_path}")

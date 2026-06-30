@@ -493,19 +493,22 @@ def test_save_collection_all_commands_kept(config_controller):
 
 def test_check_missing_skills_reports_missing_command(config_controller, tmp_path):
     """Command absent from target project's .agents/commands/ is reported missing."""
+    from skill_manager.core.quick_copy import project_label
+
     project_root = tmp_path / "ProjA"
     project_root.mkdir()
     config_controller.app._projects = [str(project_root)]
+    canonical_label = project_label(str(project_root))
 
     config_controller.app._custom_collections = {
         "Coll": {
             "paths": ["/other/.agents/commands/MyCmd.md"],
-            "projects": ["ProjA"],
+            "projects": [canonical_label],
         }
     }
     result = json.loads(config_controller.checkMissingSkills("Coll"))
-    assert "ProjA" in result
-    assert any("MyCmd.md" in p for p in result["ProjA"])
+    assert canonical_label in result
+    assert any("MyCmd.md" in p for p in result[canonical_label])
 
 
 def test_check_missing_skills_skips_present_command(config_controller, tmp_path):
@@ -529,6 +532,8 @@ def test_check_missing_skills_skips_present_command(config_controller, tmp_path)
 
 def test_check_missing_skills_mixed_skills_and_commands(config_controller, tmp_path):
     """Both skills and commands are evaluated correctly in one call."""
+    from skill_manager.core.quick_copy import project_label
+
     project_root = tmp_path / "ProjA"
     skills_dir = project_root / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
@@ -540,6 +545,7 @@ def test_check_missing_skills_mixed_skills_and_commands(config_controller, tmp_p
     (commands_dir / "CmdA.md").write_text("---\nname: CmdA\n---\nbody", encoding="utf-8")
 
     config_controller.app._projects = [str(project_root)]
+    canonical_label = project_label(str(project_root))
 
     config_controller.app._custom_collections = {
         "Coll": {
@@ -549,12 +555,12 @@ def test_check_missing_skills_mixed_skills_and_commands(config_controller, tmp_p
                 "/other/.agents/commands/CmdB.md",
                 "/other/.agents/skills/missing-skill",
             ],
-            "projects": ["ProjA"],
+            "projects": [canonical_label],
         }
     }
     result = json.loads(config_controller.checkMissingSkills("Coll"))
-    assert "ProjA" in result
-    missing_names = [Path(p).name for p in result["ProjA"]]
+    assert canonical_label in result
+    missing_names = [Path(p).name for p in result[canonical_label]]
     assert "CmdB.md" in missing_names
     assert "missing-skill" in missing_names
     assert "CmdA.md" not in missing_names

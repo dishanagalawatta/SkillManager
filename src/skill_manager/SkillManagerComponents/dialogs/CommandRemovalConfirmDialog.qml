@@ -1,6 +1,9 @@
 /**
  * Purpose: Confirmation dialog for removing a command from selected projects.
  * Shown when AppController emits commandPendingRemovals.
+ *
+ * Built on GlassDialog for a unified "Solid Matte" surface: custom header
+ * (icon + title + close), drop shadow, and ActionButton-based footer.
  */
 import QtQuick
 import QtQuick.Layouts
@@ -8,18 +11,20 @@ import QtQuick.Controls
 import ".."
 import App 1.0
 
-Dialog {
+GlassDialog {
     id: root
 
     property var pendingRemovals: []
     property string localPath: ""
     property var approvedLabels: []
 
-    title: "Remove from projects"
     modal: true
-    anchors.centerIn: parent
-    standardButtons: Dialog.NoButton
+    anchors.centerIn: Overlay.overlay
     width: 450
+    standardButtons: Dialog.NoButton
+
+    dialogTitle: "Remove from Projects"
+    dialogIcon: "\u26A0\uFE0F"
 
     onOpened: {
         // Default: all items checked
@@ -28,32 +33,29 @@ Dialog {
             let item = removalRepeater.itemAt(i)
             if (item) item.checked = true
         }
+        keepAllBtn.forceActiveFocus()
     }
 
-    background: Rectangle {
-        color: Theme.glassPill
-        radius: Theme.radiusCard
-        border.color: Theme.glassBorder
-        border.width: 1
-    }
-
+    // ── Content ──────────────────────────────────────────────────────
     contentItem: ColumnLayout {
         spacing: 12
 
         Text {
             text: "The command will be removed from the following projects:"
-            wrapMode: Text.Wrap
+            wrapMode: Text.WordWrap
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sizeBody
             color: Theme.label
-            Layout.margins: 16
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.topMargin: 24
             Layout.fillWidth: true
         }
 
         ColumnLayout {
-            Layout.leftMargin: 16
-            Layout.rightMargin: 16
-            Layout.bottomMargin: 8
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.bottomMargin: 24
             spacing: 8
 
             Repeater {
@@ -110,69 +112,47 @@ Dialog {
         }
     }
 
-    footer: RowLayout {
-        spacing: 8
-        Layout.margins: 12
+    // ── Footer ───────────────────────────────────────────────────────
+    footer: Item {
+        width: parent.width
+        height: 80
+        implicitHeight: height
 
-        ActionButton {
-            text: "Keep All"
-            Layout.preferredWidth: 100
-            Layout.preferredHeight: 36
-            onClicked: {
-                AppController.confirmCommandRemovals(root.localPath, [])
-                root.close()
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            anchors.topMargin: 16
+            anchors.bottomMargin: 24
+            spacing: 12
+
+            ActionButton {
+                id: keepAllBtn
+                role: "secondary"
+                labelText: "Keep All"
+                accessibleName: "Keep All \u2014 cancel removal"
+                Layout.preferredWidth: 100
+                buttonHeight: 36
+                onClicked: {
+                    AppController.confirmCommandRemovals(root.localPath, [])
+                    root.close()
+                }
             }
 
-            background: Rectangle {
-                radius: Theme.radiusButton
-                color: parent.hovered ? Theme.glassHover : "transparent"
-                border.color: Theme.glassBorder
+            Item { Layout.fillWidth: true }
+
+            ActionButton {
+                role: "danger"
+                labelText: "Remove Checked"
+                accessibleName: "Remove Checked \u2014 delete selected project copies"
+                Layout.preferredWidth: 140
+                buttonHeight: 36
+                enabled: root.approvedLabels.length > 0
+                onClicked: {
+                    AppController.confirmCommandRemovals(root.localPath, root.approvedLabels)
+                    root.close()
+                }
             }
-
-            contentItem: Text {
-                text: parent.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                font.weight: Font.Medium
-                color: Theme.label
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Keep All — cancel removal"
-        }
-
-        Item { Layout.fillWidth: true }
-
-        ActionButton {
-            text: "Remove Checked"
-            Layout.preferredWidth: 140
-            Layout.preferredHeight: 36
-            enabled: root.approvedLabels.length > 0
-            onClicked: {
-                AppController.confirmCommandRemovals(root.localPath, root.approvedLabels)
-                root.close()
-            }
-
-            background: Rectangle {
-                radius: Theme.radiusButton
-                color: parent.hovered ? Theme.alpha(Theme.accent, 0.85) : Theme.accent
-            }
-
-            contentItem: Text {
-                text: parent.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                font.weight: Font.Bold
-                color: "white"
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Remove Checked — delete selected project copies"
         }
     }
-
 }

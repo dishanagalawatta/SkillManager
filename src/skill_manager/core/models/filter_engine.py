@@ -58,7 +58,10 @@ class FilterEngine:
         )
 
         for skill in all_skills:
-            if not state.show_archived and skill.is_archived:
+            # ``getattr`` default covers test-only Skill stubs (e.g.
+            # ``type("Skill", (), {...})`` in tests) that may not
+            # carry the dataclass field.
+            if not state.show_archived and getattr(skill, "is_archived", False):
                 continue
             if state.collection_filter and not skill.is_bundle:
                 continue

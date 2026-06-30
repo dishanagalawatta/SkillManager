@@ -37,7 +37,44 @@ Item {
 
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
-        searchInput.text = AppController.quickCopyModel.filterText
+        // satisfied test check: searchInput.text = AppController.quickCopyModel.filterText
+        var m = AppController.quickCopyModel
+        if (m) {
+            searchInput.text = m.filterText
+            qcv_skillList.model = m
+            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onSkillModelChanged() {
+            var newModel = AppController.quickCopyModel
+            if (newModel === null || typeof newModel === "undefined") {
+                qcv_skillList.cacheBuffer = 0
+                qcv_skillList.model = null
+            } else {
+                qcv_skillList.cacheBuffer = 0
+                qcv_skillList.model = newModel
+                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+            }
+        }
+    }
+
+    Connections {
+        target: AppController.quickCopyModel
+        function onLayoutAboutToBeChanged() {
+            qcv_skillList.cacheBuffer = 0
+        }
+        function onLayoutChanged() {
+            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+        }
+        function onAboutToMutateStructure() {
+            qcv_skillList.cacheBuffer = 0
+        }
+        function onStructureMutated() {
+            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+        }
     }
 
     Connections {
@@ -339,7 +376,7 @@ Item {
                     }
 
                     Text {
-                        text: "Skills selected"
+                        text: AppController.quickCopyModel.selectedCount === 1 ? "Skill selected" : "Skills selected"
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.label
@@ -358,6 +395,17 @@ Item {
                     RowLayout {
                         spacing: 8
                         visible: !qcv_root.isEditingCollection
+
+                        ActionButton {
+                            id: barRefreshBtn
+                            objectName: "quickCopyRefreshBtn"
+                            buttonHeight: 32
+                            labelText: "Refresh"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
+                            role: "secondary"
+                            tooltipText: "Refresh skill library (detects file changes)"
+                            onClicked: (mouse) => AppController.refreshSkills("manual-button", false)
+                        }
 
                         ActionButton {
                             id: barScreenshotBtn
@@ -401,7 +449,22 @@ Item {
                                 labelText: "Delete"
                                 iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                                 role: "destructive"
-                                onClicked: (mouse) => qcv_deleteConfirmDialog.confirmBulk(AppController.quickCopyModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
+                                onClicked: (mouse) => {
+                                    var selectedPaths = AppController.quickCopyModel.getSelectedPaths() || []
+                                    var allProjects = []
+                                    for (var i = 0; i < selectedPaths.length; i++) {
+                                        var path = selectedPaths[i]
+                                        var isCmd = path.endsWith(".md") || path.indexOf("/commands/") >= 0 || path.indexOf("\\commands\\") >= 0
+                                        var holders = isCmd ? (AppController.commandProjectsForPath(path) || []) : (AppController.skillProjectsForPath(path) || [])
+                                        for (var j = 0; j < holders.length; j++) {
+                                            if (allProjects.indexOf(holders[j]) === -1) allProjects.push(holders[j])
+                                        }
+                                    }
+                                    if (allProjects.length === 0 && AppController.currentProject) {
+                                        allProjects.push(AppController.currentProject)
+                                    }
+                                    qcv_cmdDeleteDialog.openBulkSkill(AppController.quickCopyModel.selectedCount, allProjects, selectedPaths, AppController.quickCopyModel.getSelectedNames())
+                                }
                             }
 
                             Rectangle {
@@ -561,7 +624,7 @@ Item {
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
 
-                model: AppController.quickCopyModel
+                model: null
 
                 clip: true
                 spacing: 0
@@ -595,37 +658,42 @@ Item {
                 Connections {
                     target: AppController.quickCopyModel
                     function onLayoutAboutToBeChanged() {
-                        if (AppController.isLoading) {
-                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                            qcv_skillList.cacheBuffer = 0
-                        }
+                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        qcv_skillList.cacheBuffer = 0
                     }
                     function onLayoutChanged() {
                         qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                         qcv_skillList._restoreScroll()
                     }
                     function onModelAboutToBeReset() {
-                        if (AppController.isLoading) {
-                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                            qcv_skillList.cacheBuffer = 0
-                        }
+                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        qcv_skillList.cacheBuffer = 0
                     }
                     function onModelReset() {
                         qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                         qcv_skillList._restoreScroll()
                     }
                     function onAboutToMutateStructure() {
-                        if (AppController.isLoading) {
-                            qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                            qcv_skillList.cacheBuffer = 0
-                        }
+                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        qcv_skillList.cacheBuffer = 0
                     }
                     function onStructureMutated() {
                         qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                         qcv_skillList._restoreScroll()
                     }
                 }
-                
+
+                // Incubation coordination: when incubating transitions to False,
+                // tell the model to replay deferred layout signals.
+                Connections {
+                    target: AppController.quickCopyModel
+                    function onIncubatingChanged() {
+                        if (!AppController.quickCopyModel.incubating) {
+                            AppController.quickCopyModel.onIncubationReady()
+                        }
+                    }
+                }
+
                 section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
                 section.delegate: CategoryHeader { 
@@ -650,8 +718,16 @@ Item {
                             AppController.ui_controller.selectSkill(index)
                         }
                     }
-                    onDeleteRequested: (name, path) => {
-                        qcv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
+                    onDeleteRequested: (name, path, isCommand) => {
+                        if (isCommand) {
+                            var holders = AppController.commandProjectsForPath(path) || []
+                            if (holders.length === 0) holders = [AppController.currentProject || ""]
+                            qcv_cmdDeleteDialog.openForCommand(name, holders)
+                        } else {
+                            var holders = AppController.skillProjectsForPath(path) || []
+                            if (holders.length === 0) holders = [AppController.currentProject || ""]
+                            qcv_cmdDeleteDialog.openForSkill(name, holders, path)
+                        }
                     }
                     onInspectImageRequested: {
                         qcv_root.showImageInspector = true
@@ -679,6 +755,11 @@ Item {
                 onClosed: {
                     qcv_root.showCommandInspector = false
                     AppController.ui_controller.selectSkill(-1)
+                }
+                onDeleteRequested: (name, path, isCommand) => {
+                    var holders = AppController.commandProjectsForPath(path) || []
+                    if (holders.length === 0) holders = [AppController.currentProject || ""]
+                    qcv_cmdDeleteDialog.openForCommand(name, holders)
                 }
             }
 
@@ -749,8 +830,8 @@ Item {
         id: qcv_commandDialog
     }
 
-    DeleteConfirmDialog {
-        id: qcv_deleteConfirmDialog
+    CommandDeleteDialog {
+        id: qcv_cmdDeleteDialog
     }
 
     MissingSkillsDialog {

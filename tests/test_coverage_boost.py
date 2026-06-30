@@ -275,11 +275,12 @@ class TestDiscoveryCacheHit:
             project_aliases={},
         )
 
-        call_count = 0
+        counter_path = tmp_path / "parse_calls.txt"
+        counter_path.write_text("0")
 
         def parse_fn(p):
-            nonlocal call_count
-            call_count += 1
+            n = int(counter_path.read_text()) + 1
+            counter_path.write_text(str(n))
             return {"name": "Skill One", "metadata": {}}
 
         def cat_fn(n, t, m):
@@ -289,15 +290,13 @@ class TestDiscoveryCacheHit:
             skills1 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills1) == 1
 
-            # Modify a skill file to change the source dir mtime
             (skill1 / "SKILL.md").write_text("---\nname: Skill One Updated\n---")
 
-            # Touch the parent dir to update mtime
             source_lib.touch()
 
             skills2 = service.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
             assert len(skills2) == 1
-            assert call_count == 2  # parse_fn called twice = cache miss
+            assert int(counter_path.read_text()) == 2  # parse_fn called twice = cache miss
 
     def test_discover_all_cache_exception_handled(self, tmp_path):
         """Test that exception during cache loading is handled gracefully."""

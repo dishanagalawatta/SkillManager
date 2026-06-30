@@ -59,7 +59,7 @@ def app_controller(qapp, mock_config, temp_dir, monkeypatch):
     controller.config_mgr.addProject(str(proj_dir))
 
     # Force a refresh
-    controller.refreshSkills()
+    controller.refreshSkills("test", False)
 
     yield controller
 

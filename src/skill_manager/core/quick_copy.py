@@ -183,7 +183,7 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
 
     for new_skills in parallel_results:
         try:
-            skills.extend(new_skills)
+            skills.extend(new_skills)  # type: ignore[arg-type]
         except Exception as e:
             logger.warning("[DISCOVERY] Error scanning source: %s", e)
 
@@ -393,16 +393,20 @@ def project_label(project_path, project_aliases=None, original_project=None):
     if norm_project in project_aliases:
         return project_aliases[norm_project]
 
+    # Try normalized project root
+    project_path_obj = Path(project_path)
+    root = project_root_for_project(project_path_obj)
+    norm_root = normalize_path(root)
+    if norm_root in project_aliases:
+        return project_aliases[norm_root]
+
     # Full scan for matching normalized keys
     for k, v in project_aliases.items():
-        if normalize_path(k) == norm_project or (
-            norm_original and normalize_path(k) == norm_original
-        ):
+        norm_k = normalize_path(k)
+        if norm_k in (norm_project, norm_root, norm_original):
             return v
 
     # Use standard format if no alias: "RootName (Base)"
-    project_path_obj = Path(project_path)
-    root = project_root_for_project(project_path_obj)
     base = skill_base_relative(project_path_obj)
 
     # Clean up the .agents/skills suffix if it exists

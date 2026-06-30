@@ -1,29 +1,61 @@
-# .gitignore
-> Generated via /brainstorming
+# SkillManager — .gitignore
+# Canonical cleanup rules: docs/HOUSEKEEPING.md
+# Architectural decisions: docs/adr/ADR-0016 (.opencode), ADR-0018 (standardization)
 
-# Python
+# ─── IDE / Editor ────────────────────────────────────────────────
+.vscode/settings.json
+*.code-workspace
+.idea/
+*.iml
+
+# ─── OS / Desktop ────────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+.DS_Store
+*~
+
+# ─── Python ──────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-coverage.xml
-coverage.json
+*.egg-info/
 build/
 dist/
-*.egg-info/
+.mypy_cache/
+.venv/
+venv/
 
-# Qt / PySide6
+# ─── Testing / Linting ──────────────────────────────────────────
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+
+# ─── Qt / PySide6 ───────────────────────────────────────────────
 .qmlcache/
 .qmltypes/
 *.qmlc
 *.jsc
 
-# Custom / Runtime
-.opencode/
-src/data/
+# ─── Runtime State (regenerable) ─────────────────────────────────
+# Per ADR-0018: data/ is user runtime; app recreates on first run.
+data/
+cache_dump.txt
+*.log
+
+# ─── Deprecated Artifacts (ADR-0010) ─────────────────────────────
 tuf_keys/
 tuf_repo/
 .tufup-repo-config
+
+# ─── Agent / Local Tooling ──────────────────────────────────────
+# Per ADR-0016: .opencode/ is local agent config, never committed.
+.opencode/
+
+# ─── Secrets (never commit) ─────────────────────────────────────
+# .env contains live API tokens (PostHog, Sentry, etc.)
+# Use .env.example as the canonical template.
+.env

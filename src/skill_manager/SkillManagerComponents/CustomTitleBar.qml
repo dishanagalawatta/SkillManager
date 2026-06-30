@@ -88,7 +88,9 @@ Rectangle {
 
         // Standard: Minimize
         TitleBarButton {
-            iconSource: AppController.ui_controller.getAssetUri("ui/minimize-icon.svg")
+            text: "\uE921"
+            font.family: "Segoe Fluent Icons"
+            font.pixelSize: 10
             tooltipText: "Minimize Window"
             onClicked: window.showMinimized()
             hoverColor: Theme.glassHover
@@ -96,7 +98,9 @@ Rectangle {
 
         // Standard: Maximize/Restore
         TitleBarButton {
-            iconSource: window.visibility === Window.Maximized ? AppController.ui_controller.getAssetUri("ui/restore-icon.svg") : AppController.ui_controller.getAssetUri("ui/maximize-icon.svg")
+            text: window.visibility === Window.Maximized ? "\uE923" : "\uE922"
+            font.family: "Segoe Fluent Icons"
+            font.pixelSize: 10
             tooltipText: window.visibility === Window.Maximized ? "Restore Window" : "Maximize Window"
             onClicked: {
                 if (window.visibility === Window.Maximized)
@@ -109,7 +113,9 @@ Rectangle {
 
         // Standard: Close
         TitleBarButton {
-            iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
+            text: "\uE8BB"
+            font.family: "Segoe Fluent Icons"
+            font.pixelSize: 10
             tooltipText: "Close Window"
             onClicked: window.close()
             hoverColor: Theme.danger
@@ -136,7 +142,8 @@ Rectangle {
             Text {
                 visible: btn.iconSource === ""
                 text: btn.text
-                font.pixelSize: 11
+                font.family: btn.font.family
+                font.pixelSize: btn.font.pixelSize > 0 ? btn.font.pixelSize : 11
                 color: btn.textColor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter

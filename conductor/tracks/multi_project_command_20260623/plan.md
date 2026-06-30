@@ -19,6 +19,10 @@
 - [x] Step 6: Inspector QML — multi-delete (`CommandInspector.qml`)
 - [x] Step 7: Docs — API, user guide, ADR-0019
 - [ ] Step 8: Validation — `python run_tests.py` → 0 failures, lint clean
+- [x] Step 9: Skip-overwrite on identical content
+  - [x] Sub-task: byte-equal content check in `update_custom_command_file`
+  - [x] Sub-task: 3 new tests in `tests/test_commands.py`
+  - [x] Sub-task: validate via `uv run python -m pytest tests/test_commands.py`
 
 ## Design Decisions
 
@@ -29,4 +33,4 @@
 
 ## Open Questions
 
-- None — locked by user choices Q1=A, Q2=A, Q3=A, Q4=A.
+- None — locked by user choices Q1=A, Q2=A, Q3=A, Q4=A, Q5=A (byte-equal content check).

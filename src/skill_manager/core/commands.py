@@ -26,10 +26,15 @@ class CommandUpdateResult:
     pending_removals: list[str] = field(default_factory=list)
 
 
-def find_project_path_by_label(project_label_name: str, project_paths: list[str]) -> Path | None:
+def find_project_path_by_label(
+    project_label_name: str,
+    project_paths: list[str],
+    *,
+    project_aliases: dict[str, str] | None = None,
+) -> Path | None:
     for path in project_paths:
         project_path = Path(path)
-        if project_label(project_path) == project_label_name:
+        if project_label(project_path, project_aliases=project_aliases) == project_label_name:
             return project_path
     return None
 
@@ -73,13 +78,14 @@ def update_custom_command_file(
     category: str | None = None,
     project_label_name: str | None = None,
     project_paths: list[str] | None = None,
+    project_aliases: dict[str, str] | None = None,
     on_conflict: str | None = None,
 ) -> CommandUpdateResult:
     """Updates an existing command file in place.
 
     - Renames the file if ``name`` changed.
     - Moves the file to a different project's commands dir if
-      ``project_label_name`` resolves to a different project than the
+    - ``project_label_name`` resolves to a different project than the
       file's current project.
     - If ``category`` is falsy, preserves the existing frontmatter
       category; otherwise writes the new value.
@@ -104,7 +110,7 @@ def update_custom_command_file(
     # Resolve target project directory (None = "stay in current project").
     target_project_path: Path | None = None
     if project_label_name and project_paths is not None:
-        candidate = find_project_path_by_label(project_label_name, project_paths)
+        candidate = find_project_path_by_label(project_label_name, project_paths, project_aliases=project_aliases)
         if candidate is None:
             return CommandUpdateResult(
                 False, f"Error: Could not find project directory for {project_label_name}"
@@ -118,9 +124,20 @@ def update_custom_command_file(
         target_dir = path.parent
 
     new_path = target_dir / new_filename
+    new_content = build_command_content(name, body, effective_category)
 
     if new_path.exists() and new_path != path:
         if not on_conflict:
+            try:
+                existing_content = new_path.read_text(encoding="utf-8-sig")
+            except Exception:
+                existing_content = None
+            if existing_content == new_content:
+                return CommandUpdateResult(
+                    ok=True,
+                    message=f"Already up to date: {new_path.name}",
+                    path=new_path,
+                )
             return CommandUpdateResult(
                 ok=False,
                 message=f"File already exists: {new_path}",
@@ -133,8 +150,6 @@ def update_custom_command_file(
         if on_conflict == "rename":
             new_path = target_dir / _next_non_conflicting(target_dir, new_filename)
         # "overwrite" → keep new_path; write_text will replace it
-
-    new_content = build_command_content(name, body, effective_category)
 
     try:
         if target_project_path is not None:
@@ -155,6 +170,7 @@ def create_custom_command_file(
     project_label_name: str,
     category: str,
     project_paths: list[str],
+    project_aliases: dict[str, str] | None = None,
     created_on: date | None = None,
 ) -> CommandCreateResult:
     if not name:
@@ -163,7 +179,7 @@ def create_custom_command_file(
     if not project_label_name or project_label_name == "All Projects":
         return CommandCreateResult(False, "Error: Please select a specific Project")
 
-    project_path = find_project_path_by_label(project_label_name, project_paths)
+    project_path = find_project_path_by_label(project_label_name, project_paths, project_aliases=project_aliases)
     if not project_path:
         return CommandCreateResult(
             False, f"Error: Could not find project directory for {project_label_name}"
@@ -188,7 +204,12 @@ def create_custom_command_file(
     return CommandCreateResult(True, f"Created command: {filename}", file_path)
 
 
-def find_command_holder_projects(command_name: str, project_paths: list[str]) -> list[str]:
+def find_command_holder_projects(
+    command_name: str,
+    project_paths: list[str],
+    *,
+    project_aliases: dict[str, str] | None = None,
+) -> list[str]:
     """Return the list of project labels whose .agents/commands/ contains ``command_name``.
 
     ``command_name`` is the stem (no extension). Each project is checked
@@ -200,7 +221,7 @@ def find_command_holder_projects(command_name: str, project_paths: list[str]) ->
         project_path = Path(pp)
         commands_dir = project_root_for_project(project_path) / ".agents" / "commands"
         if (commands_dir / safe_name).exists():
-            holders.append(project_label(project_path))
+            holders.append(project_label(project_path, project_aliases=project_aliases))
     return holders
 
 
@@ -211,6 +232,7 @@ def create_custom_command_files_multi(
     project_labels: list[str],
     category: str,
     project_paths: list[str],
+    project_aliases: dict[str, str] | None = None,
     created_on: date | None = None,
 ) -> list[CommandCreateResult]:
     """Create one command file per selected project.
@@ -225,6 +247,7 @@ def create_custom_command_files_multi(
             project_label_name=label,
             category=category,
             project_paths=project_paths,
+            project_aliases=project_aliases,
             created_on=created_on,
         )
         for label in project_labels
@@ -239,6 +262,7 @@ def update_custom_command_file_multi(
     category: str | None = None,
     project_labels: list[str],
     project_paths: list[str],
+    project_aliases: dict[str, str] | None = None,
     on_conflict: str | None = None,
     confirmed_removals: list[str] | None = None,
 ) -> list[CommandUpdateResult]:
@@ -264,7 +288,7 @@ def update_custom_command_file_multi(
         return [CommandUpdateResult(False, "No projects selected")]
 
     stem = Path(local_path).stem
-    current_holders = find_command_holder_projects(stem, project_paths)
+    current_holders = find_command_holder_projects(stem, project_paths, project_aliases=project_aliases)
     add_set = sorted(set(project_labels) - set(current_holders))
     keep_set = sorted(set(current_holders) & set(project_labels))
     remove_set = sorted(set(current_holders) - set(project_labels))
@@ -297,6 +321,7 @@ def update_custom_command_file_multi(
         category=category,
         project_label_name=canonical_label,
         project_paths=project_paths,
+        project_aliases=project_aliases,
         on_conflict=on_conflict,
     )
     results.append(canonical)
@@ -308,7 +333,7 @@ def update_custom_command_file_multi(
             # Skip the canonical label — already handled above
             if label == canonical_label:
                 continue
-            target = find_project_path_by_label(label, project_paths)
+            target = find_project_path_by_label(label, project_paths, project_aliases=project_aliases)
             if not target:
                 results.append(
                     CommandUpdateResult(
@@ -333,7 +358,7 @@ def update_custom_command_file_multi(
     if remove_set and confirmed_removals is not None:
         actual_removals = sorted(set(remove_set) & set(confirmed_removals))
         for label in actual_removals:
-            target = find_project_path_by_label(label, project_paths)
+            target = find_project_path_by_label(label, project_paths, project_aliases=project_aliases)
             if not target:
                 results.append(
                     CommandUpdateResult(

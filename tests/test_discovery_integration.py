@@ -38,9 +38,9 @@ def test_discovery_ui_integration(qtbot, qapp, discovery_controller, temp_dir):
     qapp.processEvents()
 
     # 3. Trigger discovery
-    discovery_controller.refreshSkills()
+    discovery_controller.refreshSkills("", False)
 
-    qtbot.waitUntil(lambda: not discovery_controller.isLoading, timeout=5000)
+    qtbot.waitUntil(lambda: discovery_controller.libraryModel.rowCount() > 0, timeout=5000)
 
     # 4. Verify UI Models are updated
     library_model = discovery_controller.libraryModel
@@ -69,8 +69,8 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
     skill_md.write_text("---\nname: Version 1\n---\nBody", encoding="utf-8")
 
     discovery_controller.config_controller.addSource(str(lib_dir))
-    discovery_controller.refreshSkills()
-    qtbot.waitUntil(lambda: not discovery_controller.isLoading)
+    discovery_controller.refreshSkills("", False)
+    qtbot.waitUntil(lambda: discovery_controller.libraryModel.rowCount() > 0)
 
     assert discovery_controller.libraryModel.rowCount() > 0
 
@@ -84,9 +84,21 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
     os.utime(skill_md, None)
     os.utime(skill_folder, None)
 
-    # Trigger refresh again
-    discovery_controller.refreshSkills()
-    qtbot.waitUntil(lambda: not discovery_controller.isLoading)
+    # Trigger refresh again — track generation to know when it completes
+    _ = discovery_controller.discovery._refresh_generation
+    discovery_controller.refreshSkills("", False)
+
+    def version2_visible():
+        for i in range(discovery_controller.libraryModel.rowCount()):
+            name = discovery_controller.libraryModel.data(
+                discovery_controller.libraryModel.index(i, 0),
+                discovery_controller.libraryModel.NameRole,
+            )
+            if name == "Version 2":
+                return True
+        return False
+
+    qtbot.waitUntil(version2_visible, timeout=5000)
 
     # Check model
     for i in range(discovery_controller.libraryModel.rowCount()):

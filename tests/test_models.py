@@ -781,3 +781,11 @@ def test_collection_select_by_paths_order_preserved(qapp, skill_list):
     # selectByPaths with reverse order
     model.selectByPaths(["/b", "/a"])
     assert model.getSelectedPaths() == ["/b", "/a"]
+
+
+def test_get_selected_names(qapp, skill_list):
+    """getSelectedNames returns the names of the selected skills in the selection order."""
+    model = SkillModel()
+    model.setSkills(skill_list)
+    model.selectByPaths(["/b", "/a"])
+    assert model.getSelectedNames() == ["Skill B", "Skill A"]

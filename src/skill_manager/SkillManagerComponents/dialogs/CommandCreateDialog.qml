@@ -265,154 +265,28 @@ Dialog {
             }
         }
 
-        // Footer
-        Rectangle {
-            Layout.fillWidth: true
-            height: 80
-            color: "transparent"
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 24
-                spacing: 12
-
-                Item { Layout.fillWidth: true }
-
-                ActionButton {
-                    text: "Cancel"
-                    Layout.preferredWidth: 100
-                    Layout.preferredHeight: 40
-                    onClicked: root.reject()
-
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: parent.hovered ? Theme.glassHover : "transparent"
-                        border.color: Theme.glassBorder
-                    }
-
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Medium
-                        color: Theme.label
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-
-                ActionButton {
-                    id: createBtn
-                    text: editMode ? "Update Command" : "Create Command"
-                    Layout.preferredWidth: 160
-                    Layout.preferredHeight: 40
-                    enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== "" && root.editProjectLabels.length > 0
-
-                    onClicked: {
-                        root.pendingArgs = {
-                            localPath: editMode ? editLocalPath : "",
-                            name: cmdNameInput.text,
-                            body: cmdBodyInput.text,
-                            category: editCategoryValue,
-                            projectLabels: projectMultiSelect.selectedValues.slice()
-                        }
-                        root.awaitingConflictResolution = editMode
-                        if (editMode) {
-                            AppController.updateCustomCommandFull(
-                                root.pendingArgs.localPath,
-                                root.pendingArgs.name,
-                                root.pendingArgs.body,
-                                root.pendingArgs.category,
-                                root.pendingArgs.projectLabels,
-                                ""
-                            )
-                        } else {
-                            AppController.createCustomCommand(
-                                root.pendingArgs.name,
-                                root.pendingArgs.body,
-                                root.pendingArgs.projectLabels,
-                                root.pendingArgs.category
-                            )
-                            root.accept()
-                        }
-                    }
-
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: !parent.enabled ? Theme.secondaryLabel : (parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent))
-                    }
-
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: "white"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-            }
-        }
     }
 
-    // Removal confirmation dialog
-    CommandRemovalConfirmDialog {
-        id: removalConfirmDialog
-        parent: Overlay.overlay
-    }
-
-    // Conflict resolution dialog
-    Dialog {
-        id: conflictDialog
-        title: "File already exists"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.NoButton
-        width: 450
-        property string conflictPath: ""
-        property string suggestedRename: ""
-
-        background: Rectangle {
-            color: Theme.glassPill
-            radius: Theme.radiusCard
-            border.color: Theme.glassBorder
-            border.width: 1
-        }
-
-        contentItem: ColumnLayout {
+    footer: Item {
+        width: parent.width
+        height: 76
+        implicitHeight: height
+        
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            anchors.topMargin: 12
+            anchors.bottomMargin: 24
             spacing: 12
-            Text {
-                text: "A file named '" + conflictDialog.suggestedRename + "' already exists in the target location.\n\nWhat would you like to do?"
-                wrapMode: Text.Wrap
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                color: Theme.label
-                Layout.margins: 16
-            }
-        }
 
-        footer: RowLayout {
-            spacing: 8
-            Layout.margins: 12
+            Item { Layout.fillWidth: true }
 
             ActionButton {
                 text: "Cancel"
                 Layout.preferredWidth: 100
-                Layout.preferredHeight: 36
-                onClicked: {
-                    AppController.updateCustomCommandFull(
-                        root.pendingArgs.localPath,
-                        root.pendingArgs.name,
-                        root.pendingArgs.body,
-                        root.pendingArgs.category,
-                        root.pendingArgs.projectLabels,
-                        "cancel"
-                    )
-                    conflictDialog.close()
-                    root.awaitingConflictResolution = false
-                    root.reject()
-                }
+                Layout.preferredHeight: 40
+                onClicked: root.reject()
 
                 background: Rectangle {
                     radius: Theme.radiusButton
@@ -431,29 +305,45 @@ Dialog {
                 }
             }
 
-            Item { Layout.fillWidth: true }
-
             ActionButton {
-                text: "Overwrite"
-                Layout.preferredWidth: 120
-                Layout.preferredHeight: 36
+                id: createBtn
+                text: editMode ? "Update Command" : "Create Command"
+                Layout.preferredWidth: 160
+                Layout.preferredHeight: 40
+                enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== "" && root.editProjectLabels.length > 0
+
                 onClicked: {
-                    AppController.updateCustomCommandFull(
-                        root.pendingArgs.localPath,
-                        root.pendingArgs.name,
-                        root.pendingArgs.body,
-                        root.pendingArgs.category,
-                        root.pendingArgs.projectLabels,
-                        "overwrite"
-                    )
-                    conflictDialog.close()
-                    root.awaitingConflictResolution = false
+                    root.pendingArgs = {
+                        localPath: editMode ? editLocalPath : "",
+                        name: cmdNameInput.text,
+                        body: cmdBodyInput.text,
+                        category: editCategoryValue,
+                        projectLabels: projectMultiSelect.selectedValues.slice()
+                    }
+                    root.awaitingConflictResolution = editMode
+                    if (editMode) {
+                        AppController.updateCustomCommandFull(
+                            root.pendingArgs.localPath,
+                            root.pendingArgs.name,
+                            root.pendingArgs.body,
+                            root.pendingArgs.category,
+                            root.pendingArgs.projectLabels,
+                            ""
+                        )
+                    } else {
+                        AppController.createCustomCommand(
+                            root.pendingArgs.name,
+                            root.pendingArgs.body,
+                            root.pendingArgs.projectLabels,
+                            root.pendingArgs.category
+                        )
+                    }
                     root.accept()
                 }
 
                 background: Rectangle {
                     radius: Theme.radiusButton
-                    color: parent.hovered ? Theme.alpha(Theme.accent, 0.85) : Theme.accent
+                    color: !parent.enabled ? Theme.secondaryLabel : (parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent))
                 }
 
                 contentItem: Text {
@@ -466,39 +356,175 @@ Dialog {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
+        }
+    }
 
-            ActionButton {
-                text: "Rename ('" + conflictDialog.suggestedRename + "')"
-                Layout.preferredWidth: 200
-                Layout.preferredHeight: 36
-                onClicked: {
-                    AppController.updateCustomCommandFull(
-                        root.pendingArgs.localPath,
-                        root.pendingArgs.name,
-                        root.pendingArgs.body,
-                        root.pendingArgs.category,
-                        root.pendingArgs.projectLabels,
-                        "rename"
-                    )
-                    conflictDialog.close()
-                    root.awaitingConflictResolution = false
-                    root.accept()
+    // Removal confirmation dialog
+    CommandRemovalConfirmDialog {
+        id: removalConfirmDialog
+        parent: Overlay.overlay
+    }
+
+    // Conflict resolution dialog
+    GlassDialog {
+        id: conflictDialog
+        parent: Overlay.overlay
+        dialogTitle: "File Already Exists"
+        dialogIcon: "\u26A0\uFE0F"
+        modal: true
+        anchors.centerIn: parent
+        width: 480
+        standardButtons: Dialog.NoButton
+        property string conflictPath: ""
+        property string suggestedRename: ""
+
+        onRejected: {
+            AppController.updateCustomCommandFull(
+                root.pendingArgs.localPath,
+                root.pendingArgs.name,
+                root.pendingArgs.body,
+                root.pendingArgs.category,
+                root.pendingArgs.projectLabels,
+                "cancel"
+            )
+            conflictDialog.close()
+            root.awaitingConflictResolution = false
+            root.reject()
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 16
+            Layout.fillWidth: true
+
+            // Warning Banner
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.leftMargin: 24
+                Layout.rightMargin: 24
+                Layout.topMargin: 20
+                implicitHeight: warningLayout.implicitHeight + 24
+                radius: 8
+                color: Theme.alpha(Theme.danger, 0.06)
+                border.color: Theme.alpha(Theme.danger, 0.15)
+                border.width: 1
+
+                RowLayout {
+                    id: warningLayout
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 12
+
+                    Text {
+                        text: "\u26A0\uFE0F"
+                        font.pixelSize: 22
+                        Layout.alignment: Qt.AlignTop
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Text {
+                            text: "Conflict Detected"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeBody
+                            font.weight: Font.Bold
+                            color: Theme.danger
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "A file named <b>" + conflictDialog.suggestedRename + "</b> already exists in the target location."
+                            textFormat: Text.StyledText
+                            wrapMode: Text.Wrap
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeBody
+                            color: Theme.label
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "What would you like to do?"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeBody
+                font.weight: Font.Medium
+                color: Theme.secondaryLabel
+                Layout.leftMargin: 24
+                Layout.rightMargin: 24
+                Layout.bottomMargin: 8
+            }
+        }
+
+        footer: Item {
+            width: parent.width
+            height: 80
+            implicitHeight: height
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 24
+                anchors.rightMargin: 24
+                anchors.topMargin: 16
+                anchors.bottomMargin: 24
+                spacing: 12
+
+                ActionButton {
+                    id: cancelBtn
+                    role: "secondary"
+                    labelText: "Cancel"
+                    accessibleName: "Cancel conflict resolution"
+                    Layout.preferredWidth: 90
+                    buttonHeight: 36
+                    onClicked: conflictDialog.reject()
                 }
 
-                background: Rectangle {
-                    radius: Theme.radiusButton
-                    color: parent.hovered ? Theme.alpha(Theme.accent, 0.85) : Theme.accent
+                Item { Layout.fillWidth: true }
+
+                ActionButton {
+                    id: overwriteBtn
+                    role: "danger"
+                    labelText: "Overwrite"
+                    accessibleName: "Overwrite existing file"
+                    Layout.preferredWidth: 100
+                    buttonHeight: 36
+                    onClicked: {
+                        AppController.updateCustomCommandFull(
+                            root.pendingArgs.localPath,
+                            root.pendingArgs.name,
+                            root.pendingArgs.body,
+                            root.pendingArgs.category,
+                            root.pendingArgs.projectLabels,
+                            "overwrite"
+                        )
+                        conflictDialog.accept()
+                        root.awaitingConflictResolution = false
+                        root.accept()
+                    }
                 }
 
-                contentItem: Text {
-                    text: parent.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    font.weight: Font.Bold
-                    color: "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
+                ActionButton {
+                    id: renameBtn
+                    role: "primary"
+                    labelText: "Rename to '" + conflictDialog.suggestedRename + "'"
+                    accessibleName: "Rename to suggested name"
+                    Layout.preferredWidth: implicitWidth
+                    buttonHeight: 36
+                    onClicked: {
+                        AppController.updateCustomCommandFull(
+                            root.pendingArgs.localPath,
+                            root.pendingArgs.name,
+                            root.pendingArgs.body,
+                            root.pendingArgs.category,
+                            root.pendingArgs.projectLabels,
+                            "rename"
+                        )
+                        conflictDialog.accept()
+                        root.awaitingConflictResolution = false
+                        root.accept()
+                    }
                 }
             }
         }

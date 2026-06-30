@@ -116,7 +116,7 @@ def test_discover_packages_incremental(temp_dir, disk_cache, service):
     # Verify cache was populated
     # Use resolved path to match production code's normalization (resolves 8.3 short names on Windows)
     resolved = resolve_resilient_path(str(source_lib))
-    fp_key = f"dir_fp:{os.path.normcase(str(resolved))}"
+    fp_key = f"pkg_dir_fp:{os.path.normcase(str(resolved))}"
     assert disk_cache.get(fp_key) is not None
     assert disk_cache.get(f"pkg_skills:{fp_key}") == skills
 
@@ -279,3 +279,109 @@ def test_process_command_file_cache(temp_dir, disk_cache, service):
         res = service._process_command_file(cmd_file, project, cache=disk_cache)
         assert res["name"] == "Cached Cmd"
         mock_parse.assert_not_called()
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
+@patch("skill_manager.core.discovery.get_discovery_cache")
+def test_discover_all_dedup_prefers_project_over_package(
+    mock_get_cache, mock_save, mock_load, temp_dir, disk_cache
+):
+    """When a skill path is in both sources and projects, project version wins."""
+    mock_get_cache.return_value.__enter__.return_value = disk_cache
+    mock_load.return_value = None
+
+    # Create a shared skill directory that would be scanned as both source and project
+    shared_dir = temp_dir / "shared_skills"
+    shared_dir.mkdir()
+    skill_dir = shared_dir / "brainstorming"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nname: Brainstorming\ncategory: Ideas\n---")
+
+    # Also create a skill in a source-only path (to verify source skills are preserved)
+    source_lib = temp_dir / "master"
+    source_lib.mkdir()
+    skill2 = source_lib / "unique_source_skill"
+    skill2.mkdir()
+    (skill2 / "SKILL.md").write_text("---\nname: Unique Source Skill\n---")
+
+    service = DiscoveryService(
+        sources=[str(source_lib), str(shared_dir)],
+        projects=[str(shared_dir)],
+    )
+
+    result = service.discover_all(use_cache=False)
+    state = CacheState.model_validate(result)
+
+    # Find the brainstorming skill
+    brainstorming_skills = [s for s in state.skills if s.name == "Brainstorming"]
+    assert len(brainstorming_skills) == 1, "Brainstorming skill should appear exactly once"
+    assert brainstorming_skills[0].is_package is False, (
+        "Project version should win (is_package=False)"
+    )
+    assert "shared_skills" in brainstorming_skills[0].project_label, "Should have project label"
+
+    # Verify unique source skill is still present
+    unique_skills = [s for s in state.skills if s.name == "Unique Source Skill"]
+    assert len(unique_skills) == 1
+    assert unique_skills[0].is_package is True
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
+@patch("skill_manager.core.discovery.get_discovery_cache")
+def test_discover_all_dedup_project_only_skill(
+    mock_get_cache, mock_save, mock_load, temp_dir, disk_cache
+):
+    """Skill only in projects has is_package=False."""
+    mock_get_cache.return_value.__enter__.return_value = disk_cache
+    mock_load.return_value = None
+
+    proj_dir = temp_dir / "project"
+    proj_dir.mkdir()
+    skill_dir = proj_dir / "proj_skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nname: Proj Skill\n---")
+
+    service = DiscoveryService(
+        sources=[],
+        projects=[str(proj_dir)],
+    )
+
+    result = service.discover_all(use_cache=False)
+    state = CacheState.model_validate(result)
+
+    proj_skills = [s for s in state.skills if s.name == "Proj Skill"]
+    assert len(proj_skills) == 1
+    assert proj_skills[0].is_package is False
+    assert "project" in proj_skills[0].project_label
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
+@patch("skill_manager.core.discovery.get_discovery_cache")
+def test_discover_all_dedup_package_only_skill(
+    mock_get_cache, mock_save, mock_load, temp_dir, disk_cache
+):
+    """Skill only in sources has is_package=True."""
+    mock_get_cache.return_value.__enter__.return_value = disk_cache
+    mock_load.return_value = None
+
+    source_lib = temp_dir / "master"
+    source_lib.mkdir()
+    skill_dir = source_lib / "pkg_skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nname: Pkg Skill\n---")
+
+    service = DiscoveryService(
+        sources=[str(source_lib)],
+        projects=[],
+    )
+
+    result = service.discover_all(use_cache=False)
+    state = CacheState.model_validate(result)
+
+    pkg_skills = [s for s in state.skills if s.name == "Pkg Skill"]
+    assert len(pkg_skills) == 1
+    assert pkg_skills[0].is_package is True
+    assert pkg_skills[0].project_label == "Master Library"  # Package default label

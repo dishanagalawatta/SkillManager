@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Features
+- Silent background cache refresh: all refresh paths (watcher, poll, manual button, keyboard shortcut, rebuild cache) now run entirely on background threads with no `isLoading` flicker and no status text. The app remains fully responsive during refresh.
+- Cooperative in-flight refresh cancellation: a new generation counter lets a fresh refresh cancel an in-progress one, preventing stale data from overwriting newer results.
+- Add 4 diagnostic categories: `CATEGORY_REFRESH_DEBOUNCED`, `CATEGORY_REFRESH_CANCELLED`, `CATEGORY_REFRESH_COMMITTED`, `CATEGORY_REFRESH_BACKGROUND_START`, `CATEGORY_CACHE_REBUILD_ASYNC`
+
+### Refactoring
+- Introduce `PreparedModelState` dataclass + `SkillModel.replacePreparedState()` to swap a fully-computed model state in a single atomic reset, replacing the previous incremental `setSkills` / `_apply_filter` calls that ran on the main thread.
+- Rewrite `DiscoveryController` pipeline: heavy work (skill construction, filter pass, search-index build, row prep, visibility) runs in `_run_pipeline` on a background thread; only the final atomic commit runs on the main thread.
+- `rebuildCache()` now executes asynchronously via `BackgroundTaskRunner` instead of blocking the UI.
+
+### Bug Fixes
+- Fix "Cannot create delegate / Object or context destroyed during incubation" QML warning at startup by deferring `beginResetModel`/`endResetModel` via `Qt.callLater` (one event-loop tick) so QML can process `cacheBuffer = 0` before delegates are destroyed.
+- Fix filter-setter re-entrancy during incubation: `_commit_prepared_state` no longer toggles the `incubating` flag at end of commit (avoids premature queue drain); only sets `incubating = True` when the model already has skills (skips on first startup).
+- Connect `onAboutToMutateStructure` / `onStructureMutated` in `QuickCopyView.qml` so `cacheBuffer` is zeroed and restored around model resets (matches `LibraryView.qml` pattern).
+
+### Tests
+- Add 5 regression tests in `test_incubation_coordination.py` for `replacePreparedState` incubation deferral (deferred-when-incubating, applied-when-empty, replayed-on-ready, replayed-on-force-end, applied-when-not-incubating).
+- Update 13 test files for the new `_commit_prepared_state` / `PreparedModelState` / `FilterState` API.
+
 ### Chores
 - Workspace cleanup: audit `.gitignore`, archive 24 orphan conductor plans
 - Add ADR-0015 (conductor root plan archival) and ADR-0016 (`.opencode` gitignore policy)
