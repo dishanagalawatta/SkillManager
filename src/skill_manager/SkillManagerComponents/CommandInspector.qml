@@ -9,6 +9,8 @@ Rectangle {
     property var skill: ({})
     property bool isCollapsed: false
     property var editDialog: null
+    property var dependencyList: []
+    property var referenceRanges: []
 
     readonly property int targetWidth: {
         if (!root.skill || root.skill.local_path === undefined) return 0;
@@ -19,6 +21,7 @@ Rectangle {
     }
 
     signal closed()
+    signal deleteRequested(string name, string path, bool isCommand)
 
     GlassMenu {
         id: inspectorContextMenu
@@ -45,6 +48,41 @@ Rectangle {
     border.color: Theme.glassBorder
     clip: true
 
+    onSkillChanged: {
+        var s = root.skill
+        if (s && s.is_command && s.local_path && typeof AppController !== "undefined" && AppController) {
+            root.dependencyList = AppController.ops_controller.getReferencedSkillsForCommand(s.local_path)
+            root.referenceRanges = AppController.ops_controller.getSkillReferenceRanges(s.local_path)
+        } else {
+            root.dependencyList = []
+            root.referenceRanges = []
+        }
+        if (bodyArea) {
+            bodyArea._lastHighlightedText = ""
+        }
+        _applyHighlights(-1)
+    }
+
+    function _applyHighlights(focusedIndex) {
+        if (typeof AppController === "undefined" || !AppController) return
+        if (root.referenceRanges && root.referenceRanges.length > 0) {
+            AppController.ops_controller.applySkillHighlights(
+                bodyArea,
+                JSON.stringify(root.referenceRanges),
+                focusedIndex
+            )
+        } else {
+            AppController.ops_controller.clearSkillHighlights(bodyArea)
+        }
+    }
+
+    function _scrollToFocused(index) {
+        if (!bodyArea || index < 0 || index >= root.referenceRanges.length) return
+        var range = root.referenceRanges[index]
+        bodyArea.cursorPosition = range.start
+        bodyArea.forceActiveFocus()
+    }
+
     SmoothScrollView {
         id: mainScroll
         anchors.fill: parent
@@ -70,6 +108,7 @@ Rectangle {
 
                 TextField {
                     id: nameField
+                    ContextMenu.menu: null
                     text: root.skill.name || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
@@ -119,12 +158,7 @@ Rectangle {
                     role: "destructive"
                     flat: true
                     onClicked: (mouse) => {
-                        let holders = AppController.commandProjectsForPath(root.skill.local_path || "")
-                        if (holders.length === 0) {
-                            holders = [AppController.currentProject || ""]
-                        }
-                        deleteConfirmDialog.holderProjects = holders
-                        deleteConfirmDialog.open()
+                        root.deleteRequested(root.skill.name || "", root.skill.local_path || "", true)
                     }
                     visible: root.skill && root.skill.local_path !== undefined
                     SleekToolTip {
@@ -155,6 +189,82 @@ Rectangle {
                 }
             }
 
+            // Skill Dependencies Section
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
+                visible: root.dependencyList.length > 0
+
+                Text {
+                    text: "Skill Dependencies"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    font.weight: Font.Bold
+                    color: Theme.secondaryLabel
+                    opacity: 0.8
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        model: root.dependencyList
+
+                        Rectangle {
+                            id: depPill
+                            height: 22
+                            width: depRow.implicitWidth + 12
+                            radius: Theme.radiusSmall
+                            color: Theme.glassHover
+                            border.color: Theme.glassBorder
+                            border.width: 1
+
+                            Row {
+                                id: depRow
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                Text {
+                                    text: modelData.name
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.label
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Text {
+                                    text: modelData.occurrences > 1 ? ("× " + modelData.occurrences) : ""
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 9
+                                    color: Theme.secondaryLabel
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: modelData.occurrences > 1
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: (mouse) => {
+                                    // Find the first range index for this skill name
+                                    for (var i = 0; i < root.referenceRanges.length; i++) {
+                                        if (root.referenceRanges[i].name === modelData.name) {
+                                            _applyHighlights(i)
+                                            _scrollToFocused(i)
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+
+                            Accessible.role: Accessible.Link
+                            Accessible.name: "Skill dependency: " + modelData.name + (modelData.occurrences > 1 ? " (" + modelData.occurrences + " occurrences)" : "")
+                        }
+                    }
+                }
+            }
+
             // Command Details Section (editable)
             ColumnLayout {
                 Layout.fillWidth: true
@@ -178,10 +288,19 @@ Rectangle {
 
                         TextArea {
                             id: bodyArea
+                            ContextMenu.menu: null
+                            objectName: "commandBodyTextArea"
                             width: parent.width - parent.leftPadding - parent.rightPadding
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Command Details"
+                            property string _lastHighlightedText: ""
                             text: root.skill.body_content || ""
+                            onTextChanged: {
+                                if (text !== _lastHighlightedText) {
+                                    _lastHighlightedText = text
+                                    _applyHighlights(-1)
+                                }
+                            }
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
                             color: Theme.label
@@ -249,110 +368,5 @@ Rectangle {
         NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
     }
 
-    // Delete confirmation with project checklist
-    Dialog {
-        id: deleteConfirmDialog
-        title: "Delete Command"
-        modal: true
-        anchors.centerIn: parent
-        width: 400
-        standardButtons: Dialog.NoButton
 
-        property var holderProjects: []
-        property var checkedProjects: []
-
-        onOpened: {
-            checkedProjects = holderProjects.slice()
-        }
-
-        background: Rectangle {
-            color: Theme.glassPill
-            radius: Theme.radiusCard
-            border.color: Theme.glassBorder
-            border.width: 1
-        }
-
-        contentItem: ColumnLayout {
-            spacing: 12
-
-            Text {
-                text: "Delete \"" + (root.skill.name || "") + "\" from which projects?"
-                wrapMode: Text.Wrap
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                color: Theme.label
-                Layout.margins: 16
-                Layout.fillWidth: true
-            }
-
-            GlassMultiSelect {
-                id: deleteProjectSelect
-                Layout.fillWidth: true
-                Layout.margins: 16
-                Layout.preferredHeight: 36
-                model: deleteConfirmDialog.holderProjects
-                selectedValues: deleteConfirmDialog.checkedProjects
-                placeholderText: "Select projects..."
-                allLabel: "All Projects"
-                onSelectionChanged: deleteConfirmDialog.checkedProjects = selectedValues
-            }
-        }
-
-        footer: RowLayout {
-            spacing: 8
-            Layout.margins: 12
-
-            ActionButton {
-                text: "Cancel"
-                Layout.preferredWidth: 100
-                Layout.preferredHeight: 36
-                onClicked: deleteConfirmDialog.close()
-
-                background: Rectangle {
-                    radius: Theme.radiusButton
-                    color: parent.hovered ? Theme.glassHover : "transparent"
-                    border.color: Theme.glassBorder
-                }
-
-                contentItem: Text {
-                    text: parent.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    font.weight: Font.Medium
-                    color: Theme.label
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-
-            Item { Layout.fillWidth: true }
-
-            ActionButton {
-                text: "Delete"
-                Layout.preferredWidth: 100
-                Layout.preferredHeight: 36
-                enabled: deleteConfirmDialog.checkedProjects.length > 0
-                onClicked: {
-                    AppController.deleteCustomCommand(root.skill.name, deleteConfirmDialog.checkedProjects)
-                    deleteConfirmDialog.close()
-                    root.closed()
-                }
-
-                background: Rectangle {
-                    radius: Theme.radiusButton
-                    color: !parent.enabled ? Theme.secondaryLabel : (parent.hovered ? Theme.alpha(Theme.danger, 0.93) : Theme.danger)
-                }
-
-                contentItem: Text {
-                    text: parent.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    font.weight: Font.Bold
-                    color: "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-        }
-    }
 }

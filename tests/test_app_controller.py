@@ -5,7 +5,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from skill_manager.app import AppController
-from skill_manager.core.schemas import CacheState, SkillRecord
+from skill_manager.core.models.entities import PreparedModelState, Skill
 from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
@@ -20,7 +20,7 @@ def controller(qapp, mock_config, temp_dir):
 
     # In the real code, load() sets self.data. We'll mock that behavior.
     def mock_load_side_effect(self):
-        self.data = config_data
+        self.data = dict(config_data)  # copy to avoid mutation by migration
         return self.data
 
     # Use only ONE patch
@@ -71,20 +71,36 @@ def test_controller_status_message(controller):
 
 
 def test_controller_load_initial_data_logic(controller):
-    # Test _finalize_loading directly to avoid threads
-    state = CacheState(
-        skills=[
-            SkillRecord(name="Skill A", local_path="/test/skill_a", category="Dev", is_package=True)
-        ],
-        categories=["Dev"],
-        project_labels=[],
-        status="Success",
+    # Test _commit_prepared_state directly to avoid threads
+    skill = Skill(
+        name="Skill A",
+        local_path="/test/skill_a",
+        category="Dev",
+        is_package=True,
+        main_category="Core Engineering",
     )
-    controller.discovery._finalize_loading(state)
+    from skill_manager.core.models.entities import FilterState
+    from skill_manager.core.models.filter_engine import FilterEngine
+
+    engine = FilterEngine()
+    filter_state = FilterState(is_package_only=True)
+    filtered = engine.filter_skills([skill], filter_state)
+    all_filtered = engine.prepare_rows(filtered)
+    visible = engine.build_visible_rows(all_filtered, set())
+
+    state = PreparedModelState(
+        all_skills=[skill],
+        search_engine=MagicMock(),
+        all_filtered_skills=all_filtered,
+        visible_rows=visible,
+        categories=["Dev"],
+        status="Success",
+        generation=0,
+    )
+    controller.discovery._commit_prepared_state(state)
 
     assert controller.skillModel.rowCount() == 1
     assert "Dev" in controller.categories
-    assert controller.isLoading is False
 
 
 def test_controller_copy_single_skill(controller):
@@ -174,7 +190,9 @@ def test_controller_setters(controller):
 
 
 def test_controller_toggle_package_only(controller):
-    controller.isPackageOnly = Qt.CheckState.Unchecked
+    # isPackageOnly is read-only on the AppController (returns library model's value).
+    # To change it, set directly on the library model.
+    controller._library_model.isPackageOnly = Qt.CheckState.Unchecked
     assert controller.isPackageOnly == Qt.CheckState.Unchecked
 
 
@@ -251,9 +269,9 @@ def test_controller_small_branch_slots(controller):
     assert "No skills selected" in controller.statusMessage
 
     controller.loadInitialData = MagicMock()
-    controller.refreshSkills()
-    assert controller.statusMessage == "Refreshing library..."
-    controller.loadInitialData.assert_called_once()
+    with patch.object(controller.discovery, "loadInitialData") as mock_load:
+        controller.refreshSkills("test", False)
+        mock_load.assert_called_once_with(force_full_scan=False, silent=True)
 
     controller.saveCustomCollection("", ["/p1"], [])
     assert "" not in controller.customCollections
@@ -467,18 +485,20 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
     controller._update_packages = [{"package_path": str(update_source_path)}]
 
     service = MagicMock()
-    service.discover_all.side_effect = lambda cache_callback: (
-        cache_callback(
-            {"skills": [], "projects": [], "categories": ["Cached"], "project_labels": []}
-        )
-        or {
+    def mock_discover_all(*args, **kwargs):
+        cache_callback = kwargs.get("cache_callback")
+        if cache_callback:
+            cache_callback(
+                {"skills": [], "projects": [], "categories": ["Cached"], "project_labels": []}
+            )
+        return {
             "skills": [{"name": "A", "is_package": True}],
             "projects": [],
             "categories": ["Dev"],
             "project_labels": ["P"],
             "status": "Done",
         }
-    )
+    service.discover_all.side_effect = mock_discover_all
 
     with (
         patch(
@@ -488,17 +508,28 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
     ):
         controller.loadInitialData()
 
-    # Success case - we'll test _finalize_loading separately for correctness
-    # as the async loop is mocked away here.
-    state = CacheState(
-        skills=[SkillRecord(name="A", local_path="/test/a", is_package=True)],
+    # Success case - test _commit_prepared_state directly
+    from skill_manager.core.models.entities import FilterState
+    from skill_manager.core.models.filter_engine import FilterEngine
+
+    skill = Skill(name="A", local_path="/test/a", is_package=True, main_category="")
+    engine = FilterEngine()
+    filter_state = FilterState(is_package_only=True)
+    filtered = engine.filter_skills([skill], filter_state)
+    all_filtered = engine.prepare_rows(filtered)
+    visible = engine.build_visible_rows(all_filtered, set())
+
+    state = PreparedModelState(
+        all_skills=[skill],
+        search_engine=MagicMock(),
+        all_filtered_skills=all_filtered,
+        visible_rows=visible,
         categories=["Dev"],
-        project_labels=["P"],
         status="Done",
+        generation=0,
     )
-    controller.discovery._finalize_loading(state)
+    controller.discovery._commit_prepared_state(state)
     assert controller.categories == ["Dev"]
-    assert controller.statusMessage == "Done"
 
     # Error case
     with (

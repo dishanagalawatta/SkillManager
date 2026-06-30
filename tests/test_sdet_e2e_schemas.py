@@ -25,7 +25,7 @@ category: SDET Test
     (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
     app_controller.config_mgr.addSource(str(lib_dir))
-    app_controller.refreshSkills()
+    app_controller.refreshSkills("test", False)
     QApplication.instance().processEvents()  # type: ignore[union-attr]
 
 

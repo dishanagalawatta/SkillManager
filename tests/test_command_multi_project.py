@@ -242,6 +242,52 @@ class TestUpdateMultiProject:
         content = cmd_file.read_text(encoding="utf-8")
         assert "Cmd" in content
 
+    def test_update_multi_project_with_aliases(self, tmp_path):
+        """When project aliases are configured, multi-project updates match them correctly without false removal warnings."""
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        # Command is in project A
+        cmd_a = _write_command(proj_a / ".agents" / "commands", "Cmd")
+
+        # Let's map project roots to custom aliases
+        aliases = {
+            str(proj_a): "AliasA",
+            str(proj_b): "AliasB",
+        }
+
+        # Query update with aliases as labels
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_a),
+            name="Cmd",
+            body="body",
+            category="Commands",
+            project_labels=["AliasA", "AliasB"],
+            project_paths=[str(proj_a), str(proj_b)],
+            project_aliases=aliases,
+        )
+
+        # No warning/removal requested
+        assert len(results) >= 2
+        for r in results:
+            assert not r.needs_confirm, "Should not require confirmation of removals"
+            assert r.ok, f"Expected ok result, got: {r.message}"
+
+        # Holders check with aliases
+        holders = find_command_holder_projects("Cmd", [str(proj_a), str(proj_b)], project_aliases=aliases)
+        assert "AliasA" in holders
+        assert "AliasB" in holders
+
+        # Test with the .agents/skills subfolder paths as well
+        proj_a_skills = proj_a / ".agents" / "skills"
+        proj_b_skills = proj_b / ".agents" / "skills"
+        proj_a_skills.mkdir(parents=True, exist_ok=True)
+        proj_b_skills.mkdir(parents=True, exist_ok=True)
+
+        holders_sub = find_command_holder_projects("Cmd", [str(proj_a_skills), str(proj_b_skills)], project_aliases=aliases)
+        assert "AliasA" in holders_sub
+        assert "AliasB" in holders_sub
+
 
 # ---------------------------------------------------------------------------
 # Tests 7-8: DiscoveryService.discover_project

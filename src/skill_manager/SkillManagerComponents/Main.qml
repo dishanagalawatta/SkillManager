@@ -24,8 +24,10 @@ Window {
     onHeightChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
     onXChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
     onYChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
-    
+    property bool isClosing: false
+
     onClosing: (close) => {
+        isClosing = true
         // Clean up the active view to ensure models are detached BEFORE context tear down
         if (viewLoader && viewLoader.item && typeof viewLoader.item.cleanup === "function") {
             viewLoader.item.cleanup()
@@ -159,11 +161,9 @@ Window {
                 viewLoader.item.cleanup()
             }
             AppController.ui_controller.currentView = view
-            window.currentView = view
-            // Delay context destruction to next event loop tick so incubators cleanly abort
-            Qt.callLater(() => {
-                viewLoader.source = source
-            })
+            viewTransitionTimer.pendingSource = ""
+            viewTransitionTimer.pendingView = view
+            viewTransitionTimer.start()
         }
     }
 
@@ -182,7 +182,7 @@ Window {
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
 
     // --- Skill Ops ---
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills("keyboard-shortcut", false) }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutArchiveEnabled; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutDeleteEnabled; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
 
@@ -215,6 +215,23 @@ Window {
 
     ScreenshotOverlay {
         id: screenshotOverlay
+    }
+
+    Timer {
+        id: viewTransitionTimer
+        interval: 50
+        repeat: false
+        property string pendingView: ""
+        property string pendingSource: ""
+        onTriggered: {
+            if (pendingView !== "") {
+                window.currentView = pendingView
+                pendingView = ""
+            } else if (pendingSource !== "") {
+                viewLoader.source = pendingSource
+                pendingSource = ""
+            }
+        }
     }
 
     Timer {
@@ -295,7 +312,12 @@ Window {
                         window.navigateTo(view)
                     } else if (viewLoader.source.toString().indexOf("QuickCopyView.qml") === -1 && 
                                viewLoader.source.toString().indexOf("LibraryView.qml") === -1) {
-                        viewLoader.source = "views/QuickCopyView.qml"
+                        if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+                            viewLoader.item.cleanup()
+                        }
+                        viewTransitionTimer.pendingView = ""
+                        viewTransitionTimer.pendingSource = "views/QuickCopyView.qml"
+                        viewTransitionTimer.start()
                     }
                 }
             }

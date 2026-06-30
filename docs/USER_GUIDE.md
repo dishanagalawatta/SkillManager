@@ -24,9 +24,12 @@ The Library is where you manage your source skills.
 
 > **Multi-project deployment.** You can now deploy a custom command to
 > multiple projects at once. The Create/Edit dialog shows a multi-select
-> dropdown — click individual projects or use "All Projects" to select
+> dropdown - click individual projects or use "All Projects" to select
 > every repository. Edits update every copy; the delete confirmation
 > lets you choose which projects to remove the command from.
+> **Smart no-op.** If the destination file already contains the same content,
+> SkillManager skips the write and does not show the conflict dialog — even
+> when the target project is different from the source.
 - **Copying to Projects**: Select one or multiple skills and use the "Copy to Projects" button to deploy them into specific project folders.
 - **Archive/Unarchive**: Archive skills you don't need while keeping them available for restoration.
 - **Star/Favorite**: Star important skills to pin them to the top of the list.

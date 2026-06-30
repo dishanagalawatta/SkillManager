@@ -340,7 +340,7 @@ Item {
                         visible: root.showInlineDelete && mouseArea.containsMouse
                         onClicked: (mouse) => {
                             if (model && model.path) {
-                                root.deleteRequested(model.name, model.path)
+                                root.deleteRequested(model.name, model.path, model.isCommand === true)
                             }
                         }
                         contentItem: Text {
@@ -372,6 +372,6 @@ Item {
     signal clicked()
     signal doubleClicked()
     signal rightClicked()
-    signal deleteRequested(string name, string path)
+    signal deleteRequested(string name, string path, bool isCommand)
     signal inspectImageRequested()
 }

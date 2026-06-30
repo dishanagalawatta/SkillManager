@@ -12,6 +12,7 @@ class Skill:
     category: str = "General"
     description: str = ""
     local_path: str = ""
+    folder_name: str = ""
     project_label: str = ""
     project_path: str = ""
     project_root: str = ""
@@ -61,16 +62,20 @@ class Skill:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Skill":
         """Factory method to create a Skill from a raw dictionary."""
+        from pathlib import Path
+        raw_folder_name = data.get("folder_name")
         record = SkillRecord.model_validate(data)
         data = record.model_dump()
         # Handle some legacy key mappings
         is_package = data.get("is_package", data.get("is_source", False))
+        folder_name = raw_folder_name or (Path(data["local_path"]).name if data.get("local_path") else "")
 
         return cls(
             name=str(data.get("name", "")),
             category=data.get("category", "General"),
             description=data.get("description", ""),
             local_path=data.get("local_path", ""),
+            folder_name=folder_name,
             project_label=data.get("project_label", ""),
             project_path=data.get("project_path", ""),
             project_root=data.get("project_root", ""),
@@ -97,12 +102,15 @@ class Skill:
 
         Use only for data that was already validated (e.g. from discovery cache).
         """
+        from pathlib import Path
         is_package = data.get("is_package", data.get("is_source", False))
+        folder_name = data.get("folder_name") or (Path(data["local_path"]).name if data.get("local_path") else "")
         return cls(
             name=str(data.get("name", "")),
             category=data.get("category", "General"),
             description=data.get("description", ""),
             local_path=data.get("local_path", ""),
+            folder_name=folder_name,
             project_label=data.get("project_label", ""),
             project_path=data.get("project_path", ""),
             project_root=data.get("project_root", ""),
@@ -122,6 +130,26 @@ class Skill:
             main_category=data.get("main_category", "⚙️ System & Workflow"),
             tags=data.get("tags", []),
         )
+
+
+@dataclass
+class PreparedModelState:
+    """Snapshot of a fully pre-computed model state, built in a background thread.
+
+    All heavy work (Skill construction, FilterEngine pass, SearchEngine build,
+    row preparation, visibility calculation) is done by the caller in the
+    background thread.  The main thread only needs to swap the internal
+    lists and emit a single ``modelReset``.
+    """
+
+    all_skills: list[Skill]
+    search_engine: Any  # SearchEngine instance — Any to avoid circular import
+    all_filtered_skills: list[Skill]
+    visible_rows: list[Skill]
+    categories: list[str]
+    status: str
+    generation: int  # Monotonic refresh generation for cancellation
+    is_final: bool = True  # True = full load, False = incremental (cache preview)
 
 
 @dataclass

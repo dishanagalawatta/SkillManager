@@ -432,21 +432,16 @@ class ConfigController(BaseController):
 
     @Slot(str, result=str)
     def getProjectLabel(self, path: str) -> str:
-        """Returns the human-readable label for a project path."""
+        """Returns the human-readable label for a project path.
+
+        Delegates to the canonical ``project_label()`` so that the dropdown
+        labels always match the ``project_label`` stored on each skill.
+        """
         if not path:
             return ""
-        norm_path = path.replace("\\", "/")
-        label = self.app._project_aliases.get(path) or self.app._project_aliases.get(norm_path)
-        if not label:
-            p = Path(path)
-            if norm_path.endswith("/.agents/skills"):
-                label = p.parent.parent.name
-            elif p.name.lower() == "skills" and len(p.parts) > 2:
-                parent = p.parent.name
-                label = p.parent.parent.name if parent == ".agents" else parent
-            else:
-                label = p.name
-        return label
+        from skill_manager.core.quick_copy import project_label
+
+        return project_label(path, project_aliases=self.app._project_aliases)
 
     @Property(list, notify=updateProjectsChanged)
     def updateProjects(self):

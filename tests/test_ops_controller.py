@@ -10,7 +10,7 @@ from skill_manager.utils.task_runner import SynchronousTaskRunner
 @pytest.fixture
 def ops_controller(mock_app):
     with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
-        mock_timer.side_effect = lambda msec, functor: functor()
+        mock_timer.side_effect = lambda msec, receiver, functor=None: (functor() if functor is not None else receiver())
         yield OpsController(mock_app)
 
 
@@ -642,6 +642,7 @@ def test_update_custom_command_full(
         category="NewCat",
         project_labels=["Old"],
         project_paths=mock_app._projects,
+        project_aliases=mock_app._project_aliases,
         on_conflict=None,
         confirmed_removals=None,
     )
@@ -702,6 +703,7 @@ def test_update_custom_command_full_moves_to_new_project(
         category="NewCat",
         project_labels=["ProjectB"],
         project_paths=mock_app._projects,
+        project_aliases=mock_app._project_aliases,
         on_conflict=None,
         confirmed_removals=None,
     )
@@ -1264,6 +1266,94 @@ def test_confirm_command_removals_reinvokes_with_confirmed(
         category="Commands",
         project_labels=["projA", "projB"],
         project_paths=mock_app._projects,
+        project_aliases=mock_app._project_aliases,
         on_conflict=None,
         confirmed_removals=["projB"],
     )
+
+
+def test_ops_controller_confirm_command_skills_carry(ops_controller, mock_app):
+    import json
+    with patch("skill_manager.core.copier.copy_commands_with_skill_carry") as mock_carry:
+        mock_carry.return_value = {
+            "copied": 1,
+            "skills_copied": 2,
+            "skills_failed": 0,
+            "missing_skills": [],
+        }
+        ops_controller.confirmCommandSkillsCarry(
+            "/proj/path",
+            json.dumps(["/cmd/path"]),
+            json.dumps([{"name": "Skill1"}])
+        )
+        mock_carry.assert_called_once_with(
+            [{"local_path": "/cmd/path", "name": "path"}],
+            "/proj/path",
+            mock_app._library_model._all_skills,
+            confirmed_skills=[{"name": "Skill1"}],
+        )
+        mock_app._set_status.assert_called_with(
+            "Copied 1 command(s) and 2 skill(s) to project."
+        )
+
+
+@patch("skill_manager.core.discovery.DiscoveryService")
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_ops_controller_create_custom_command_emits_carry_prompt(
+    mock_patch, mock_discovery, ops_controller, mock_app, tmp_path
+):
+    import json
+
+    from skill_manager.core.commands import CommandCreateResult
+
+    cmd_path = tmp_path / ".agents" / "commands" / "Cmd.md"
+    results = [CommandCreateResult(ok=True, message="Success", path=cmd_path)]
+
+    emissions = []
+    ops_controller.commandSkillsCarryPrompt.connect(
+        lambda cmd, proj, miss: emissions.append((cmd, proj, miss))
+    )
+
+    with (
+        patch("skill_manager.core.commands.create_custom_command_files_multi", return_value=results),
+        patch("skill_manager.core.copier.find_missing_skills_for_commands", return_value=[{"name": "Skill1"}]),
+    ):
+        ops_controller.createCustomCommand("Cmd", "body", ["projA"], "Commands")
+
+        assert len(emissions) == 1
+        cmd_json, proj_str, miss_json = emissions[0]
+        assert json.loads(cmd_json) == [str(cmd_path)]
+        assert Path(proj_str) == tmp_path
+        assert json.loads(miss_json) == [{"name": "Skill1"}]
+
+
+@patch("skill_manager.core.discovery.DiscoveryService")
+@patch("skill_manager.core.persistence.patch_cache_add")
+def test_ops_controller_update_custom_command_emits_carry_prompt(
+    mock_patch, mock_discovery, ops_controller, mock_app, tmp_path
+):
+    import json
+
+    from skill_manager.core.commands import CommandUpdateResult
+
+    cmd_path = tmp_path / ".agents" / "commands" / "Cmd.md"
+    results = [CommandUpdateResult(ok=True, message="Success", path=cmd_path)]
+
+    emissions = []
+    ops_controller.commandSkillsCarryPrompt.connect(
+        lambda cmd, proj, miss: emissions.append((cmd, proj, miss))
+    )
+
+    with (
+        patch("skill_manager.core.commands.update_custom_command_file_multi", return_value=results),
+        patch("skill_manager.core.copier.find_missing_skills_for_commands", return_value=[{"name": "Skill1"}]),
+    ):
+        ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "body", "Commands", ["projA"])
+
+        assert len(emissions) == 1
+        cmd_json, proj_str, miss_json = emissions[0]
+        assert json.loads(cmd_json) == [str(cmd_path)]
+        assert Path(proj_str) == tmp_path
+        assert json.loads(miss_json) == [{"name": "Skill1"}]
+
+

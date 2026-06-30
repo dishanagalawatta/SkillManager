@@ -22,4 +22,6 @@ MultiEffect {
     shadowBlur: root.radius / 24.0  // Normalize radius to 0-1 range for blur
     shadowHorizontalOffset: root.horizontalOffset
     shadowVerticalOffset: root.verticalOffset
+    
+    autoPaddingEnabled: true
 }

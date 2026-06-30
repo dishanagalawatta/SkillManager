@@ -139,65 +139,68 @@ Dialog {
             }
         }
         
-        // Footer
-        Rectangle {
-            Layout.fillWidth: true
-            height: 80
-            color: "transparent"
+    }
+        
+    footer: Item {
+        width: parent.width
+        height: 76
+        implicitHeight: height
+        
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            anchors.topMargin: 12
+            anchors.bottomMargin: 24
+            spacing: 12
             
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 24
-                spacing: 12
+            Item { Layout.fillWidth: true }
+            
+            ActionButton {
+                text: "Cancel"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 40
+                onClicked: root.reject()
                 
-                Item { Layout.fillWidth: true }
-                
-                ActionButton {
-                    text: "Cancel"
-                    Layout.preferredWidth: 100
-                    Layout.preferredHeight: 40
-                    onClicked: root.reject()
-                    
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: parent.hovered ? Theme.glassHover : "transparent"
-                        border.color: Theme.glassBorder
-                    }
-                    
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Medium
-                        color: Theme.label
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.glassBorder
                 }
                 
-                ActionButton {
-                    text: "Save"
-                    Layout.preferredWidth: 100
-                    Layout.preferredHeight: 40
-                    onClicked: {
-                        AppController.setProjectAlias(root.projectPath, renameInput.text)
-                        root.accept()
-                    }
-                    
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
-                    }
-                    
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: "white"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Medium
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            
+            ActionButton {
+                text: "Save"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 40
+                onClicked: {
+                    AppController.setProjectAlias(root.projectPath, renameInput.text)
+                    root.accept()
+                }
+                
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
+                }
+                
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }

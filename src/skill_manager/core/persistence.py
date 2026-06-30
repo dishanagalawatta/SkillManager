@@ -30,25 +30,44 @@ CACHE_EXCLUDED_FIELDS = frozenset({"raw_content", "body_content"})
 
 def _atomic_write_json(file_path: str | Path, data: Any, indent: bool = True) -> bool:
     """Writes JSON to a temporary file then renames it for atomicity using orjson."""
+    import time
+
     file_path = str(file_path)
     temp_path = f"{file_path}.tmp"
-    try:
-        option = orjson.OPT_INDENT_2 if indent else 0
-        # orjson handles more types (UUID, datetime) and is faster.
-        # We use OPT_SERIALIZE_DATACLASS for future compatibility if needed.
-        # OPT_APPEND_NEWLINE is good for file output.
-        content = orjson.dumps(
-            data, option=option | orjson.OPT_SERIALIZE_DATACLASS | orjson.OPT_APPEND_NEWLINE
-        )
-        with open(temp_path, "wb") as f:
-            f.write(content)
-        os.replace(temp_path, file_path)
-        return True
-    except Exception as e:
-        logger.warning("Error atomic writing to %s: %s", file_path, e)
-        with contextlib.suppress(OSError):
-            os.remove(temp_path)
-        return False
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            option = orjson.OPT_INDENT_2 if indent else 0
+            content = orjson.dumps(
+                data, option=option | orjson.OPT_SERIALIZE_DATACLASS | orjson.OPT_APPEND_NEWLINE
+            )
+            with open(temp_path, "wb") as f:
+                f.write(content)
+            os.replace(temp_path, file_path)
+            return True
+        except OSError as e:
+            # WinError 32: process cannot access the file (file in use)
+            # WinError 2: file not found (temp file removed by another process)
+            if e.winerror in (32, 2) and attempt < max_retries - 1:
+                wait = 0.05 * (2 ** attempt)  # 50ms, 100ms, 200ms
+                logger.warning(
+                    "Atomic write to %s hit WinError %d (attempt %d/%d), retrying in %.0fms",
+                    file_path, e.winerror, attempt + 1, max_retries, wait * 1000,
+                )
+                time.sleep(wait)
+                continue
+            logger.warning("Error atomic writing to %s: %s", file_path, e)
+            with contextlib.suppress(OSError):
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            return False
+        except Exception as e:
+            logger.warning("Error atomic writing to %s: %s", file_path, e)
+            with contextlib.suppress(OSError):
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            return False
+    return False
 
 
 def save_archive(archive_paths: list[str]) -> bool:
@@ -130,17 +149,30 @@ def save_package_skill_inventory(data: dict[str, Any]) -> bool:
     return _atomic_write_json(PACKAGE_SKILL_INVENTORY_FILE, data)
 
 
+def _normalize_skill_project_path(skill: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a skill's project_path through get_skills_dir for consistency."""
+    pp = skill.get("project_path")
+    if pp:
+        from skill_manager.core.copier import get_skills_dir
+
+        skill["project_path"] = str(get_skills_dir(pp))
+    return skill
+
+
 def save_cache(data: dict[str, Any]) -> bool:
     """Saves discovered skills to cache for faster startup.
 
     Strips raw_content and body_content — these are large per-skill blobs
     read on-demand from disk, not needed in the index cache.
+    Normalizes project_path through get_skills_dir before writing.
     """
     try:
         slim_data = dict(data)
         if "skills" in slim_data:
             slim_data["skills"] = [
-                {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
+                _normalize_skill_project_path(
+                    {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
+                )
                 for skill in slim_data["skills"]
             ]
         return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data)
@@ -150,14 +182,24 @@ def save_cache(data: dict[str, Any]) -> bool:
 
 
 def load_cache() -> dict[str, Any] | None:
-    """Loads skills from cache. Returns None if missing or corrupted."""
+    """Loads skills from cache. Returns None if missing or corrupted.
+
+    Normalizes each skill's project_path in-memory on load so the model
+    receives correct paths even if the on-disk cache is stale.
+    """
     cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
     if not cache_path.exists():
         return None
     try:
         with open(cache_path, "rb") as f:
             data = orjson.loads(f.read())
-        return CacheState.model_validate(data).model_dump()
+        validated = CacheState.model_validate(data).model_dump()
+        # Normalize project_path in-memory for all skills
+        if "skills" in validated:
+            validated["skills"] = [
+                _normalize_skill_project_path(s) for s in validated["skills"]
+            ]
+        return validated
     except (orjson.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning("[CACHE] Corrupted cache (%s).", e)
         with contextlib.suppress(BaseException):
@@ -213,14 +255,15 @@ def patch_cache_add(
         if "projects" not in data:
             data["projects"] = []
 
-        # Strip large fields from new_skills
+        # Strip large fields from new_skills and normalize project_path
         clean_new_skills = []
         for s in new_skills:
             clean_s = {k: v for k, v in s.items() if k not in CACHE_EXCLUDED_FIELDS}
+            _normalize_skill_project_path(clean_s)
             clean_new_skills.append(clean_s)
 
-        # Update skills list
-        skills_map = {s.get("local_path"): s for s in data["skills"]}
+        # Update skills list — also normalize existing cache entries
+        skills_map = {_normalize_skill_project_path(s).get("local_path"): s for s in data["skills"]}
         updated_count = 0
         for s in clean_new_skills:
             path = s.get("local_path")

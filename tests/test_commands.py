@@ -297,6 +297,102 @@ def test_update_custom_command_file_returns_conflict_marker(tmp_path):
     assert src.exists()
 
 
+def test_update_custom_command_file_skips_conflict_when_content_matches(tmp_path):
+    """When the destination file has identical content, no conflict is raised."""
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+
+    # Blocker has the SAME content that update would produce
+    expected_content = build_command_content("cmd", "body", "X")
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text(expected_content)
+    blocker_mtime = blocker.stat().st_mtime
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="body",
+        category="X",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+    )
+    assert result.ok
+    assert not result.needs_conflict_resolution
+    assert result.path == blocker
+    # File should not have been rewritten
+    assert blocker.stat().st_mtime == blocker_mtime
+    assert blocker.read_text() == expected_content
+
+
+def test_update_custom_command_file_keeps_source_on_content_match(tmp_path):
+    """When content matches, the source file should not be deleted."""
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    expected_content = build_command_content("cmd", "hello", "Cat")
+    src.write_text(expected_content)
+
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text(expected_content)
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="hello",
+        category="Cat",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+    )
+    assert result.ok
+    assert src.exists()
+    assert blocker.read_text() == expected_content
+
+
+def test_update_custom_command_file_still_conflicts_on_content_mismatch(tmp_path):
+    """Regression: files with different content must still trigger conflict."""
+    from skill_manager.core.quick_copy import project_label
+
+    proj_a = tmp_path / "projA"
+    proj_b = tmp_path / "projB"
+    (proj_a / ".agents" / "skills").mkdir(parents=True)
+    (proj_a / ".agents" / "commands").mkdir(parents=True)
+    (proj_b / ".agents" / "skills").mkdir(parents=True)
+    (proj_b / ".agents" / "commands").mkdir(parents=True)
+
+    src = proj_a / ".agents" / "commands" / "cmd.md"
+    src.write_text("---\nname: cmd\ncategory: X\ntype: command\ndate: 2026-01-01\n---\n\nbody")
+    blocker = proj_b / ".agents" / "commands" / "cmd.md"
+    blocker.write_text("---\nname: cmd\ncategory: Y\ntype: command\ndate: 2026-01-01\n---\n\nexisting")
+
+    result = update_custom_command_file(
+        local_path=str(src),
+        name="cmd",
+        body="new body",
+        project_label_name=project_label(proj_b),
+        project_paths=[str(proj_a), str(proj_b)],
+    )
+    assert not result.ok
+    assert result.needs_conflict_resolution
+    assert str(result.conflicting_path) == str(blocker)
+    assert src.exists()
+
+
 def test_update_custom_command_file_auto_renames_on_conflict(tmp_path):
     from skill_manager.core.quick_copy import project_label
 

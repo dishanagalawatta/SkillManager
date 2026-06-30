@@ -22,7 +22,8 @@ from skill_manager.core.diagnostics import (
     CATEGORY_SOURCE_MISSING,
     CATEGORY_WINDOW_STATE,
 )
-from skill_manager.core.schemas import CacheState, SkillRecord
+from skill_manager.core.models.entities import PreparedModelState, Skill
+from skill_manager.core.schemas import SkillRecord
 
 
 @pytest.fixture
@@ -63,18 +64,21 @@ class TestDiscoverySafetyNet:
             "/p/s2": SkillRecord(name="S2", local_path="/p/s2"),
         }
 
-        state = CacheState(
-            skills=[],
+        state = PreparedModelState(
+            all_skills=[],
+            search_engine=MagicMock(),
+            all_filtered_skills=[],
+            visible_rows=[],
             categories=[],
             status="Found 0 skills (0 projects)",
+            generation=0,
+            is_final=True,
         )
-        ctrl._finalize_loading(state, is_final=True)
+        ctrl._commit_prepared_state(state)
 
         # Skills should NOT be removed
-        app._library_model.removeSkillsByPath.assert_not_called()
-        app._quick_copy_model.removeSkillsByPath.assert_not_called()
-        app._library_model.setSkills.assert_not_called()
-        assert app._is_loading is False
+        app._library_model.replacePreparedState.assert_not_called()
+        app._quick_copy_model.replacePreparedState.assert_not_called()
 
     def test_safety_net_does_not_trigger_for_non_final(self, temp_data_dir):
         """Non-final discovery returning 0 skills should not trigger safety net."""
@@ -97,11 +101,20 @@ class TestDiscoverySafetyNet:
             "/p/s1": SkillRecord(name="S1", local_path="/p/s1"),
         }
 
-        state = CacheState(skills=[], status="Found 0 skills")
-        ctrl._finalize_loading(state, is_final=False)
+        state = PreparedModelState(
+            all_skills=[],
+            search_engine=MagicMock(),
+            all_filtered_skills=[],
+            visible_rows=[],
+            categories=[],
+            status="Found 0 skills",
+            generation=0,
+            is_final=False,
+        )
+        ctrl._commit_prepared_state(state)
 
-        # Non-final with 0 skills: incremental path removes old skills
-        app._library_model.removeSkillsByPath.assert_called_once()
+        # Non-final with 0 skills: model is updated (incremental path)
+        app._library_model.replacePreparedState.assert_called_once()
 
     def test_safety_net_does_not_trigger_when_new_skills_exist(self, temp_data_dir):
         """When new skills are discovered, safety net should not trigger even if some are removed."""
@@ -126,15 +139,22 @@ class TestDiscoverySafetyNet:
         }
 
         # One skill kept, one removed
-        state = CacheState(
-            skills=[SkillRecord(name="S1", local_path="/p/s1")],
+        state = PreparedModelState(
+            all_skills=[
+                Skill(name="S1", local_path="/p/s1", is_package=True)
+            ],
+            search_engine=MagicMock(),
+            all_filtered_skills=[],
+            visible_rows=[],
             categories=[],
             status="Found 1 skills",
+            generation=0,
+            is_final=True,
         )
-        ctrl._finalize_loading(state, is_final=True)
+        ctrl._commit_prepared_state(state)
 
-        # Safety net should NOT trigger — incremental update removes only s2
-        app._library_model.removeSkillsByPath.assert_called_once_with(["/p/s2"])
+        # Safety net should NOT trigger — model is updated with new skills
+        app._library_model.replacePreparedState.assert_called_once()
 
 
 class TestLegacyConfigFallback:

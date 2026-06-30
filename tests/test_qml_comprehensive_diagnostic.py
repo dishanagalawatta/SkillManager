@@ -45,7 +45,7 @@ PUBLIC_VIEWS = [
 DIALOGS = [
     "CommandCreateDialog.qml",
     "CommandCarrySkillsDialog.qml",
-    "DeleteConfirmDialog.qml",
+    "CommandDeleteDialog.qml",
     "ArchiveConfirmDialog.qml",
     "PackageEditDialog.qml",
     "ProjectRenameDialog.qml",

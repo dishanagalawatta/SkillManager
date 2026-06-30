@@ -126,6 +126,7 @@ Rectangle {
 
                 TextField {
                     id: argField
+                    ContextMenu.menu: null
                     objectName: "argField"
                     visible: root.isQuickCopy && root.skill.local_path !== undefined
                     Layout.preferredWidth: 150
@@ -431,6 +432,7 @@ Rectangle {
 
                         TextArea {
                             id: rawContentArea
+                            ContextMenu.menu: null
                             width: rawContentScroll.width - rawContentScroll.leftPadding - rawContentScroll.rightPadding
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Skill Details"

@@ -48,12 +48,14 @@ def test_config_controller_add_project(config_controller, mock_app):
 def test_config_controller_get_project_label(config_controller, mock_app):
     mock_app._project_aliases = {"C:\\project": "MyProj"}
     assert config_controller.getProjectLabel("C:\\project") == "MyProj"
+
+    # Root path without alias: canonical project_label returns "name (.)"
     import sys
 
     if sys.platform == "win32":
-        assert config_controller.getProjectLabel("C:\\other") == "other"
+        assert config_controller.getProjectLabel("C:\\other") == "other (.)"
     else:
-        assert config_controller.getProjectLabel("C:\\other") == "C:\\other"
+        assert config_controller.getProjectLabel("/other") == "other (.)"
 
 
 def test_config_controller_set_project_alias(config_controller, mock_app):

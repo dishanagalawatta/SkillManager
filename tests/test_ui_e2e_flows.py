@@ -47,7 +47,7 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     app_controller.updates.addUpdatePackage("test-package")
 
     # Trigger refresh
-    app_controller.refreshSkills()
+    app_controller.refreshSkills("test", False)
 
     # Process events to allow schedule_on_ui_thread callbacks to run
     qapp.processEvents()

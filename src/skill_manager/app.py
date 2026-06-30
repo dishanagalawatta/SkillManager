@@ -8,6 +8,7 @@ import ctypes
 import logging
 import os
 import sys
+import time
 from typing import Any
 
 import sentry_sdk
@@ -70,6 +71,8 @@ from skill_manager.core.analytics import (  # noqa: E402
 from skill_manager.core.categories import get_category_emoji  # noqa: E402
 from skill_manager.core.config import (  # noqa: E402
     ConfigManager,
+    ScopedConfigManager,
+    migrate_scoped_filter_keys,
 )
 from skill_manager.core.diagnostics import (  # noqa: E402
     CATEGORY_SOURCE_MISSING,
@@ -95,12 +98,17 @@ logger = logging.getLogger(__name__)
 
 
 def _handle_qml_warning(msg):
-    """Filter benign QML warnings, such as component destruction during incubation."""
+    """Log every QML warning at WARNING level.
+
+    We deliberately do *not* suppress any warnings — including the
+    benign-looking "Object or context destroyed during incubation"
+    message. The incubation-warning has historically hidden real
+    regressions (e.g. signal ordering bugs, late state mutations);
+    logging it makes those regressions surface in the test output
+    and in user logs.
+    """
     msg_str = msg.toString() if hasattr(msg, "toString") else str(msg)
-    if "Object or context destroyed during incubation" in msg_str:
-        logger.debug(f"QML Warning (suppressed): {msg_str}")
-    else:
-        logger.warning(f"QML Warning: {msg_str}")
+    logger.warning(f"QML Warning: {msg_str}")
 
 
 class AppController(QObject):
@@ -156,14 +164,23 @@ class AppController(QObject):
         # 1. Core Models and Configuration
         self._config = config if config else ConfigManager()
         self.task_runner = BackgroundTaskRunner()
-        self._library_model = SkillModel(config=self._config)
-        self._quick_copy_model = SkillModel(config=self._config)
+
+        # Migrate legacy un-namespaced filter keys to per-model namespaces
+        migrate_scoped_filter_keys(self._config)
+
+        # Create scoped configs so library and quick_copy models don't share filter state
+        self._library_config = ScopedConfigManager(self._config, "library")
+        self._quick_copy_config = ScopedConfigManager(self._config, "quickcopy")
+
+        self._library_model = SkillModel(config=self._library_config)
+        self._quick_copy_model = SkillModel(config=self._quick_copy_config)
 
         # 2. Basic Attribute Initialization
         self._selected_skill = {}
         self._is_loading = False
         self._status_message = ""
         self._discovered_projects = []
+        self._last_poll_ts = 0.0
         self._categories = []
         self._clipboard = QGuiApplication.clipboard()
         self._is_recording_shortcut = False
@@ -179,6 +196,12 @@ class AppController(QObject):
         self._sources = self._config.get("sources", [])
         self._projects = self._config.get("projects", [])
         self._project_aliases = self._config.get("project_aliases", {})
+
+        # Boot-normalize: rewrite any stored project paths that don't point
+        # to a .agents/skills (or intended .agents/skills) directory so that
+        # ``project_label`` and ``getProjectLabel`` always agree.
+        self._normalize_project_paths_on_startup()
+
         self._update_packages = []
         raw_skills = self._config.get("skills", [])
         for s in raw_skills:
@@ -285,6 +308,16 @@ class AppController(QObject):
         self._starred_paths = load_starred()
 
         # Set up file watching for live refreshes
+        # The debounce timer coalesces rapid filesystem events into a single
+        # refresh, preventing repeated scans when the watcher fires many
+        # events in quick succession.
+        self._watcher_debounce_timer = QTimer()
+        self._watcher_debounce_timer.setSingleShot(True)
+        self._watcher_debounce_timer.setInterval(400)  # ms
+        self._watcher_debounce_timer.timeout.connect(
+            lambda: self.refreshSkills("file-watcher", False)
+        )
+
         watch_paths = self._sources.copy()
         for src in self._update_packages:
             pkg_path = src.get("package_path") or src.get("local_path")
@@ -292,7 +325,8 @@ class AppController(QObject):
                 watch_paths.append(pkg_path)
 
         self._watcher = SkillFolderWatcher(
-            paths=watch_paths, callback=lambda _: QTimer.singleShot(0, self.refreshSkills)
+            paths=watch_paths,
+            callback=lambda _: self._watcher_debounce_timer.start(),
         )
 
         # In tests, we often want to skip the initial background discovery
@@ -306,6 +340,12 @@ class AppController(QObject):
             self._watcher.start()
             QTimer.singleShot(100, self.loadInitialData)
 
+            # Stat-polling safety net: check known skill paths every 30s
+            # to catch deletions that watchdog may miss on Windows.
+            self._poll_timer = QTimer()
+            self._poll_timer.timeout.connect(self._poll_known_paths)
+            self._poll_timer.start(30_000)
+
             # Skill Package Update Scheduler
             self._scheduler = QtScheduler()
             self._scheduler.start()
@@ -316,6 +356,39 @@ class AppController(QObject):
             self.config_mgr.skillPackageAutoUpdateModeChanged.connect(
                 self._update_package_scheduler
             )
+
+    def _normalize_project_paths_on_startup(self):
+        """Rewrite stored project paths to their canonical .agents/skills form.
+
+        If a project was stored as a root path (e.g. ``C:\\path\\myproj``)
+        instead of ``C:\\path\\myproj\\.agents\\skills``, the stored path is
+        updated in-place and persisted so that ``project_label`` and
+        ``getProjectLabel`` always agree.
+        """
+        from skill_manager.core.copier import get_skills_dir
+
+        if not self._projects:
+            return
+
+        changed = False
+        normalized = []
+        for project_path in self._projects:
+            try:
+                canonical = get_skills_dir(project_path)
+                canonical_str = str(canonical)
+                if canonical_str != project_path:
+                    logger.info("Boot normalization: %r -> %r", project_path, canonical_str)
+                    normalized.append(canonical_str)
+                    changed = True
+                else:
+                    normalized.append(project_path)
+            except Exception as exc:
+                logger.warning("Boot normalization failed for %r: %s", project_path, exc)
+                normalized.append(project_path)
+
+        if changed:
+            self._projects = normalized
+            self._config.set("projects", self._projects)
 
     def _run_startup_package_scan(self):
         """Runs the initial scan for skill package updates."""
@@ -376,6 +449,13 @@ class AppController(QObject):
     @Slot(str)
     def setCurrentProject(self, label):
         if self._current_project_label != label:
+            # Warn if the label doesn't match any known project.
+            if label and label not in self.config_mgr.projectLabels:
+                logger.warning(
+                    "setCurrentProject: label %r not in projectLabels; "
+                    "filter will show an empty list until a valid project is selected",
+                    label,
+                )
             self._current_project_label = label
             self._quick_copy_model.projectFilter = label
             self.currentProjectChanged.emit()
@@ -819,6 +899,10 @@ class AppController(QObject):
     def deleteSelectedSkills(self):
         self.ops.deleteSelectedSkills()
 
+    @Slot(list)
+    def deleteSkillsByPaths(self, paths):
+        self.ops.deleteSkillsByPaths(paths)
+
     @Slot()
     def archiveSelectedSkills(self):
         self.ops.archiveSelectedSkills()
@@ -831,7 +915,7 @@ class AppController(QObject):
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
-    @Slot(str, str, str, str, str, str)
+    @Slot(str, str, str, str, list, str)
     def updateCustomCommandFull(self, lp, n, b, cat, proj, on_conflict=""):
         self.ops.updateCustomCommandFull(lp, n, b, cat, proj, on_conflict)
 
@@ -839,9 +923,34 @@ class AppController(QObject):
     def notify_command_updated(self, old_path: str, new_path: str) -> None:
         self.commandUpdateCompleted.emit(old_path, new_path)
 
-    @Slot(str, str, str, str)
+    @Slot(str, str, list, str)
     def createCustomCommand(self, n, b, pl, cat):
         self.ops.createCustomCommand(n, b, pl, cat)
+
+    @Slot(str, result=list)
+    def commandProjectsForPath(self, lp):
+        return self.ops.commandProjectsForPath(lp)
+
+    @Slot(str, result=list)
+    def skillProjectsForPath(self, lp):
+        return self.ops.skillProjectsForPath(lp)
+
+    @Slot(str, list)
+    def deleteCustomCommand(self, name, project_labels):
+        self.ops.deleteCustomCommand(name, project_labels)
+
+    @Slot(str, list)
+    def confirmCommandRemovals(self, local_path, confirmed_labels):
+        self.ops.confirmCommandRemovals(local_path, confirmed_labels)
+
+    @Slot(str, str, str)
+    def confirmCommandSkillsCarry(self, project_path, command_paths_json, confirmed_skills_json):
+        self.ops.confirmCommandSkillsCarry(project_path, command_paths_json, confirmed_skills_json)
+
+
+    @Slot(str, list)
+    def deleteSkillFromProjects(self, path, projects):
+        self.ops.deleteSkillFromProjects(path, projects)
 
     @Slot(str)
     def addToArchive(self, p):
@@ -902,15 +1011,64 @@ class AppController(QObject):
     def isPackageOnly(self):  # type: ignore[reportRedeclaration]
         return self._library_model.isPackageOnly
 
-    @isPackageOnly.setter  # type: ignore[func-attr]
-    def isPackageOnly(self, value):
-        self._library_model.isPackageOnly = value
-        self._quick_copy_model.isPackageOnly = value
-        self.isPackageOnlyChanged.emit()
+    @Slot()
+    def loadInitialData(self, force_full_scan: bool = False):
+        self.discovery.loadInitialData(force_full_scan=force_full_scan, silent=True)
 
     @Slot()
-    def loadInitialData(self):
-        self.discovery.loadInitialData()
+    def rebuildCache(self):
+        """Delete all on-disk caches and trigger a full re-discovery.
+
+        Clears both the JSON index and the granular diskcache directory
+        so that stale skills (deleted on disk but still in cache) are
+        properly removed.  Resets in-memory state so the next discovery
+        produces a full diff.
+
+        All cache-clearing and re-discovery runs in a background thread
+        to keep the UI fully fluid.
+
+        Accessible from Settings > Maintenance.
+        """
+        from skill_manager.core.diagnostics import (
+            CATEGORY_CACHE_REBUILD_ASYNC,
+            get_diagnostic_logger,
+        )
+
+        diag = get_diagnostic_logger()
+        diag.log_event("INFO", CATEGORY_CACHE_REBUILD_ASYNC, "Cache rebuild requested")
+
+        # Cancel any in-flight refresh and clear in-memory state
+        self.discovery.cancel_inflight()
+        if hasattr(self, "discovery"):
+            self.discovery._previous_skills = {}
+
+        def _clear_and_rebuild():
+            """Background: clear caches then run a fresh discovery."""
+            from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
+
+            # 1. Delete JSON index cache
+            cache_path = os.path.join(SKILL_LIBRARY_CACHE_FILE)
+            if os.path.exists(cache_path):
+                try:
+                    os.remove(cache_path)
+                    logger.info("[CACHE] Deleted JSON index: %s", cache_path)
+                except OSError as e:
+                    logger.warning("[CACHE] Failed to delete JSON index: %s", e)
+
+            # 2. Clear granular diskcache (discovery fingerprints + parsed results)
+            try:
+                from skill_manager.core.discovery import get_discovery_cache
+
+                with get_discovery_cache() as dc:
+                    dc.clear()
+                logger.info("[CACHE] Cleared granular discovery cache")
+            except Exception as e:
+                logger.warning("[CACHE] Failed to clear discovery cache: %s", e)
+
+            # 3. Run full discovery from the background thread
+            self.discovery.loadInitialData(force_full_scan=True, silent=True)
+
+        self.task_runner.run(_clear_and_rebuild)
 
     @Slot(str, str, str)
     def logDiagnosticEvent(self, level: str, category: str, msg: str):
@@ -923,10 +1081,53 @@ class AppController(QObject):
     def getCategoryEmoji(self, category_name: str) -> str:
         return get_category_emoji(category_name)
 
-    @Slot()
-    def refreshSkills(self):
-        self._set_status("Refreshing library...")
-        self.loadInitialData()
+    @Slot(str, bool)
+    def refreshSkills(self, source: str, force_full_scan: bool):
+        """Trigger a silent background refresh.
+
+        The refresh runs entirely in a background thread.  No ``isLoading``
+        flag is set and no status message is shown — the UI stays fluid.
+        Any in-flight refresh is cancelled and replaced.
+        """
+        logger.info(
+            "[REFRESH] Triggering re-discovery (source=%s, force_full_scan=%s)",
+            source,
+            force_full_scan,
+        )
+        self.discovery.cancel_inflight()
+        self.discovery.loadInitialData(force_full_scan=force_full_scan, silent=True)
+
+    def _poll_known_paths(self) -> None:
+        """Stat-polling safety net: check if known skill paths still exist.
+
+        Catches deletions that watchdog may miss on Windows (recursive
+        watching unreliability, event coalescing, etc.).  If any known
+        path is missing, triggers a full refresh.  Runs every 30s via
+        ``_poll_timer``; cost is negligible (~8.5ms for 1700 skills).
+
+        Includes 5-second debounce to prevent the poll from triggering
+        refreshes in a tight loop when the deletion is detected but the
+        discovery hasn't yet propagated the removal to the model.
+        """
+        try:
+            now = time.monotonic()
+            if now - self._last_poll_ts < 5.0:
+                return
+            self._last_poll_ts = now
+
+            known = self._quick_copy_model.get_known_paths()
+            if not known:
+                return
+            missing = [p for p in known if not os.path.exists(p)]
+            if missing:
+                logger.info(
+                    "[POLL] Detected %d missing skill path(s), triggering refresh: %s",
+                    len(missing),
+                    missing[:5],
+                )
+                self.refreshSkills("stat-poll", True)
+        except Exception:
+            logger.debug("[POLL] Exception during path polling", exc_info=True)
 
     def _on_client_format_changed(self):
         self._quick_copy_model.clientFilter = self._client_format
@@ -938,6 +1139,7 @@ class AppController(QObject):
             self._current_project_label = labels[0] if labels else ""
             self.currentProjectChanged.emit()
 
+    @Slot(str)
     def _set_status(self, msg):
         if getattr(self, "_status_message", "") == msg:
             return
@@ -1309,17 +1511,18 @@ def main():  # pragma: no cover
     QTimer.singleShot(5000, _check_window_visible)
 
     ret = app.exec()
-    
+
     # Clean up joblib loky workers and memory-mapped temp files before forcing exit
     try:
         from joblib.externals.loky import get_reusable_executor
+
         get_reusable_executor().shutdown(wait=True)
     except Exception as e:
         logging.getLogger(__name__).warning("Error shutting down joblib executor: %s", e)
-        
     # Allow standard Python garbage collection and atexit handlers to run so that
     # C++ QObjects, ThreadStorage, and joblib temp folders are gracefully destroyed.
     sys.exit(ret)
+
 
 if __name__ == "__main__":
     main()

@@ -32,6 +32,36 @@ Item {
     
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
+        var m = AppController.libraryModel
+        if (m) {
+            lv_listView.model = m
+            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onSkillModelChanged() {
+            var newModel = AppController.libraryModel
+            if (newModel === null || typeof newModel === "undefined") {
+                lv_listView.cacheBuffer = 0
+                lv_listView.model = null
+            } else {
+                lv_listView.cacheBuffer = 0
+                lv_listView.model = newModel
+                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+            }
+        }
+    }
+
+    Connections {
+        target: AppController.libraryModel
+        function onLayoutAboutToBeChanged() {
+            lv_listView.cacheBuffer = 0
+        }
+        function onLayoutChanged() {
+            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+        }
     }
 
     // No forced reset on completion - use persistent state
@@ -196,7 +226,7 @@ Item {
                     }
 
                     Text {
-                        text: "Skills selected"
+                        text: AppController.libraryModel.selectedCount === 1 ? "Skill selected" : "Skills selected"
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.label
@@ -211,6 +241,16 @@ Item {
                     spacing: 8
                     
                     // Always Visible Actions
+                    ActionButton {
+                        id: lv_refreshBtn
+                        buttonHeight: 32
+                        labelText: "Refresh"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
+                        role: "secondary"
+                        tooltipText: "Refresh skill library (detects file changes)"
+                        onClicked: (mouse) => AppController.refreshSkills("manual-button", false)
+                    }
+
                     ActionButton {
                         id: lv_addCommandBtn
                         buttonHeight: 32
@@ -272,7 +312,22 @@ Item {
                             labelText: "Delete"
                             iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                             role: "destructive"
-                            onClicked: (mouse) => lv_deleteConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.deleteSelectedSkills())
+                            onClicked: (mouse) => {
+                                var selectedPaths = AppController.libraryModel.getSelectedPaths() || []
+                                var allProjects = []
+                                for (var i = 0; i < selectedPaths.length; i++) {
+                                    var path = selectedPaths[i]
+                                    var isCmd = path.endsWith(".md") || path.indexOf("/commands/") >= 0 || path.indexOf("\\commands\\") >= 0
+                                    var holders = isCmd ? (AppController.commandProjectsForPath(path) || []) : (AppController.skillProjectsForPath(path) || [])
+                                    for (var j = 0; j < holders.length; j++) {
+                                        if (allProjects.indexOf(holders[j]) === -1) allProjects.push(holders[j])
+                                    }
+                                }
+                                if (allProjects.length === 0 && AppController.currentProject) {
+                                    allProjects.push(AppController.currentProject)
+                                }
+                                lv_cmdDeleteDialog.openBulkSkill(AppController.libraryModel.selectedCount, allProjects, selectedPaths, AppController.libraryModel.getSelectedNames())
+                            }
                         }
 
                         Rectangle {
@@ -341,7 +396,7 @@ Item {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
-                model: AppController.libraryModel
+                model: null
                 clip: true
                 spacing: 0
                 
@@ -374,34 +429,39 @@ Item {
                 Connections {
                     target: AppController.libraryModel
                     function onLayoutAboutToBeChanged() {
-                        if (AppController.isLoading) {
-                            lv_listView.savedScrollPos = lv_listView.contentY
-                            lv_listView.cacheBuffer = 0 // Safely abort active incubators
-                        }
+                        lv_listView.savedScrollPos = lv_listView.contentY
+                        lv_listView.cacheBuffer = 0 // Safely abort active incubators
                     }
                     function onLayoutChanged() {
                         lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                         lv_listView._restoreScroll()
                     }
                     function onModelAboutToBeReset() {
-                        if (AppController.isLoading) {
-                            lv_listView.savedScrollPos = lv_listView.contentY
-                            lv_listView.cacheBuffer = 0
-                        }
+                        lv_listView.savedScrollPos = lv_listView.contentY
+                        lv_listView.cacheBuffer = 0
                     }
                     function onModelReset() {
                         lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                         lv_listView._restoreScroll()
                     }
                     function onAboutToMutateStructure() {
-                        if (AppController.isLoading) {
-                            lv_listView.savedScrollPos = lv_listView.contentY
-                            lv_listView.cacheBuffer = 0
-                        }
+                        lv_listView.savedScrollPos = lv_listView.contentY
+                        lv_listView.cacheBuffer = 0
                     }
                     function onStructureMutated() {
                         lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                         lv_listView._restoreScroll()
+                    }
+                }
+
+                // Incubation coordination: when incubating transitions to False,
+                // tell the model to replay deferred layout signals.
+                Connections {
+                    target: AppController.libraryModel
+                    function onIncubatingChanged() {
+                        if (!AppController.libraryModel.incubating) {
+                            AppController.libraryModel.onIncubationReady()
+                        }
                     }
                 }
 
@@ -429,8 +489,16 @@ Item {
                             AppController.ui_controller.selectSkill(index)
                         }
                     }
-                    onDeleteRequested: (name, path) => {
-                        lv_deleteConfirmDialog.confirmSingle(name, () => AppController.ops_controller.deleteSkill(path))
+                    onDeleteRequested: (name, path, isCommand) => {
+                        if (isCommand) {
+                            var holders = AppController.commandProjectsForPath(path) || []
+                            if (holders.length === 0) holders = [AppController.currentProject || ""]
+                            lv_cmdDeleteDialog.openForCommand(name, holders)
+                        } else {
+                            var holders = AppController.skillProjectsForPath(path) || []
+                            if (holders.length === 0) holders = [AppController.currentProject || ""]
+                            lv_cmdDeleteDialog.openForSkill(name, holders, path)
+                        }
                     }
                     onInspectImageRequested: {
                         lv_root.showImageInspector = true
@@ -458,6 +526,11 @@ Item {
                 onClosed: {
                     lv_root.showCommandInspector = false
                     AppController.ui_controller.selectSkill(-1)
+                }
+                onDeleteRequested: (name, path, isCommand) => {
+                    var holders = AppController.commandProjectsForPath(path) || []
+                    if (holders.length === 0) holders = [AppController.currentProject || ""]
+                    lv_cmdDeleteDialog.openForCommand(name, holders)
                 }
             }
 
@@ -526,12 +599,33 @@ Item {
         id: lv_commandDialog
     }
 
-    DeleteConfirmDialog {
-        id: lv_deleteConfirmDialog
+    CommandDeleteDialog {
+        id: lv_cmdDeleteDialog
     }
 
     ArchiveConfirmDialog {
         id: lv_archiveConfirmDialog
     }
 
+    CommandCarrySkillsDialog {
+        id: lv_carrySkillsDialog
+        onCarryConfirmed: (confirmedSkills) => {
+            AppController.confirmCommandSkillsCarry(
+                lv_carrySkillsDialog.projectPath,
+                JSON.stringify(lv_carrySkillsDialog.commandPaths),
+                JSON.stringify(confirmedSkills)
+            )
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onCommandSkillsCarryPrompt(commandPathsJson, projectPath, missingSkillsJson) {
+            var cmdPaths = JSON.parse(commandPathsJson || "[]")
+            var skills = JSON.parse(missingSkillsJson || "[]")
+            lv_carrySkillsDialog.openWithContext(cmdPaths, projectPath, skills)
+        }
+    }
+
 }
+

@@ -170,69 +170,71 @@ Dialog {
                 Layout.fillWidth: true
             }
         }
+    }
+
+    footer: Item {
+        width: parent.width
+        height: 76
+        implicitHeight: height
         
-        // Footer
-        Rectangle {
-            Layout.fillWidth: true
-            height: 80
-            color: "transparent"
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            anchors.topMargin: 12
+            anchors.bottomMargin: 24
+            spacing: 12
             
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 24
-                spacing: 12
+            Item { Layout.fillWidth: true }
+            
+            ActionButton {
+                id: cancelBtn
+                text: "Cancel"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 40
+                onClicked: root.reject()
                 
-                Item { Layout.fillWidth: true }
-                
-                ActionButton {
-                    id: cancelBtn
-                    text: "Cancel"
-                    Layout.preferredWidth: 100
-                    Layout.preferredHeight: 40
-                    onClicked: root.reject()
-                    
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: parent.hovered ? Theme.glassHover : "transparent"
-                        border.color: Theme.glassBorder
-                        border.width: parent.activeFocus ? 2 : 1
-                    }
-                    
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Medium
-                        color: Theme.label
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.glassBorder
+                    border.width: parent.activeFocus ? 2 : 1
                 }
                 
-                ActionButton {
-                    id: archiveBtn
-                    text: "Archive"
-                    Layout.preferredWidth: 100
-                    Layout.preferredHeight: 40
-                    
-                    onClicked: root.accept()
-                    
-                    background: Rectangle {
-                        radius: Theme.radiusButton
-                        color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
-                        border.color: parent.activeFocus ? Theme.label : "transparent"
-                        border.width: 2
-                    }
-                    
-                    contentItem: Text {
-                        text: parent.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: "white"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Medium
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            
+            ActionButton {
+                id: archiveBtn
+                text: "Archive"
+                Layout.preferredWidth: 100
+                Layout.preferredHeight: 40
+                
+                onClicked: root.accept()
+                
+                background: Rectangle {
+                    radius: Theme.radiusButton
+                    color: parent.down ? Theme.accent : (parent.hovered ? Theme.alpha(Theme.accent, 0.93) : Theme.accent)
+                    border.color: parent.activeFocus ? Theme.label : "transparent"
+                    border.width: 2
+                }
+                
+                contentItem: Text {
+                    text: parent.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: Font.Bold
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }

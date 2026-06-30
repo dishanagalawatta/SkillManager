@@ -35,11 +35,26 @@ def get_discovery_cache() -> Cache:
     return Cache(str(cache_dir))
 
 
+def _hash_child_names(dir_path: Path) -> str:
+    """Return a short hash of sorted immediate child directory names.
+
+    Catches skill-folder additions, deletions, and renames even when the
+    parent directory's mtime and size are unchanged.
+    """
+    try:
+        names = sorted(p.name for p in dir_path.iterdir() if p.is_dir())
+        return hashlib.sha1("\n".join(names).encode()).hexdigest()[:16]
+    except OSError:
+        return ""
+
+
 def compute_dir_fingerprint(dir_path: Path) -> str:
     """Compute a lightweight fingerprint for a directory.
 
     Uses directory mtime + count of immediate child dirs containing SKILL.md
-    + max mtime of those subdirs to detect internal file changes.
+    + max mtime of those subdirs + hash of child dir names to detect
+    internal file changes including skill-folder deletions that leave the
+    parent's mtime unchanged.
     """
     try:
         stat = dir_path.stat()
@@ -55,7 +70,8 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
         if skill_dirs:
             max_sub_mtime = max(d.stat().st_mtime for d in skill_dirs)
 
-        raw = f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}"
+        child_names_hash = _hash_child_names(dir_path)
+        raw = f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}"
         return hashlib.md5(raw.encode()).hexdigest()
     except OSError as e:
         logger.debug("[DISCOVERY] Fingerprint error for %s: %s", dir_path, e)
@@ -81,7 +97,10 @@ class DiscoveryService:
         self.project_aliases = project_aliases or {}
 
     def discover_all(
-        self, use_cache: bool = True, cache_callback: Callable[[dict[str, Any]], None] | None = None
+        self,
+        use_cache: bool = True,
+        cache_callback: Callable[[dict[str, Any]], None] | None = None,
+        force_full_scan: bool = False,
     ) -> dict[str, Any]:
         """Performs full discovery of skills from all sources and projects.
 
@@ -134,7 +153,9 @@ class DiscoveryService:
             cat_fn = self._wrap_categorize_skill(disk_cache)
 
             # 2a. Discover from master packages (incremental)
-            package_skills_raw = self.discover_packages_incremental(disk_cache, parse_fn, cat_fn)
+            package_skills_raw = self.discover_packages_incremental(
+                disk_cache, parse_fn, cat_fn, force_full_scan=force_full_scan
+            )
 
             all_skills: list[SkillRecord] = []
             for skill in package_skills_raw:
@@ -142,7 +163,9 @@ class DiscoveryService:
                 all_skills.append(SkillRecord.model_validate(transformed))
 
             # 2b. Discover from project skill folders (incremental)
-            projects_state = self.discover_projects_incremental(disk_cache, parse_fn, cat_fn)
+            projects_state = self.discover_projects_incremental(
+                disk_cache, parse_fn, cat_fn, force_full_scan=force_full_scan
+            )
 
             for p in projects_state:
                 for skill in p.get("skills", []):
@@ -159,6 +182,20 @@ class DiscoveryService:
                         cmd_data = self._process_command_file(cmd_file, p, disk_cache)
                         if cmd_data:
                             all_skills.append(SkillRecord.model_validate(cmd_data))
+
+        # 3a. Deduplicate by local_path, preferring project skills over
+        # package skills. This prevents the same physical skill from appearing
+        # twice (once as a package, once as a project) and ensures project
+        # skills are correctly marked as is_package=False.
+        seen_paths: dict[str, SkillRecord] = {}
+        for skill in all_skills:
+            lp = skill.local_path
+            if not lp:
+                continue
+            existing = seen_paths.get(lp)
+            if existing is None or (existing.is_package and not skill.is_package):
+                seen_paths[lp] = skill
+        all_skills = list(seen_paths.values())
 
         # 3. Pre-compute metadata
         cats = sorted({s.category for s in all_skills if s.category})
@@ -180,7 +217,11 @@ class DiscoveryService:
         return result
 
     def discover_packages_incremental(
-        self, disk_cache: Cache, parse_fn: Callable, cat_fn: Callable
+        self,
+        disk_cache: Cache,
+        parse_fn: Callable,
+        cat_fn: Callable,
+        force_full_scan: bool = False,
     ) -> list[dict[str, Any]]:
         """Discover package skills, skipping directories with unchanged fingerprints."""
         from skill_manager.core.quick_copy import (
@@ -211,24 +252,29 @@ class DiscoveryService:
         changed_sources: list[Path] = []
         cached_skills: list[dict[str, Any]] = []
 
-        for src in unique_sources:
-            fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
-            current_fp = compute_dir_fingerprint(src)
-            stored_fp = disk_cache.get(fp_key)  # type: ignore[arg-type]
+        if force_full_scan:
+            # Force full scan: treat all sources as changed, skip cache lookup
+            changed_sources = list(unique_sources)
+        else:
+            for src in unique_sources:
+                fp_key = f"pkg_{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+                current_fp = compute_dir_fingerprint(src)
+                stored_fp = disk_cache.get(fp_key)  # type: ignore[arg-type]
 
-            if current_fp and current_fp == stored_fp:
-                cached = disk_cache.get(f"pkg_skills:{fp_key}")  # type: ignore[arg-type]
-                if cached is not None:
-                    cached_skills.extend(cached)  # type: ignore[arg-type]
-                    continue
+                if current_fp and current_fp == stored_fp:
+                    cached = disk_cache.get(f"pkg_skills:{fp_key}")  # type: ignore[arg-type]
+                    if cached is not None:
+                        cached_skills.extend(cached)  # type: ignore[arg-type]
+                        continue
 
-            changed_sources.append(src)
+                changed_sources.append(src)
 
         if changed_sources:
 
             def _scan_one(resolved_source: Path) -> list[dict[str, Any]]:
                 source_skills: list[dict[str, Any]] = []
-                ignore_spec = load_ignore_spec(resolved_source)
+                from skill_manager.core.quick_copy import project_root_for_project
+                ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
                     for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):
                         if not child.is_dir() or is_ignored(child, resolved_source, ignore_spec):
@@ -278,17 +324,38 @@ class DiscoveryService:
 
             for src, new_skills in zip(changed_sources, parallel_results, strict=False):
                 try:
-                    skills.extend(new_skills)
-                    fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+                    skills.extend(new_skills)  # type: ignore[arg-type]
+                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
                     disk_cache.set(fp_key, compute_dir_fingerprint(src))
                     disk_cache.set(f"pkg_skills:{fp_key}", new_skills)
                 except Exception as e:
                     logger.warning("[DISCOVERY] Scan failed for %s: %s", src, e)
 
-        return cached_skills + skills
+        # Verification: remove skills whose local_path no longer exists on disk
+        all_skills = cached_skills + skills
+        verified: list[dict[str, Any]] = []
+        removed_count = 0
+        for skill in all_skills:
+            lp = skill.get("local_path", "")
+            if lp and not os.path.exists(lp):
+                logger.warning(
+                    "[DISCOVERY] Verification: removing missing skill %s (path=%s)",
+                    skill.get("name"),
+                    lp,
+                )
+                removed_count += 1
+                continue
+            verified.append(skill)
+        if removed_count:
+            logger.info("[DISCOVERY] Verification removed %d missing skill(s)", removed_count)
+        return verified
 
     def discover_projects_incremental(
-        self, disk_cache: Cache, parse_fn: Callable, cat_fn: Callable
+        self,
+        disk_cache: Cache,
+        parse_fn: Callable,
+        cat_fn: Callable,
+        force_full_scan: bool = False,
     ) -> list[dict[str, Any]]:
         """Discover project skills, skipping directories with unchanged fingerprints."""
         from skill_manager.core.quick_copy import resolve_resilient_path
@@ -311,7 +378,14 @@ class DiscoveryService:
         projects_state: list[dict[str, Any]] = []
 
         for resolved in unique_projects:
-            fp_key = f"{self._DIR_FP_PREFIX}{os.path.normcase(str(resolved))}"
+            if force_full_scan:
+                # Force full scan: skip fingerprint check, always re-scan
+                project_data = self._scan_single_project(str(resolved), resolved, parse_fn, cat_fn)
+                if project_data:
+                    projects_state.append(project_data)
+                continue
+
+            fp_key = f"proj_{self._DIR_FP_PREFIX}{os.path.normcase(str(resolved))}"
             current_fp = compute_dir_fingerprint(resolved)
             stored_fp = disk_cache.get(fp_key)  # type: ignore[arg-type]
 
@@ -328,7 +402,30 @@ class DiscoveryService:
                 disk_cache.set(fp_key, compute_dir_fingerprint(resolved))
                 disk_cache.set(f"proj_skills:{fp_key}", project_data)
 
-        return projects_state
+        # Verification: remove skills whose local_path no longer exists on disk
+        verified_projects: list[dict[str, Any]] = []
+        total_removed = 0
+        for project in projects_state:
+            original_count = len(project.get("skills", []))
+            verified_skills = [
+                s for s in project.get("skills", []) if os.path.exists(s.get("local_path", ""))
+            ]
+            removed = original_count - len(verified_skills)
+            if removed:
+                logger.warning(
+                    "[DISCOVERY] Verification: project %s had %d missing skill(s)",
+                    project.get("project_label"),
+                    removed,
+                )
+                total_removed += removed
+            project_copy = dict(project)
+            project_copy["skills"] = verified_skills
+            verified_projects.append(project_copy)
+        if total_removed:
+            logger.info(
+                "[DISCOVERY] Verification removed %d missing skill(s) from projects", total_removed
+            )
+        return verified_projects
 
     def _scan_single_project(
         self, project_path_str: str, resolved: Path, parse_fn: Callable, cat_fn: Callable

@@ -1,13 +1,16 @@
+"""Run lint and full test suite in parallel.
+
+Convenience wrapper — in CI, prefer direct uv commands:
+  uv run ruff check src tests --fix
+  uv run pytest -n auto --dist loadfile
+"""
+
 import subprocess
 import sys
 
 
 def main():
-    """
-    Executes linting and all tests in parallel.
-    1. Runs ruff check with auto-fix.
-    2. Runs pytest with parallel execution.
-    """
+    """Execute ruff lint + pytest in sequence."""
     print("Running linter (ruff)...")
     lint_cmd = ["uv", "run", "ruff", "check", "src", "tests", "--fix"]
 

@@ -567,6 +567,76 @@ Item {
                         }
                     }
 
+                    // Maintenance Section
+                    GlassPill {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: maintenanceSettingsLayout.implicitHeight + 32
+                        radius: Theme.radiusCard
+
+                        ColumnLayout {
+                            id: maintenanceSettingsLayout
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 12
+
+                            Text {
+                                text: "Maintenance"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+
+                                SettingsRow {
+                                    titleText: "Rebuild Skill Cache"
+                                    descriptionText: "Clears all caches (index + granular) and forces a full re-scan from disk.\nUse if skills appear incorrectly, projects show wrong entries, or deleted skills still appear."
+                                    ActionButton {
+                                        id: rebuildCacheButton
+                                        text: "Rebuild Cache"
+                                        width: 120
+                                        height: 36
+                                        onClicked: AppController.rebuildCache()
+                                        hoverEnabled: true
+
+                                        background: Rectangle {
+                                            radius: Theme.radiusButton
+                                            color: parent.hovered ? Theme.glassHover : "transparent"
+                                            border.color: Theme.glassBorder
+                                            border.width: 1
+                                        }
+
+                                        contentItem: Text {
+                                            text: parent.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.sizeBody
+                                            font.weight: Font.Medium
+                                            color: Theme.accent
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        ToolTip {
+                                            parent: rebuildCacheButton
+                                            text: "Force a full re-scan from disk.\nClears all caches and reloads."
+                                            delay: 500
+                                            visible: rebuildCacheButton.hovered
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
 
                 }
             }

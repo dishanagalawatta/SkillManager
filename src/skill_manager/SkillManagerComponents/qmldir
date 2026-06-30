@@ -33,8 +33,11 @@ CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml
 SourceEditDialog 1.0 dialogs/SourceEditDialog.qml
 ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml
-DeleteConfirmDialog 1.0 dialogs/DeleteConfirmDialog.qml
+CommandDeleteDialog 1.0 dialogs/CommandDeleteDialog.qml
+CommandRemovalConfirmDialog 1.0 dialogs/CommandRemovalConfirmDialog.qml
 ArchiveConfirmDialog 1.0 dialogs/ArchiveConfirmDialog.qml
 ProjectReorderDialog 1.0 dialogs/ProjectReorderDialog.qml
 GlassCheckBox 1.0 GlassCheckBox.qml
 ScreenshotOverlay 1.0 ScreenshotOverlay.qml
+CommandCarrySkillsDialog 1.0 dialogs/CommandCarrySkillsDialog.qml
+MissingSkillsDialog 1.0 dialogs/MissingSkillsDialog.qml

@@ -61,8 +61,9 @@ class TestConfigControllerSDET:
             assert "/absolute/path" in mock_app._sources
 
     def test_get_project_label_robustness(self, controller, mock_app):
-        # Test standard folder
-        assert controller.getProjectLabel("/home/user/MyProj") == "MyProj"
+
+        # Test standard folder (root path: canonical label includes "(.)")
+        assert controller.getProjectLabel("/home/user/MyProj") == "MyProj (.)"
 
         # Test .agents/skills folder
         assert controller.getProjectLabel("/home/user/MyProj/.agents/skills") == "MyProj"
