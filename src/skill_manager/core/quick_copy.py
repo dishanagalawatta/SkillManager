@@ -331,7 +331,9 @@ def discover_project_skills(
     # Parallelize project discovery
     projects_list = []
     parallel_results = Parallel(n_jobs=-1, prefer="processes")(
-        delayed(discover_single_project)(proj, parse_skill_md, categorize_skill, build_search_text, project_aliases)
+        delayed(discover_single_project)(
+            proj, parse_skill_md, categorize_skill, build_search_text, project_aliases
+        )
         for proj in unique_projects
     )
 

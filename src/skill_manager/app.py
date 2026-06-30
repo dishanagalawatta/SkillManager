@@ -947,7 +947,6 @@ class AppController(QObject):
     def confirmCommandSkillsCarry(self, project_path, command_paths_json, confirmed_skills_json):
         self.ops.confirmCommandSkillsCarry(project_path, command_paths_json, confirmed_skills_json)
 
-
     @Slot(str, list)
     def deleteSkillFromProjects(self, path, projects):
         self.ops.deleteSkillFromProjects(path, projects)

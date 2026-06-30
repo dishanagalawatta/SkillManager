@@ -274,6 +274,7 @@ class DiscoveryService:
             def _scan_one(resolved_source: Path) -> list[dict[str, Any]]:
                 source_skills: list[dict[str, Any]] = []
                 from skill_manager.core.quick_copy import project_root_for_project
+
                 ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
                     for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):

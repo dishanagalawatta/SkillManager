@@ -274,7 +274,9 @@ class TestUpdateMultiProject:
             assert r.ok, f"Expected ok result, got: {r.message}"
 
         # Holders check with aliases
-        holders = find_command_holder_projects("Cmd", [str(proj_a), str(proj_b)], project_aliases=aliases)
+        holders = find_command_holder_projects(
+            "Cmd", [str(proj_a), str(proj_b)], project_aliases=aliases
+        )
         assert "AliasA" in holders
         assert "AliasB" in holders
 
@@ -284,7 +286,9 @@ class TestUpdateMultiProject:
         proj_a_skills.mkdir(parents=True, exist_ok=True)
         proj_b_skills.mkdir(parents=True, exist_ok=True)
 
-        holders_sub = find_command_holder_projects("Cmd", [str(proj_a_skills), str(proj_b_skills)], project_aliases=aliases)
+        holders_sub = find_command_holder_projects(
+            "Cmd", [str(proj_a_skills), str(proj_b_skills)], project_aliases=aliases
+        )
         assert "AliasA" in holders_sub
         assert "AliasB" in holders_sub
 

@@ -8,6 +8,7 @@ Covers:
 - _poll_known_paths handles empty model gracefully
 - _poll_known_paths handles exceptions gracefully
 """
+
 from __future__ import annotations
 
 import os
@@ -77,8 +78,7 @@ class TestPerDirectoryWatcher:
 
     def test_stop_cancels_handler(self):
         cb = MagicMock()
-        with patch("watchdog.observers.Observer"), \
-             tempfile.TemporaryDirectory() as td:
+        with patch("watchdog.observers.Observer"), tempfile.TemporaryDirectory() as td:
             w = SkillFolderWatcher(paths=[td], callback=cb)
             w.start()
             assert w.started
@@ -101,6 +101,7 @@ class TestPollKnownPaths:
     def test_triggers_refresh_when_path_missing(self):
         # Import first to avoid dotenv issues during patching
         from skill_manager.app import AppController
+
         app = self._make_app_with_model(["/existent", "/missing-skill"])
         with patch("os.path.exists", side_effect=lambda p: p == "/existent"):
             AppController._poll_known_paths(app)
@@ -108,6 +109,7 @@ class TestPollKnownPaths:
 
     def test_no_refresh_when_all_exist(self):
         from skill_manager.app import AppController
+
         app = self._make_app_with_model(["/path/a", "/path/b"])
         with patch("os.path.exists", return_value=True):
             AppController._poll_known_paths(app)
@@ -115,12 +117,14 @@ class TestPollKnownPaths:
 
     def test_no_refresh_when_model_empty(self):
         from skill_manager.app import AppController
+
         app = self._make_app_with_model([])
         AppController._poll_known_paths(app)
         app.refreshSkills.assert_not_called()
 
     def test_handles_exception_gracefully(self):
         from skill_manager.app import AppController
+
         app = MagicMock()
         app._last_poll_ts = 0.0
         app._quick_copy_model.get_known_paths.side_effect = RuntimeError("boom")
@@ -130,9 +134,12 @@ class TestPollKnownPaths:
 
     def test_logs_missing_paths(self):
         from skill_manager.app import AppController
+
         app = self._make_app_with_model(["/a", "/b", "/c"])
-        with patch("os.path.exists", side_effect=lambda p: p != "/b"), \
-             patch("skill_manager.app.logger") as mock_logger:
+        with (
+            patch("os.path.exists", side_effect=lambda p: p != "/b"),
+            patch("skill_manager.app.logger") as mock_logger,
+        ):
             AppController._poll_known_paths(app)
             mock_logger.info.assert_called()
             call_args = mock_logger.info.call_args
@@ -145,6 +152,7 @@ class TestGetKnownPaths:
 
     def test_returns_paths(self):
         from skill_manager.core.models.qt_model import SkillModel
+
         model = SkillModel.__new__(SkillModel)
         model._all_skills = [
             MagicMock(local_path="/path/a"),
@@ -156,6 +164,7 @@ class TestGetKnownPaths:
 
     def test_empty_model(self):
         from skill_manager.core.models.qt_model import SkillModel
+
         model = SkillModel.__new__(SkillModel)
         model._all_skills = []
         result = model.get_known_paths()

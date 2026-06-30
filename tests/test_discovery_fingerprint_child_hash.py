@@ -1,4 +1,5 @@
 """Tests for compute_dir_fingerprint detecting child-name changes."""
+
 import hashlib
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def test_fingerprint_includes_child_names_hash_component():
 
     # Cleanup
     import shutil
+
     shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -50,13 +52,12 @@ def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
 
     # Delete one child (simulates removing brainstorming skill)
     import shutil
+
     shutil.rmtree(d / "child-a")
 
     fp_after = compute_dir_fingerprint(d)
 
-    assert fp_before != fp_after, (
-        "Fingerprint MUST change when a child dir is deleted"
-    )
+    assert fp_before != fp_after, "Fingerprint MUST change when a child dir is deleted"
 
 
 def test_fingerprint_changes_when_child_dir_renamed(tmp_path):
@@ -101,6 +102,7 @@ def test_hash_child_names_sorted():
     assert len(h1) == 16
 
     import shutil
+
     shutil.rmtree(tmp, ignore_errors=True)
 
 

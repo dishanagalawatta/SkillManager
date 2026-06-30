@@ -485,6 +485,7 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
     controller._update_packages = [{"package_path": str(update_source_path)}]
 
     service = MagicMock()
+
     def mock_discover_all(*args, **kwargs):
         cache_callback = kwargs.get("cache_callback")
         if cache_callback:
@@ -498,6 +499,7 @@ def test_controller_load_initial_data_success_and_error(controller, temp_dir):
             "project_labels": ["P"],
             "status": "Done",
         }
+
     service.discover_all.side_effect = mock_discover_all
 
     with (
@@ -794,9 +796,12 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     proj_label = compute_project_label(project_path)
-    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", [proj_label], "")
+    controller.updateCustomCommandFull(
+        str(cmd_file), "Cmd", "new body", "Commands", [proj_label], ""
+    )
 
     from PySide6.QtWidgets import QApplication
+
     QApplication.processEvents()
 
     assert emissions, (

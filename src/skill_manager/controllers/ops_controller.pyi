@@ -80,4 +80,3 @@ class OpsController(QObject):
     def confirmCommandSkillsCarry(
         self, project_path: str, command_paths_json: str, confirmed_skills_json: str
     ) -> None: ...
-

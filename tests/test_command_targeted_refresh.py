@@ -107,12 +107,17 @@ def test_removal_drops_stale_path_immediately(
     # After rescan of A and B: A has Cmd, B has nothing (removed)
     mock_discover.side_effect = [
         [_skill_dict("Cmd", path_a, proj_a)],  # projectA rescan
-        [],                                      # projectB rescan — nothing found
+        [],  # projectB rescan — nothing found
     ]
 
     # updateCustomCommandFull with confirmed_removals=["projectB"]
     ops_controller.updateCustomCommandFull(
-        str(path_a), "Cmd", "new body", "Commands", ["projectA"], "",
+        str(path_a),
+        "Cmd",
+        "new body",
+        "Commands",
+        ["projectA"],
+        "",
         confirmed_removals=["projectB"],
     )
 
