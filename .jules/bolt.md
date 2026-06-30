@@ -1,3 +1,7 @@
 ## 2024-06-22 - rapidfuzz process.extractOne early-exit regression
 **Learning:** `rapidfuzz.process.extractOne` evaluates the entire sequence to find the absolute maximum match. If the existing Python loop optimizes large list evaluations with an early exit (e.g. `if max_score > 70: break`), replacing it blindly with `extractOne` can actually cause performance regressions and functional differences.
 **Action:** Always verify if the original looping logic relies on early termination thresholds. If it does, and the list size is significant, avoid `extractOne` and instead optimize the Python loop using fast-path exact substring checks before invoking expensive `fuzz.ratio` operations.
+
+## 2025-02-20 - [Optimize Fuzzy Search Inner Loop]
+**Learning:** `rapidfuzz.process.extractOne` is extremely fast for finding the highest matching score across an array of tokens when delegated to the underlying C++ extension. However, dynamic inline list conversion like `dict.fromkeys()` executed per-document iteration adds severe O(N) overhead during slow path evaluation. Pre-computing this deduplication at index time guarantees maximum efficiency.
+**Action:** When working with nested fuzzy loops across lists of tokens, always verify if `rapidfuzz.process.extractOne` can be used with `score_cutoff` instead of manual Python loops, and critically evaluate whether invariant conversions (like deduplication) can be hoisted entirely out of the scoring loops into the upstream index or parsing structures.

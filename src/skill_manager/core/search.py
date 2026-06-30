@@ -10,7 +10,7 @@ import re
 from typing import Any
 
 try:
-    from rapidfuzz import fuzz
+    from rapidfuzz import fuzz, process
 except ImportError:
     # Fallback to basic matching if rapidfuzz is not available
     fuzz = None
@@ -63,7 +63,7 @@ class SkillIndexer:
             "tags": tags_lower,
             "description_tokens": description_tokens,
             "full_text": f"{name} {category} {description} {' '.join(tags)}".lower(),
-            "all_doc_tokens": all_doc_tokens,
+            "all_doc_tokens": list(dict.fromkeys(all_doc_tokens)),
         }
 
 
@@ -159,14 +159,12 @@ class SearchEngine:
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
-                    unique_doc_tokens = dict.fromkeys(all_doc_tokens)
                     for qt in query_tokens:
-                        for dt in unique_doc_tokens:
-                            score = fuzz.ratio(qt, dt)
-                            if score > max_token_match:
-                                max_token_match = score
-                            if max_token_match > 70:
-                                break
+                        match = process.extractOne(
+                            qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match
+                        )
+                        if match:
+                            max_token_match = match[1]
                         if max_token_match > 70:
                             break
 

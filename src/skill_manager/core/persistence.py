@@ -48,7 +48,7 @@ def _atomic_write_json(file_path: str | Path, data: Any, indent: bool = True) ->
         except OSError as e:
             # WinError 32: process cannot access the file (file in use)
             # WinError 2: file not found (temp file removed by another process)
-            if e.winerror in (32, 2) and attempt < max_retries - 1:
+            if getattr(e, "winerror", None) in (32, 2) and attempt < max_retries - 1:
                 wait = 0.05 * (2 ** attempt)  # 50ms, 100ms, 200ms
                 logger.warning(
                     "Atomic write to %s hit WinError %d (attempt %d/%d), retrying in %.0fms",
