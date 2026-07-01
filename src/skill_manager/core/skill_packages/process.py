@@ -22,15 +22,12 @@ def sanitize_token(text: str | None) -> str | None:
     # Matches http://token@ or https://token@ and masks the token part
     if "@" in text and ("http://" in text or "https://" in text):
         text = re.sub(r"(https?://)[^@/\s]+@", r"\1***@", text)
-    # Matches echo password=... in git credential helpers
+    # Matches echo password=... in git credential helpers.
+    # Unified pattern handles unquoted, single-quoted, and double-quoted
+    # tokens (including mixed-quote concatenation) in a single pass.
     if "echo password=" in text:
-        # Handle double-quoted passwords (remove quotes and content)
-        text = re.sub(r'(echo password=)"([^"]*)"', r"\1***", text)
-        # Handle single-quoted passwords (remove quotes and content)
-        text = re.sub(r"(echo password=)'([^']*)'", r"\1***", text)
-        # Handle unquoted passwords (stop at semicolon, newline, or end)
-        # Use negative lookahead to avoid matching after quotes are already processed
-        text = re.sub(r'(echo password=)(?![\'"])([^;\n]+)', lambda m: m.group(1) + "***", text)
+        pattern = r"(echo password=)(?:[^;\r\n\s'\"]|'[^']*'|\"(?:\\\\.|[^\"\\\\])*\")+"
+        text = re.sub(pattern, r"\1***", text)
 
     # Explicitly redact known token patterns
     if "ghp_" in text:
