@@ -18,7 +18,7 @@ Button {
 
     SleekToolTip {
         id: btnToolTip
-        visible: control.hovered && control.collapsed
+        visible: (control.hovered || control.visualFocus) && control.collapsed
         text: control.labelText
     }
 
