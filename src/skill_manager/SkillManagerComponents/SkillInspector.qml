@@ -153,7 +153,7 @@ Rectangle {
                     }
                     SleekToolTip {
                         text: "Argument (e.g. ultra)"
-                        visible: parent.hovered || parent.visualFocus
+                        visible: argField.hovered || argField.activeFocus
                     }
                 }
                 IconButton {
