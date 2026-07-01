@@ -49,14 +49,10 @@ def _atomic_write_json(file_path: str | Path, data: Any, indent: bool = True) ->
             # WinError 32: process cannot access the file (file in use)
             # WinError 2: file not found (temp file removed by another process)
             if getattr(e, "winerror", None) in (32, 2) and attempt < max_retries - 1:
-                wait = 0.05 * (2**attempt)  # 50ms, 100ms, 200ms
+                wait = 0.05 * (2 ** attempt)  # 50ms, 100ms, 200ms
                 logger.warning(
                     "Atomic write to %s hit WinError %d (attempt %d/%d), retrying in %.0fms",
-                    file_path,
-                    e.winerror,
-                    attempt + 1,
-                    max_retries,
-                    wait * 1000,
+                    file_path, e.winerror, attempt + 1, max_retries, wait * 1000,
                 )
                 time.sleep(wait)
                 continue
@@ -200,7 +196,9 @@ def load_cache() -> dict[str, Any] | None:
         validated = CacheState.model_validate(data).model_dump()
         # Normalize project_path in-memory for all skills
         if "skills" in validated:
-            validated["skills"] = [_normalize_skill_project_path(s) for s in validated["skills"]]
+            validated["skills"] = [
+                _normalize_skill_project_path(s) for s in validated["skills"]
+            ]
         return validated
     except (orjson.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning("[CACHE] Corrupted cache (%s).", e)

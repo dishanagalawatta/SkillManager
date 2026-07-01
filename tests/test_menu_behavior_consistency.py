@@ -70,21 +70,9 @@ def test_inspector_context_menus_disabled():
     command_inspector = (QML_DIR / "CommandInspector.qml").read_text(encoding="utf-8")
 
     # Verify that in SkillInspector, TextField and TextArea have ContextMenu.menu: null
-    assert (
-        re.search(r"id:\s*argField\s*\r?\n\s*ContextMenu\.menu:\s*null", skill_inspector)
-        is not None
-    )
-    assert (
-        re.search(r"id:\s*rawContentArea\s*\r?\n\s*ContextMenu\.menu:\s*null", skill_inspector)
-        is not None
-    )
+    assert re.search(r"id:\s*argField\s*\r?\n\s*ContextMenu\.menu:\s*null", skill_inspector) is not None
+    assert re.search(r"id:\s*rawContentArea\s*\r?\n\s*ContextMenu\.menu:\s*null", skill_inspector) is not None
 
     # Verify that in CommandInspector, TextField and TextArea have ContextMenu.menu: null
-    assert (
-        re.search(r"id:\s*nameField\s*\r?\n\s*ContextMenu\.menu:\s*null", command_inspector)
-        is not None
-    )
-    assert (
-        re.search(r"id:\s*bodyArea\s*\r?\n\s*ContextMenu\.menu:\s*null", command_inspector)
-        is not None
-    )
+    assert re.search(r"id:\s*nameField\s*\r?\n\s*ContextMenu\.menu:\s*null", command_inspector) is not None
+    assert re.search(r"id:\s*bodyArea\s*\r?\n\s*ContextMenu\.menu:\s*null", command_inspector) is not None

@@ -140,7 +140,9 @@ class TestDiscoverySafetyNet:
 
         # One skill kept, one removed
         state = PreparedModelState(
-            all_skills=[Skill(name="S1", local_path="/p/s1", is_package=True)],
+            all_skills=[
+                Skill(name="S1", local_path="/p/s1", is_package=True)
+            ],
             search_engine=MagicMock(),
             all_filtered_skills=[],
             visible_rows=[],

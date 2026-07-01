@@ -81,9 +81,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     # --- 2. Search Filtering ---
     # Wait for async Loader to finish creating LibraryView
-    qtbot.waitUntil(
-        lambda: root.findChild(QQuickItem, "librarySearchInput") is not None, timeout=3000
-    )
+    qtbot.waitUntil(lambda: root.findChild(QQuickItem, "librarySearchInput") is not None, timeout=3000)
     search_input = root.findChild(QQuickItem, "librarySearchInput")
     assert search_input is not None
 

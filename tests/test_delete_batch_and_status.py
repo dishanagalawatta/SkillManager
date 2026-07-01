@@ -16,7 +16,6 @@ from skill_manager.core.models.qt_model import SkillModel
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 
-
 def _make_skill(name: str, path: str) -> Skill:
     return Skill(name=name, local_path=path, category="Dev")
 
@@ -48,7 +47,6 @@ def real_model():
 
 # ── Tests ───────────────────────────────────────────────────────────────
 
-
 class TestQueuedStatusUpdate:
     """The background delete thread must use QMetaObject.invokeMethod for status."""
 
@@ -59,9 +57,7 @@ class TestQueuedStatusUpdate:
         ]
 
         with (
-            patch(
-                "skill_manager.controllers.ops_controller.delete_project_skill_folders"
-            ) as del_fn,
+            patch("skill_manager.controllers.ops_controller.delete_project_skill_folders") as del_fn,
             patch("skill_manager.controllers.ops_controller.patch_cache_remove"),
             patch("skill_manager.controllers.ops_controller.QMetaObject") as mock_qmo,
         ):
@@ -82,7 +78,6 @@ class TestQueuedStatusUpdate:
             # Third positional arg is the ConnectionType (QueuedConnection)
             # PySide6 Qt.ConnectionType.QueuedConnection is 0x2
             from PySide6.QtCore import Qt
-
             assert call_args[0][2] == Qt.ConnectionType.QueuedConnection
 
 
@@ -96,9 +91,7 @@ class TestStatusFallback:
         ]
 
         with (
-            patch(
-                "skill_manager.controllers.ops_controller.delete_project_skill_folders"
-            ) as del_fn,
+            patch("skill_manager.controllers.ops_controller.delete_project_skill_folders") as del_fn,
             patch("skill_manager.controllers.ops_controller.patch_cache_remove"),
             patch("skill_manager.controllers.ops_controller.QMetaObject") as mock_qmo,
             patch("skill_manager.controllers.ops_controller.logger") as mock_logger,

@@ -202,9 +202,7 @@ class OpsController(BaseController):
                 )
                 for d in result["details"]:
                     if d["status"] in ("skipped", "failed"):
-                        logger.warning(
-                            "[DELETE] %s: %s — %s", d["skill"], d["status"], d["message"]
-                        )
+                        logger.warning("[DELETE] %s: %s — %s", d["skill"], d["status"], d["message"])
 
             # ── Step 2: Delete Files (Commands + Screenshots) via unlink
             file_items = command_items + screenshot_items
@@ -242,15 +240,12 @@ class OpsController(BaseController):
             if hasattr(self.app, "_set_status"):
                 try:
                     ok = QMetaObject.invokeMethod(
-                        self.app,
-                        "_set_status",
+                        self.app, "_set_status",
                         Qt.ConnectionType.QueuedConnection,
                         Q_ARG(str, status),
                     )
                     if not ok:
-                        logger.warning(
-                            "[DELETE] invokeMethod(_set_status) returned False; falling back to direct call"
-                        )
+                        logger.warning("[DELETE] invokeMethod(_set_status) returned False; falling back to direct call")
                         try:
                             self.app._set_status(status)
                         except Exception as exc:
@@ -685,16 +680,11 @@ class OpsController(BaseController):
 
         from skill_manager.core.copier import find_missing_skills_for_commands
         from skill_manager.core.quick_copy import project_root_for_project
-
         for result in created:
             if result.path:
                 project_path = project_root_for_project(result.path)
                 cmd_dict = {"local_path": str(result.path), "name": result.path.stem}
-                logger.info(
-                    "[CARRY CREATE] Checking missing skills for command: %s in project: %s",
-                    result.path,
-                    project_path,
-                )
+                logger.info("[CARRY CREATE] Checking missing skills for command: %s in project: %s", result.path, project_path)
                 missing = find_missing_skills_for_commands(
                     [cmd_dict],
                     project_path,
@@ -703,18 +693,16 @@ class OpsController(BaseController):
                 logger.info("[CARRY CREATE] Found missing skills: %s", missing)
                 if missing:
                     from dataclasses import asdict
-
-                    missing_dicts = [
-                        asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing
-                    ]
+                    missing_dicts = [asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing]
                     QTimer.singleShot(
                         0,
                         self,
-                        lambda p=project_path, rp=result.path, m=missing_dicts: (
-                            self.commandSkillsCarryPrompt.emit(
-                                json.dumps([str(rp)]), str(p), json.dumps(m)
-                            )
-                        ),
+                        lambda p=project_path, rp=result.path, m=missing_dicts:
+                        self.commandSkillsCarryPrompt.emit(
+                            json.dumps([str(rp)]),
+                            str(p),
+                            json.dumps(m)
+                        )
                     )
 
     def _snapshot_affected_paths(self, affected_project_paths: set[Path]) -> set[str]:
@@ -725,19 +713,11 @@ class OpsController(BaseController):
         snap: set[str] = set()
         for model in (self.app._library_model, self.app._quick_copy_model):
             for skill in model._all_skills:
-                sp = (
-                    skill.project_path
-                    if hasattr(skill, "project_path")
-                    else skill.get("project_path", "")
-                )
+                sp = skill.project_path if hasattr(skill, "project_path") else skill.get("project_path", "")
                 if not sp:
                     continue
                 if str(get_skills_dir(sp)) in affected_norm:
-                    lp = (
-                        skill.local_path
-                        if hasattr(skill, "local_path")
-                        else skill.get("local_path", "")
-                    )
+                    lp = skill.local_path if hasattr(skill, "local_path") else skill.get("local_path", "")
                     if lp:
                         snap.add(lp)
         return snap
@@ -836,9 +816,7 @@ class OpsController(BaseController):
         # Include paths of any removed projects
         if canonical and canonical.pending_removals:
             for label in canonical.pending_removals:
-                target = find_project_path_by_label(
-                    label, self.app._projects, project_aliases=self.app._project_aliases
-                )
+                target = find_project_path_by_label(label, self.app._projects, project_aliases=self.app._project_aliases)
                 if target:
                     affected_project_paths.add(project_root_for_project(target))
 
@@ -846,9 +824,7 @@ class OpsController(BaseController):
         # where pending_removals is empty but the user confirmed deletions)
         if confirmed_removals:
             for label in confirmed_removals:
-                target = find_project_path_by_label(
-                    label, self.app._projects, project_aliases=self.app._project_aliases
-                )
+                target = find_project_path_by_label(label, self.app._projects, project_aliases=self.app._project_aliases)
                 if target:
                     affected_project_paths.add(project_root_for_project(target))
 
@@ -901,16 +877,11 @@ class OpsController(BaseController):
 
             from skill_manager.core.copier import find_missing_skills_for_commands
             from skill_manager.core.quick_copy import project_root_for_project
-
             for r in updated:
                 if r.path:
                     proj_root = project_root_for_project(r.path)
                     cmd_dict = {"local_path": str(r.path), "name": r.path.stem}
-                    logger.info(
-                        "[CARRY UPDATE] Checking missing skills for command: %s in project: %s",
-                        r.path,
-                        proj_root,
-                    )
+                    logger.info("[CARRY UPDATE] Checking missing skills for command: %s in project: %s", r.path, proj_root)
                     missing = find_missing_skills_for_commands(
                         [cmd_dict],
                         proj_root,
@@ -919,18 +890,16 @@ class OpsController(BaseController):
                     logger.info("[CARRY UPDATE] Found missing skills: %s", missing)
                     if missing:
                         from dataclasses import asdict
-
-                        missing_dicts = [
-                            asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing
-                        ]
+                        missing_dicts = [asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing]
                         QTimer.singleShot(
                             0,
                             self,
-                            lambda p=proj_root, rp=r.path, m=missing_dicts: (
-                                self.commandSkillsCarryPrompt.emit(
-                                    json.dumps([str(rp)]), str(p), json.dumps(m)
-                                )
-                            ),
+                            lambda p=proj_root, rp=r.path, m=missing_dicts:
+                            self.commandSkillsCarryPrompt.emit(
+                                json.dumps([str(rp)]),
+                                str(p),
+                                json.dumps(m)
+                            )
                         )
 
         QTimer.singleShot(0, _apply_merge)
@@ -954,9 +923,7 @@ class OpsController(BaseController):
         )
 
     @Slot(str, str, str)
-    def confirmCommandSkillsCarry(
-        self, project_path: str, command_paths_json: str, confirmed_skills_json: str
-    ):
+    def confirmCommandSkillsCarry(self, project_path: str, command_paths_json: str, confirmed_skills_json: str):
         """Second-phase of copy commands with carry. Copies commands and confirmed missing skills."""
         import json
         from pathlib import Path
@@ -1009,9 +976,7 @@ class OpsController(BaseController):
                     from skill_manager.core.persistence import patch_cache_add
 
                     pre_paths = self._snapshot_affected_paths({Path(project_path)})
-                    new_paths = {
-                        s.get("local_path", "") for s in all_discovered if s.get("local_path")
-                    }
+                    new_paths = {s.get("local_path", "") for s in all_discovered if s.get("local_path")}
                     stale_paths = pre_paths - new_paths
 
                     self.app._library_model._begin_batch()
@@ -1025,15 +990,12 @@ class OpsController(BaseController):
                     finally:
                         self.app._library_model._end_batch()
                         self.app._quick_copy_model._end_batch()
-                    logger.info(
-                        "[CARRY] Targeted refresh: %d skills merged for %s",
-                        len(all_discovered),
-                        project_path,
-                    )
+                    logger.info("[CARRY] Targeted refresh: %d skills merged for %s", len(all_discovered), project_path)
 
             QTimer.singleShot(0, self, _apply)
 
         self.app.task_runner.run(_run)
+
 
     @Slot(str, result=list)
     def skillProjectsForPath(self, local_path: str) -> "list[str]":
@@ -1072,13 +1034,11 @@ class OpsController(BaseController):
                 continue
             skill_folder = target / ".agents" / "skills" / folder_name
             if skill_folder.is_dir():
-                items_to_delete.append(
-                    {
-                        "local_path": str(skill_folder),
-                        "project_path": str(target),
-                        "name": folder_name,
-                    }
-                )
+                items_to_delete.append({
+                    "local_path": str(skill_folder),
+                    "project_path": str(target),
+                    "name": folder_name,
+                })
 
         if items_to_delete:
             self.deleteSkills(items_to_delete)
@@ -1095,9 +1055,7 @@ class OpsController(BaseController):
             return []
 
         stem = path.stem
-        return find_command_holder_projects(
-            stem, self.app._projects, project_aliases=self.app._project_aliases
-        )
+        return find_command_holder_projects(stem, self.app._projects, project_aliases=self.app._project_aliases)
 
     @Slot(str, list)
     def deleteCustomCommand(self, command_name: str, project_labels: "list[str]"):
@@ -1108,17 +1066,17 @@ class OpsController(BaseController):
         safe_name = build_command_filename(command_name)
         items = []
         for label in project_labels:
-            target = find_project_path_by_label(
-                label, self.app._projects, project_aliases=self.app._project_aliases
-            )
+            target = find_project_path_by_label(label, self.app._projects, project_aliases=self.app._project_aliases)
             if not target:
                 continue
             commands_dir = project_root_for_project(target) / ".agents" / "commands"
             file_path = commands_dir / safe_name
             if file_path.is_file():
-                items.append(
-                    {"name": command_name, "local_path": str(file_path), "is_command": True}
-                )
+                items.append({
+                    "name": command_name,
+                    "local_path": str(file_path),
+                    "is_command": True
+                })
 
         if items:
             self.deleteSkills(items)
@@ -1240,10 +1198,7 @@ class OpsController(BaseController):
             missing = result.get("missing_skills") or []
             if missing:
                 from dataclasses import asdict
-
-                missing_dicts = [
-                    asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing
-                ]
+                missing_dicts = [asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing]
                 QTimer.singleShot(
                     0,
                     self,
@@ -1377,14 +1332,8 @@ class OpsController(BaseController):
 
         all_skills = self.app._library_model._all_skills  # type: ignore[attr-defined]
         resolved = find_referenced_skills_in_command(command_path, all_skills)
-        by_folder = {
-            s.get("folder_name", "").lower(): s.get("name", "").lower()
-            for s in resolved
-            if s.get("folder_name")
-        }
-        by_name = {
-            s.get("name", "").lower(): s.get("name", "").lower() for s in resolved if s.get("name")
-        }
+        by_folder = {s.get("folder_name", "").lower(): s.get("name", "").lower() for s in resolved if s.get("folder_name")}
+        by_name = {s.get("name", "").lower(): s.get("name", "").lower() for s in resolved if s.get("name")}
 
         _, body = split_frontmatter(content)
 
@@ -1409,7 +1358,9 @@ class OpsController(BaseController):
             if display_name is None:
                 continue
 
-            ranges.append({"name": display_name, "start": m.start(), "end": m.end()})
+            ranges.append(
+                {"name": display_name, "start": m.start(), "end": m.end()}
+            )
 
         return ranges
 
@@ -1419,9 +1370,7 @@ class OpsController(BaseController):
 
     @Slot(QObject, str, int)
     @Slot(str, str, int)
-    def applySkillHighlights(
-        self, target: QObject | str, ranges_json: str, focused_index: int = -1
-    ) -> None:
+    def applySkillHighlights(self, target: QObject | str, ranges_json: str, focused_index: int = -1) -> None:
         """Apply QSyntaxHighlighter-based highlights to a QML TextArea.
 
         Parameters
@@ -1551,9 +1500,7 @@ class OpsController(BaseController):
             if obj_name == name:
                 has_doc = False
                 with contextlib.suppress(RuntimeError):
-                    has_doc = hasattr(obj, "textDocument") or (
-                        hasattr(obj, "property") and obj.property("textDocument") is not None
-                    )
+                    has_doc = hasattr(obj, "textDocument") or (hasattr(obj, "property") and obj.property("textDocument") is not None)
                 if has_doc:
                     results.append(obj)
 

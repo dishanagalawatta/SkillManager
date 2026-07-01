@@ -1,5 +1,4 @@
 """Regression tests: stat-poll must not trigger infinite refresh loops."""
-
 from __future__ import annotations
 
 import time

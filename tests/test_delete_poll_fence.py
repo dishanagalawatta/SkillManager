@@ -26,9 +26,7 @@ def test_is_deleting_set_true_during_delete(ops_controller, mock_app):
 
     with patch("skill_manager.controllers.ops_controller.delete_project_skill_folders") as mock_del:
         mock_del.return_value = {"deleted": 0, "failed": 0, "details": []}
-        ops_controller.deleteSkills(
-            [{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}]
-        )
+        ops_controller.deleteSkills([{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}])
 
     # After synchronous task_runner.run, _is_deleting should be False again
     assert ops_controller._is_deleting is False

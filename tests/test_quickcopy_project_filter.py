@@ -6,7 +6,6 @@ Covers:
 3. ``addOrUpdateSkills`` recomputing ``project_label`` from ``project_path``
 4. ``setCurrentProject`` with an unknown label (warning, empty list)
 """
-
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +17,6 @@ from skill_manager.core.quick_copy import project_label
 # ---------------------------------------------------------------------------
 # 1. Label parity
 # ---------------------------------------------------------------------------
-
 
 @pytest.mark.parametrize(
     "path, aliases",
@@ -42,7 +40,8 @@ def test_project_label_parity(path, aliases):
     expected = project_label(path, project_aliases=aliases)
     actual = ctrl.getProjectLabel(path)
     assert actual == expected, (
-        f"Label mismatch for {path!r}: project_label={expected!r}, getProjectLabel={actual!r}"
+        f"Label mismatch for {path!r}: "
+        f"project_label={expected!r}, getProjectLabel={actual!r}"
     )
 
 
@@ -56,7 +55,9 @@ def test_project_label_parity_with_alias():
 
     ctrl.setProjectAlias("/work/old-name", "Legacy Name")
 
-    expected = project_label("/work/old-name", project_aliases={"/work/old-name": "Legacy Name"})
+    expected = project_label(
+        "/work/old-name", project_aliases={"/work/old-name": "Legacy Name"}
+    )
     actual = ctrl.getProjectLabel("/work/old-name")
     assert actual == expected
     assert actual == "Legacy Name"
@@ -76,14 +77,14 @@ def test_project_label_parity_root_path_no_aliases():
     expected = project_label(path)
     actual = ctrl.getProjectLabel(path)
     assert actual == expected, (
-        f"Root path label mismatch: project_label={expected!r}, getProjectLabel={actual!r}"
+        f"Root path label mismatch: project_label={expected!r}, "
+        f"getProjectLabel={actual!r}"
     )
 
 
 # ---------------------------------------------------------------------------
 # 2. Boot normalization
 # ---------------------------------------------------------------------------
-
 
 def _make_config(projects, aliases=None):
     """Build a mock ConfigManager for AppController tests."""
@@ -182,7 +183,6 @@ def test_boot_normalize_no_change_when_already_normalized(tmp_path):
 # 3. addOrUpdateSkills normalizes project_label
 # ---------------------------------------------------------------------------
 
-
 def test_add_or_update_skills_normalizes_project_label(tmp_path):
     """addOrUpdateSkills recomputes project_label even if one is provided."""
     from skill_manager.core.models.qt_model import SkillModel
@@ -262,7 +262,6 @@ def test_add_or_update_skills_with_aliases(tmp_path):
 # ---------------------------------------------------------------------------
 # 4. setCurrentProject with unknown label
 # ---------------------------------------------------------------------------
-
 
 def test_set_current_project_unknown_label_keeps_filter():
     """setCurrentProject with an unknown label keeps the filter (empty list)."""

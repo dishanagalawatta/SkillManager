@@ -1,5 +1,4 @@
 """Tests that stat-poll triggers force_full_scan when paths are missing."""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

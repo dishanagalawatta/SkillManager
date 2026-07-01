@@ -1,5 +1,4 @@
 """Integration test: rebuildCache clears stale skills and re-discovers correctly."""
-
 import shutil
 from unittest.mock import MagicMock
 
@@ -21,12 +20,10 @@ def test_rebuild_cache_removes_stale_skills(tmp_path):
     model = SkillModel(config=MagicMock(get=MagicMock(return_value={})))
 
     # Populate model with both skills
-    model.setSkills(
-        [
-            {"name": "SkillA", "local_path": str(dir_a), "project_path": "", "project_label": "p"},
-            {"name": "SkillB", "local_path": str(dir_b), "project_path": "", "project_label": "p"},
-        ]
-    )
+    model.setSkills([
+        {"name": "SkillA", "local_path": str(dir_a), "project_path": "", "project_label": "p"},
+        {"name": "SkillB", "local_path": str(dir_b), "project_path": "", "project_label": "p"},
+    ])
     assert len(model._all_skills) == 2
 
     # Now delete skill-b (simulates user removing it)
@@ -34,11 +31,9 @@ def test_rebuild_cache_removes_stale_skills(tmp_path):
 
     # Simulate what happens after rebuildCache: setSkills is called again
     # with the discovery results (which should now exclude skill-b)
-    model.setSkills(
-        [
-            {"name": "SkillA", "local_path": str(dir_a), "project_path": "", "project_label": "p"},
-        ]
-    )
+    model.setSkills([
+        {"name": "SkillA", "local_path": str(dir_a), "project_path": "", "project_label": "p"},
+    ])
 
     assert len(model._all_skills) == 1
     assert model._all_skills[0].name == "SkillA"

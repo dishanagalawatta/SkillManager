@@ -18,9 +18,7 @@ def ops_controller(mock_app):
 def test_delete_logs_entry(ops_controller, caplog):
     """deleteSkills should log entry with item count."""
     with caplog.at_level(logging.INFO):
-        ops_controller.deleteSkills(
-            [{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}]
-        )
+        ops_controller.deleteSkills([{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}])
 
     assert "[DELETE] deleteSkills called with" in caplog.text
 
@@ -46,10 +44,7 @@ def test_delete_logs_failed_item(ops_controller, tmp_path, caplog):
     items = [{"name": "RO", "local_path": str(f), "is_command": True, "is_screenshot": False}]
 
     with (
-        patch(
-            "skill_manager.controllers.ops_controller.Path.unlink",
-            side_effect=PermissionError("denied"),
-        ),
+        patch("skill_manager.controllers.ops_controller.Path.unlink", side_effect=PermissionError("denied")),
         caplog.at_level(logging.ERROR),
     ):
         ops_controller.deleteSkills(items)

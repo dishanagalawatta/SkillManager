@@ -3,7 +3,6 @@
 Verifies that save_cache, load_cache, and patch_cache_add normalize
 project_path through get_skills_dir for consistency.
 """
-
 from unittest.mock import patch
 
 from skill_manager.core.persistence import (
@@ -70,7 +69,6 @@ def test_save_cache_normalizes_project_paths(tmp_path):
     assert cache_file.exists()
 
     import orjson
-
     with open(cache_file, "rb") as f:
         saved = orjson.loads(f.read())
 
@@ -115,7 +113,6 @@ def test_load_cache_normalizes_project_paths(tmp_path):
     }
 
     import orjson
-
     with open(cache_file, "wb") as f:
         f.write(orjson.dumps(cache_data))
 
@@ -149,7 +146,6 @@ def test_patch_cache_add_normalizes_paths(tmp_path):
     }
 
     import orjson
-
     with open(cache_file, "wb") as f:
         f.write(orjson.dumps(cache_data))
 

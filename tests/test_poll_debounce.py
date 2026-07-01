@@ -1,5 +1,4 @@
 """Tests for 5-second debounce on stat-poll."""
-
 from __future__ import annotations
 
 import time

@@ -1,5 +1,4 @@
 """Tests for rebuildCache() clearing both caches and resetting state."""
-
 from unittest.mock import MagicMock, patch
 
 
@@ -27,11 +26,9 @@ def test_rebuild_cache_clears_json_index(tmp_path):
 
     app = _make_app(tmp_path)
 
-    with (
-        patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(json_cache)),
-        patch("skill_manager.app.os.path.exists", return_value=True),
-        patch("skill_manager.app.os.remove") as mock_remove,
-    ):
+    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(json_cache)), \
+         patch("skill_manager.app.os.path.exists", return_value=True), \
+         patch("skill_manager.app.os.remove") as mock_remove:
         AppController.rebuildCache(app)
 
         mock_remove.assert_called_once_with(str(json_cache))
@@ -54,13 +51,9 @@ def test_rebuild_cache_clears_granular_diskcache(tmp_path):
 
     app = _make_app(tmp_path)
 
-    with (
-        patch(
-            "skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")
-        ),
-        patch("skill_manager.app.os.path.exists", return_value=False),
-        patch("skill_manager.core.discovery.get_discovery_cache") as mock_get_cache,
-    ):
+    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")), \
+         patch("skill_manager.app.os.path.exists", return_value=False), \
+         patch("skill_manager.core.discovery.get_discovery_cache") as mock_get_cache:
         mock_dc = Cache(str(discovery_cache_dir))
         mock_get_cache.return_value.__enter__ = lambda s: mock_dc
         mock_get_cache.return_value.__exit__ = MagicMock(return_value=False)
@@ -79,12 +72,8 @@ def test_rebuild_cache_resets_previous_skills(tmp_path):
 
     app = _make_app(tmp_path)
 
-    with (
-        patch(
-            "skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")
-        ),
-        patch("skill_manager.app.os.path.exists", return_value=False),
-    ):
+    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")), \
+         patch("skill_manager.app.os.path.exists", return_value=False):
         AppController.rebuildCache(app)
 
     assert app.discovery._previous_skills == {}
@@ -96,12 +85,8 @@ def test_rebuild_cache_triggers_load_initial_data(tmp_path):
 
     app = _make_app(tmp_path)
 
-    with (
-        patch(
-            "skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")
-        ),
-        patch("skill_manager.app.os.path.exists", return_value=False),
-    ):
+    with patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(tmp_path / "nonexistent.json")), \
+         patch("skill_manager.app.os.path.exists", return_value=False):
         AppController.rebuildCache(app)
 
     app.discovery.loadInitialData.assert_called_once_with(force_full_scan=True, silent=True)

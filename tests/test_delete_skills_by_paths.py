@@ -44,9 +44,7 @@ def test_delete_by_paths_deduplicates_across_models(mock_app, ops_controller):
     """When same path exists in both models, only delete once."""
     skill = {"name": "S3", "local_path": "/path/s3", "is_command": False}
     mock_app._library_model._all_skills = [skill]
-    mock_app._quick_copy_model._all_skills = [
-        {"name": "S3b", "local_path": "/path/s3", "is_command": False}
-    ]
+    mock_app._quick_copy_model._all_skills = [{"name": "S3b", "local_path": "/path/s3", "is_command": False}]
 
     with patch.object(ops_controller, "deleteSkills") as mock_delete:
         ops_controller.deleteSkillsByPaths(["/path/s3"])

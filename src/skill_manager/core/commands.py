@@ -110,9 +110,7 @@ def update_custom_command_file(
     # Resolve target project directory (None = "stay in current project").
     target_project_path: Path | None = None
     if project_label_name and project_paths is not None:
-        candidate = find_project_path_by_label(
-            project_label_name, project_paths, project_aliases=project_aliases
-        )
+        candidate = find_project_path_by_label(project_label_name, project_paths, project_aliases=project_aliases)
         if candidate is None:
             return CommandUpdateResult(
                 False, f"Error: Could not find project directory for {project_label_name}"
@@ -181,9 +179,7 @@ def create_custom_command_file(
     if not project_label_name or project_label_name == "All Projects":
         return CommandCreateResult(False, "Error: Please select a specific Project")
 
-    project_path = find_project_path_by_label(
-        project_label_name, project_paths, project_aliases=project_aliases
-    )
+    project_path = find_project_path_by_label(project_label_name, project_paths, project_aliases=project_aliases)
     if not project_path:
         return CommandCreateResult(
             False, f"Error: Could not find project directory for {project_label_name}"
@@ -292,9 +288,7 @@ def update_custom_command_file_multi(
         return [CommandUpdateResult(False, "No projects selected")]
 
     stem = Path(local_path).stem
-    current_holders = find_command_holder_projects(
-        stem, project_paths, project_aliases=project_aliases
-    )
+    current_holders = find_command_holder_projects(stem, project_paths, project_aliases=project_aliases)
     add_set = sorted(set(project_labels) - set(current_holders))
     keep_set = sorted(set(current_holders) & set(project_labels))
     remove_set = sorted(set(current_holders) - set(project_labels))
@@ -339,9 +333,7 @@ def update_custom_command_file_multi(
             # Skip the canonical label — already handled above
             if label == canonical_label:
                 continue
-            target = find_project_path_by_label(
-                label, project_paths, project_aliases=project_aliases
-            )
+            target = find_project_path_by_label(label, project_paths, project_aliases=project_aliases)
             if not target:
                 results.append(
                     CommandUpdateResult(
@@ -366,9 +358,7 @@ def update_custom_command_file_multi(
     if remove_set and confirmed_removals is not None:
         actual_removals = sorted(set(remove_set) & set(confirmed_removals))
         for label in actual_removals:
-            target = find_project_path_by_label(
-                label, project_paths, project_aliases=project_aliases
-            )
+            target = find_project_path_by_label(label, project_paths, project_aliases=project_aliases)
             if not target:
                 results.append(
                     CommandUpdateResult(

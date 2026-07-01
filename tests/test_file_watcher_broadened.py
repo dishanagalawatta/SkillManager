@@ -6,7 +6,6 @@ Covers:
 - Debounce still works for all event types
 - Edge cases: None timer, rapid events, cancel during debounce
 """
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock

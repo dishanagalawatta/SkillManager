@@ -32,8 +32,8 @@ class SkillRefHighlighter(QSyntaxHighlighter):
         self._ranges: list[tuple[int, int]] = []  # (start, end) pairs
         self._focused_index: int = -1
         self._accent = QColor(self._resolve_color(accent_color))
-        self._base_alpha: int = 80  # always-on translucent accent
-        self._focus_alpha: int = 180  # stronger for focused match
+        self._base_alpha: int = 80       # always-on translucent accent
+        self._focus_alpha: int = 180     # stronger for focused match
         self._underline_alpha: int = 220
 
     # ------------------------------------------------------------------

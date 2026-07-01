@@ -10,9 +10,7 @@ from skill_manager.utils.task_runner import SynchronousTaskRunner
 @pytest.fixture
 def ops_controller(mock_app):
     with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
-        mock_timer.side_effect = lambda msec, receiver, functor=None: (
-            functor() if functor is not None else receiver()
-        )
+        mock_timer.side_effect = lambda msec, receiver, functor=None: (functor() if functor is not None else receiver())
         yield OpsController(mock_app)
 
 
@@ -622,13 +620,11 @@ def test_update_custom_command_full(
     )
     mock_update_multi.return_value = [update_result]
 
-    mock_discover.return_value = [
-        {
-            "local_path": str(local_path),
-            "name": "Cmd",
-            "category": "Commands",
-        }
-    ]
+    mock_discover.return_value = [{
+        "local_path": str(local_path),
+        "name": "Cmd",
+        "category": "Commands",
+    }]
 
     ops_controller.updateCustomCommandFull(
         str(local_path),
@@ -690,13 +686,11 @@ def test_update_custom_command_full_moves_to_new_project(
     )
     mock_update_multi.return_value = [update_result]
 
-    mock_discover.return_value = [
-        {
-            "local_path": str(new_path),
-            "name": "cmd",
-            "category": "NewCat",
-        }
-    ]
+    mock_discover.return_value = [{
+        "local_path": str(new_path),
+        "name": "cmd",
+        "category": "NewCat",
+    }]
 
     ops_controller.updateCustomCommandFull(
         str(local_path), "cmd", "new body", "NewCat", ["ProjectB"], ""
@@ -748,9 +742,7 @@ def test_update_custom_command_full_emits_conflict_signal(
     )
     mock_update_multi.return_value = [update_result]
 
-    ops_controller.updateCustomCommandFull(
-        str(local_path), "cmd", "new body", "NewCat", ["ProjectB"]
-    )
+    ops_controller.updateCustomCommandFull(str(local_path), "cmd", "new body", "NewCat", ["ProjectB"])
 
     # The controller calls self.app.commandUpdateConflict.emit(...)
     # With MagicMock, the attribute creates a new mock each time, so we
@@ -1065,7 +1057,6 @@ def test_update_custom_command_refreshes_selection_real_discovery(
     )
 
     from PySide6.QtWidgets import QApplication
-
     QApplication.processEvents()
 
     # The command was updated; verify _selected_skill reflects the new body
@@ -1109,7 +1100,6 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
     )
 
     from PySide6.QtWidgets import QApplication
-
     QApplication.processEvents()
 
     # The old file should be gone, new file should exist
@@ -1284,7 +1274,6 @@ def test_confirm_command_removals_reinvokes_with_confirmed(
 
 def test_ops_controller_confirm_command_skills_carry(ops_controller, mock_app):
     import json
-
     with patch("skill_manager.core.copier.copy_commands_with_skill_carry") as mock_carry:
         mock_carry.return_value = {
             "copied": 1,
@@ -1293,7 +1282,9 @@ def test_ops_controller_confirm_command_skills_carry(ops_controller, mock_app):
             "missing_skills": [],
         }
         ops_controller.confirmCommandSkillsCarry(
-            "/proj/path", json.dumps(["/cmd/path"]), json.dumps([{"name": "Skill1"}])
+            "/proj/path",
+            json.dumps(["/cmd/path"]),
+            json.dumps([{"name": "Skill1"}])
         )
         mock_carry.assert_called_once_with(
             [{"local_path": "/cmd/path", "name": "path"}],
@@ -1301,7 +1292,9 @@ def test_ops_controller_confirm_command_skills_carry(ops_controller, mock_app):
             mock_app._library_model._all_skills,
             confirmed_skills=[{"name": "Skill1"}],
         )
-        mock_app._set_status.assert_called_with("Copied 1 command(s) and 2 skill(s) to project.")
+        mock_app._set_status.assert_called_with(
+            "Copied 1 command(s) and 2 skill(s) to project."
+        )
 
 
 @patch("skill_manager.core.discovery.DiscoveryService")
@@ -1322,13 +1315,8 @@ def test_ops_controller_create_custom_command_emits_carry_prompt(
     )
 
     with (
-        patch(
-            "skill_manager.core.commands.create_custom_command_files_multi", return_value=results
-        ),
-        patch(
-            "skill_manager.core.copier.find_missing_skills_for_commands",
-            return_value=[{"name": "Skill1"}],
-        ),
+        patch("skill_manager.core.commands.create_custom_command_files_multi", return_value=results),
+        patch("skill_manager.core.copier.find_missing_skills_for_commands", return_value=[{"name": "Skill1"}]),
     ):
         ops_controller.createCustomCommand("Cmd", "body", ["projA"], "Commands")
 
@@ -1358,10 +1346,7 @@ def test_ops_controller_update_custom_command_emits_carry_prompt(
 
     with (
         patch("skill_manager.core.commands.update_custom_command_file_multi", return_value=results),
-        patch(
-            "skill_manager.core.copier.find_missing_skills_for_commands",
-            return_value=[{"name": "Skill1"}],
-        ),
+        patch("skill_manager.core.copier.find_missing_skills_for_commands", return_value=[{"name": "Skill1"}]),
     ):
         ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "body", "Commands", ["projA"])
 

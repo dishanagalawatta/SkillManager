@@ -1,5 +1,6 @@
 """Tests for targeted re-scan: skillsDeleted signal triggers O(1) removal."""
 
+
 import pytest
 
 from skill_manager.controllers.discovery_controller import DiscoveryController
@@ -40,14 +41,10 @@ def test_skills_deleted_updates_previous_skills(mock_app, discovery_controller):
     from skill_manager.core.schemas import SkillRecord
 
     r1 = SkillRecord(
-        name="S1",
-        local_path="/local/s1",
-        category="dev",
+        name="S1", local_path="/local/s1", category="dev",
     )
     r2 = SkillRecord(
-        name="S2",
-        local_path="/local/s2",
-        category="dev",
+        name="S2", local_path="/local/s2", category="dev",
     )
     discovery_controller._previous_skills = {"/local/s1": r1, "/local/s2": r2}
 

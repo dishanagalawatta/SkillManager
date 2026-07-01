@@ -1,5 +1,4 @@
 """Tests for force_full_scan parameter in discovery pipeline."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -41,9 +40,7 @@ class TestForceFullScan:
         mock_disk_cache = MagicMock()
 
         with patch("skill_manager.core.discovery.compute_dir_fingerprint", return_value="fp1"):
-            service.discover_projects_incremental(
-                mock_disk_cache, _parse_skill, _cat_test, force_full_scan=True
-            )
+            service.discover_projects_incremental(mock_disk_cache, _parse_skill, _cat_test, force_full_scan=True)
             mock_disk_cache.get.assert_not_called()
 
     def test_discover_projects_incremental_no_force_checks_cache(self, tmp_path: Path) -> None:
@@ -74,12 +71,8 @@ class TestForceFullScan:
 
         mock_disk_cache.get.side_effect = mock_get
 
-        with patch(
-            "skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"
-        ):
-            result = service.discover_projects_incremental(
-                mock_disk_cache, _parse_skill, _cat_test, force_full_scan=False
-            )
+        with patch("skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"):
+            result = service.discover_projects_incremental(mock_disk_cache, _parse_skill, _cat_test, force_full_scan=False)
             assert mock_disk_cache.get.called
             assert result[0]["skills"][0]["name"] == "cached"
 
@@ -94,12 +87,8 @@ class TestForceFullScan:
         service = DiscoveryService(sources=[str(tmp_path)], projects=[])
         mock_disk_cache = MagicMock()
 
-        with patch(
-            "skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"
-        ):
-            service.discover_packages_incremental(
-                mock_disk_cache, _parse_skill_pkg, _cat_pkg, force_full_scan=True
-            )
+        with patch("skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"):
+            service.discover_packages_incremental(mock_disk_cache, _parse_skill_pkg, _cat_pkg, force_full_scan=True)
             mock_disk_cache.get.assert_not_called()
 
     def test_discover_packages_incremental_no_force_checks_cache(self, tmp_path: Path) -> None:
@@ -125,12 +114,8 @@ class TestForceFullScan:
 
         mock_disk_cache.get.side_effect = mock_get
 
-        with patch(
-            "skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"
-        ):
-            result = service.discover_packages_incremental(
-                mock_disk_cache, _parse_skill_pkg, _cat_pkg, force_full_scan=False
-            )
+        with patch("skill_manager.core.discovery.compute_dir_fingerprint", return_value="cached-fp"):
+            result = service.discover_packages_incremental(mock_disk_cache, _parse_skill_pkg, _cat_pkg, force_full_scan=False)
             assert mock_disk_cache.get.called
             assert result[0]["name"] == "cached-pkg"
 

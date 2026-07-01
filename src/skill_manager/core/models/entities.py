@@ -63,15 +63,12 @@ class Skill:
     def from_dict(cls, data: dict[str, Any]) -> "Skill":
         """Factory method to create a Skill from a raw dictionary."""
         from pathlib import Path
-
         raw_folder_name = data.get("folder_name")
         record = SkillRecord.model_validate(data)
         data = record.model_dump()
         # Handle some legacy key mappings
         is_package = data.get("is_package", data.get("is_source", False))
-        folder_name = raw_folder_name or (
-            Path(data["local_path"]).name if data.get("local_path") else ""
-        )
+        folder_name = raw_folder_name or (Path(data["local_path"]).name if data.get("local_path") else "")
 
         return cls(
             name=str(data.get("name", "")),
@@ -106,11 +103,8 @@ class Skill:
         Use only for data that was already validated (e.g. from discovery cache).
         """
         from pathlib import Path
-
         is_package = data.get("is_package", data.get("is_source", False))
-        folder_name = data.get("folder_name") or (
-            Path(data["local_path"]).name if data.get("local_path") else ""
-        )
+        folder_name = data.get("folder_name") or (Path(data["local_path"]).name if data.get("local_path") else "")
         return cls(
             name=str(data.get("name", "")),
             category=data.get("category", "General"),

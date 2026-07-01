@@ -50,7 +50,6 @@ class TestUIOpsFlow:
         # 5. Assert
         qtbot.waitUntil(lambda: model.rowCount() == 0, timeout=3000)
         import time
-
         time.sleep(0.1)
 
     def test_toggle_star_ui_updates_state(self, qml_engine, app_controller, qtbot, temp_dir):

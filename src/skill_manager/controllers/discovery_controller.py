@@ -132,7 +132,9 @@ class DiscoveryController(BaseController):
 
         try:
             # ---- Phase 2: discover (with incremental fingerprint cache) ----
-            cache_state_dict = self._discover_all_background(service, force_full_scan)
+            cache_state_dict = self._discover_all_background(
+                service, force_full_scan
+            )
 
             if self._is_cancelled(generation):
                 self._log_cancelled(generation)
@@ -165,14 +167,14 @@ class DiscoveryController(BaseController):
                 f"skills={len(prepared_states['library'].all_skills)}, elapsed={elapsed:.2f}s)",
                 data={
                     "generation": generation,
-                    "skill_count": len(prepared_states["library"].all_skills),
+                    "skill_count": len(prepared_states['library'].all_skills),
                     "elapsed_seconds": round(elapsed, 3),
                 },
             )
             logger.info(
                 "[DISCOVERY] Background pipeline complete: gen=%d, %d skills, %.2fs",
                 generation,
-                len(prepared_states["library"].all_skills),
+                len(prepared_states['library'].all_skills),
                 elapsed,
             )
 
@@ -276,9 +278,7 @@ class DiscoveryController(BaseController):
             return None
 
         # ---- Build visible rows (collapse/expand logic) ----
-        library_visible = engine.build_visible_rows(
-            library_all_filtered, library_state_obj.collapsed_categories
-        )
+        library_visible = engine.build_visible_rows(library_all_filtered, library_state_obj.collapsed_categories)
 
         if self._is_cancelled(generation):
             return None
@@ -296,9 +296,7 @@ class DiscoveryController(BaseController):
         if self._is_cancelled(generation):
             return None
 
-        quick_copy_visible = engine.build_visible_rows(
-            quick_copy_all_filtered, quick_copy_state_obj.collapsed_categories
-        )
+        quick_copy_visible = engine.build_visible_rows(quick_copy_all_filtered, quick_copy_state_obj.collapsed_categories)
 
         if self._is_cancelled(generation):
             return None
@@ -339,7 +337,7 @@ class DiscoveryController(BaseController):
                 categories=categories,
                 status=status,
                 generation=generation,
-            ),
+            )
         }
 
     def _build_filter_state_for_background(self, model) -> Any:
@@ -370,9 +368,7 @@ class DiscoveryController(BaseController):
     # ------------------------------------------------------------------
 
     @Slot(object)
-    def _commit_prepared_state(
-        self, prepared_states: dict[str, PreparedModelState] | PreparedModelState
-    ) -> None:
+    def _commit_prepared_state(self, prepared_states: dict[str, PreparedModelState] | PreparedModelState) -> None:
         """Commit fully pre-computed model states on the main thread.
 
         This is the only code that touches the Qt models.  All heavy
@@ -380,7 +376,10 @@ class DiscoveryController(BaseController):
         single ``beginResetModel``/``endResetModel`` pair.
         """
         if isinstance(prepared_states, PreparedModelState):
-            prepared_states = {"library": prepared_states, "quick_copy": prepared_states}
+            prepared_states = {
+                "library": prepared_states,
+                "quick_copy": prepared_states
+            }
 
         diag = get_diagnostic_logger()
 
@@ -421,7 +420,9 @@ class DiscoveryController(BaseController):
         # empty model causes the filter setters to queue work, and when
         # onIncubationReady drains the queue it triggers a second model
         # mutation while QML is creating delegates from the first one.
-        has_existing_skills = bool(self.app._library_model._all_skills)
+        has_existing_skills = bool(
+            self.app._library_model._all_skills
+        )
         if has_existing_skills:
             self.app._library_model.incubating = True
             self.app._quick_copy_model.incubating = True

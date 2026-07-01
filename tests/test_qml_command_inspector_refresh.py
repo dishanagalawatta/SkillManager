@@ -75,7 +75,6 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
     )
 
     from PySide6.QtWidgets import QApplication
-
     QApplication.processEvents()
 
     # Signal should fire
@@ -254,7 +253,9 @@ def test_command_inspector_uses_shared_dialog():
     assert "signal deleteRequested(string name, string path, bool isCommand)" in content, (
         "CommandInspector must declare deleteRequested signal"
     )
-    assert "deleteRequested(" in content, "CommandInspector must emit deleteRequested signal"
+    assert "deleteRequested(" in content, (
+        "CommandInspector must emit deleteRequested signal"
+    )
 
 
 def test_command_delete_dialog_uses_new_design_language():
@@ -394,7 +395,7 @@ def test_command_removal_dialog_uses_danger_role_button():
     )
     content = dialog.read_text(encoding="utf-8")
     assert 'role: "danger"' in content, (
-        'CommandRemovalConfirmDialog must use role: "danger" for the Remove Checked button'
+        "CommandRemovalConfirmDialog must use role: \"danger\" for the Remove Checked button"
     )
     assert "Remove Checked" in content, "Remove Checked button label must be present"
 
@@ -516,10 +517,12 @@ def test_action_button_supports_danger_role():
     )
     content = ab.read_text(encoding="utf-8")
     assert 'role === "danger"' in content, (
-        'ActionButton must handle role === "danger" in its color logic'
+        "ActionButton must handle role === \"danger\" in its color logic"
     )
     # The solid-danger branch must use Theme.danger as the fill (not transparent)
-    danger_block = re.search(r'role\s*===\s*"danger".*?return.*?Theme\.danger', content, re.DOTALL)
+    danger_block = re.search(
+        r'role\s*===\s*"danger".*?return.*?Theme\.danger', content, re.DOTALL
+    )
     assert danger_block, (
         "ActionButton role:danger must fill with Theme.danger (solid red), "
         "not the outline destructive style."
