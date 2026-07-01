@@ -17,3 +17,7 @@
 ## 2026-06-29 - Keyboard Accessibility for QML Tooltips
 **Learning:** In QML standard controls (like `Button`), binding a tooltip's `visible` property solely to `hovered` breaks keyboard accessibility for screen reader and keyboard-only users navigating via Tab.
 **Action:** Always include `visualFocus` in the visibility condition (e.g., `visible: (control.hovered || control.visualFocus) && condition`) to ensure the tooltip is accessible when navigated to via keyboard.
+
+## 2025-02-23 - Avoid Redundant Accessible Descriptions
+**Learning:** Setting `Accessible.description` to the exact same value as `Accessible.name` (e.g., both referencing a tooltip's text) creates a harmful redundancy where screen readers will announce the exact same text twice to the user.
+**Action:** When evaluating custom QML controls, if the desired description is identical to the accessible name, simply omit the `Accessible.description` property altogether to streamline screen reader verbosity.
