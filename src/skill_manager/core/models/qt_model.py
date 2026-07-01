@@ -632,6 +632,7 @@ class SkillModel(QAbstractListModel):
             self.totalSelectableCountChanged.emit()
 
         from PySide6.QtCore import QTimer
+
         QTimer.singleShot(0, _deferred_apply)
 
     def _apply_filter_with_diff(self):
@@ -674,6 +675,7 @@ class SkillModel(QAbstractListModel):
             self.aboutToMutateStructure.emit()
 
             import difflib
+
             old_keys = [s.local_path if s.local_path else str(id(s)) for s in old_list]
             new_keys = [s.local_path if s.local_path else str(id(s)) for s in new_list]
 
@@ -715,6 +717,7 @@ class SkillModel(QAbstractListModel):
             self._all_filtered_skills = new_all_filtered
 
             import difflib
+
             old_keys = [s.local_path if s.local_path else str(id(s)) for s in old_list]
             new_keys = [s.local_path if s.local_path else str(id(s)) for s in new_list]
 
@@ -748,6 +751,7 @@ class SkillModel(QAbstractListModel):
             self.totalSelectableCountChanged.emit()
 
         from PySide6.QtCore import QTimer
+
         QTimer.singleShot(0, _deferred_diff_apply)
 
     def _begin_batch(self):

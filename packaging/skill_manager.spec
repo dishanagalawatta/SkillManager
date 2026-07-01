@@ -16,12 +16,22 @@ added_files = [
 ]
 
 # Collect any additional data files if needed
-# added_files += collect_data_files('some_library')
+from PyInstaller.utils.hooks import collect_all
+
+# Collect metadata and submodules for dynamic packages
+apscheduler_datas, apscheduler_binaries, apscheduler_hiddenimports = collect_all('apscheduler')
+tzlocal_datas, tzlocal_binaries, tzlocal_hiddenimports = collect_all('tzlocal')
+pynput_datas, pynput_binaries, pynput_hiddenimports = collect_all('pynput')
+joblib_datas, joblib_binaries, joblib_hiddenimports = collect_all('joblib')
+
+added_files += apscheduler_datas + tzlocal_datas + pynput_datas + joblib_datas
+added_binaries = apscheduler_binaries + tzlocal_binaries + pynput_binaries + joblib_binaries
+added_hidden = apscheduler_hiddenimports + tzlocal_hiddenimports + pynput_hiddenimports + joblib_hiddenimports + ["git", "psutil", "msgpack"]
 
 a = Analysis(
     [os.path.join(base_path, "src", "skill_manager", "__main__.py")],
     pathex=[os.path.join(base_path, "src")],
-    binaries=[],
+    binaries=added_binaries,
     datas=added_files,
     hiddenimports=[
         "PySide6.QtQuick",
@@ -44,7 +54,7 @@ a = Analysis(
         "orjson",
         "diskcache",
         "sentry_sdk",
-    ],
+    ] + added_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

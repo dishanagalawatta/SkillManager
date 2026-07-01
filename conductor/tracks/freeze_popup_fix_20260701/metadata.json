@@ -1,0 +1,10 @@
+{
+  "slug": "freeze_popup_fix_20260701",
+  "title": "Fix PyInstaller frozen-build popup error",
+  "status": "completed",
+  "owner": "@DIKKA",
+  "created": "2026-07-01",
+  "completed": "2026-07-01",
+  "description": "Fix OSError WinError 6 popup in PyInstaller builds by switching joblib to threads backend in frozen mode",
+  "related_adrs": ["ADR-0021"]
+}

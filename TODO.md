@@ -24,20 +24,17 @@
 
 ## To Do (Ready for Pickup)
 
-* [ ] Autodetect skills mentioned in commands, carry (prompt user) skills when copy command to other projects.
+* [ ] Update readme FIle (Revert)
+* [ ] See for winget approval
+* [ ] Posthog implementation review.
 
 ## In Progress
-
-- [ ] **[High Severity]** fix failing github actions
 
 ---
 
 # 4. Bug Tracker
 
-test command copy to other projects.
-
-![1782231392537](image/TODO/1782231392537.png)
-
 ---
 
 # 5. Icebox / Backlog
+

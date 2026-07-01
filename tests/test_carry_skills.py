@@ -140,9 +140,7 @@ class TestFindMissingSkillsForCommands:
 
         cmd = _write_command(tmp_path, "plain", "Just some plain text.")
         s1 = _make_skill("git-pr", folder_name="git-pr")
-        result = find_missing_skills_for_commands(
-            [{"local_path": str(cmd)}], str(tmp_path), [s1]
-        )
+        result = find_missing_skills_for_commands([{"local_path": str(cmd)}], str(tmp_path), [s1])
         assert result == []
 
 
@@ -163,7 +161,9 @@ class TestCopyCommandsWithSkillCarry:
         (target / ".agents" / "skills").mkdir(parents=True)
 
         result = copy_commands_with_skill_carry(
-            [{"local_path": str(cmd)}], str(target), [s1],
+            [{"local_path": str(cmd)}],
+            str(target),
+            [s1],
             confirmed_skills=None,
         )
         assert len(result["missing_skills"]) == 1
@@ -181,11 +181,11 @@ class TestCopyCommandsWithSkillCarry:
         target = tmp_path / "target"
         (target / ".agents" / "skills").mkdir(parents=True)
 
-        skill_to_carry = _make_skill(
-            "git-pr", folder_name="git-pr", local_path=str(source)
-        )
+        skill_to_carry = _make_skill("git-pr", folder_name="git-pr", local_path=str(source))
         result = copy_commands_with_skill_carry(
-            [{"local_path": str(cmd)}], str(target), [skill_to_carry],
+            [{"local_path": str(cmd)}],
+            str(target),
+            [skill_to_carry],
             confirmed_skills=[skill_to_carry],
         )
         assert result["skills_copied"] >= 1
@@ -204,7 +204,9 @@ class TestCopyCommandsWithSkillCarry:
         cmd = _write_command(tmp_path / ".agents" / "commands", "deploy", "Use /git-pr.")
         skill = _make_skill("git-pr", folder_name="git-pr", local_path=str(target_skills))
         result = copy_commands_with_skill_carry(
-            [{"local_path": str(cmd)}], str(tmp_path), [skill],
+            [{"local_path": str(cmd)}],
+            str(tmp_path),
+            [skill],
             confirmed_skills=None,
         )
         assert result["missing_skills"] == []
@@ -218,7 +220,9 @@ class TestCopyCommandsWithSkillCarry:
         (target / ".agents" / "skills").mkdir(parents=True)
 
         result = copy_commands_with_skill_carry(
-            [{"local_path": str(cmd)}], str(target), [s1],
+            [{"local_path": str(cmd)}],
+            str(target),
+            [s1],
             confirmed_skills=[],
         )
         assert result["missing_skills"] == []

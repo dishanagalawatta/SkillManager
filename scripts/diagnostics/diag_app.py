@@ -1,13 +1,15 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import os
+
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtWidgets import QApplication
+
 from skill_manager.app import AppController
-from skill_manager.core.config import ConfigManager
 
 app = QApplication([])
 ctrl = AppController()

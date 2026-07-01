@@ -70,6 +70,10 @@ def setup_logging():
 
 
 def main():
+    import multiprocessing
+
+    multiprocessing.freeze_support()
+
     # Force-clear QML cache in dev mode (uv run / editable install)
     if is_dev_mode():
         force_clear_qml_disk_cache()

@@ -98,7 +98,7 @@ class TestEndBatchFirstPopulation:
         skills = [_make_skill(i) for i in range(30)]
         model._begin_batch()
         model.setSkills(skills)  # suppressed by batch
-        model._end_batch()       # should use diff (model was not empty)
+        model._end_batch()  # should use diff (model was not empty)
 
         # Should NOT emit layout or reset signals — diff emits granular signals
         assert "about" not in layout_signals, (

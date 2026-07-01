@@ -154,6 +154,7 @@ class TestGetSkillReferenceRanges:
 
         # The /git-pr reference in the body starts at some position in the body content (excluding frontmatter)
         from skill_manager.core.parsing.base import split_frontmatter
+
         content = cmd_file.read_text(encoding="utf-8")
         _, body = split_frontmatter(content)
         expected_start = body.index("/git-pr")
@@ -204,10 +205,9 @@ class TestApplySkillHighlights:
             # Apply highlights
             ranges = [{"name": "world", "start": 6, "end": 11}]
             import json
+
             app_controller.ops.applySkillHighlights(
-                "commandBodyTextArea",
-                json.dumps(ranges),
-                focused_index=-1
+                "commandBodyTextArea", json.dumps(ranges), focused_index=-1
             )
 
             # Verify the highlighter was attached to the underlying real QTextDocument
@@ -248,9 +248,7 @@ class TestCommandInspectorQML:
         )
 
         # Must have a Repeater for the dependency pills
-        assert "Repeater" in content, (
-            "CommandInspector must have a Repeater for dependency pills"
-        )
+        assert "Repeater" in content, "CommandInspector must have a Repeater for dependency pills"
 
         # Must have the onSkillChanged handler to update the lists
         assert "onSkillChanged" in content, (
@@ -317,9 +315,7 @@ class TestCommandInspectorQML:
             / "SkillManagerComponents"
             / "SkillReferenceOverlay.qml"
         )
-        assert not overlay.exists(), (
-            "SkillReferenceOverlay.qml should be deleted"
-        )
+        assert not overlay.exists(), "SkillReferenceOverlay.qml should be deleted"
 
 
 class TestFindQmlTextEdit:

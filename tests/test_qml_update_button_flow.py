@@ -505,9 +505,7 @@ class TestQmlConnectionsHandler:
 
     def test_projects_list_connections_handler_exists(self, qml_source):
         """UpdatesView must bind uv_projectsList.model to AppController.config_controller.updateProjects."""
-        assert (
-            "model: AppController.config_controller.updateProjects" in qml_source
-        )
+        assert "model: AppController.config_controller.updateProjects" in qml_source
 
     def test_connections_handler_uses_correct_signal(self, qml_source):
         """UpdatesView uses direct model binding — no Connections reset guard needed."""

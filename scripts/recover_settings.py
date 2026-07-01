@@ -64,9 +64,17 @@ def recover():
         print(f"  Migrated {len(legacy['skills'])} package configs")
 
     # Preserve valid settings from legacy that might be more recent
-    for key in ["client_format", "default_client", "show_archived",
-                "category_filter", "collection_filter", "show_commands",
-                "show_starred", "is_package_only", "is_source_only"]:
+    for key in [
+        "client_format",
+        "default_client",
+        "show_archived",
+        "category_filter",
+        "collection_filter",
+        "show_commands",
+        "show_starred",
+        "is_package_only",
+        "is_source_only",
+    ]:
         if key in legacy and key not in recovered:
             recovered[key] = legacy[key]
 
@@ -108,11 +116,15 @@ def recover():
         ui_state["window_opacity"] = 1.0
         fixed_corrupted = True
     if ui_state.get("window_width", 1200) < 400:
-        print(f"  [FIX] Detected tiny window_width={ui_state.get('window_width')}, resetting to 1200")
+        print(
+            f"  [FIX] Detected tiny window_width={ui_state.get('window_width')}, resetting to 1200"
+        )
         ui_state["window_width"] = 1200
         fixed_corrupted = True
     if ui_state.get("window_height", 800) < 400:
-        print(f"  [FIX] Detected tiny window_height={ui_state.get('window_height')}, resetting to 800")
+        print(
+            f"  [FIX] Detected tiny window_height={ui_state.get('window_height')}, resetting to 800"
+        )
         ui_state["window_height"] = 800
         fixed_corrupted = True
 

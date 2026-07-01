@@ -5,6 +5,7 @@ The stale-skill filtering is handled at the discovery/cache level
 addOrUpdateSkills accept whatever they receive — the discovery layer
 is responsible for only providing existing skills.
 """
+
 from unittest.mock import MagicMock
 
 

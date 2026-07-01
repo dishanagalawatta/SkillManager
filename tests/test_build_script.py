@@ -120,13 +120,20 @@ def test_spec_file_exclusions_and_hiddenimports():
     hiddenimports = []
     excludes = []
 
+    def extract_constants(expr_node):
+        constants = []
+        for child in ast.walk(expr_node):
+            if isinstance(child, ast.Constant):
+                constants.append(child.value)
+            elif hasattr(ast, "Str") and isinstance(child, ast.Str):  # legacy fallback
+                constants.append(child.s)
+        return constants
+
     for keyword in analysis_call.keywords:
         if keyword.arg == "hiddenimports":
-            assert isinstance(keyword.value, ast.List)
-            hiddenimports = [el.value for el in keyword.value.elts if isinstance(el, ast.Constant)]
+            hiddenimports = extract_constants(keyword.value)
         elif keyword.arg == "excludes":
-            assert isinstance(keyword.value, ast.List)
-            excludes = [el.value for el in keyword.value.elts if isinstance(el, ast.Constant)]
+            excludes = extract_constants(keyword.value)
 
     # collections.abc is a stdlib submodule; listing it as a hiddenimport
     # causes PyInstaller to emit "ERROR: Hidden import 'collections.abc' not found"

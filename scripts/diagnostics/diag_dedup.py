@@ -1,11 +1,14 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import os
+
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtWidgets import QApplication
+
 from skill_manager.app import AppController
 from skill_manager.core.discovery import DiscoveryService
 
@@ -25,7 +28,7 @@ service = DiscoveryService(
     starred_paths=ctrl._starred_paths,
     project_aliases=ctrl._project_aliases,
 )
-    
+
 result = service.discover_all(use_cache=False, force_full_scan=False)
 skills = result.get("skills", [])
 

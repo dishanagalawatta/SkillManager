@@ -62,7 +62,9 @@ class DiscoveryController(BaseController):
     # ------------------------------------------------------------------
 
     @Slot()
-    def loadInitialData(self, force_full_scan: bool = False, silent: bool = True):
+    def loadInitialData(
+        self, force_full_scan: bool = False, silent: bool = True, skip_discovery: bool = False
+    ):
         """Kick off a background discovery pipeline.
 
         Parameters
@@ -73,6 +75,11 @@ class DiscoveryController(BaseController):
             When True (the default), do **not** set ``is_loading`` or show
             a status message.  The UI stays completely fluid while the
             background thread works.
+        skip_discovery:
+            When True, load the existing cache without running a new
+            discovery scan.  Used by the peer-heartbeat optimization:
+            if a sibling instance recently wrote the cache, skip the
+            expensive scan and load from disk directly.
         """
         with self._refresh_lock:
             self._refresh_generation += 1
@@ -91,7 +98,15 @@ class DiscoveryController(BaseController):
             self.app.isLoadingChanged.emit()
             self.app._set_status("Scanning skills...")
 
-        if hasattr(self.app, "task_runner"):
+        if skip_discovery:
+            # Peer heartbeat: load from cache directly without scanning
+            if hasattr(self.app, "task_runner"):
+                self.app.task_runner.run(self._run_pipeline_from_cache, args=(gen,))
+            else:
+                threading.Thread(
+                    target=self._run_pipeline_from_cache, args=(gen,), daemon=True
+                ).start()
+        elif hasattr(self.app, "task_runner"):
             self.app.task_runner.run(self._run_pipeline, args=(gen, force_full_scan))
         else:
             threading.Thread(
@@ -132,9 +147,7 @@ class DiscoveryController(BaseController):
 
         try:
             # ---- Phase 2: discover (with incremental fingerprint cache) ----
-            cache_state_dict = self._discover_all_background(
-                service, force_full_scan
-            )
+            cache_state_dict = self._discover_all_background(service, force_full_scan)
 
             if self._is_cancelled(generation):
                 self._log_cancelled(generation)
@@ -167,14 +180,14 @@ class DiscoveryController(BaseController):
                 f"skills={len(prepared_states['library'].all_skills)}, elapsed={elapsed:.2f}s)",
                 data={
                     "generation": generation,
-                    "skill_count": len(prepared_states['library'].all_skills),
+                    "skill_count": len(prepared_states["library"].all_skills),
                     "elapsed_seconds": round(elapsed, 3),
                 },
             )
             logger.info(
                 "[DISCOVERY] Background pipeline complete: gen=%d, %d skills, %.2fs",
                 generation,
-                len(prepared_states['library'].all_skills),
+                len(prepared_states["library"].all_skills),
                 elapsed,
             )
 
@@ -183,6 +196,51 @@ class DiscoveryController(BaseController):
                 return
             traceback.print_exc()
             self._discoveryError.emit(f"Discovery failed: {exc}")
+
+    def _run_pipeline_from_cache(self, generation: int) -> None:
+        """Load from cache directly without running a discovery scan.
+
+        Used by the peer-heartbeat optimization: if a sibling instance
+        recently wrote the cache, skip the expensive filesystem scan and
+        load from disk directly.
+        """
+        from skill_manager.core.persistence import load_cache
+
+        t0 = time.monotonic()
+
+        try:
+            cached = load_cache()
+            if cached is None:
+                logger.info("[HEARTBEAT] Cache miss — falling back to full discovery")
+                self._run_pipeline(generation, force_full_scan=False)
+                return
+
+            cache_state = CacheState.model_validate(cached)
+
+            prepared_states = self._build_prepared_states(cache_state, generation)
+
+            if self._is_cancelled(generation):
+                self._log_cancelled(generation)
+                return
+
+            if prepared_states is None:
+                return
+
+            self._discoveryPrepared.emit(prepared_states)
+
+            elapsed = time.monotonic() - t0
+            logger.info(
+                "[HEARTBEAT] Cache load complete: gen=%d, %d skills, %.2fs",
+                generation,
+                len(prepared_states["library"].all_skills),
+                elapsed,
+            )
+
+        except Exception as exc:
+            if self._is_cancelled(generation):
+                return
+            logger.warning("[HEARTBEAT] Cache load failed, falling back to discovery: %s", exc)
+            self._run_pipeline(generation, force_full_scan=False)
 
     def _discover_all_background(
         self,
@@ -278,7 +336,9 @@ class DiscoveryController(BaseController):
             return None
 
         # ---- Build visible rows (collapse/expand logic) ----
-        library_visible = engine.build_visible_rows(library_all_filtered, library_state_obj.collapsed_categories)
+        library_visible = engine.build_visible_rows(
+            library_all_filtered, library_state_obj.collapsed_categories
+        )
 
         if self._is_cancelled(generation):
             return None
@@ -296,7 +356,9 @@ class DiscoveryController(BaseController):
         if self._is_cancelled(generation):
             return None
 
-        quick_copy_visible = engine.build_visible_rows(quick_copy_all_filtered, quick_copy_state_obj.collapsed_categories)
+        quick_copy_visible = engine.build_visible_rows(
+            quick_copy_all_filtered, quick_copy_state_obj.collapsed_categories
+        )
 
         if self._is_cancelled(generation):
             return None
@@ -337,7 +399,7 @@ class DiscoveryController(BaseController):
                 categories=categories,
                 status=status,
                 generation=generation,
-            )
+            ),
         }
 
     def _build_filter_state_for_background(self, model) -> Any:
@@ -368,7 +430,9 @@ class DiscoveryController(BaseController):
     # ------------------------------------------------------------------
 
     @Slot(object)
-    def _commit_prepared_state(self, prepared_states: dict[str, PreparedModelState] | PreparedModelState) -> None:
+    def _commit_prepared_state(
+        self, prepared_states: dict[str, PreparedModelState] | PreparedModelState
+    ) -> None:
         """Commit fully pre-computed model states on the main thread.
 
         This is the only code that touches the Qt models.  All heavy
@@ -376,10 +440,7 @@ class DiscoveryController(BaseController):
         single ``beginResetModel``/``endResetModel`` pair.
         """
         if isinstance(prepared_states, PreparedModelState):
-            prepared_states = {
-                "library": prepared_states,
-                "quick_copy": prepared_states
-            }
+            prepared_states = {"library": prepared_states, "quick_copy": prepared_states}
 
         diag = get_diagnostic_logger()
 
@@ -413,24 +474,21 @@ class DiscoveryController(BaseController):
             return
 
         # ---- Apply prepared state to both models ----
-        # Only set incubating when the model already has skills (refresh),
-        # not on the initial load.  On first startup _all_skills is empty,
-        # so replacePreparedState applies immediately and there's nothing
-        # for QML to incubate against.  Setting incubating=True on an
-        # empty model causes the filter setters to queue work, and when
-        # onIncubationReady drains the queue it triggers a second model
-        # mutation while QML is creating delegates from the first one.
-        has_existing_skills = bool(
-            self.app._library_model._all_skills
-        )
-        if has_existing_skills:
+        # Set incubating based on whether the new prepared state has skills.
+        # This protects both initial startup populations and subsequent refreshes from
+        # race conditions caused by subsequent synchronous filter operations.
+        lib_incubating = bool(library_prepared.all_skills)
+        qc_incubating = bool(quick_copy_prepared.all_skills)
+        if lib_incubating:
             self.app._library_model.incubating = True
+        if qc_incubating:
             self.app._quick_copy_model.incubating = True
 
         # Check cancellation one last time before committing
         if self._is_cancelled(library_prepared.generation):
-            if has_existing_skills:
+            if lib_incubating:
                 self.app._library_model.incubating = False
+            if qc_incubating:
                 self.app._quick_copy_model.incubating = False
             diag.log_event(
                 "INFO",

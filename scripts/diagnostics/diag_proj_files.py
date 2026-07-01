@@ -1,12 +1,15 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import os
+
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-from skill_manager.core.discovery import DiscoveryService, get_discovery_cache, parse_skill_md, categorize_skill
-from skill_manager.app import AppController
 from PySide6.QtWidgets import QApplication
+
+from skill_manager.app import AppController
+from skill_manager.core.discovery import DiscoveryService, get_discovery_cache
 
 app = QApplication([])
 ctrl = AppController()
@@ -17,11 +20,12 @@ service = DiscoveryService(
     starred_paths=ctrl._starred_paths,
     project_aliases=ctrl._project_aliases,
 )
-    
+
 with get_discovery_cache() as cache:
     # Just let it do its thing, but I want to print what is actually scanned
     for project in service.projects:
         from skill_manager.core.quick_copy import resolve_resilient_path
+
         resolved = resolve_resilient_path(project)
         if "SkillManager" in str(resolved):
             print(f"Scanning: {resolved}")
