@@ -72,7 +72,6 @@ Rectangle {
 
                     Accessible.role: Accessible.Button
                     Accessible.name: sidebarToolTip.text
-                    Accessible.description: sidebarToolTip.text
                 }
             }
             
