@@ -14,7 +14,6 @@ hotkey sets that can change at runtime is ``HotKey`` + ``Listener``
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -52,10 +51,7 @@ class GlobalHotkeyManager(QObject):
         self._lock = threading.Lock()
         self._stop_lock = threading.Lock()
         self._pynput_available: bool | None = None  # None = unchecked
-
-    def __del__(self) -> None:
-        with contextlib.suppress(Exception):
-            self.stop()
+        self._cleaned_up = False
 
     def _ensure_pynput(self) -> bool:
         """Lazy-import pynput. Returns True if usable, False if not."""
@@ -188,7 +184,10 @@ class GlobalHotkeyManager(QObject):
         logger.info("Global hotkey manager started")
 
     def stop(self) -> None:
-        """Unregister all hotkeys and stop listener."""
+        """Unregister all hotkeys and stop listener. Idempotent."""
+        if self._cleaned_up:
+            return
+        self._cleaned_up = True
         with self._lock:
             self._hotkeys.clear()
         self._stop_active_listener()

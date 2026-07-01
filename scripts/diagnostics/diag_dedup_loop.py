@@ -1,13 +1,22 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import os
+
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtWidgets import QApplication
+
 from skill_manager.app import AppController
-from skill_manager.core.discovery import DiscoveryService, get_discovery_cache, parse_skill_md, categorize_skill, SkillRecord
+from skill_manager.core.discovery import (
+    DiscoveryService,
+    SkillRecord,
+    categorize_skill,
+    get_discovery_cache,
+    parse_skill_md,
+)
 
 app = QApplication([])
 ctrl = AppController()
@@ -19,7 +28,7 @@ service = DiscoveryService(
     starred_paths=ctrl._starred_paths,
     project_aliases=ctrl._project_aliases,
 )
-    
+
 with get_discovery_cache() as cache:
     pkg_raw = service.discover_packages_incremental(cache, parse_skill_md, categorize_skill, False)
     all_skills = []
@@ -30,7 +39,9 @@ with get_discovery_cache() as cache:
     proj_raw = service.discover_projects_incremental(cache, parse_skill_md, categorize_skill, False)
     for p in proj_raw:
         for s in p.get("skills", []):
-            transformed = service.transform_skill(s, is_package=False, project_label=p.get("project_label"))
+            transformed = service.transform_skill(
+                s, is_package=False, project_label=p.get("project_label")
+            )
             all_skills.append(SkillRecord.model_validate(transformed))
 
     seen_paths = {}
@@ -43,11 +54,12 @@ with get_discovery_cache() as cache:
             print(f"  existing is None = {existing is None}")
             if existing:
                 print(f"  existing.is_package = {existing.is_package}")
-                print(f"  condition: existing.is_package and not skill.is_package = {existing.is_package and not skill.is_package}")
-        
+                print(
+                    f"  condition: existing.is_package and not skill.is_package = {existing.is_package and not skill.is_package}"
+                )
+
         if not lp:
             continue
         existing = seen_paths.get(lp)
         if existing is None or (existing.is_package and not skill.is_package):
             seen_paths[lp] = skill
-            

@@ -29,9 +29,10 @@ def test_delete_custom_command_success(tmp_path, mock_app, ops_controller):
     # Configure project and mock label matching
     mock_app._projects = [str(project_dir)]
 
-    with patch("skill_manager.core.commands.find_project_path_by_label", return_value=project_dir), \
-         patch.object(ops_controller, "deleteSkills") as mock_delete:
-
+    with (
+        patch("skill_manager.core.commands.find_project_path_by_label", return_value=project_dir),
+        patch.object(ops_controller, "deleteSkills") as mock_delete,
+    ):
         ops_controller.deleteCustomCommand("my_cmd", ["my_project_label"])
 
         # Verify deleteSkills was called

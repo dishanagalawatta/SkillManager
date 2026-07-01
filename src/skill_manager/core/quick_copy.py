@@ -10,6 +10,8 @@ from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
 
+from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers  # noqa: E402
+
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
 
 # Re-exported for convenience; canonical impl lives in skill_references.
@@ -115,6 +117,11 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
     Returns:
         List[dict] — one entry per discovered skill.
     """
+    import sys
+
+    if getattr(sys, "is_shutting_down", False):
+        return []
+
     skills = []
     seen_sources = set()
     unique_sources = []
@@ -177,7 +184,8 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
             source_skills.append(skill_data)
         return source_skills
 
-    parallel_results = Parallel(n_jobs=-1, prefer="processes")(
+    # Capped to 2 workers to prevent RAM exhaustion with multiple instances.
+    parallel_results = Parallel(n_jobs=joblib_workers(), prefer=joblib_prefer())(
         delayed(scan_source)(src) for src in unique_sources
     )
 
@@ -309,6 +317,11 @@ def discover_project_skills(
     Returns:
         List of project dicts, each with discovered skills.
     """
+    import sys
+
+    if getattr(sys, "is_shutting_down", False):
+        return []
+
     if project_aliases is None:
         project_aliases = {}
 
@@ -329,9 +342,12 @@ def discover_project_skills(
         return []
 
     # Parallelize project discovery
+    # Capped to 2 workers to prevent RAM exhaustion with multiple instances.
     projects_list = []
-    parallel_results = Parallel(n_jobs=-1, prefer="processes")(
-        delayed(discover_single_project)(proj, parse_skill_md, categorize_skill, build_search_text, project_aliases)
+    parallel_results = Parallel(n_jobs=joblib_workers(), prefer=joblib_prefer())(
+        delayed(discover_single_project)(
+            proj, parse_skill_md, categorize_skill, build_search_text, project_aliases
+        )
         for proj in unique_projects
     )
 

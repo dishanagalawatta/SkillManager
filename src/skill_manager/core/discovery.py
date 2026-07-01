@@ -13,18 +13,19 @@ from diskcache import Cache
 from joblib import Parallel, delayed
 
 from skill_manager.core.config import DATA_DIR
-from skill_manager.core.diagnostics import (
+from skill_manager.core.diagnostics import (  # noqa: E402
     CATEGORY_SOURCE_MISSING,
     get_diagnostic_logger,
 )
-from skill_manager.core.parsing import (
+from skill_manager.core.parsing import (  # noqa: E402
     build_skill_search_text,
     categorize_skill,
     parse_command_md,
     parse_skill_md,
 )
-from skill_manager.core.persistence import load_cache, save_cache
-from skill_manager.core.schemas import CacheState, SkillRecord
+from skill_manager.core.persistence import load_cache, save_cache  # noqa: E402
+from skill_manager.core.schemas import CacheState, SkillRecord  # noqa: E402
+from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers
 
 logger = logging.getLogger(__name__)
 
@@ -274,6 +275,7 @@ class DiscoveryService:
             def _scan_one(resolved_source: Path) -> list[dict[str, Any]]:
                 source_skills: list[dict[str, Any]] = []
                 from skill_manager.core.quick_copy import project_root_for_project
+
                 ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
                     for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):
@@ -317,8 +319,8 @@ class DiscoveryService:
                 return source_skills
 
             # Offload heavy parsing to separate processes to keep the PySide6 UI thread responsive.
-            # Using loky (joblib's backend) correctly serializes nested closures like _scan_one.
-            parallel_results = Parallel(n_jobs=-1, prefer="processes")(
+            # Capped to 2 workers to prevent RAM exhaustion with multiple instances.
+            parallel_results = Parallel(n_jobs=joblib_workers(), prefer=joblib_prefer())(
                 delayed(_scan_one)(src) for src in changed_sources
             )
 

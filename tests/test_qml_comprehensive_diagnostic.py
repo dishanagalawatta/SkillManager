@@ -100,8 +100,6 @@ SHARED_COMPONENTS = [
 ]
 
 
-
-
 class _MockAppController(QObject):
     pass
 
@@ -225,9 +223,8 @@ def test_view_loads_with_no_warnings(qapp, app_controller, filename):
     obj, errors, warnings = _load(qapp, path, app_controller)
     assert not errors, f"{filename} failed to load:\n" + "\n".join(f"  - {e}" for e in errors)
     _ours = [w for w in warnings if not w.startswith("QML scene:")]
-    assert not _ours, (
-        f"{filename} loaded with {len(_ours)} QML warning(s):\n"
-        + "\n".join(f"  - {w}" for w in _ours)
+    assert not _ours, f"{filename} loaded with {len(_ours)} QML warning(s):\n" + "\n".join(
+        f"  - {w}" for w in _ours
     )
 
 
@@ -249,13 +246,10 @@ def test_dialog_loads_with_no_warnings(qapp, app_controller, filename):
     # these are Dialog centering bindings that fire during standalone test
     # loads when the Dialog has no parent window.  Never occur at runtime.
     _ours = [
-        w for w in warnings
-        if not w.startswith("QML scene:")
-        and "Cannot read property" not in w
+        w for w in warnings if not w.startswith("QML scene:") and "Cannot read property" not in w
     ]
-    assert not _ours, (
-        f"{filename} loaded with {len(_ours)} QML warning(s):\n"
-        + "\n".join(f"  - {w}" for w in _ours)
+    assert not _ours, f"{filename} loaded with {len(_ours)} QML warning(s):\n" + "\n".join(
+        f"  - {w}" for w in _ours
     )
 
 

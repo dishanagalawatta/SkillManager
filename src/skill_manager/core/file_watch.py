@@ -7,6 +7,13 @@ Architecture:
   the native-extension load until the watcher is actually constructed
 - Graceful degradation: if watchdog is unavailable, the watcher silently
   no-ops on ``start()`` instead of crashing the import chain
+
+Debounce scaling:
+    When ``debounce_scale`` > 1, the effective debounce interval is
+    multiplied by that factor.  This is used when multiple SkillManager
+    instances are running concurrently — each instance increases its
+    debounce interval proportionally to reduce event-processing
+    thrashing across the group.
 """
 
 from __future__ import annotations
@@ -23,6 +30,11 @@ if TYPE_CHECKING:
     from watchdog.events import FileSystemEvent
 
 logger = logging.getLogger(__name__)
+
+# When multiple instances are running, each instance scales its debounce
+# interval to reduce event-processing thrashing.  The heartbeat module
+# provides the instance count; this module applies it as a multiplier.
+DEFAULT_DEBOUNCE_SCALE = 1
 
 
 class SkillFolderEventHandler(FileSystemEventHandler):
@@ -41,10 +53,15 @@ class SkillFolderEventHandler(FileSystemEventHandler):
       folder deletions as non-directory events on Windows)
     """
 
-    def __init__(self, callback: Callable[[str], None], debounce_ms: int = 300):
+    def __init__(
+        self,
+        callback: Callable[[str], None],
+        debounce_ms: int = 300,
+        debounce_scale: int = DEFAULT_DEBOUNCE_SCALE,
+    ):
         super().__init__()
         self._callback = callback
-        self._debounce_ms = debounce_ms
+        self._debounce_ms = debounce_ms * max(1, debounce_scale)
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
 
@@ -100,9 +117,17 @@ class SkillFolderWatcher:
     dynamically register discovered skill directories after initial startup.
     """
 
-    def __init__(self, paths: list[str], callback: Callable[[str], None], debounce_ms: int = 300):
+    def __init__(
+        self,
+        paths: list[str],
+        callback: Callable[[str], None],
+        debounce_ms: int = 300,
+        debounce_scale: int = DEFAULT_DEBOUNCE_SCALE,
+    ):
         self._paths = [Path(path).expanduser() for path in paths if path]
-        self._handler = SkillFolderEventHandler(callback, debounce_ms=debounce_ms)
+        self._handler = SkillFolderEventHandler(
+            callback, debounce_ms=debounce_ms, debounce_scale=debounce_scale
+        )
         self.started = False
         self._observer = None  # type: ignore[assignment]
         try:

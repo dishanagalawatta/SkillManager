@@ -13,6 +13,7 @@
 | [ADR-0018](docs/adr/ADR-0018-workspace-standardization.md) | Workspace Standardization | Accepted | 2026-05-25 | @DIKKA |
 | [ADR-0019](docs/adr/ADR-0019-multiprocessing-joblib.md) | Multiprocessing with Joblib | Accepted | 2026-05-28 | @DIKKA |
 | [ADR-0020](docs/adr/ADR-0020-command-skill-pills.md) | Command Inspector Skill-Dependency Pills | Accepted | 2026-06-14 | @DIKKA |
+| [ADR-0021](docs/adr/ADR-0021-frozen-joblib-threads.md) | Frozen-build joblib backend override | Accepted | 2026-07-01 | @DIKKA |
 
 ## Template
 

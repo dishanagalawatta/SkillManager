@@ -6,7 +6,6 @@ and save_cache work correctly with the normalization logic.
 """
 
 
-
 def _write_cache(tmp_path, skills):
     """Write a cache file with the given skills list."""
     import orjson
@@ -25,12 +24,20 @@ def test_load_cache_normalizes_project_paths(tmp_path):
     skills_dir = project_root / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
 
-    _write_cache(tmp_path, [
-        {"name": "Test", "local_path": str(skills_dir / "TestSkill"),
-         "project_path": str(project_root), "project_label": "p"},
-    ])
+    _write_cache(
+        tmp_path,
+        [
+            {
+                "name": "Test",
+                "local_path": str(skills_dir / "TestSkill"),
+                "project_path": str(project_root),
+                "project_label": "p",
+            },
+        ],
+    )
 
     import skill_manager.core.persistence as pers_mod
+
     original = pers_mod.SKILL_LIBRARY_CACHE_FILE
     pers_mod.SKILL_LIBRARY_CACHE_FILE = str(tmp_path / "skill_library_index.json")
     try:
@@ -48,11 +55,15 @@ def test_load_cache_keeps_all_skills(tmp_path):
 
     fake_path = str(tmp_path / "nonexistent-skill")
 
-    _write_cache(tmp_path, [
-        {"name": "Fake", "local_path": fake_path, "project_path": "", "project_label": "p"},
-    ])
+    _write_cache(
+        tmp_path,
+        [
+            {"name": "Fake", "local_path": fake_path, "project_path": "", "project_label": "p"},
+        ],
+    )
 
     import skill_manager.core.persistence as pers_mod
+
     original = pers_mod.SKILL_LIBRARY_CACHE_FILE
     pers_mod.SKILL_LIBRARY_CACHE_FILE = str(tmp_path / "skill_library_index.json")
     try:
@@ -68,6 +79,7 @@ def test_load_cache_returns_none_when_missing(tmp_path):
     """load_cache returns None when cache file doesn't exist."""
     import skill_manager.core.persistence as pers_mod
     from skill_manager.core.persistence import load_cache
+
     original = pers_mod.SKILL_LIBRARY_CACHE_FILE
     pers_mod.SKILL_LIBRARY_CACHE_FILE = str(tmp_path / "nonexistent.json")
     try:

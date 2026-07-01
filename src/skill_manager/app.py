@@ -8,6 +8,11 @@ import ctypes
 import logging
 import os
 import sys
+import threading
+
+# Suppress all Python warnings (especially loky resource_tracker warnings in child processes)
+os.environ["PYTHONWARNINGS"] = "ignore"
+
 import time
 from typing import Any
 
@@ -947,7 +952,6 @@ class AppController(QObject):
     def confirmCommandSkillsCarry(self, project_path, command_paths_json, confirmed_skills_json):
         self.ops.confirmCommandSkillsCarry(project_path, command_paths_json, confirmed_skills_json)
 
-
     @Slot(str, list)
     def deleteSkillFromProjects(self, path, projects):
         self.ops.deleteSkillFromProjects(path, projects)
@@ -1226,8 +1230,16 @@ class AppController(QObject):
             self.global_hotkey.unregister(self._hotkey_id_screenshot)
 
     def on_quit(self):
-        """Ensures all pending state is saved before exit."""
-        # Stop global hotkey listener
+        """Ensures all pending state is saved before exit.
+
+        Called via ``app.aboutToQuit`` during the Qt event loop shutdown.
+        Must not do heavy blocking I/O — those go in ``cleanup()``.
+        """
+        sys.is_shutting_down = True
+        logger.debug("[SHUTDOWN] on_quit entered")
+        dump_diagnostics("on_quit enter")
+
+        # Stop global hotkey listener (idempotent, safe to call multiple times)
         if hasattr(self, "global_hotkey"):
             self.global_hotkey.stop()
 
@@ -1235,28 +1247,185 @@ class AppController(QObject):
             self._watcher.stop()
         if hasattr(self, "_scheduler") and self._scheduler.running:
             self._scheduler.shutdown(wait=False)
-        if self.ui._save_timer.isActive():
+        if (
+            hasattr(self, "ui")
+            and hasattr(self.ui, "_save_timer")
+            and self.ui._save_timer.isActive()
+        ):
             self.ui._save_timer.stop()
             self.ui.saveUiState()
 
-        # Flush Sentry manually with a timeout
-        try:
-            import sentry_sdk
+        # Release the single-instance mutex so another instance can acquire it
+        global _app_mutex
+        _app_mutex = None
 
-            sentry_sdk.flush(timeout=2.0)
+        logger.debug("[SHUTDOWN] on_quit complete")
+        dump_diagnostics("on_quit complete")
+
+    def cleanup(self):
+        """Post-Qt cleanup: flush telemetry and break reference cycles.
+
+        Runs *after* ``app.exec()`` returns. All operations are bounded
+        to prevent the shutdown from hanging.
+        """
+        logger.debug("[SHUTDOWN] cleanup entered")
+        dump_diagnostics("cleanup enter")
+
+        # Clean up joblib temp folders manually
+        try:
+            import shutil
+            import tempfile
+            from pathlib import Path
+
+            temp_dir = Path(tempfile.gettempdir())
+            for folder in temp_dir.glob("joblib_memmapping_folder_*"):
+                shutil.rmtree(folder, ignore_errors=True)
+        except Exception as e:
+            logger.debug(f"Joblib folder cleanup error: {e}")
+
+        # Flush Sentry (best-effort, 0.5s bound)
+        try:
+            sentry_sdk.flush(timeout=0.5)
         except Exception as e:
             logger.debug(f"Sentry flush error: {e}")
 
-        # PostHog shutdown has no timeout and can hang indefinitely on network issues.
-        # Run it in a daemon thread and wait for a maximum of 1.5 seconds.
-        import threading
+        # PostHog shutdown in daemon thread (fire-and-forget)
+        # No join — let it complete in the background.
+        threading.Thread(target=posthog_shutdown, daemon=True).start()
 
-        t = threading.Thread(target=posthog_shutdown, daemon=True)
-        t.start()
-        t.join(timeout=1.5)
+        # Shutdown tracked background threads (1.0s bound)
+        if hasattr(self, "task_runner"):
+            self.task_runner.shutdown(timeout=1.0)
+
+        logger.debug("[SHUTDOWN] cleanup complete")
+        dump_diagnostics("cleanup complete")
+
+
+_diag_lock = threading.Lock()
+
+
+def dump_diagnostics(reason: str) -> None:
+    """Write comprehensive stack traces, threads, and child processes to shutdown_diag.log and stderr.
+
+    This runs during shutdown steps or from the watchdog thread to identify hangs.
+    """
+    try:
+        import contextlib
+        import sys
+        import time
+        import traceback
+        from pathlib import Path
+
+        import psutil
+
+        # Query child processes info
+        child_info = []
+        try:
+            parent = psutil.Process(os.getpid())
+            for child in parent.children(recursive=True):
+                with contextlib.suppress(Exception):
+                    child_info.append(f"{child.name()}({child.pid})[{child.status()}]")
+        except Exception as e:
+            child_info.append(f"error:{e}")
+
+        children_str = ",".join(child_info) if child_info else "none"
+
+        # Print a clear diagnostic message directly to the terminal
+        console_msg = f"[SHUTDOWN_DIAG] {reason} (PID: {os.getpid()}, Threads: {threading.active_count()}, Children: {children_str})\n"
+        with contextlib.suppress(Exception):
+            os.write(2, console_msg.encode())
+
+        diag_file = Path("shutdown_diag.log")
+        with _diag_lock, diag_file.open("a", encoding="utf-8") as f:
+            f.write(f"\n================ DIAGNOSTICS: {reason} ================\n")
+            f.write(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"PID: {os.getpid()}\n")
+            f.write(f"Active Threads count: {threading.active_count()}\n")
+
+            # Log children in detail
+            f.write(f"\n--- CHILD PROCESSES ({len(child_info)}) ---\n")
+            try:
+                parent = psutil.Process(os.getpid())
+                for child in parent.children(recursive=True):
+                    try:
+                        f.write(
+                            f"PID: {child.pid}, Name: {child.name()}, Status: {child.status()}, Created: {child.create_time()}\n"
+                        )
+                    except Exception as e:
+                        f.write(f"PID: {child.pid} error: {e}\n")
+            except Exception as e:
+                f.write(f"Failed to get children: {e}\n")
+
+            f.write("\n--- THREAD LIST ---\n")
+            for t in threading.enumerate():
+                daemon_str = "daemon" if t.daemon else "non-daemon"
+                f.write(f"Thread: {t.name} (ID: {t.ident}, {daemon_str}, alive: {t.is_alive()})\n")
+
+            f.write("\n--- STACK TRACES ---\n")
+            for thread_id, frame in sys._current_frames().items():
+                t = next((x for x in threading.enumerate() if x.ident == thread_id), None)
+                t_name = t.name if t else "Unknown"
+                f.write(f"\nStack for thread {t_name} (ID {thread_id}):\n")
+                traceback.print_stack(frame, file=f)
+
+            f.write("\n=======================================================\n")
+    except Exception as e:
+        with contextlib.suppress(Exception):
+            os.write(2, f"Failed to dump diagnostics: {e}\n".encode())
+
+
+def _watchdog_exit(ret: int, timeout: float = 5.0) -> threading.Thread:
+    """Force-kill the process after *timeout* seconds if shutdown hangs.
+
+    Spawns a daemon thread that periodically dumps diagnostics to a log file
+    and calls ``os._exit()`` after the timeout.
+    """
+
+    def _force_exit():
+        # Log diagnostics every 1 second until the timeout is reached
+        start_time = time.time()
+        tick = 1
+        while True:
+            remaining = timeout - (time.time() - start_time)
+            if remaining <= 0:
+                break
+            time.sleep(min(1.0, remaining))
+            if timeout - (time.time() - start_time) > 0:
+                dump_diagnostics(f"Watchdog tick {tick}s")
+                tick += 1
+
+        # Final diagnostics dump right before force-exit
+        dump_diagnostics("Watchdog final timeout reached")
+
+        with contextlib.suppress(Exception):
+            os.write(
+                2,
+                f"\n[SHUTDOWN] Watchdog timeout: calling os._exit({ret})\n".encode(),
+            )
+        os._exit(ret)
+
+    t = threading.Thread(target=_force_exit, daemon=True)
+    t.start()
+    return t
+
+
+def _bring_existing_window_to_front() -> None:
+    """Finds the existing SkillManager window and brings it to the front."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    hwnd = ctypes.windll.user32.FindWindowW(None, "Skill Manager")
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
 
 
 def main():  # pragma: no cover
+    import multiprocessing
+
+    multiprocessing.freeze_support()
+
     # Initialize Sentry as early as possible
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN", ""),  # Placeholder for user's DSN
@@ -1270,6 +1439,16 @@ def main():  # pragma: no cover
     # Acquire mutex so Inno Setup installer can cleanly close the app
     global _app_mutex
     _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
+    ERROR_ALREADY_EXISTS = 183
+
+    # Check if we should enforce single-instance
+    single_instance_requested = (
+        os.environ.get("SKILL_MANAGER_SINGLE_INSTANCE") == "1" or "--single-instance" in sys.argv
+    )
+
+    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS and single_instance_requested:
+        _bring_existing_window_to_front()
+        sys.exit(0)
 
     # Use a standard AppUserModelID format
     myappid = "Antigravity.SkillManager.App.1.0"
@@ -1512,16 +1691,57 @@ def main():  # pragma: no cover
 
     ret = app.exec()
 
-    # Clean up joblib loky workers and memory-mapped temp files before forcing exit
-    try:
-        from joblib.externals.loky import get_reusable_executor
+    # Arm the watchdog — if shutdown takes >5s, force-exit
+    dump_diagnostics("app.exec finished")
+    _watchdog_exit(ret, timeout=5.0)
 
-        get_reusable_executor().shutdown(wait=True)
+    # Drain pending Qt events so QML releases GPU resources cleanly.
+    app.processEvents()
+    app.processEvents()
+
+    # Explicitly clear QML components to cleanly stop timers
+    dump_diagnostics("clearing component cache")
+    engine.clearComponentCache()
+
+    # Post-Qt cleanup: flush telemetry, join background threads (bounded < 0.5s)
+    dump_diagnostics("calling controller.cleanup")
+    controller.cleanup()
+    # We bypass sys.exit and del app to avoid hangs caused by Qt C++ teardown
+    # or buggy atexit hooks (like loky on Windows).
+    # We suppress stderr immediately before exit to hide unavoidable Qt
+    # DllMain detach warnings (QThreadStorage, QDxgiVSyncService).
+    try:
+        # Kill all descendant processes (children, grandchildren) using psutil.
+        # We do NOT query cmdline() or other slow/blocking properties to avoid hangs.
+        # We reverse the children list to kill bottom-up (grandchildren first, then children)
+        # to ensure intermediate parents are not terminated before their descendants.
+        import psutil
+
+        dump_diagnostics("executing psutil kill")
+        parent = psutil.Process(os.getpid())
+        for child in reversed(parent.children(recursive=True)):
+            with contextlib.suppress(Exception):
+                child.kill()
     except Exception as e:
-        logging.getLogger(__name__).warning("Error shutting down joblib executor: %s", e)
-    # Allow standard Python garbage collection and atexit handlers to run so that
-    # C++ QObjects, ThreadStorage, and joblib temp folders are gracefully destroyed.
-    sys.exit(ret)
+        dump_diagnostics(f"psutil kill failed: {e}")
+
+    dump_diagnostics("final process termination")
+    try:
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, 2)
+    except Exception:
+        pass
+
+    # We call os.kill(pid, 9) (which translates to TerminateProcess on Windows)
+    # to bypass ExitProcess loader-lock deadlocks and terminate instantly.
+    # If running under pytest, we bypass this to prevent killing the test runner.
+    if "pytest" in sys.modules:
+        sys.exit(ret)
+
+    try:
+        os.kill(os.getpid(), 9)
+    except Exception:
+        os._exit(ret)
 
 
 if __name__ == "__main__":

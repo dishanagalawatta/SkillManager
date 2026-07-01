@@ -21,6 +21,7 @@ from skill_manager.core.config import (
     TEMP_SCREENSHOTS_FILE,
 )
 from skill_manager.core.schemas import CacheState
+from skill_manager.utils.cooperative_lock import FileLock, LockTimeout
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,14 @@ def _atomic_write_json(file_path: str | Path, data: Any, indent: bool = True) ->
             # WinError 32: process cannot access the file (file in use)
             # WinError 2: file not found (temp file removed by another process)
             if e.winerror in (32, 2) and attempt < max_retries - 1:
-                wait = 0.05 * (2 ** attempt)  # 50ms, 100ms, 200ms
+                wait = 0.05 * (2**attempt)  # 50ms, 100ms, 200ms
                 logger.warning(
                     "Atomic write to %s hit WinError %d (attempt %d/%d), retrying in %.0fms",
-                    file_path, e.winerror, attempt + 1, max_retries, wait * 1000,
+                    file_path,
+                    e.winerror,
+                    attempt + 1,
+                    max_retries,
+                    wait * 1000,
                 )
                 time.sleep(wait)
                 continue
@@ -165,6 +170,9 @@ def save_cache(data: dict[str, Any]) -> bool:
     Strips raw_content and body_content — these are large per-skill blobs
     read on-demand from disk, not needed in the index cache.
     Normalizes project_path through get_skills_dir before writing.
+
+    Uses a cross-platform file lock so that multiple instances writing
+    concurrently do not corrupt the JSON cache.
     """
     try:
         slim_data = dict(data)
@@ -175,7 +183,11 @@ def save_cache(data: dict[str, Any]) -> bool:
                 )
                 for skill in slim_data["skills"]
             ]
-        return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data)
+        with FileLock(SKILL_LIBRARY_CACHE_FILE):
+            return _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, slim_data)
+    except LockTimeout:
+        logger.warning("[CACHE] Lock timeout on save_cache — skipping write (peer is active)")
+        return False
     except Exception as e:
         logger.warning("Error saving cache: %s", e)
         return False
@@ -196,9 +208,7 @@ def load_cache() -> dict[str, Any] | None:
         validated = CacheState.model_validate(data).model_dump()
         # Normalize project_path in-memory for all skills
         if "skills" in validated:
-            validated["skills"] = [
-                _normalize_skill_project_path(s) for s in validated["skills"]
-            ]
+            validated["skills"] = [_normalize_skill_project_path(s) for s in validated["skills"]]
         return validated
     except (orjson.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning("[CACHE] Corrupted cache (%s).", e)
@@ -210,6 +220,8 @@ def load_cache() -> dict[str, Any] | None:
 def patch_cache_remove(paths_to_remove: list[str]) -> int:
     """Surgically removes entries from on-disk cache without full rescan.
     Returns the number of removed entries.
+
+    Uses a cross-platform file lock for multi-instance safety.
     """
     try:
         cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
@@ -217,17 +229,23 @@ def patch_cache_remove(paths_to_remove: list[str]) -> int:
             return 0
 
         path_set = set(paths_to_remove)
-        with open(cache_path, "rb") as f:
-            data = orjson.loads(f.read())
+        with FileLock(SKILL_LIBRARY_CACHE_FILE):
+            with open(cache_path, "rb") as f:
+                data = orjson.loads(f.read())
 
-        original_count = len(data.get("skills", []))
-        data["skills"] = [s for s in data.get("skills", []) if s.get("local_path") not in path_set]
-        removed = original_count - len(data["skills"])
+            original_count = len(data.get("skills", []))
+            data["skills"] = [
+                s for s in data.get("skills", []) if s.get("local_path") not in path_set
+            ]
+            removed = original_count - len(data["skills"])
 
-        if removed > 0:
-            _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
+            if removed > 0:
+                _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
 
-        return removed
+            return removed
+    except LockTimeout:
+        logger.warning("[CACHE] Lock timeout on patch_cache_remove — skipping (peer is active)")
+        return 0
     except Exception as exc:
         logger.warning("[CACHE] Patch failed: %s", exc)
         return 0
@@ -238,70 +256,82 @@ def patch_cache_add(
 ) -> int:
     """Surgically adds or updates entries in the on-disk cache without full rescan.
     Returns the number of added or updated entries.
+
+    Uses a cross-platform file lock for multi-instance safety.
     """
     try:
         cache_path = Path(SKILL_LIBRARY_CACHE_FILE)
         if not cache_path.exists():
             return 0
 
-        with open(cache_path, "rb") as f:
-            data = orjson.loads(f.read())
+        with FileLock(SKILL_LIBRARY_CACHE_FILE):
+            with open(cache_path, "rb") as f:
+                data = orjson.loads(f.read())
 
-        if not isinstance(data, dict):
-            return 0
+            if not isinstance(data, dict):
+                return 0
 
-        if "skills" not in data:
-            data["skills"] = []
-        if "projects" not in data:
-            data["projects"] = []
+            if "skills" not in data:
+                data["skills"] = []
+            if "projects" not in data:
+                data["projects"] = []
 
-        # Strip large fields from new_skills and normalize project_path
-        clean_new_skills = []
-        for s in new_skills:
-            clean_s = {k: v for k, v in s.items() if k not in CACHE_EXCLUDED_FIELDS}
-            _normalize_skill_project_path(clean_s)
-            clean_new_skills.append(clean_s)
+            # Strip large fields from new_skills and normalize project_path
+            clean_new_skills = []
+            for s in new_skills:
+                clean_s = {k: v for k, v in s.items() if k not in CACHE_EXCLUDED_FIELDS}
+                _normalize_skill_project_path(clean_s)
+                clean_new_skills.append(clean_s)
 
-        # Update skills list — also normalize existing cache entries
-        skills_map = {_normalize_skill_project_path(s).get("local_path"): s for s in data["skills"]}
-        updated_count = 0
-        for s in clean_new_skills:
-            path = s.get("local_path")
-            if path:
-                skills_map[path] = s
-                updated_count += 1
-        data["skills"] = list(skills_map.values())
-
-        # Update projects state if provided
-        if projects_state:
-            projects_map = {p.get("project_path"): p for p in data["projects"]}
-            for p in projects_state:
-                path = p.get("project_path")
+            # Update skills list — also normalize existing cache entries
+            skills_map = {
+                _normalize_skill_project_path(s).get("local_path"): s for s in data["skills"]
+            }
+            updated_count = 0
+            for s in clean_new_skills:
+                path = s.get("local_path")
                 if path:
-                    # Clean the skills inside project
-                    cleaned_p = dict(p)
-                    if "skills" in cleaned_p:
-                        cleaned_p["skills"] = [
-                            {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
-                            for skill in cleaned_p["skills"]
-                        ]
-                    projects_map[path] = cleaned_p
-            data["projects"] = list(projects_map.values())
+                    skills_map[path] = s
+                    updated_count += 1
+            data["skills"] = list(skills_map.values())
 
-        # Re-compute categories and project_labels
-        data["categories"] = sorted({s["category"] for s in data["skills"] if s.get("category")})
-        data["project_labels"] = sorted(
-            {p["project_label"] for p in data.get("projects", []) if p.get("project_label")}
-        )
+            # Update projects state if provided
+            if projects_state:
+                projects_map = {p.get("project_path"): p for p in data["projects"]}
+                for p in projects_state:
+                    path = p.get("project_path")
+                    if path:
+                        # Clean the skills inside project
+                        cleaned_p = dict(p)
+                        if "skills" in cleaned_p:
+                            cleaned_p["skills"] = [
+                                {k: v for k, v in skill.items() if k not in CACHE_EXCLUDED_FIELDS}
+                                for skill in cleaned_p["skills"]
+                            ]
+                        projects_map[path] = cleaned_p
+                data["projects"] = list(projects_map.values())
 
-        # Update status
-        num_skills = len(data["skills"])
-        num_projects = len(data.get("projects", []))
-        data["status"] = f"Found {num_skills} skills in master library ({num_projects} projects)"
+            # Re-compute categories and project_labels
+            data["categories"] = sorted(
+                {s["category"] for s in data["skills"] if s.get("category")}
+            )
+            data["project_labels"] = sorted(
+                {p["project_label"] for p in data.get("projects", []) if p.get("project_label")}
+            )
 
-        _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
+            # Update status
+            num_skills = len(data["skills"])
+            num_projects = len(data.get("projects", []))
+            data["status"] = (
+                f"Found {num_skills} skills in master library ({num_projects} projects)"
+            )
 
-        return updated_count
+            _atomic_write_json(SKILL_LIBRARY_CACHE_FILE, data)
+
+            return updated_count
+    except LockTimeout:
+        logger.warning("[CACHE] Lock timeout on patch_cache_add — skipping (peer is active)")
+        return 0
     except Exception as exc:
         logger.warning("[CACHE] Patch add failed: %s", exc)
         return 0

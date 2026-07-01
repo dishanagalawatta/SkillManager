@@ -302,3 +302,13 @@ def clean_models(app_controller):
     with tests that explicitly request it.
     """
     yield
+
+
+@pytest.fixture(autouse=True)
+def reset_shutdown_flag():
+    """Ensure sys.is_shutting_down is reset to False before each test."""
+    if hasattr(sys, "is_shutting_down"):
+        delattr(sys, "is_shutting_down")
+    yield
+    if hasattr(sys, "is_shutting_down"):
+        delattr(sys, "is_shutting_down")

@@ -486,8 +486,12 @@ class UpdateService:
                 project_aliases=self.project_aliases,
             )
 
+            import sys
+
             updated_sources = []
             for source in self.update_packages:
+                if getattr(sys, "is_shutting_down", False):
+                    break
                 try:
                     updated_sources.append(check_skill_package_versions(source))
                 except Exception as exc:
