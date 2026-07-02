@@ -26,7 +26,7 @@ def sanitize_token(text: str | None) -> str | None:
     # Unified pattern handles unquoted, single-quoted, and double-quoted
     # tokens (including mixed-quote concatenation) in a single pass.
     if "echo password=" in text:
-        pattern = r"(echo password=)(?:[^;\r\n\s'\"]|'[^']*'|\"(?:\\\\.|[^\"\\\\])*\")+"
+        pattern = r"(echo password=)(?:[^;\r\n\s'\"]|'[^']*'|\"(?:\\.|[^\"\\])*\")+"
         text = re.sub(pattern, r"\1***", text)
 
     # Explicitly redact known token patterns
