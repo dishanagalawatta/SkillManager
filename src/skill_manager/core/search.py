@@ -56,6 +56,9 @@ class SkillIndexer:
         if category_lower:
             all_doc_tokens.append(category_lower)
 
+        # Deduplicate while preserving order for deterministic testing
+        all_doc_tokens = list(dict.fromkeys(all_doc_tokens))
+
         return {
             "name": name.lower(),
             "name_tokens": name_tokens,
@@ -159,9 +162,8 @@ class SearchEngine:
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
-                    unique_doc_tokens = dict.fromkeys(all_doc_tokens)
                     for qt in query_tokens:
-                        for dt in unique_doc_tokens:
+                        for dt in all_doc_tokens:
                             score = fuzz.ratio(qt, dt)
                             if score > max_token_match:
                                 max_token_match = score
