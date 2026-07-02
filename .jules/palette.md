@@ -21,3 +21,6 @@
 ## 2025-02-23 - Avoid Redundant Accessible Descriptions
 **Learning:** Setting `Accessible.description` to the exact same value as `Accessible.name` (e.g., both referencing a tooltip's text) creates a harmful redundancy where screen readers will announce the exact same text twice to the user.
 **Action:** When evaluating custom QML controls, if the desired description is identical to the accessible name, simply omit the `Accessible.description` property altogether to streamline screen reader verbosity.
+## 2026-06-29 - Consolidate Tooltips using Built-in Properties
+**Learning:** When custom QML controls (like `IconButton` in `skill_manager`) provide a built-in `tooltipText` property, manually nesting `SleekToolTip` elements and redefining `Accessible.name`/`Accessible.description` leads to verbose, redundant code that is prone to accessibility bugs (like missing `visualFocus` bindings or double-announcing).
+**Action:** Always favor using the built-in `tooltipText` property over manually nesting tooltip items.

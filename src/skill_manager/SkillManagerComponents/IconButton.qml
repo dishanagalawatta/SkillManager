@@ -94,7 +94,6 @@ Button {
     }
     Accessible.role: Accessible.Button
     Accessible.name: accessibleName
-    Accessible.description: btnToolTip.text
 
     HoverHandler {
         cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
