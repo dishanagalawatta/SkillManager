@@ -39,8 +39,20 @@ Rectangle {
             spacing: 12
             
             Item {
+                id: logoBtn
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
+                activeFocusOnTab: true
+
+                Accessible.role: Accessible.Button
+                Accessible.name: sidebarToolTip.text
+
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.isCollapsed = !root.isCollapsed
+                        event.accepted = true
+                    }
+                }
 
                 Image {
                     id: sidebarLogoImg
@@ -57,6 +69,14 @@ Rectangle {
                     visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
                 }
                 
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.color: Theme.accent
+                    border.width: 2
+                    visible: logoBtn.activeFocus
+                }
+
                 MouseArea {
                     id: logoMouseArea
                     anchors.fill: parent
@@ -67,11 +87,8 @@ Rectangle {
                     SleekToolTip {
                         id: sidebarToolTip
                         text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                        visible: parent.containsMouse
+                        visible: parent.containsMouse || logoBtn.activeFocus
                     }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: sidebarToolTip.text
                 }
             }
             
