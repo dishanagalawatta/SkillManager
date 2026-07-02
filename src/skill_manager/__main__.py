@@ -5,6 +5,9 @@ from pathlib import Path
 
 
 def _patch_subprocess():
+    if not hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return
+
     original_popen = subprocess.Popen
 
     class NoWindowPopen(original_popen):
