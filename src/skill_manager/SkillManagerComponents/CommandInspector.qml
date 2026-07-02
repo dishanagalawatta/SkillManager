@@ -142,15 +142,7 @@ Rectangle {
                         }
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    SleekToolTip {
-                        id: editCmdToolTip
-                        text: "Edit settings"
-                        visible: parent.hovered
-                    }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Edit settings"
-                    Accessible.description: editCmdToolTip.text
+                    tooltipText: "Edit settings"
                 }
 
                 IconButton {
@@ -161,15 +153,7 @@ Rectangle {
                         root.deleteRequested(root.skill.name || "", root.skill.local_path || "", true)
                     }
                     visible: root.skill && root.skill.local_path !== undefined
-                    SleekToolTip {
-                        id: delCmdToolTip
-                        text: "Delete command"
-                        visible: parent.hovered
-                    }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Delete command"
-                    Accessible.description: delCmdToolTip.text
+                    tooltipText: "Delete command"
                 }
 
                 IconButton {
@@ -177,15 +161,7 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    SleekToolTip {
-                        id: closeCmdToolTip
-                        text: "Close Inspector"
-                        visible: parent.hovered
-                    }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Close Inspector"
-                    Accessible.description: closeCmdToolTip.text
+                    tooltipText: "Close Inspector"
                 }
             }
 

@@ -153,7 +153,7 @@ Rectangle {
                     }
                     SleekToolTip {
                         text: "Argument (e.g. ultra)"
-                        visible: parent.hovered
+                        visible: argField.hovered || argField.activeFocus
                     }
                 }
                 IconButton {
@@ -164,6 +164,7 @@ Rectangle {
                     Layout.preferredHeight: 32
                     visible: root.skill && root.skill.local_path !== undefined
                     onClicked: (mouse) => AppController.ops_controller.toggleCurrentSkillStarred()
+                    tooltipText: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
                     
                     contentItem: Text {
                         text: starButton.text
@@ -181,16 +182,6 @@ Rectangle {
                         color: starButton.hovered ? Theme.glassHover : "transparent"
                         radius: Theme.radiusPill
                     }
-                    
-                    SleekToolTip {
-                        id: starToolTip
-                        visible: parent.hovered
-                        text: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
-                    }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
-                    Accessible.description: starToolTip.text
                 }
 
                 IconButton {
@@ -198,15 +189,7 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => root.closed()
                     visible: root.skill && root.skill.local_path !== undefined
-                    SleekToolTip {
-                        id: closeToolTip
-                        text: "Close Inspector"
-                        visible: parent.hovered
-                    }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Close Inspector"
-                    Accessible.description: closeToolTip.text
+                    tooltipText: "Close Inspector"
                 }
             }
 
