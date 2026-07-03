@@ -41,3 +41,8 @@
 **Vulnerability:** The application attempted to redact credential helper strings using three separate regular expressions targeting double quotes, single quotes, and unquoted strings independently. This approach was vulnerable to mixed-quote bypasses (e.g., `echo password='my'"'"'secret'`) where none of the individual regexes would fully match the shell token, resulting in the password leaking in subprocess logs.
 **Learning:** Shell interpreters process string concatenation via adjacent quoting (e.g., `'a'"b"`). Parsing these complex token boundaries with disjointed regexes fails to securely match the true string boundary.
 **Prevention:** Use a single unified regex pattern that matches the entire shell token by combining unquoted characters, single-quoted strings, and double-quoted strings (e.g., `r'(echo password=)(?:[^;\r\n\s\'"]|\'[^\']*\'|"(?:\\.|[^"\\])*")+'`).
+
+## 2026-07-03 - [CRITICAL] Command Injection via shell=True in Subprocess
+**Vulnerability:** In `src/skill_manager/core/skill_packages/updater.py`, `run_shell_command` executed user-provided strings via `run_process(command, shell=True)`. This allows arbitrary shell command injection if an attacker crafts malicious configurations.
+**Learning:** `shell=True` inherently allows for shell injection via operators like `;`, `&`, `|` if the underlying command string is not properly sanitized.
+**Prevention:** Eliminate `shell=True` usages where possible. If an entire command string needs to be passed, tokenize it using `shlex.split(command, posix=sys.platform != 'win32')` and run with `shell=False`.
