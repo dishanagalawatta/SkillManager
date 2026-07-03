@@ -10,8 +10,10 @@ ComboBox {
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             keyboardNavigated = true
+            event.accepted = true
+        } else {
+            event.accepted = false
         }
-        event.accepted = false
     }
 
     signal collectionSelected(string name)
@@ -151,8 +153,10 @@ ComboBox {
             Keys.onPressed: (event) => {
                 if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                     control.keyboardNavigated = true
+                    event.accepted = true
+                } else {
+                    event.accepted = false
                 }
-                event.accepted = false
             }
 
             Connections {

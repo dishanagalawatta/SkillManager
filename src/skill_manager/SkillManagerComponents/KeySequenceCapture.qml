@@ -68,6 +68,8 @@ Rectangle {
                 root.active = true
                 root.forceActiveFocus()
                 event.accepted = true
+            } else {
+                event.accepted = false
             }
             return
         }

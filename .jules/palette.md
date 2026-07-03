@@ -24,3 +24,7 @@
 ## 2026-06-29 - Consolidate Tooltips using Built-in Properties
 **Learning:** When custom QML controls (like `IconButton` in `skill_manager`) provide a built-in `tooltipText` property, manually nesting `SleekToolTip` elements and redefining `Accessible.name`/`Accessible.description` leads to verbose, redundant code that is prone to accessibility bugs (like missing `visualFocus` bindings or double-announcing).
 **Action:** Always favor using the built-in `tooltipText` property over manually nesting tooltip items.
+
+## $(date +%Y-%m-%d) - Key events not propagating in custom QML controls
+**Learning:** When building custom controls in QML (or extending controls like `ComboBox`), if a `Keys.onPressed` handler catches events but fails to explicitly set `event.accepted = false` for unhandled keys, those events are swallowed. This breaks native keyboard accessibility for the parent or standard control (e.g., up/down arrow navigation in a dropdown).
+**Action:** Always explicitly set `event.accepted = false` in the `else` or fallthrough branches of `Keys.onPressed` handlers when the key is not handled by the custom logic, ensuring proper event propagation.
