@@ -167,7 +167,15 @@ def run_shell_command(
 ):
     if intercept_cross_platform_command(command, output_callback):
         return
-    run_process(command, output_callback, shell=True, cwd=cwd)
+    import sys
+
+    try:
+        command_list = shlex.split(command, posix=sys.platform != "win32")
+        if command_list:
+            run_process(command_list, output_callback, shell=False, cwd=cwd)
+    except ValueError as e:
+        emit(output_callback, f"Failed to parse command '{command}': {e}")
+        raise
 
 
 def run_skill_package_update(
