@@ -574,3 +574,215 @@ def test_run_shell_command_tokenizes_safely(mock_intercept, mock_run_process, mo
 
     assert args == ["echo", "'C:\\Program Files'"]
     assert kwargs.get("shell") is False
+
+
+def test_run_npx_update():
+    from skill_manager.core.skill_packages.updater import run_npx_update
+
+    with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run:
+        run_npx_update({"package_name": "my-pkg", "package_args": "--dev"}, None)
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert args == ["npx", "--yes", "--", "my-pkg", "--dev"]
+
+    with pytest.raises(ValueError):
+        run_npx_update({}, None)
+
+
+def test_intercept_cross_platform_command_unbalanced_quotes(temp_dir):
+    from skill_manager.core.skill_packages.updater import intercept_cross_platform_command
+
+    # Unbalanced quotes trigger the ValueError fallback path for stripping quotes
+    with pytest.raises(RuntimeError):
+        intercept_cross_platform_command('test -d "unbalanced', None)
+
+    assert intercept_cross_platform_command(f'test -d "{temp_dir}" && echo "ok', None) is True
+
+
+def test_intercept_cross_platform_command_echo_stripping(temp_dir):
+    from skill_manager.core.skill_packages.updater import intercept_cross_platform_command
+
+    msgs = []
+    # Using '...' triggers path.endswith("'") check
+    assert intercept_cross_platform_command(f"test -d '{temp_dir}' && echo 'ok'", msgs.append)
+    assert msgs[-1] == "ok"
+
+    msgs = []
+    # Test unbalanced single quotes
+    assert intercept_cross_platform_command(f"test -d '{temp_dir}' && echo 'ok", msgs.append)
+
+
+@patch("skill_manager.core.skill_packages.updater.run_shell_command")
+def test_run_skill_package_update_verify_command(mock_run_shell):
+    from skill_manager.core.skill_packages.updater import run_skill_package_update
+
+    source = {
+        "name": "test_pkg",
+        "verify_command": "echo verify",
+    }
+    with (
+        patch("skill_manager.core.skill_packages.updater.run_git_package_update"),
+        patch(
+            "skill_manager.core.skill_packages.updater.check_skill_package_versions",
+            return_value={"current_version": "1.0"},
+        ),
+    ):
+        run_skill_package_update(source, None)
+        assert mock_run_shell.call_count == 1
+        assert mock_run_shell.call_args[0][0] == "echo verify"
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_clone(mock_repo_class, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    clone_path = temp_dir / "new-repo"
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+        "github_token": "secret_token",
+    }
+
+    with patch("skill_manager.core.skill_packages.updater.cmd.Git") as mock_git_class:
+        mock_git = mock_git_class.return_value
+        # Mock successful execute
+        mock_git.execute.return_value = b"Cloned"
+
+        run_git_package_update(source, None)
+        mock_git.execute.assert_called()
+        args = mock_git.execute.call_args[0][0]
+        assert "clone" in args
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_missing_url(mock_repo_class):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    source = {"clone_path": "/some/path"}
+    with pytest.raises(ValueError, match="Configure a repository_url"):
+        run_git_package_update(source, None)
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_non_empty_dir(mock_repo_class, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    clone_path = temp_dir / "non-empty-repo"
+    clone_path.mkdir()
+    (clone_path / "some_file.txt").write_text("hello")
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    with pytest.raises(ValueError, match="Clone path exists but is not an empty git checkout"):
+        run_git_package_update(source, None)
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_no_clone_path_generates_one(mock_repo_class, monkeypatch):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    source = {"repository_url": "https://github.com/repo.git", "name": "my-test-repo"}
+
+    with patch("skill_manager.core.skill_packages.updater.cmd.Git") as mock_git_class:
+        mock_git = mock_git_class.return_value
+        mock_git.execute.return_value = b"Cloned"
+
+        run_git_package_update(source, None)
+        assert source["clone_path"] == source["clone_path"]
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_pull_success(mock_repo_class, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    clone_path = temp_dir / "existing-repo"
+    clone_path.mkdir()
+    (clone_path / ".git").mkdir()
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    mock_repo = mock_repo_class.return_value
+    # mock byte output to hit decode
+    mock_repo.git.execute.return_value = b"Pulled"
+
+    msgs = []
+    run_git_package_update(source, msgs.append)
+
+    assert "Pulled" in msgs
+
+
+@patch("skill_manager.core.skill_packages.updater.Repo")
+def test_run_git_package_update_pull_error(mock_repo_class, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    clone_path = temp_dir / "existing-repo-2"
+    clone_path.mkdir()
+    (clone_path / ".git").mkdir()
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    mock_repo = mock_repo_class.return_value
+    mock_repo.git.execute.side_effect = Exception("failed to pull")
+
+    with pytest.raises(Exception, match="failed to"):
+        run_git_package_update(source, None)
+
+
+@patch("skill_manager.core.skill_packages.updater.cmd.Git")
+def test_run_git_package_update_clone_error(mock_git_class, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_git_package_update
+
+    clone_path = temp_dir / "new-repo-2"
+
+    source = {
+        "repository_url": "https://github.com/repo.git",
+        "clone_path": str(clone_path),
+        "package_path": str(clone_path),
+    }
+
+    mock_git = mock_git_class.return_value
+    mock_git.execute.side_effect = Exception("failed to clone")
+
+    with pytest.raises(Exception, match="failed to"):
+        run_git_package_update(source, None)
+
+@patch("skill_manager.core.skill_packages.updater.shutil.rmtree")
+def test_run_skill_package_update_cleanup_outdated(mock_rmtree, temp_dir):
+    from skill_manager.core.skill_packages.updater import run_skill_package_update
+    clone_path = temp_dir / "clone_source"
+    clone_path.mkdir()
+
+    # Needs a child directory to be considered outdated
+    (temp_dir / "managed_old").mkdir()
+
+    source = {
+        "name": "test_cleanup",
+        "clone_path": str(clone_path),
+        "package_path": str(temp_dir),
+        "managed_folders": ["managed_old"],
+        "source_type": "git",
+        "repository_url": "https://github.com/repo.git",
+    }
+
+    # We mock out all the sub-functions so we only test the cleanup block
+    with patch("skill_manager.core.skill_packages.updater.run_git_package_update"), \
+         patch("skill_manager.core.skill_packages.updater.relocate_packages", return_value=["managed_new"]), \
+         patch("skill_manager.core.skill_packages.updater.check_skill_package_versions", return_value={"current_version": "1.0"}):
+        result = run_skill_package_update(source, None)
+        assert mock_rmtree.call_count == 1
+        assert "managed_old" in result["removed_folders"]
+        assert "managed_new" in result["managed_folders"]
