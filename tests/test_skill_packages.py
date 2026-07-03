@@ -547,3 +547,30 @@ def test_run_process_timeout(mock_popen):
     mock_proc.poll.return_value = None
     mock_proc.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_proc
+
+
+@patch("skill_manager.core.skill_packages.updater.run_process")
+@patch("skill_manager.core.skill_packages.updater.intercept_cross_platform_command")
+def test_run_shell_command_tokenizes_safely(mock_intercept, mock_run_process, monkeypatch):
+    from skill_manager.core.skill_packages.updater import run_shell_command
+
+    mock_intercept.return_value = False
+
+    monkeypatch.setattr("sys.platform", "linux")
+    run_shell_command("echo 'hello world'", None)
+    mock_run_process.assert_called_once()
+    args = mock_run_process.call_args[0][0]
+    kwargs = mock_run_process.call_args[1]
+
+    assert args == ["echo", "hello world"]
+    assert kwargs.get("shell") is False
+
+    mock_run_process.reset_mock()
+    monkeypatch.setattr("sys.platform", "win32")
+    run_shell_command(r"echo 'C:\Program Files'", None)
+    mock_run_process.assert_called_once()
+    args = mock_run_process.call_args[0][0]
+    kwargs = mock_run_process.call_args[1]
+
+    assert args == ["echo", "'C:\\Program Files'"]
+    assert kwargs.get("shell") is False

@@ -1,3 +1,5 @@
+import pytest
+from unittest.mock import patch
 from skill_manager.core.updater import update_projects
 
 
@@ -63,3 +65,15 @@ def test_update_projects_skip(temp_dir):
     updated, skipped = result
     assert updated == 0
     assert skipped == 1
+
+
+@patch("skill_manager.core.skill_packages.updater.run_process")
+@patch("skill_manager.core.skill_packages.updater.intercept_cross_platform_command")
+def test_run_shell_command_value_error(mock_intercept, mock_run_process):
+    from skill_manager.core.skill_packages.updater import run_shell_command
+
+    mock_intercept.return_value = False
+
+    # Passing unbalanced quotes causes shlex to throw ValueError
+    with pytest.raises(ValueError):
+        run_shell_command("echo 'unbalanced quotes", None)
