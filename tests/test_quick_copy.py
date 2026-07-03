@@ -437,3 +437,82 @@ def test_replace_skill_references_in_command():
     # Test no skills
     result = replace_skill_references_in_command("@test-skill", "Gemini CLI", [])
     assert "@test-skill" in result
+
+def test_normalize_path_cache():
+    from skill_manager.core.quick_copy import normalize_path
+
+    # Hit cache multiple times
+    res1 = normalize_path("some/test/path")
+    res2 = normalize_path("some/test/path")
+    assert res1 == res2
+
+def test_resolve_resilient_path_cache():
+    from skill_manager.core.quick_copy import resolve_resilient_path
+
+    # Hit cache multiple times
+    res1 = resolve_resilient_path("some/test/path")
+    res2 = resolve_resilient_path("some/test/path")
+    assert res1 == res2
+
+def test_normalize_path_none_cache():
+    from skill_manager.core.quick_copy import normalize_path, resolve_resilient_path
+
+    # Hit cache multiple times for None and empty string
+    res1 = normalize_path(None)
+    res2 = normalize_path(None)
+    assert res1 == res2 == ""
+
+    res1 = resolve_resilient_path(None)
+    res2 = resolve_resilient_path(None)
+    from pathlib import Path
+    assert res1 == res2 == Path()
+
+    # Also test an invalid path for resolve_resilient_path (OSError handling)
+    import sys
+    if sys.platform != "win32":
+        res1 = resolve_resilient_path("/invalid/path/that/does/not/exist")
+        assert res1 == Path("/invalid/path/that/does/not/exist")
+
+def test_normalize_path_cache_windows_behavior():
+    from skill_manager.core.quick_copy import normalize_path
+
+    # Hit cache multiple times for a path that gets replaced with slashes
+    res1 = normalize_path("C:\\some\\path")
+    res2 = normalize_path("C:\\some\\path")
+    assert res1 == res2
+
+def test_resolve_resilient_path_invalid_windows_cache():
+    from skill_manager.core.quick_copy import resolve_resilient_path
+
+    # Hit cache multiple times for a path that gets replaced with slashes
+    import sys
+    if sys.platform == "win32":
+        res1 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+        res2 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+        from pathlib import Path
+        assert res1 == res2 == Path("C:\\some\\path\\that\\does\\not\\exist")
+
+def test_resolve_resilient_path_invalid_linux_cache():
+    from skill_manager.core.quick_copy import resolve_resilient_path
+
+    # Hit cache multiple times for a path that gets replaced with slashes
+    import sys
+    if sys.platform != "win32":
+        res1 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+        res2 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+        from pathlib import Path
+        assert res1 == res2 == Path("C:\\some\\path\\that\\does\\not\\exist")
+
+def test_resolve_resilient_path_invalid_oserror_cache(monkeypatch):
+    from skill_manager.core.quick_copy import resolve_resilient_path
+
+    def raise_oserror(*args, **kwargs):
+        raise OSError("Access denied")
+
+    monkeypatch.setattr("pathlib.Path.exists", raise_oserror)
+
+    # Hit cache multiple times for a path that gets replaced with slashes
+    res1 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+    res2 = resolve_resilient_path("C:\\some\\path\\that\\does\\not\\exist")
+    from pathlib import Path
+    assert res1 == res2 == Path("C:\\some\\path\\that\\does\\not\\exist")
