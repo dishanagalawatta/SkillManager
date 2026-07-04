@@ -50,7 +50,7 @@ Item {
                 let parts = root.mainCatName.split(" ");
                 return parts.length > 0 ? parts[0] : "";
             }
-            font.pixelSize: 20
+            font.pixelSize: Theme.sizeLargeTitle
             opacity: root.isMainCollapsed ? 0.7 : 1.0
             Layout.alignment: Qt.AlignVCenter
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -77,7 +77,7 @@ Item {
             ColorOverlay {
                 anchors.fill: starIcon
                 source: starIcon
-                color: "#FFD700"
+                color: Theme.accent
             }
         }
 
@@ -90,9 +90,9 @@ Item {
                 return spaceIdx !== -1 ? root.mainCatName.substring(spaceIdx + 1) : root.mainCatName;
             }
             font.family: Theme.fontFamily
-            font.pixelSize: 14
+            font.pixelSize: Theme.sizeBody
             font.weight: Font.Bold
-            color: root.mainCatName === "Special" ? "#FFD700" : Theme.label
+            color: root.mainCatName === "Special" ? Theme.accent : Theme.label
             opacity: 0.9
         }
     }
