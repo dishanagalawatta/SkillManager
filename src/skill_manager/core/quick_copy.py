@@ -2,7 +2,6 @@ import logging
 import os
 import shutil
 from collections.abc import Callable
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -82,7 +81,6 @@ def replace_skill_references_in_command(content: str, client_format: str, all_sk
     return re.sub(pattern, replacer, str(content))
 
 
-@lru_cache(maxsize=2048)
 def resolve_resilient_path(path_str):
     """Resolve a skill path and auto-detect .agents/skills for project roots."""
     if not path_str:
@@ -363,7 +361,6 @@ def discover_project_skills(
     return projects_list
 
 
-@lru_cache(maxsize=2048)
 def normalize_path(path):
     if not path:
         return ""
