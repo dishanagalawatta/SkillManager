@@ -194,15 +194,12 @@ class TestIncubationDeferral:
 
         real_model.removeSkillsByPath(["/a"])
 
-        # The batch protocol was entered
-        # But because _incubating is True inside _end_batch -> _apply_filter,
-        # the actual filter is queued via _pending_signals
-        assert len(real_model._pending_signals) >= 1
+        # The batch protocol was entered. Because _incubating is True,
+        # _end_batch returns early and keeps _batch_apply_needed = True.
+        # The filter will be drained by onIncubationReady().
+        assert real_model._batch_apply_needed is True
 
-        # Skills not yet removed from _all_skills (the batch body ran, but filter deferred)
-        # Actually: the _all_skills mutation runs inside _begin_batch/_end_batch
-        # directly, not through the filter queue. The filter is what's deferred.
-        # So _all_skills should reflect the removal, but _filtered_skills may be stale.
+        # Skills removed from _all_skills (the batch body ran, but filter deferred)
         paths_remaining = [s.local_path for s in real_model._all_skills]
         assert "/a" not in paths_remaining
 
@@ -211,9 +208,11 @@ class TestIncubationDeferral:
         real_model._incubating = True
         real_model.removeSkillsByPath(["/a"])
 
+        # _batch_apply_needed is True (deferred by re-entry guard)
+        assert real_model._batch_apply_needed is True
+
         # Drain the incubation gate
         real_model._incubating = False
-        real_model._replay_deferred = bool(real_model._pending_signals)
         real_model.onIncubationReady()
 
         # Now filtered_skills should reflect the removal

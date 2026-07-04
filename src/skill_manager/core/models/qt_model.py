@@ -756,19 +756,46 @@ class SkillModel(QAbstractListModel):
 
     def _begin_batch(self):
         """Suppress layout signals and filter work until _end_batch()."""
+        logger.debug(
+            "_begin_batch: incubating=%s replay=%s pending=%d",
+            self._incubating,
+            self._replay_deferred,
+            len(self._pending_signals),
+        )
         self._suppress_layout = True
         self._batch_apply_needed = False
         self._batch_reset_needed = False
 
     def _end_batch(self):
-        """Re-enable layout signals and emit a single layoutChanged or modelReset."""
+        """Re-enable layout signals and emit a single layoutChanged or modelReset.
+
+        Re-entry guard: if the model is still incubating from a previous
+        mutation (QML not yet finished rendering delegates), or signals are
+        queued for replay, defer this batch's filter pass.
+        ``onIncubationReady()`` will drain it after the current incubation
+        completes. Prevents the race where a second mutation's
+        ``layoutChanged`` destroys delegates still being rendered from the
+        first mutation's drained signals.
+        """
         self._suppress_layout = False
         if self._batch_apply_needed:
-            self._batch_apply_needed = False
+            needs_defer = (
+                self._incubating or self._replay_deferred or self._pending_signals
+            ) and self._all_skills
+            if needs_defer:
+                logger.debug(
+                    "_end_batch DEFERRED: incubating=%s replay=%s pending=%d",
+                    self._incubating,
+                    self._replay_deferred,
+                    len(self._pending_signals),
+                )
+                return
             if self._batch_reset_needed:
                 self._apply_filter(reset=True)
             else:
                 self._apply_filter_with_diff()
+            self._batch_apply_needed = False
+            logger.debug("_end_batch: applied filter synchronously")
 
     # -----------------------------------------------------------------
     # Incubation ↔ QML readiness coordination
@@ -799,10 +826,24 @@ class SkillModel(QAbstractListModel):
         Replays any signals we deferred while ``_incubating`` was True.
         No-op if nothing was deferred.
         """
-        if not self._replay_deferred:
-            return
-        self._replay_pending_signals()
-        self._replay_deferred = False
+        logger.debug(
+            "onIncubationReady: replay=%s pending=%d batch_apply=%s",
+            self._replay_deferred,
+            len(self._pending_signals),
+            self._batch_apply_needed,
+        )
+        if self._replay_deferred:
+            self._replay_pending_signals()
+            self._replay_deferred = False
+        # If _end_batch was deferred (batch_apply still set) and we're now
+        # past incubation, drain the batch filter pass immediately.
+        if self._batch_apply_needed and not self._incubating:
+            logger.debug("onIncubationReady: draining deferred batch")
+            self._batch_apply_needed = False
+            if self._batch_reset_needed:
+                self._apply_filter(reset=True)
+            else:
+                self._apply_filter_with_diff()
 
     def _force_end_incubation(self):
         """End the incubation window and arm deferred replay.
@@ -812,6 +853,11 @@ class SkillModel(QAbstractListModel):
         actually pending signals to replay — otherwise the next mutation
         would re-arm a no-op round-trip.
         """
+        logger.debug(
+            "_force_end_incubation: incubating=%s pending=%d",
+            self._incubating,
+            len(self._pending_signals),
+        )
         if not self._incubating and not self._pending_signals:
             return
         self._incubating = False

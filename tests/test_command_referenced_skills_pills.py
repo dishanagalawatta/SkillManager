@@ -250,8 +250,8 @@ class TestCommandInspectorQML:
         # Must have a Repeater for the dependency pills
         assert "Repeater" in content, "CommandInspector must have a Repeater for dependency pills"
 
-        # Must have the onSkillChanged handler to update the lists
-        assert "onSkillChanged" in content, (
+        # Must have the onSelectedSkillChanged handler to update the lists
+        assert "onSelectedSkillChanged" in content, (
             "CommandInspector must update dependency lists on skill changed"
         )
 

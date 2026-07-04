@@ -1,3 +1,5 @@
+ytp
+
 # 1. Project Metadata
 
 * **Project Name:** CourseBar
@@ -24,6 +26,7 @@
 
 ## To Do (Ready for Pickup)
 
+* [ ] Create a mcp to control app so that agent can access the app
 * [ ] Update readme FIle (Revert)
 * [ ] See for winget approval
 * [ ] Posthog implementation review.
@@ -37,4 +40,3 @@
 ---
 
 # 5. Icebox / Backlog
-

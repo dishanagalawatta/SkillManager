@@ -8,6 +8,7 @@ hidden-dir skipping).
 from pathlib import Path
 
 from skill_manager.core.commands import (
+    build_command_content,
     find_command_holder_projects,
     update_custom_command_file_multi,
 )
@@ -78,6 +79,12 @@ class TestUpdateMultiProject:
         # At least one result per project with ok=True
         ok_results = [r for r in results if r.ok]
         assert len(ok_results) >= 2, f"Expected >=2 ok results, got {len(ok_results)}"
+
+        # Check set_membership
+        canonical = [r for r in ok_results if r.set_membership == "canonical"]
+        fanout = [r for r in ok_results if r.set_membership == "fanout_add"]
+        assert len(canonical) == 1, f"Expected 1 canonical result, got {len(canonical)}"
+        assert len(fanout) >= 1, f"Expected >=1 fanout_add result, got {len(fanout)}"
 
         # Both labels appear in holder check
         holders = find_command_holder_projects("Cmd", [str(proj_a), str(proj_b)])
@@ -291,6 +298,133 @@ class TestUpdateMultiProject:
         )
         assert "AliasA" in holders_sub
         assert "AliasB" in holders_sub
+
+    def test_update_multi_project_keeps_original_holder(self, tmp_path):
+        """When the original file is in projB but projA sorts first AND
+        both hold the command, the file stays in projB (not moved to projA)."""
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        # Put the command in BOTH projects, but the local_path is from projB
+        cmd_b = _write_command(proj_b / ".agents" / "commands", "Cmd", "old-body-b")
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+
+        # projA sorts BEFORE projB. Both hold the command. The original file is in projB.
+        aliases = {str(proj_a): label_a, str(proj_b): label_b}
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_b),
+            name="Cmd",
+            body="new body",
+            category="Commands",
+            project_labels=[label_b, label_a],
+            project_paths=[str(proj_a), str(proj_b)],
+            project_aliases=aliases,
+        )
+
+        # File should stay in projB (not moved to projA despite alphabetical order)
+        cmd_in_b = proj_b / ".agents" / "commands" / "Cmd.md"
+        assert cmd_in_b.is_file(), "File should remain in original project B"
+
+        # File should also exist in projA (fan-out copy)
+        cmd_in_a = proj_a / ".agents" / "commands" / "Cmd.md"
+        assert cmd_in_a.is_file(), "File should be copied to project A"
+
+        # The canonical result path should be in projB (original)
+        ok_results = [r for r in results if r.ok and r.path]
+        canonical_path = ok_results[0].path if ok_results else None
+        assert canonical_path is not None
+        assert canonical_path.parent == cmd_in_b.parent, (
+            f"Canonical should stay in B, got {canonical_path}"
+        )
+
+    def test_update_multi_project_skips_identical_fanout(self, tmp_path):
+        """When fan-out target already has identical content, skip overwrite.
+
+        Scenario: command is renamed from 'Cmd' to 'CmdNew'. projA was NOT a holder
+        of 'CmdNew' (so it's in add_set), but already has a 'CmdNew.md' with
+        identical content. The fan-out should detect this and skip the write.
+        """
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        body = "same-body"
+        identical_content = build_command_content("CmdNew", body, "Commands")
+
+        # projB has the original 'Cmd.md' (old name)
+        cmd_old = _write_command(proj_b / ".agents" / "commands", "Cmd", body)
+
+        # projA already has 'CmdNew.md' with identical content (from a previous sync)
+        (proj_a / ".agents" / "commands" / "CmdNew.md").write_text(
+            identical_content, encoding="utf-8"
+        )
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+        aliases = {str(proj_a): label_a, str(proj_b): label_b}
+
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_old),
+            name="CmdNew",
+            body=body,
+            category="Commands",
+            project_labels=[label_b, label_a],
+            project_paths=[str(proj_a), str(proj_b)],
+            project_aliases=aliases,
+        )
+
+        # projA should get "Already up to date" (identical content, skip write)
+        ok_results = [r for r in results if r.ok]
+        a_result = next(
+            (r for r in ok_results if r.path and str(proj_a) in str(r.path)),
+            None,
+        )
+        assert a_result is not None, f"Expected projA result, got: {[r.path for r in ok_results]}"
+        assert "Already up to date" in a_result.message, (
+            f"Expected 'Already up to date' for projA, got: {a_result.message}"
+        )
+        assert a_result.set_membership == "fanout_skip", (
+            f"Expected set_membership='fanout_skip', got: {a_result.set_membership}"
+        )
+
+    def test_update_multi_project_warns_on_different_content(self, tmp_path):
+        """When target project has different content, conflict is raised.
+
+        Both projects already hold the command, so add_set is empty and the
+        fan-out has nothing to do.  The canonical update targets the original
+        project (projB) and succeeds.  projA is an existing holder that keeps
+        its own file — it is NOT overwritten by the fan-out.
+        """
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        cmd_b = _write_command(proj_b / ".agents" / "commands", "Cmd", "new-body")
+        # Pre-populate A with different content
+        (proj_a / ".agents" / "commands" / "Cmd.md").write_text(
+            "---\nname: Cmd\n---\ndifferent-body", encoding="utf-8"
+        )
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_b),
+            name="Cmd",
+            body="new-body",
+            category="Commands",
+            project_labels=[label_b, label_a],
+            project_paths=[str(proj_a), str(proj_b)],
+        )
+
+        # Canonical update targets projB (original project) and succeeds.
+        # Fan-out has nothing to do (add_set empty). projA keeps its file.
+        ok_results = [r for r in results if r.ok]
+        assert len(ok_results) == 1, f"Expected 1 ok result, got {len(ok_results)}"
+        assert "Cmd.md" in ok_results[0].message
+        # projA's file is NOT overwritten
+        a_content = (proj_a / ".agents" / "commands" / "Cmd.md").read_text(encoding="utf-8")
+        assert "different-body" in a_content
 
 
 # ---------------------------------------------------------------------------

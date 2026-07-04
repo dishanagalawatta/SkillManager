@@ -619,6 +619,7 @@ def test_update_custom_command_full(
         suggested_rename=None,
         needs_confirm=False,
         pending_removals=[],
+        set_membership="canonical",
     )
     mock_update_multi.return_value = [update_result]
 
@@ -687,6 +688,7 @@ def test_update_custom_command_full_moves_to_new_project(
         suggested_rename=None,
         needs_confirm=False,
         pending_removals=[],
+        set_membership="canonical",
     )
     mock_update_multi.return_value = [update_result]
 
@@ -745,6 +747,7 @@ def test_update_custom_command_full_emits_conflict_signal(
         suggested_rename="cmd-1.md",
         needs_confirm=False,
         pending_removals=[],
+        set_membership="canonical",
     )
     mock_update_multi.return_value = [update_result]
 
@@ -888,9 +891,13 @@ class TestRefreshSelectedSkill:
 
         ops_controller._refresh_selected_skill("/cmd/Cmd.md")
 
-        mock_app.selectedSkillChanged.emit.assert_called_once()
-        mock_app.skillModel.get_skill_at.assert_called_with(0)
-        assert mock_app._selected_skill["body_content"] == "new body"
+        mock_app.set_selected_skill.assert_called_once_with(
+            {
+                "local_path": "/cmd/Cmd.md",
+                "name": "Cmd",
+                "body_content": "new body",
+            }
+        )
 
     def test_rename_refreshes_with_new_path(self, ops_controller, mock_app):
         from skill_manager.core.models.entities import Skill
@@ -906,9 +913,13 @@ class TestRefreshSelectedSkill:
 
         ops_controller._refresh_selected_skill("/cmd/Old.md", rename_path="/cmd/New.md")
 
-        mock_app.selectedSkillChanged.emit.assert_called_once()
-        mock_app.skillModel.get_skill_at.assert_called_with(0)
-        assert mock_app._selected_skill["local_path"] == "/cmd/New.md"
+        mock_app.set_selected_skill.assert_called_once_with(
+            {
+                "local_path": "/cmd/New.md",
+                "name": "New",
+                "body_content": "updated",
+            }
+        )
 
     def test_not_in_view_when_path_missing_from_model(self, ops_controller, mock_app):
         mock_app._selected_skill = {"local_path": "/cmd/Missing.md"}
@@ -1050,7 +1061,7 @@ def test_update_custom_command_refreshes_selection_real_discovery(
 
     # Load into model and select
     _load_command_into_model(app, cmd_file, "Cmd", "old body")
-    app._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
+    app.set_selected_skill({"local_path": str(cmd_file), "name": "Cmd"})
 
     emissions = []
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
@@ -1094,7 +1105,7 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
 
     # Load into model and select using the old path
     _load_command_into_model(app, old_file, "OldCmd", "old body")
-    app._selected_skill = {"local_path": str(old_file), "name": "OldCmd"}
+    app.set_selected_skill({"local_path": str(old_file), "name": "OldCmd"})
 
     emissions = []
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
@@ -1122,8 +1133,8 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
         "selectedSkillChanged was not emitted after rename — "
         "discover_single likely returned None for the command file"
     )
-    assert app._selected_skill.get("local_path") == str(new_file), (
-        f"_selected_skill should point to renamed file, got {app._selected_skill.get('local_path')}"
+    assert app._selected_skill.value("local_path") == str(new_file), (
+        f"_selected_skill should point to renamed file, got {app._selected_skill.value('local_path')}"
     )
 
 
@@ -1140,7 +1151,7 @@ def test_create_custom_command_no_selection_refresh_for_different_skill_real_dis
 
     app._projects = [str(project_path)]
 
-    app._selected_skill = {"local_path": "/other/skill/Skill.md", "name": "Other"}
+    app.set_selected_skill({"local_path": "/other/skill/Skill.md", "name": "Other"})
 
     emissions = []
     app.selectedSkillChanged.connect(lambda: emissions.append(True))

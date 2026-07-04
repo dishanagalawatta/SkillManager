@@ -7,11 +7,12 @@ import App 1.0
 Rectangle {
     id: root
 
-    property var skill: ({})
+    readonly property var _sel: AppController.selectedSkill || ({})
+    property var skill: _sel
     property bool isCollapsed: false
 
     readonly property int targetWidth: {
-        if (!root.skill || root.skill.local_path === undefined) return 0;
+        if (!root._sel || root._sel.local_path === undefined) return 0;
         if (isCollapsed) return 32;
 
         let dynamicWidth = parent ? parent.width * 0.5 : 440;
@@ -62,16 +63,16 @@ Rectangle {
 
     // --- State ---
     property string imagePath: {
-        if (!root.skill || !root.skill.is_screenshot || !root.skill.local_path) return "";
-        let p = root.skill.local_path.replace(/\\/g, "/");
+        if (!root._sel || !root._sel.is_screenshot || !root._sel.local_path) return "";
+        let p = root._sel.local_path.replace(/\\/g, "/");
         if (p.startsWith("/")) return "file://" + p;
         return "file:///" + p;
     }
     property bool imageLoadFailed: false
     onImagePathChanged: { imageLoadFailed = false }
     property string imageFileName: {
-        if (!root.skill || !root.skill.local_path) return "";
-        let parts = root.skill.local_path.replace(/\\/g, "/").split("/");
+        if (!root._sel || !root._sel.local_path) return "";
+        let parts = root._sel.local_path.replace(/\\/g, "/").split("/");
         return parts[parts.length - 1];
     }
     property real zoomLevel: 1.0
@@ -285,7 +286,7 @@ Rectangle {
                 // Skill name
                 Text {
                     Layout.fillWidth: true
-                    text: root.skill ? (root.skill.name || "Untitled") : ""
+                    text: root._sel ? (root._sel.name || "Untitled") : ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
                     font.weight: Font.DemiBold
@@ -600,7 +601,7 @@ Rectangle {
 
                 // Placeholder shown when screenshot file is missing
                 Rectangle {
-                    visible: root.imageLoadFailed && root.skill && root.skill.is_screenshot
+                    visible: root.imageLoadFailed && root._sel && root._sel.is_screenshot
                     anchors.centerIn: parent
                     width: 320
                     height: 120
@@ -622,7 +623,7 @@ Rectangle {
                         }
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: root.skill ? (root.skill.local_path || "") : ""
+                            text: root._sel ? (root._sel.local_path || "") : ""
                             color: "#66FFFFFF"
                             font.pixelSize: 11
                             width: 290

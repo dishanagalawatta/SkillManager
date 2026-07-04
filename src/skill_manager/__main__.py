@@ -92,8 +92,9 @@ def main():
     diag.initialize(log_level=log_level)
 
     # Enable only if the user has opted in via Settings > General
+    # Always enable in dev mode for selection_refreshed diagnostics
     _cfg = ConfigManager()
-    diag.set_enabled(_cfg.get("diagnostic_logging", False))
+    diag.set_enabled(is_dev_mode() or _cfg.get("diagnostic_logging", False))
     diag.log_startup()
 
     app_main()

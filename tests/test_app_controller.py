@@ -242,9 +242,9 @@ def test_controller_selection_and_clipboard_paths(controller):
     controller.skillModel.setSkills([{"name": "S1", "local_path": "/p1", "is_package": True}])
 
     controller.selectSkill(0)
-    assert controller.selectedSkill["name"] == "S1"
+    assert controller.selectedSkill.value("name") == "S1"
     controller.selectSkill(-1)
-    assert controller.selectedSkill == {}
+    assert controller.selectedSkill.value("name") is None
 
     controller._clipboard = MagicMock()
     controller.copyTextToClipboard("hello")
@@ -794,7 +794,7 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     _write_command_file(cmd_file, "Cmd", "old body")
 
     _load_command_into_model(controller, cmd_file, "Cmd", "old body")
-    controller._selected_skill = {"local_path": str(cmd_file), "name": "Cmd"}
+    controller.set_selected_skill({"local_path": str(cmd_file), "name": "Cmd"})
 
     emissions = []
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
@@ -837,7 +837,7 @@ def test_create_custom_command_refreshes_selected_skill_real_discovery(
     _write_command_file(cmd_file, "NewCmd", "echo hello")
 
     _load_command_into_model(controller, cmd_file, "NewCmd", "echo hello")
-    controller._selected_skill = {"local_path": str(cmd_file), "name": "NewCmd"}
+    controller.set_selected_skill({"local_path": str(cmd_file), "name": "NewCmd"})
 
     emissions = []
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))

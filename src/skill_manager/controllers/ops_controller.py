@@ -79,19 +79,21 @@ class OpsController(BaseController):
         if not skill:
             return
 
-        path = (
-            skill.get("local_path")
-            if isinstance(skill, dict)
-            else getattr(skill, "local_path", None)
-        )
+        if hasattr(skill, "value"):
+            path = skill.value("local_path")
+        elif isinstance(skill, dict):
+            path = skill.get("local_path")
+        else:
+            path = getattr(skill, "local_path", None)
         if not path:
             return
 
-        current_val = (
-            skill.get(attr_name, False)
-            if isinstance(skill, dict)
-            else getattr(skill, attr_name, False)
-        )
+        if hasattr(skill, "value"):
+            current_val = skill.value(attr_name) or False
+        elif isinstance(skill, dict):
+            current_val = skill.get(attr_name, False)
+        else:
+            current_val = getattr(skill, attr_name, False)
         new_state = not current_val
 
         # Update global list
@@ -107,7 +109,9 @@ class OpsController(BaseController):
         self._updateModelsProperty(path, attr_name, new_state)
 
         # Update the selected object reference
-        if isinstance(skill, dict):
+        if hasattr(skill, "insert"):
+            skill.insert(attr_name, new_state)
+        elif isinstance(skill, dict):
             skill[attr_name] = new_state
         else:
             setattr(skill, attr_name, new_state)
@@ -523,8 +527,12 @@ class OpsController(BaseController):
         if self.app.skillModel.selectedCount > 0:
             self.copySelectedSkillsToClipboard()
             return
-        if self.app._selected_skill and self.app._selected_skill.get("local_path"):
-            self.copySkillReference(self.app._selected_skill)
+        selected = self.app._selected_skill
+        if hasattr(selected, "value") and selected.value("local_path"):
+            self.copySkillReference({k: selected.value(k) for k in selected.keys()})  # noqa: SIM118
+            return
+        if isinstance(selected, dict) and selected.get("local_path"):
+            self.copySkillReference(selected)
             return
         first_skill = self.app.skillModel.get_skill_at(0)
         if first_skill:
@@ -809,7 +817,32 @@ class OpsController(BaseController):
             self.app._set_status(msg)
             return
 
-        self.app._set_status(f"Updated command in {len(updated)} project(s)")
+        added = sum(1 for r in updated if r.set_membership in ("canonical", "fanout_add"))
+        skipped = sum(1 for r in updated if r.set_membership == "fanout_skip")
+        removed = sum(1 for r in updated if r.set_membership == "removal")
+        parts = [f"Updated command in {added} project(s)"]
+        if skipped:
+            parts.append(f"{skipped} already up to date")
+        if removed:
+            parts.append(f"{removed} removed")
+        self.app._set_status(", ".join(parts))
+
+        # ── Instant body refresh: update _selected_skill immediately
+        # so the CommandInspector reflects the new content without
+        # waiting for the deferred discovery-rescan pipeline.
+        selected = self.app._selected_skill
+        sel_path = None
+        if hasattr(selected, "value"):
+            sel_path = selected.value("local_path")
+        elif isinstance(selected, dict):
+            sel_path = selected.get("local_path")
+        if sel_path == local_path:
+            if hasattr(selected, "insert"):
+                selected.insert("body_content", body)
+                selected.insert("name", name)
+            elif isinstance(selected, dict):
+                selected["body_content"] = body
+                selected["name"] = name
 
         # ── Targeted rescan: collect unique affected project paths
         from skill_manager.core.commands import find_project_path_by_label
@@ -881,6 +914,22 @@ class OpsController(BaseController):
 
             if updated and updated[0].path:
                 self._refresh_selected_skill(local_path, rename_path=str(updated[0].path))
+                # Force-update body_content on _selected_skill with the
+                # authoritative value from the update args.  The model
+                # may still carry stale data if the discovery rescan
+                # re-read the file before the write flushed.
+                selected = self.app._selected_skill
+                sel_path = None
+                if hasattr(selected, "value"):
+                    sel_path = selected.value("local_path")
+                elif isinstance(selected, dict):
+                    sel_path = selected.get("local_path")
+                target_path = str(updated[0].path)
+                if sel_path == target_path and body:
+                    if hasattr(selected, "insert"):
+                        selected.insert("body_content", body)
+                    elif isinstance(selected, dict):
+                        selected["body_content"] = body
                 self.app.notify_command_updated(local_path, str(updated[0].path))
 
             if stale_paths:
@@ -1174,7 +1223,12 @@ class OpsController(BaseController):
         """
         diag = get_diagnostic_logger()
         selected = self.app._selected_skill
-        selected_path = selected.get("local_path") if isinstance(selected, dict) else None
+        if hasattr(selected, "value"):
+            selected_path = selected.value("local_path")
+        elif isinstance(selected, dict):
+            selected_path = selected.get("local_path")
+        else:
+            selected_path = None
 
         if not selected_path:
             diag.log_event("INFO", CATEGORY_SELECTION_REFRESHED, "noop: nothing selected")
@@ -1193,16 +1247,37 @@ class OpsController(BaseController):
 
         # Find the row in the active model
         model = self.app.skillModel
+
         for i in range(len(model._filtered_skills)):
             skill = model._filtered_skills[i]
             if skill.local_path == lookup_path:
-                self.app._selected_skill = model.get_skill_at(i)
-                self.app.selectedSkillChanged.emit()
+                fresh = model.get_skill_at(i)
+                self.app.set_selected_skill(fresh)
                 diag.log_event(
                     "INFO",
                     CATEGORY_SELECTION_REFRESHED,
                     f"refreshed: {lookup_path}"
                     + (f" (renamed from {local_path})" if rename_path else ""),
+                    data={"fresh_body": (fresh.get("body_content") or "")[:80]},
+                )
+                return
+
+        # Fallback: search _all_skills (skill may be filtered out by search)
+        for skill in model._all_skills:
+            if skill.local_path == lookup_path:
+                import dataclasses
+
+                if dataclasses.is_dataclass(skill) and not isinstance(skill, type):
+                    fresh_dict = dataclasses.asdict(skill)
+                else:
+                    fresh_dict = dict(vars(skill))
+                self.app.set_selected_skill(fresh_dict)
+                diag.log_event(
+                    "INFO",
+                    CATEGORY_SELECTION_REFRESHED,
+                    f"refreshed_from_all_skills: {lookup_path}"
+                    + (f" (renamed from {local_path})" if rename_path else ""),
+                    data={"fresh_body": (fresh_dict.get("body_content") or "")[:80]},
                 )
                 return
 

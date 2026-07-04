@@ -56,11 +56,13 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
         model.state.is_package_only = None
         model._apply_filter()
 
-    app_controller._selected_skill = {
-        "local_path": str(cmd_file),
-        "name": "Cmd",
-        "body_content": "old body",
-    }
+    app_controller.set_selected_skill(
+        {
+            "local_path": str(cmd_file),
+            "name": "Cmd",
+            "body_content": "old body",
+        }
+    )
 
     # Track signal
     emissions = []
@@ -82,8 +84,8 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
     assert emissions, "selectedSkillChanged was not emitted"
 
     # _selected_skill should now have the new body
-    assert app_controller._selected_skill.get("body_content") == "new body", (
-        f"body_content should be 'new body', got {app_controller._selected_skill.get('body_content')}"
+    assert app_controller._selected_skill.value("body_content") == "new body", (
+        f"body_content should be 'new body', got {app_controller._selected_skill.value('body_content')}"
     )
 
 
@@ -524,3 +526,62 @@ def test_action_button_supports_danger_role():
         "ActionButton role:danger must fill with Theme.danger (solid red), "
         "not the outline destructive style."
     )
+
+
+# ── CommandInspector body refresh tests ─────────────────────────────
+
+
+def test_command_inspector_has_direct_skill_binding():
+    """CommandInspector.qml must bind bodyArea.text directly to skill.body_content."""
+    from pathlib import Path
+
+    inspector = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "skill_manager"
+        / "SkillManagerComponents"
+        / "CommandInspector.qml"
+    )
+    content = inspector.read_text(encoding="utf-8")
+    assert "root._sel.body_content" in content, (
+        "CommandInspector must bind bodyArea.text to root._sel.body_content "
+        "(QQmlPropertyMap provides per-key notify signals for reliable reactivity)"
+    )
+
+
+def test_command_inspector_no_body_content_workaround():
+    """CommandInspector.qml must NOT use a bodyContent string property workaround."""
+    from pathlib import Path
+
+    inspector = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "skill_manager"
+        / "SkillManagerComponents"
+        / "CommandInspector.qml"
+    )
+    content = inspector.read_text(encoding="utf-8")
+    assert "property string bodyContent" not in content, (
+        "bodyContent workaround removed — QQmlPropertyMap handles reactivity natively"
+    )
+
+
+def test_command_inspector_on_skill_changed_handler():
+    """onSelectedSkillChanged must update dependency lists."""
+    from pathlib import Path
+
+    inspector = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "skill_manager"
+        / "SkillManagerComponents"
+        / "CommandInspector.qml"
+    )
+    content = inspector.read_text(encoding="utf-8")
+    assert "onSelectedSkillChanged" in content, (
+        "CommandInspector must have onSelectedSkillChanged handler"
+    )
+    assert "root.dependencyList" in content, (
+        "onSelectedSkillChanged must update root.dependencyList"
+    )
+    assert "_applyHighlights" in content, "onSelectedSkillChanged must call _applyHighlights"

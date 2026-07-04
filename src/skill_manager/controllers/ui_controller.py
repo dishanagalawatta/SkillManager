@@ -329,10 +329,9 @@ class UIController(BaseController):
     def selectSkill(self, index: int):
         """Sets the selected skill based on model index."""
         if index == -1:
-            self.app._selected_skill = {}
+            self.app.set_selected_skill({})
         else:
-            self.app._selected_skill = self.app.skillModel.get_skill_at(index)
-        self.app.selectedSkillChanged.emit()
+            self.app.set_selected_skill(self.app.skillModel.get_skill_at(index))
 
     @Slot()
     def selectAllVisibleSkills(self):
