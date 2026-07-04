@@ -171,7 +171,7 @@ def run_shell_command(
     if sys.platform == "win32":
         # On Windows, passing a string with shell=False securely invokes CreateProcess
         # without cmd.exe interpretation, safely handling paths with spaces.
-        safe_command = command  # pragma: no cover
+        safe_command = command
     else:
         try:
             safe_command = shlex.split(command, posix=True)
