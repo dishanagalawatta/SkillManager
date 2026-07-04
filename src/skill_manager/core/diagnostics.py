@@ -456,9 +456,15 @@ def is_dev_mode() -> bool:
     if getattr(sys, "frozen", False):
         return False
     try:
-        src_dir = Path(__file__).resolve().parent.parent
-        if src_dir.name == "src" and (src_dir.parent / "pyproject.toml").exists():
-            return True
+        # Walk up from this file (src/skill_manager/core/diagnostics.py)
+        # until we find src/ with pyproject.toml or project root with pyproject.toml.
+        d = Path(__file__).resolve().parent
+        for _ in range(5):
+            if d.name == "src" and (d.parent / "pyproject.toml").exists():
+                return True
+            if (d / "pyproject.toml").exists() and (d / "src").is_dir():
+                return True
+            d = d.parent
     except Exception:
         pass
     return False

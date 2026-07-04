@@ -6,14 +6,16 @@ import App 1.0
 Rectangle {
     id: root
 
-    property var skill: ({})
+    readonly property var _sel: AppController.selectedSkill || ({})
+    property var skill: _sel
     property bool isCollapsed: false
     property var editDialog: null
     property var dependencyList: []
     property var referenceRanges: []
+    property string _prevLocalPath: ""
 
     readonly property int targetWidth: {
-        if (!root.skill || root.skill.local_path === undefined) return 0;
+        if (!root._sel || root._sel.local_path === undefined) return 0;
         if (isCollapsed) return 32;
 
         let dynamicWidth = parent ? parent.width * 0.5 : 400;
@@ -48,8 +50,8 @@ Rectangle {
     border.color: Theme.glassBorder
     clip: true
 
-    onSkillChanged: {
-        var s = root.skill
+    function _refreshDependencies() {
+        var s = root._sel
         if (s && s.is_command && s.local_path && typeof AppController !== "undefined" && AppController) {
             root.dependencyList = AppController.ops_controller.getReferencedSkillsForCommand(s.local_path)
             root.referenceRanges = AppController.ops_controller.getSkillReferenceRanges(s.local_path)
@@ -61,6 +63,30 @@ Rectangle {
             bodyArea._lastHighlightedText = ""
         }
         _applyHighlights(-1)
+    }
+
+    Connections {
+        target: root._sel
+        function onValueChanged(key, value) {
+            if (key === "local_path" || key === "is_command") {
+                if (value !== root._prevLocalPath) {
+                    root._prevLocalPath = (key === "local_path" ? (value || "") : root._prevLocalPath)
+                    root._refreshDependencies()
+                }
+            } else if (key === "body_content") {
+                if (bodyArea) {
+                    bodyArea._lastHighlightedText = ""
+                }
+                _applyHighlights(-1)
+            }
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onSelectedSkillChanged() {
+            root._refreshDependencies()
+        }
     }
 
     function _applyHighlights(focusedIndex) {
@@ -96,7 +122,7 @@ Rectangle {
             x: 12
             y: 12
             spacing: 16
-            visible: !root.isCollapsed && root.skill.local_path !== undefined
+            visible: !root.isCollapsed && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
 
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -109,7 +135,7 @@ Rectangle {
                 TextField {
                     id: nameField
                     ContextMenu.menu: null
-                    text: root.skill.name || ""
+                    text: root._sel.name || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -138,10 +164,10 @@ Rectangle {
                     flat: true
                     onClicked: (mouse) => {
                         if (root.editDialog) {
-                            root.editDialog.openForEdit(root.skill)
+                            root.editDialog.openForEdit(root._sel)
                         }
                     }
-                    visible: root.skill && root.skill.local_path !== undefined
+                    visible: root._sel && root._sel.local_path !== undefined
                     tooltipText: "Edit settings"
                 }
 
@@ -150,9 +176,9 @@ Rectangle {
                     role: "destructive"
                     flat: true
                     onClicked: (mouse) => {
-                        root.deleteRequested(root.skill.name || "", root.skill.local_path || "", true)
+                        root.deleteRequested(root._sel.name || "", root._sel.local_path || "", true)
                     }
-                    visible: root.skill && root.skill.local_path !== undefined
+                    visible: root._sel && root._sel.local_path !== undefined
                     tooltipText: "Delete command"
                 }
 
@@ -160,7 +186,7 @@ Rectangle {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
-                    visible: root.skill && root.skill.local_path !== undefined
+                    visible: root._sel && root._sel.local_path !== undefined
                     tooltipText: "Close Inspector"
                 }
             }
@@ -270,7 +296,7 @@ Rectangle {
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Command Details"
                             property string _lastHighlightedText: ""
-                            text: root.skill.body_content || ""
+                            text: (root._sel && root._sel.body_content) || ""
                             onTextChanged: {
                                 if (text !== _lastHighlightedText) {
                                     _lastHighlightedText = text

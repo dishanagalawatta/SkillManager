@@ -17,6 +17,7 @@ sub-controller's own .pyi (when present) or its runtime type.
 from typing import Any, ClassVar
 
 from PySide6.QtCore import QObject, Qt, SignalInstance
+from PySide6.QtQml import QQmlPropertyMap
 
 from skill_manager.controllers.app_update_controller import AppUpdateController
 from skill_manager.controllers.config_controller import ConfigController
@@ -81,7 +82,7 @@ class AppController(QObject):
     skillModel: SkillModel
     libraryModel: SkillModel
     quickCopyModel: SkillModel
-    selectedSkill: dict
+    selectedSkill: QQmlPropertyMap
     isLoading: bool
     isTesting: bool
     statusMessage: str
@@ -150,7 +151,7 @@ class AppController(QObject):
     _config: Any
     _library_model: SkillModel
     _quick_copy_model: SkillModel
-    _selected_skill: dict
+    _selected_skill: QQmlPropertyMap
     _is_loading: bool
     _status_message: str
     _discovered_projects: list[str]
@@ -231,6 +232,7 @@ class AppController(QObject):
         self, lp: str, n: str, b: str, cat: str, project_labels: list[str], on_conflict: str = ...
     ) -> None: ...
     def notify_command_updated(self, old_path: str, new_path: str) -> None: ...
+    def set_selected_skill(self, skill_dict: dict[str, Any]) -> None: ...
     def createCustomCommand(self, n: str, b: str, project_labels: list[str], cat: str) -> None: ...
     def commandProjectsForPath(self, lp: str) -> list[str]: ...
     def skillProjectsForPath(self, lp: str) -> list[str]: ...

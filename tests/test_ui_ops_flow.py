@@ -93,7 +93,7 @@ class TestUIOpsFlow:
         app_controller.selectSkill(index)
 
         # Verify selection was successful
-        assert app_controller._selected_skill.get("local_path") == str(skill_dir)
+        assert app_controller._selected_skill.value("local_path") == str(skill_dir)
 
         # 3. Act
         app_controller.ops.toggleStarred()

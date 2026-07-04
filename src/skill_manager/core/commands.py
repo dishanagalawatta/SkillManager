@@ -24,6 +24,7 @@ class CommandUpdateResult:
     suggested_rename: str | None = None
     needs_confirm: bool = False
     pending_removals: list[str] = field(default_factory=list)
+    set_membership: str = ""  # "canonical" | "fanout_add" | "fanout_skip" | "removal"
 
 
 def find_project_path_by_label(
@@ -310,8 +311,23 @@ def update_custom_command_file_multi(
             )
         ]
 
-    # Determine canonical label: prefer keep_set, fall back to add_set
-    if keep_set:
+    # Determine canonical label: prefer the original file's project to
+    # avoid moving the file to a different project (which surprises users).
+    # Find the raw project path whose root matches the local file's root,
+    # then compute the label the same way find_command_holder_projects does.
+    local_root = project_root_for_project(Path(local_path))
+    original_project_label = None
+    for pp in project_paths:
+        if project_root_for_project(Path(pp)) == local_root:
+            original_project_label = project_label(Path(pp), project_aliases=project_aliases)
+            break
+    if original_project_label is None:
+        original_project_label = project_label(
+            Path(local_path).parent, project_aliases=project_aliases
+        )
+    if original_project_label in keep_set:
+        canonical_label = original_project_label
+    elif keep_set:
         canonical_label = keep_set[0]
     elif add_set:
         canonical_label = add_set[0]
@@ -330,7 +346,19 @@ def update_custom_command_file_multi(
         project_aliases=project_aliases,
         on_conflict=on_conflict,
     )
-    results.append(canonical)
+    results.append(
+        CommandUpdateResult(
+            ok=canonical.ok,
+            message=canonical.message,
+            path=canonical.path,
+            needs_conflict_resolution=canonical.needs_conflict_resolution,
+            conflicting_path=canonical.conflicting_path,
+            suggested_rename=canonical.suggested_rename,
+            needs_confirm=canonical.needs_confirm,
+            pending_removals=canonical.pending_removals,
+            set_membership="canonical",
+        )
+    )
 
     # Phase 2: fan-out to add_set (skip keep_set labels)
     if canonical.ok and canonical.path and canonical.path.is_file():
@@ -353,9 +381,26 @@ def update_custom_command_file_multi(
             target_file = target_dir / canonical.path.name
             try:
                 target_dir.mkdir(parents=True, exist_ok=True)
+                if target_file.exists():
+                    existing = target_file.read_text(encoding="utf-8-sig")
+                    if existing == new_content:
+                        results.append(
+                            CommandUpdateResult(
+                                True,
+                                f"Already up to date: {target_file.name}",
+                                target_file,
+                                set_membership="fanout_skip",
+                            )
+                        )
+                        continue
                 target_file.write_text(new_content, encoding="utf-8")
                 results.append(
-                    CommandUpdateResult(True, f"Updated command: {target_file.name}", target_file)
+                    CommandUpdateResult(
+                        True,
+                        f"Updated command: {target_file.name}",
+                        target_file,
+                        set_membership="fanout_add",
+                    )
                 )
             except Exception as exc:
                 results.append(
@@ -383,12 +428,18 @@ def update_custom_command_file_multi(
                     removal_target.unlink()
                     results.append(
                         CommandUpdateResult(
-                            True, f"Removed command from {label}: {removal_target.name}"
+                            True,
+                            f"Removed command from {label}: {removal_target.name}",
+                            set_membership="removal",
                         )
                     )
                 else:
                     results.append(
-                        CommandUpdateResult(True, f"No command file to remove in {label}")
+                        CommandUpdateResult(
+                            True,
+                            f"No command file to remove in {label}",
+                            set_membership="removal",
+                        )
                     )
             except Exception as exc:
                 results.append(

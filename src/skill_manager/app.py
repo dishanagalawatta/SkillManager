@@ -20,7 +20,7 @@ import sentry_sdk
 from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QIcon
-from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
+from PySide6.QtQml import QQmlApplicationEngine, QQmlPropertyMap, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
 
 import skill_manager
@@ -181,7 +181,7 @@ class AppController(QObject):
         self._quick_copy_model = SkillModel(config=self._quick_copy_config)
 
         # 2. Basic Attribute Initialization
-        self._selected_skill = {}
+        self._selected_skill = QQmlPropertyMap(self)
         self._is_loading = False
         self._status_message = ""
         self._discovered_projects = []
@@ -481,9 +481,25 @@ class AppController(QObject):
     def quickCopyModel(self):
         return self._quick_copy_model
 
-    @Property(dict, notify=selectedSkillChanged)
+    @Property(QObject, notify=selectedSkillChanged)
     def selectedSkill(self):
-        return self._selected_skill or {}
+        return self._selected_skill
+
+    def set_selected_skill(self, skill_dict: dict[str, Any]) -> None:
+        """Update the selected skill via QQmlPropertyMap.
+
+        Creates a new QQmlPropertyMap each time so QML's binding system
+        detects the new object and re-evaluates all bindings (including
+        ``text: root.skill.body_content``).
+        """
+        old = self._selected_skill
+        new_map = QQmlPropertyMap(self)
+        for key, value in skill_dict.items():
+            new_map.insert(key, value)
+        self._selected_skill = new_map
+        self.selectedSkillChanged.emit()
+        if old is not None:
+            old.deleteLater()
 
     @Property(bool, notify=isLoadingChanged)
     def isLoading(self):

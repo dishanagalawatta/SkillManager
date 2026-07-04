@@ -6,12 +6,13 @@ import App 1.0
 Rectangle {
     id: root
     
-    property var skill: ({})
+    readonly property var _sel: AppController.selectedSkill || ({})
+    property var skill: _sel
     property bool isQuickCopy: false
     property bool isCollapsed: false
 
     readonly property int targetWidth: {
-        if (!root.skill || root.skill.local_path === undefined) return 0;
+        if (!root._sel || root._sel.local_path === undefined) return 0;
         if (isCollapsed) return 32;
 
         let dynamicWidth = parent ? parent.width * 0.5 : (isQuickCopy ? 350 : 400);
@@ -65,9 +66,9 @@ Rectangle {
             }
             if (shouldSkip) continue;
             
-            // Skip the name header if it matches root.skill.name (case insensitive, allowing for markdown headers)
+            // Skip the name header if it matches root._sel.name (case insensitive, allowing for markdown headers)
             let headerMatch = trimmed.replace(/^#+\s+/, '').trim().toLowerCase();
-            if (headerMatch === (root.skill.name || "").toLowerCase()) continue;
+            if (headerMatch === (root._sel.name || "").toLowerCase()) continue;
             
             result.push(line);
         }
@@ -92,7 +93,7 @@ Rectangle {
         ColumnLayout {
             anchors.fill: parent
             spacing: 16
-            visible: !root.isCollapsed && root.skill.local_path !== undefined
+            visible: !root.isCollapsed && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
             
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -103,7 +104,7 @@ Rectangle {
                 spacing: 8
                 TextEdit {
                     id: skillNameEdit
-                    text: root.skill.name || "No Selection"
+                    text: root._sel.name || "No Selection"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -128,7 +129,7 @@ Rectangle {
                     id: argField
                     ContextMenu.menu: null
                     objectName: "argField"
-                    visible: root.isQuickCopy && root.skill.local_path !== undefined
+                    visible: root.isQuickCopy && root._sel.local_path !== undefined
                     Layout.preferredWidth: 150
                     Layout.alignment: Qt.AlignVCenter
                     placeholderText: "Optional argument..."
@@ -158,18 +159,18 @@ Rectangle {
                 }
                 IconButton {
                     id: starButton
-                    text: (root.skill && root.skill.is_starred) ? "★" : "☆"
+                    text: (root._sel && root._sel.is_starred) ? "★" : "☆"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
-                    visible: root.skill && root.skill.local_path !== undefined
+                    visible: root._sel && root._sel.local_path !== undefined
                     onClicked: (mouse) => AppController.ops_controller.toggleCurrentSkillStarred()
-                    tooltipText: (root.skill && root.skill.is_starred) ? "Unstar Skill" : "Star Skill"
+                    tooltipText: (root._sel && root._sel.is_starred) ? "Unstar Skill" : "Star Skill"
                     
                     contentItem: Text {
                         text: starButton.text
                         font.pixelSize: 22
-                        color: (root.skill && root.skill.is_starred) ? "#FFD700" : Theme.secondaryLabel
+                        color: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         opacity: starButton.hovered ? 1.0 : 0.8
@@ -188,7 +189,7 @@ Rectangle {
                     text: "✕"
                     flat: true
                     onClicked: (mouse) => root.closed()
-                    visible: root.skill && root.skill.local_path !== undefined
+                    visible: root._sel && root._sel.local_path !== undefined
                     tooltipText: "Close Inspector"
                 }
             }
@@ -196,7 +197,7 @@ Rectangle {
             // Description
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root.skill.description !== ""
+                visible: root._sel.description !== ""
                 spacing: 4
                 
                 Text {
@@ -210,7 +211,7 @@ Rectangle {
                 
                 TextEdit {
                     id: descriptionEdit
-                    text: root.skill.description || ""
+                    text: root._sel.description || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
                     color: Theme.label
@@ -236,15 +237,15 @@ Rectangle {
                 id: metaFlow
                 Layout.fillWidth: true
                 spacing: 8
-                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
+                visible: root._sel.local_path !== undefined && !root._sel.is_screenshot
 
                 Repeater {
-                    model: root.skill.local_path ? [
-                        { label: "Location", value: root.skill.project_label || "Unknown" },
-                        { label: "Type", value: root.skill.category || "Unknown" },
-                        { label: "Risk", value: root.skill.risk || "Unknown" },
-                        { label: "Source", value: root.skill.source || "Unknown" },
-                        { label: "Date", value: root.skill.date || "Unknown" }
+                    model: root._sel.local_path ? [
+                        { label: "Location", value: root._sel.project_label || "Unknown" },
+                        { label: "Type", value: root._sel.category || "Unknown" },
+                        { label: "Risk", value: root._sel.risk || "Unknown" },
+                        { label: "Source", value: root._sel.source || "Unknown" },
+                        { label: "Date", value: root._sel.date || "Unknown" }
                     ] : []
                     
                     Rectangle {
@@ -298,7 +299,7 @@ Rectangle {
             // Documentation / Commands (Moved up for better visibility)
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: (root.skill && root.skill.commands && !root.skill.is_screenshot) ? root.skill.commands.length > 0 : false
+                visible: (root._sel && root._sel.commands && !root._sel.is_screenshot) ? root._sel.commands.length > 0 : false
                 spacing: 4
                 
                 Text {
@@ -314,7 +315,7 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 6
                     Repeater {
-                        model: root.skill.commands || []
+                        model: root._sel.commands || []
                         delegate: Rectangle {
                             height: 16
                             width: tagText.implicitWidth + 10
@@ -350,7 +351,7 @@ Rectangle {
             // Screenshot Preview
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root.skill.is_screenshot === true
+                visible: root._sel.is_screenshot === true
                 spacing: 8
                 
                 Text {
@@ -374,8 +375,8 @@ Rectangle {
                         anchors.margins: 4
                         fillMode: Image.PreserveAspectFit
                         source: {
-                            if (!root.skill.is_screenshot || !root.skill.local_path) return "";
-                            let p = root.skill.local_path.replace(/\\/g, "/");
+                            if (!root._sel.is_screenshot || !root._sel.local_path) return "";
+                            let p = root._sel.local_path.replace(/\\/g, "/");
                             if (p.startsWith("/")) return "file://" + p;
                             return "file:///" + p;
                         }
@@ -385,7 +386,7 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => AppController.ui_controller.openPath(root.skill.local_path)
+                        onClicked: (mouse) => AppController.ui_controller.openPath(root._sel.local_path)
                     }
                 }
             }
@@ -393,7 +394,7 @@ Rectangle {
             // Skill Details / Raw Content Section
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root.skill.local_path !== undefined && !root.skill.is_screenshot
+                visible: root._sel.local_path !== undefined && !root._sel.is_screenshot
                 spacing: 8
                 
                 Rectangle {
@@ -419,10 +420,10 @@ Rectangle {
                             width: rawContentScroll.width - rawContentScroll.leftPadding - rawContentScroll.rightPadding
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Skill Details"
-                            text: cleanBodyContent((root.skill && root.skill.body_content) || "")
+                            text: cleanBodyContent((root._sel && root._sel.body_content) || "")
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
-                            color: (root.skill && root.skill.raw_content) ? Theme.label : Theme.secondaryLabel
+                            color: (root._sel && root._sel.raw_content) ? Theme.label : Theme.secondaryLabel
                             wrapMode: TextEdit.Wrap
                             readOnly: true
                             selectByMouse: true
@@ -449,7 +450,7 @@ Rectangle {
             // Flexible spacer for screenshot mode to prevent vertical stretching
             Item {
                 Layout.fillHeight: true
-                visible: root.skill.is_screenshot === true
+                visible: root._sel.is_screenshot === true
             }
         }
     }

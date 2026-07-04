@@ -343,3 +343,54 @@ def test_no_stale_paths_when_command_only_renames_in_place(
         assert str(old_path) in removed
         # addOrUpdateSkills was called with the new entry
         model.addOrUpdateSkills.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Selection refresh: find renamed file in _all_skills even when filtered out
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_finds_renamed_file_in_all_skills(mock_app, ops_controller):
+    """When a file is renamed (moved between projects), the selection refresh
+    must find it in _all_skills, not just _filtered_skills."""
+    new_path = "C:/Projects/New/projA/.agents/commands/Cmd.md"
+    skill = _FakeSkill(local_path=new_path, project_path="C:/Projects/New/projA")
+
+    # Set up selected skill with the OLD path
+    mock_app._selected_skill = {
+        "local_path": "C:/Projects/Old/projB/.agents/commands/Cmd.md",
+        "name": "Cmd",
+    }
+
+    # Model has the new path in _all_skills but NOT in _filtered_skills
+    mock_app.skillModel._all_skills = [skill]
+    mock_app.skillModel._filtered_skills = []  # filtered out
+    # Mock get_skill_at to return the skill
+    mock_app.skillModel.get_skill_at = MagicMock(return_value=skill)
+
+    ops_controller._refresh_selected_skill(
+        local_path="C:/Projects/Old/projB/.agents/commands/Cmd.md",
+        rename_path=new_path,
+    )
+
+    # Selection should be updated to the new skill (even though filtered)
+    mock_app.set_selected_skill.assert_called_once()
+    call_arg = mock_app.set_selected_skill.call_args[0][0]
+    assert call_arg["local_path"] == new_path
+
+
+def test_refresh_returns_when_not_in_view(mock_app, ops_controller):
+    """When the renamed path is genuinely missing from _all_skills,
+    selection is unchanged and a WARNING is logged."""
+    old_path = "C:/Projects/Old/projB/.agents/commands/Cmd.md"
+    mock_app._selected_skill = {"local_path": old_path, "name": "Cmd"}
+    mock_app.skillModel._all_skills = []
+    mock_app.skillModel._filtered_skills = []
+
+    ops_controller._refresh_selected_skill(
+        local_path=old_path,
+        rename_path="C:/Projects/New/projA/.agents/commands/Cmd.md",
+    )
+
+    # Selection should NOT change — the new path doesn't exist
+    mock_app.set_selected_skill.assert_not_called()
