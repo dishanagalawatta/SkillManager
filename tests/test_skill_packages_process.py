@@ -99,3 +99,52 @@ def test_run_process_failure(mock_popen):
         run_process(["python", "-c", "import sys; sys.exit(1)"], output_callback=None)
 
     assert exc_info.value.returncode == 1
+
+def test_run_process_shell_resolution_handles_empty():
+    assert resolve_process_command([]) == []
+    assert resolve_process_command("") == ""
+
+def test_run_shell_command_intercept():
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("skill_manager.core.skill_packages.updater.intercept_cross_platform_command", return_value=True):
+        with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run_process:
+            run_shell_command("test -d path", None)
+            mock_run_process.assert_not_called()
+
+def test_run_shell_command_parse_error():
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("sys.platform", "linux"):
+        with patch("skill_manager.core.skill_packages.updater.emit") as mock_emit:
+            with pytest.raises(ValueError, match="Failed to parse shell command"):
+                run_shell_command("echo 'hello", None)
+            mock_emit.assert_called_once()
+
+def test_run_shell_command_posix():
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("sys.platform", "linux"):
+        with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run_process:
+            run_shell_command("echo 'hello world'", None)
+            mock_run_process.assert_called_once_with(["echo", "hello world"], None, shell=False, cwd=None)
+
+def test_run_shell_command_win32():
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("sys.platform", "win32"):
+        with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run_process:
+            run_shell_command("echo 'hello world'", None)
+            mock_run_process.assert_called_once_with("echo 'hello world'", None, shell=False, cwd=None)
+
+def test_run_shell_command_posix():
+    from unittest.mock import patch
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("sys.platform", "linux"):
+        with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run_process:
+            run_shell_command("echo 'hello world'", None)
+            mock_run_process.assert_called_once_with(["echo", "hello world"], None, shell=False, cwd=None)
+
+def test_run_shell_command_win32():
+    from unittest.mock import patch
+    from skill_manager.core.skill_packages.updater import run_shell_command
+    with patch("sys.platform", "win32"):
+        with patch("skill_manager.core.skill_packages.updater.run_process") as mock_run_process:
+            run_shell_command("echo 'hello world'", None)
+            mock_run_process.assert_called_once_with("echo 'hello world'", None, shell=False, cwd=None)
