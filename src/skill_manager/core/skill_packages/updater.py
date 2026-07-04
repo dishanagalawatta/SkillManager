@@ -1,6 +1,7 @@
 import os
 import shlex
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -167,7 +168,19 @@ def run_shell_command(
 ):
     if intercept_cross_platform_command(command, output_callback):
         return
-    run_process(command, output_callback, shell=True, cwd=cwd)
+    if sys.platform == "win32":
+        # On Windows, passing a string with shell=False securely invokes CreateProcess
+        # without cmd.exe interpretation, safely handling paths with spaces.
+        safe_command = command
+    else:
+        try:
+            safe_command = shlex.split(command, posix=True)
+        except ValueError as e:
+            msg = f"Failed to parse shell command: {e}"
+            emit(output_callback, f"[ERROR] {msg}")
+            raise ValueError(msg) from e
+
+    run_process(safe_command, output_callback, shell=False, cwd=cwd)
 
 
 def run_skill_package_update(
