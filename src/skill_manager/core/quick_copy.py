@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 from collections.abc import Callable
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -361,6 +362,7 @@ def discover_project_skills(
     return projects_list
 
 
+@lru_cache(maxsize=2048)
 def normalize_path(path):
     if not path:
         return ""
