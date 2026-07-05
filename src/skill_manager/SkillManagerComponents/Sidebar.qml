@@ -39,8 +39,29 @@ Rectangle {
             spacing: 12
             
             Item {
+                id: logoToggleBtn
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
+                activeFocusOnTab: true
+
+                Accessible.role: Accessible.Button
+                Accessible.name: sidebarToolTip.text
+
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.isCollapsed = !root.isCollapsed
+                        event.accepted = true
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: Theme.radiusSmall
+                    color: "transparent"
+                    border.color: logoToggleBtn.activeFocus ? Theme.accent : "transparent"
+                    border.width: logoToggleBtn.activeFocus ? 2 : 0
+                }
 
                 Image {
                     id: sidebarLogoImg
@@ -61,17 +82,17 @@ Rectangle {
                     id: logoMouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: (mouse) => root.isCollapsed = !root.isCollapsed
+                    onClicked: {
+                        logoToggleBtn.forceActiveFocus()
+                        root.isCollapsed = !root.isCollapsed
+                    }
                     cursorShape: Qt.PointingHandCursor
 
                     SleekToolTip {
                         id: sidebarToolTip
                         text: root.isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"
-                        visible: parent.containsMouse
+                        visible: logoMouseArea.containsMouse || logoToggleBtn.activeFocus
                     }
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: sidebarToolTip.text
                 }
             }
             
@@ -93,7 +114,7 @@ Rectangle {
             labelText: "Quick Copy"
             collapsed: root.isCollapsed
             active: root.currentView === "Quick Copy"
-            onClicked: (mouse) => { 
+            onClicked:  {
                 console.log("Sidebar: Quick Copy clicked")
                 root.currentView = "Quick Copy"; 
                 root.navigationChanged("Quick Copy") 
@@ -105,7 +126,7 @@ Rectangle {
             labelText: "Library"
             collapsed: root.isCollapsed
             active: root.currentView === "Library"
-            onClicked: (mouse) => { 
+            onClicked:  {
                 root.currentView = "Library"
                 root.navigationChanged("Library") 
             }
@@ -116,7 +137,7 @@ Rectangle {
             labelText: "Updates"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"
-            onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }
+            onClicked:  { root.currentView = "Updates"; root.navigationChanged("Updates") }
         }
 
         SidebarButton {
@@ -124,7 +145,7 @@ Rectangle {
             labelText: "Settings"
             collapsed: root.isCollapsed
             active: root.currentView === "Settings"
-            onClicked: (mouse) => { root.currentView = "Settings"; root.navigationChanged("Settings") }
+            onClicked:  { root.currentView = "Settings"; root.navigationChanged("Settings") }
         }
     }
 }
