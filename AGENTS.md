@@ -90,7 +90,7 @@
 | Test (parallel) | `uv run pytest -n auto` |
 | Test (single file) | `uv run pytest tests/test_config.py` |
 | All checks | `python scripts/dev_test.py` |
-| Build | `uv run python scripts/build_app.py` |
+| Build | `uv run skill-manager-build` |
 
 ## Cross-references
 

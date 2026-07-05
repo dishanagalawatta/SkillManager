@@ -3,6 +3,8 @@ Purpose: Automate packaging workflow by preparing assets (e.g. icon conversion) 
 Usage:
     uv run python scripts/build_app.py
     uv run python scripts/build_app.py --dry-run
+    uv run skill-manager-build
+    skill-manager-build
 """
 
 import os
@@ -12,7 +14,18 @@ import subprocess
 import sys
 import time
 
-from PIL import Image
+# ── Venv guard (re-exec to project venv if not already in it) ─────────────────
+# Must run BEFORE any third-party imports (PIL, PyInstaller, etc.)
+# so the child process lands on a Python where those packages exist.
+_scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+from _launcher import ensure_venv  # noqa: E402
+
+ensure_venv()
+
+# ── Safe to import third-party packages below this line ────────────────────────
+from PIL import Image  # noqa: E402
 
 
 def handle_remove_readonly(func, path, exc_info):
@@ -131,8 +144,14 @@ def run_pyinstaller(spec_path: str) -> int:
     #      which triggers a Logging error traceback. The plugin is unused.
     import tempfile
 
+    # Strip uv-injected PYTHONHOME so PyInstaller's collect_all() uses
+    # the venv's own Python (where diskcache and friends are installed)
+    # instead of the base Python installation.
+    _blocked = {"PYTHONHOME", "UV_INTERNAL__PYTHONHOME"}
+    build_env = {k: v for k, v in os.environ.items() if k not in _blocked}
+
     with tempfile.TemporaryFile(mode="w+", suffix=".log", encoding="utf-8") as tmp:
-        result = subprocess.run(cmd, check=True, stderr=tmp)
+        result = subprocess.run(cmd, check=True, stderr=tmp, env=build_env)
         tmp.seek(0)
         stderr_text = tmp.read()
 
@@ -245,6 +264,38 @@ def main() -> None:
         sys.exit(returncode)
 
     print("\nPyInstaller build completed successfully. Proceeding to packaging...")
+
+    # 2.3 Post-build validation: verify critical packages were bundled
+    toc_path = os.path.join(project_root, "build", "skill_manager", "Analysis-00.toc")
+    if os.path.exists(toc_path):
+        with open(toc_path, encoding="utf-8") as f:
+            toc_content = f.read()
+        critical_missing = []
+        for pkg in ("diskcache",):
+            if pkg not in toc_content:
+                critical_missing.append(pkg)
+        if critical_missing:
+            print(
+                f"\nERROR: Critical packages missing from build: {', '.join(critical_missing)}",
+                file=sys.stderr,
+            )
+            print(
+                "The PyInstaller build completed but the following packages were not included:",
+                file=sys.stderr,
+            )
+            for pkg in critical_missing:
+                print(f"  - {pkg}: required at runtime but not found in Analysis-00.toc", file=sys.stderr)
+            print(
+                "\nThis usually means collect_all() failed to find the package.",
+                file=sys.stderr,
+            )
+            print(
+                "Check that the package is installed in the venv and not blocked by PYTHONHOME.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        print("Warning: Analysis-00.toc not found; skipping critical-package validation.")
 
     # 3. Create Portable Zip
     # This provides a fast-launching alternative to the Windows Installer

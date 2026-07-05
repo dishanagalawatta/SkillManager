@@ -106,7 +106,11 @@ To build locally for testing:
 
 1. **Run the Packaging Script**:
    ```bash
-   uv run python scripts/build_app.py
+   uv run skill-manager-build
+   ```
+   Or directly (auto-relaunches under venv if needed):
+   ```bash
+   python scripts/build_app.py
    ```
    *This script handles icon conversion (png -> ico) and invokes PyInstaller using the spec file.*
 
@@ -159,5 +163,6 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 | `uv run ruff check src tests` | Run linter only |
 | `uv run ruff format src` | Format code |
 | `uv run pytest` | Run unit tests |
-| `uv run python scripts/build_app.py` | Build executable locally |
+| `uv run skill-manager-build` | Build executable locally |
+| `python scripts/build_app.py` | Build executable (auto-relaunches under venv) |
 

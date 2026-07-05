@@ -23,10 +23,11 @@ apscheduler_datas, apscheduler_binaries, apscheduler_hiddenimports = collect_all
 tzlocal_datas, tzlocal_binaries, tzlocal_hiddenimports = collect_all('tzlocal')
 pynput_datas, pynput_binaries, pynput_hiddenimports = collect_all('pynput')
 joblib_datas, joblib_binaries, joblib_hiddenimports = collect_all('joblib')
+diskcache_datas, diskcache_binaries, diskcache_hiddenimports = collect_all('diskcache')
 
-added_files += apscheduler_datas + tzlocal_datas + pynput_datas + joblib_datas
-added_binaries = apscheduler_binaries + tzlocal_binaries + pynput_binaries + joblib_binaries
-added_hidden = apscheduler_hiddenimports + tzlocal_hiddenimports + pynput_hiddenimports + joblib_hiddenimports + ["git", "psutil", "msgpack"]
+added_files += apscheduler_datas + tzlocal_datas + pynput_datas + joblib_datas + diskcache_datas
+added_binaries = apscheduler_binaries + tzlocal_binaries + pynput_binaries + joblib_binaries + diskcache_binaries
+added_hidden = apscheduler_hiddenimports + tzlocal_hiddenimports + pynput_hiddenimports + joblib_hiddenimports + diskcache_hiddenimports + ["git", "psutil", "msgpack"]
 
 a = Analysis(
     [os.path.join(base_path, "src", "skill_manager", "__main__.py")],
@@ -52,7 +53,6 @@ a = Analysis(
         "frontmatter",
         "markdown_it",
         "orjson",
-        "diskcache",
         "sentry_sdk",
     ] + added_hidden,
     hookspath=[],

@@ -68,8 +68,11 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for full development guide.
 ## Building
 
 ```bash
-# PyInstaller build
-uv run python scripts/build_app.py
+# PyInstaller build (preferred — runs inside venv automatically)
+uv run skill-manager-build
+
+# Or directly (auto-relaunches under venv if needed)
+python scripts/build_app.py
 
 # Inno Setup installer (Windows)
 # See packaging/windows/installer.iss
