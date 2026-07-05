@@ -58,6 +58,9 @@ dev = [
 [project.gui-scripts]
 skill-manager = "skill_manager.__main__:main"
 
+[project.scripts]
+skill-manager-build = "skill_manager._build:main"
+
 
 
 

@@ -179,6 +179,35 @@ def test_spec_file_exclusions_and_hiddenimports():
         assert ex in excludes, f"Module {ex} should be excluded in spec file excludes list"
 
 
+def test_diskcache_collect_all_in_spec():
+    """Verify diskcache is collected via collect_all and not just in hiddenimports.
+
+    Regression test: diskcache has 6 submodules that PyInstaller's static
+    analysis cannot trace from the top-level name alone.  Using
+    ``collect_all('diskcache')`` ensures all submodules, data files, and
+    dist-info are bundled.  See ADR or commit history for context.
+    """
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    spec_path = os.path.join(project_root, "packaging", "skill_manager.spec")
+
+    with open(spec_path, encoding="utf-8") as f:
+        spec_content = f.read()
+
+    # Must use collect_all for diskcache (not just a string in hiddenimports)
+    assert (
+        "collect_all('diskcache')" in spec_content or 'collect_all("diskcache")' in spec_content
+    ), (
+        "diskcache must use collect_all() in the spec file, "
+        "not just a string in hiddenimports (which misses submodules)"
+    )
+
+    # collect_all results must be accumulated into added_files / added_hidden
+    assert "diskcache_datas" in spec_content, "diskcache_datas must be added to added_files"
+    assert "diskcache_hiddenimports" in spec_content, (
+        "diskcache_hiddenimports must be added to added_hidden"
+    )
+
+
 def test_rapidfuzz_dependency():
     import tomllib
 
@@ -199,3 +228,103 @@ def test_rapidfuzz_dependency():
             break
 
     assert has_rapidfuzz, "rapidfuzz should be in pyproject.toml project dependencies"
+
+
+def test_build_app_validates_critical_packages():
+    """Verify build_app.py validates critical packages (diskcache) after build."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    build_script = os.path.join(project_root, "scripts", "build_app.py")
+
+    with open(build_script, encoding="utf-8") as f:
+        content = f.read()
+
+    # Must check for diskcache in Analysis-00.toc after PyInstaller completes
+    assert "diskcache" in content, "build_app.py should validate diskcache is in the build"
+    assert "Analysis-00.toc" in content, "build_app.py should read Analysis-00.toc for validation"
+
+
+def test_build_app_strips_pythonhome():
+    """Verify build_app.py strips PYTHONHOME to avoid uv/system Python mismatch."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    build_script = os.path.join(project_root, "scripts", "build_app.py")
+
+    with open(build_script, encoding="utf-8") as f:
+        content = f.read()
+
+    # Must strip PYTHONHOME from the subprocess environment
+    assert "PYTHONHOME" in content, "build_app.py should handle PYTHONHOME"
+    assert "UV_INTERNAL__PYTHONHOME" in content, "build_app.py should strip UV_INTERNAL__PYTHONHOME"
+    assert "env=build_env" in content, "build_app.py should pass custom env to subprocess"
+
+
+def test_launcher_module_exists():
+    """scripts/_launcher.py must exist as shared helper."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    launcher_path = os.path.join(project_root, "scripts", "_launcher.py")
+    assert os.path.isfile(launcher_path), "scripts/_launcher.py must be created"
+
+
+def test_build_app_uses_launcher_guard():
+    """build_app.py must call ensure_venv() at module level before PIL import."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    build_script = os.path.join(project_root, "scripts", "build_app.py")
+
+    with open(build_script, encoding="utf-8") as f:
+        content = f.read()
+
+    assert "from _launcher import ensure_venv" in content, (
+        "build_app.py must import ensure_venv from _launcher"
+    )
+    assert "ensure_venv()" in content, "build_app.py must call ensure_venv() at module level"
+    # PIL import must come AFTER the venv guard
+    launcher_line = content.index("ensure_venv()")
+    pil_line = content.index("from PIL import Image")
+    assert launcher_line < pil_line, (
+        "ensure_venv() must be called before PIL import (PIL may not exist outside the venv)"
+    )
+
+
+def test_dev_run_refactored_to_use_launcher():
+    """dev_run.py must use shared _launcher module (no duplicated guard logic)."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    dev_run = os.path.join(project_root, "scripts", "dev_run.py")
+
+    with open(dev_run, encoding="utf-8") as f:
+        content = f.read()
+
+    assert "from _launcher import ensure_venv" in content, (
+        "dev_run.py must import ensure_venv from _launcher"
+    )
+    # Old ad-hoc implementation should be removed
+    assert "_REENTRY_ENV_VAR = " not in content, (
+        "dev_run.py should not define _REENTRY_ENV_VAR (lives in _launcher.py)"
+    )
+    assert "def _ensure_venv" not in content, (
+        "dev_run.py should not define _ensure_venv (lives in _launcher.py)"
+    )
+    assert "def _is_venv_python" not in content, (
+        "dev_run.py should not define _is_venv_python (lives in _launcher.py)"
+    )
+
+
+def test_skill_manager_build_console_script():
+    """pyproject.toml must register skill-manager-build entry point."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    pyproject_path = os.path.join(project_root, "pyproject.toml")
+
+    with open(pyproject_path, encoding="utf-8") as f:
+        content = f.read()
+
+    assert "skill-manager-build" in content, (
+        "pyproject.toml must register skill-manager-build entry point"
+    )
+    assert "skill_manager._build:main" in content, (
+        "skill-manager-build must point to skill_manager._build:main"
+    )
+
+
+def test_build_wrapper_module_exists():
+    """src/skill_manager/_build.py must exist as the console script entry point."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    wrapper_path = os.path.join(project_root, "src", "skill_manager", "_build.py")
+    assert os.path.isfile(wrapper_path), "src/skill_manager/_build.py must be created"
