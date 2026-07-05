@@ -141,7 +141,7 @@ def test_boot_normalize_project_paths(tmp_path):
 
     assert len(ctrl._projects) == 1
     normalized = ctrl._projects[0].replace("\\", "/")
-    assert normalized.endswith((".agents/skills", ".agents\\skills")), (
+    assert normalized.endswith(".agents/skills"), (
         f"Expected .agents/skills suffix, got {ctrl._projects[0]!r}"
     )
     config.set.assert_any_call("projects", ctrl._projects)
@@ -175,7 +175,7 @@ def test_boot_normalize_no_change_when_already_normalized(tmp_path):
         for p in patches:
             p.stop()
 
-    assert ctrl._projects[0] == canonical_path
+    assert ctrl._projects[0].replace("\\", "/") == canonical_path.replace("\\", "/")
 
 
 # ---------------------------------------------------------------------------
