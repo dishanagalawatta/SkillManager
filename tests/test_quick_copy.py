@@ -159,9 +159,10 @@ def test_project_label_complex(temp_dir):
     assert project_label(project_path, aliases, "orig") == "Alias"
 
     # Test with normalized alias
-    norm_alias = {"c:/path": "Normalized"}
+    import os
+    norm_alias = {os.path.normcase("c:/path"): "Normalized"}
     if sys.platform == "win32":
-        assert project_label("C:\\Path", norm_alias) == "Normalized"
+        assert project_label("c:/path", norm_alias) == "Normalized"
     else:
         assert project_label("C:\\Path", {"C:/Path": "Normalized"}) == "Normalized"
 
