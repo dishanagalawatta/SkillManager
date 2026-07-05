@@ -1,6 +1,7 @@
 import os
 import shlex
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -161,13 +162,17 @@ def intercept_cross_platform_command(
 
 
 def run_shell_command(
-    command: str,
+    command: list[str],
     output_callback: Callable[[str], None] | None,
     cwd: str | os.PathLike | None = None,
+    original_command_str: str = "",
 ):
-    if intercept_cross_platform_command(command, output_callback):
+    if intercept_cross_platform_command(
+        original_command_str or shlex.join(command), output_callback
+    ):
         return
-    run_process(command, output_callback, shell=True, cwd=cwd)
+
+    run_process(command, output_callback, shell=False, cwd=cwd)
 
 
 def run_skill_package_update(
@@ -199,7 +204,11 @@ def run_skill_package_update(
         if source.get("source_type") == "npx":
             run_npx_update(source, intercept_callback, cwd=staging_path)
         elif source.get("update_command"):
-            run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
+            cmd_str = source["update_command"]
+            cmd_list = shlex.split(cmd_str, posix=sys.platform != "win32")
+            run_shell_command(
+                cmd_list, intercept_callback, cwd=staging_path, original_command_str=cmd_str
+            )
         else:
             run_git_package_update(source, intercept_callback)
 
@@ -255,7 +264,9 @@ def run_skill_package_update(
 
     if source.get("verify_command"):
         emit(output_callback, f"Verifying {source['name']}...")
-        run_shell_command(source["verify_command"], output_callback)
+        cmd_str = source["verify_command"]
+        cmd_list = shlex.split(cmd_str, posix=sys.platform != "win32")
+        run_shell_command(cmd_list, output_callback, original_command_str=cmd_str)
 
     updated_source_info = check_skill_package_versions(source, force_refresh=True)
     source.update(updated_source_info)
