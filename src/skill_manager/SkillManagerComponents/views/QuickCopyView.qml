@@ -220,6 +220,7 @@ Item {
                             delegate: IconButton {
                                 id: clientBtn
                                 buttonSize: 32
+                                tooltipText: modelData
                                 property bool isSelected: modelData === AppController.clientFormat
                                 onClicked: (mouse) => AppController.ui_controller.setClientFormat(modelData)
                                 contentItem: Item {
@@ -251,8 +252,6 @@ Item {
                                     border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
                                     border.width: 1
                                 }
-                                ToolTip.visible: hovered
-                                ToolTip.text: modelData
                             }
                         }
                     }

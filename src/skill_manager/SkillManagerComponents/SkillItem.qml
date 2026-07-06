@@ -338,6 +338,7 @@ Item {
                         Layout.preferredHeight: 32
                         flat: true
                         visible: root.showInlineDelete && mouseArea.containsMouse
+                        tooltipText: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         onClicked: (mouse) => {
                             if (model && model.path) {
                                 root.deleteRequested(model.name, model.path, model.isCommand === true)
@@ -355,9 +356,6 @@ Item {
                             color: deleteBtn.hovered ? Theme.glassHover : "transparent"
                             border.width: deleteBtn.hovered ? 1 : 0
                             border.color: Theme.glassBorder
-                        }
-                        SleekToolTip {
-                            text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         }
                     }
                 }
