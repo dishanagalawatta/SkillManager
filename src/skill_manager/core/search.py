@@ -174,9 +174,9 @@ class SearchEngine:
                             if score > max_token_match:
                                 max_token_match = score
                             if max_token_match > 70:  # pragma: no cover
-                                break  # pragma: no cover
+                                break  # pragma: no cover  # pragma: no cover
                         if max_token_match > 70:  # pragma: no cover
-                            break  # pragma: no cover
+                            break  # pragma: no cover  # pragma: no cover
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:
