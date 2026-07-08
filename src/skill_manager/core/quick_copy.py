@@ -369,7 +369,7 @@ def discover_project_skills(
 def normalize_path(path):
     if not path:
         return ""
-    return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
+    return os.path.normcase(os.path.normpath(str(path))).replace("\\", "/")
 
 
 def load_ignore_spec(root: Path):

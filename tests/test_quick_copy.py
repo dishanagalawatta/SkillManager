@@ -43,9 +43,9 @@ def test_merge_command_references():
 
 def test_normalize_path():
     if sys.platform == "win32":
-        assert normalize_path("C:\\Path\\To/File") == "c:/path/to/file"
+        assert normalize_path(r"C:\Path\To/File") == "c:/path/to/file"
     else:
-        assert normalize_path("C:\\Path\\To/File") == "C:/Path/To/File"
+        assert normalize_path(r"C:\Path\To/File") == "C:/Path/To/File"
     assert normalize_path("") == ""
 
 

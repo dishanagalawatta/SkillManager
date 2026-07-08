@@ -120,12 +120,19 @@ def test_spec_file_exclusions_and_hiddenimports():
     hiddenimports = []
     excludes = []
 
+    import sys
+
     def extract_constants(expr_node):
         constants = []
         for child in ast.walk(expr_node):
             if isinstance(child, ast.Constant):
                 constants.append(child.value)
-            elif hasattr(ast, "Str") and isinstance(child, ast.Str):  # legacy fallback
+            elif (
+                sys.version_info < (3, 14)
+                and hasattr(ast, "Str")
+                and ast.Str is not getattr(ast, "Constant", None)
+                and isinstance(child, ast.Str)
+            ):
                 constants.append(child.s)
         return constants
 
