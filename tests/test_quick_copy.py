@@ -47,6 +47,7 @@ def test_normalize_path():
     else:
         assert normalize_path("C:\\Path\\To/File") == "C:/Path/To/File"
     assert normalize_path("") == ""
+    assert normalize_path(Path("C:\\Path\\To/File")) in ("c:/path/to/file", "C:/Path/To/File")
 
 
 def test_discover_project_skills_success(temp_dir):
