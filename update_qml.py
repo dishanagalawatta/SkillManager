@@ -1,4 +1,4 @@
-import QtQuick
+content = """import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import App 1.0
@@ -65,7 +65,7 @@ Item {
             width: 20
             height: 20
             Layout.alignment: Qt.AlignVCenter
-            
+
             Image {
                 id: starIcon
                 anchors.centerIn: parent
@@ -104,7 +104,7 @@ Item {
     TapHandler {
         onTapped: Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
     }
-    
+
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
@@ -127,3 +127,7 @@ Item {
     Accessible.name: root.mainCatName
     Accessible.description: headerToolTip.text
 }
+"""
+
+with open('src/skill_manager/SkillManagerComponents/CategoryHeader.qml', 'w') as f:
+    f.write(content)
