@@ -493,3 +493,8 @@ def test_resolve_resilient_path_is_file(monkeypatch, tmp_path):
     resolve_resilient_path.cache_clear()
     res = resolve_resilient_path(f)
     assert res == f.resolve()
+
+
+def test_resolve_resilient_path_empty_path():
+    res = resolve_resilient_path("")
+    assert str(res) == "."
