@@ -125,9 +125,9 @@ def test_spec_file_exclusions_and_hiddenimports():
         for child in ast.walk(expr_node):
             if isinstance(child, ast.Constant):
                 constants.append(child.value)
-            elif hasattr(ast, "Str") and isinstance(child, getattr(ast, "Str", type(None))):  # legacy fallback
-                constants.append(child.s)
-        return constants
+            elif type(child).__name__ == "Str":
+                constants.append(getattr(child, "s", None))
+        return [c for c in constants if c is not None]
 
     for keyword in analysis_call.keywords:
         if keyword.arg == "hiddenimports":
