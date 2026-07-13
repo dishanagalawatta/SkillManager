@@ -23,10 +23,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: root.visualFocus ? Theme.glassActive : (headerHover.hovered ? Theme.glassHover : "transparent")
+        color: root.activeFocus ? Theme.glassActive : (headerHover.hovered ? Theme.glassHover : "transparent")
         radius: Theme.radiusSmall
-        border.color: root.visualFocus ? Theme.accent : "transparent"
-        border.width: root.visualFocus ? 2 : 0
+        border.color: root.activeFocus ? Theme.accent : "transparent"
+        border.width: root.activeFocus ? 2 : 0
         anchors.margins: 2
     }
 
@@ -118,7 +118,7 @@ Item {
 
     SleekToolTip {
         id: headerToolTip
-        visible: headerHover.hovered || root.visualFocus
+        visible: headerHover.hovered || root.activeFocus
         text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
     }
 
