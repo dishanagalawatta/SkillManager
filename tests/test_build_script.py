@@ -125,7 +125,7 @@ def test_spec_file_exclusions_and_hiddenimports():
         for child in ast.walk(expr_node):
             if isinstance(child, ast.Constant):
                 constants.append(child.value)
-            elif hasattr(ast, "Str") and isinstance(child, ast.Str):  # legacy fallback
+            elif hasattr(ast, "Str") and isinstance(child, getattr(ast, "Str", type(None))):  # legacy fallback
                 constants.append(child.s)
         return constants
 
