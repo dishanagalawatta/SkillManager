@@ -437,3 +437,19 @@ def test_replace_skill_references_in_command():
     # Test no skills
     result = replace_skill_references_in_command("@test-skill", "Gemini CLI", [])
     assert "@test-skill" in result
+
+
+def test_resolve_resilient_path_cached():
+    from skill_manager.core.quick_copy import resolve_resilient_path
+
+    p1 = resolve_resilient_path("a/b/c")
+    p2 = resolve_resilient_path("a/b/c")
+    assert p1 == p2
+
+
+def test_normalize_path_cached():
+    from skill_manager.core.quick_copy import normalize_path
+
+    n1 = normalize_path("A/B/C")
+    n2 = normalize_path("A/B/C")
+    assert n1 == n2
