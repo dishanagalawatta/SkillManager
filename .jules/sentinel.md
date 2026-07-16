@@ -1,3 +1,8 @@
+## 2026-06-25 - [Arbitrary Command Execution via shell=True in Subprocess]
+**Vulnerability:** A `shell=True` vulnerability was present in `src/skill_manager/core/skill_packages/updater.py` inside `run_shell_command`, where a string command from an update source was passed directly to the shell, opening the door for command injection.
+**Learning:** Using `shell=True` to execute commands provided from external configuration allows an attacker to append arbitrary shell commands using metacharacters (e.g. `;`, `&&`). Even internal wrapper functions (`run_process`) become dangerous if they rely on `shell=True`.
+**Prevention:** Never use `shell=True`. To support commands on both Windows and POSIX systems correctly, parse the command string into a list of arguments using `shlex.split(command, posix=sys.platform != 'win32')` and pass the list to the subprocess with `shell=False`.
+
 ## 2026-05-20 - [Argument Injection Mitigation in Git Commands]
 **Vulnerability:** User-controlled configuration values (like repository URLs or paths) passed directly to `git` subcommands (`ls-remote`, `clone`) via `subprocess.run` are vulnerable to argument injection if they start with a hyphen (e.g., `--upload-pack=malicious_command`).
 **Learning:** Even when using lists in `subprocess.run` without `shell=True`, passing untrusted strings that begin with a hyphen to executables can be interpreted as flags, leading to arbitrary code execution or other unintended behavior.
