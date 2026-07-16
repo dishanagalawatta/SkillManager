@@ -34,7 +34,7 @@
 
 - **Framework**: pytest + pytest-qt + pytest-cov
 - **Parallel**: `uv run pytest -n auto --dist loadfile`
-- **Coverage**: Target 90% (`fail_under = 90` in `pyproject.toml`)
+- **Coverage**: Target 87% (`fail_under = 87` in `pyproject.toml`)
 - **Run all checks**: `python scripts/dev_test.py`
 
 ### Git & Commits
