@@ -603,6 +603,7 @@ Item {
                                     ActionButton {
                                         id: rebuildCacheButton
                                         text: "Rebuild Cache"
+                                        tooltipText: "Force a full re-scan from disk.\nClears all caches and reloads."
                                         width: 120
                                         height: 36
                                         onClicked: AppController.rebuildCache()
@@ -623,13 +624,6 @@ Item {
                                             color: Theme.accent
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                        }
-
-                                        ToolTip {
-                                            parent: rebuildCacheButton
-                                            text: "Force a full re-scan from disk.\nClears all caches and reloads."
-                                            delay: 500
-                                            visible: rebuildCacheButton.hovered
                                         }
                                     }
                                 }

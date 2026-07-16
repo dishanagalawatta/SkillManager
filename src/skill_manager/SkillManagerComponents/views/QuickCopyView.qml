@@ -251,7 +251,7 @@ Item {
                                     border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
                                     border.width: 1
                                 }
-                                ToolTip.visible: hovered
+                                ToolTip.visible: clientBtn.hovered || clientBtn.visualFocus
                                 ToolTip.text: modelData
                             }
                         }
