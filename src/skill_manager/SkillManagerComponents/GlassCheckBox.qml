@@ -17,9 +17,9 @@ Item {
 
     activeFocusOnTab: true
 
-    Keys.onSpacePressed: { control.toggled(); event.accepted = true; }
-    Keys.onReturnPressed: { control.toggled(); event.accepted = true; }
-    Keys.onEnterPressed: { control.toggled(); event.accepted = true; }
+    Keys.onSpacePressed: (event) => { control.toggled(); event.accepted = true; }
+    Keys.onReturnPressed: (event) => { control.toggled(); event.accepted = true; }
+    Keys.onEnterPressed: (event) => { control.toggled(); event.accepted = true; }
 
     Rectangle {
         id: bgRect
@@ -102,8 +102,8 @@ Item {
 
     SleekToolTip {
         id: cbToolTip
-        visible: mouseArea.containsMouse && tooltipText !== ""
-        text: tooltipText
+        visible: (mouseArea.containsMouse || control.activeFocus) && control.tooltipText !== ""
+        text: control.tooltipText
     }
     
     Accessible.role: Accessible.CheckBox
