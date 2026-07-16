@@ -437,3 +437,64 @@ def test_replace_skill_references_in_command():
     # Test no skills
     result = replace_skill_references_in_command("@test-skill", "Gemini CLI", [])
     assert "@test-skill" in result
+
+
+def test_lru_cache_coverage_normalize():
+    normalize_path.cache_clear()
+    assert normalize_path("/tmp/foo") == normalize_path("/tmp/foo")
+
+
+def test_lru_cache_coverage_resolve():
+    resolve_resilient_path.cache_clear()
+    assert resolve_resilient_path("/tmp/foo") == resolve_resilient_path("/tmp/foo")
+
+
+def test_resolve_resilient_path_os_error(monkeypatch):
+    def mock_exists(*args, **kwargs):
+        raise OSError("Mock OSError")
+
+    monkeypatch.setattr(Path, "exists", mock_exists)
+    resolve_resilient_path.cache_clear()
+    res = resolve_resilient_path("/some/failing/path")
+    assert str(res).endswith("path")
+
+
+def test_resolve_resilient_path_is_dir_no_agents(monkeypatch, tmp_path):
+    d = tmp_path / "foo"
+    d.mkdir()
+    resolve_resilient_path.cache_clear()
+    res = resolve_resilient_path(d)
+    assert res == d.resolve()
+
+
+def test_resolve_resilient_path_is_dir_with_agents(monkeypatch, tmp_path):
+    d = tmp_path / "foo"
+    d.mkdir()
+    agents = d / ".agents" / "skills"
+    agents.mkdir(parents=True)
+    resolve_resilient_path.cache_clear()
+    res = resolve_resilient_path(d)
+    assert res == agents.resolve()
+
+
+def test_resolve_resilient_path_is_dir_with_agents_but_not_skills(monkeypatch, tmp_path):
+    d = tmp_path / "foo"
+    d.mkdir()
+    agents = d / ".agents"
+    agents.mkdir(parents=True)
+    resolve_resilient_path.cache_clear()
+    res = resolve_resilient_path(d)
+    assert res == d.resolve()
+
+
+def test_resolve_resilient_path_is_file(monkeypatch, tmp_path):
+    f = tmp_path / "foo.txt"
+    f.touch()
+    resolve_resilient_path.cache_clear()
+    res = resolve_resilient_path(f)
+    assert res == f.resolve()
+
+
+def test_resolve_resilient_path_empty_path():
+    res = resolve_resilient_path("")
+    assert str(res) == "."

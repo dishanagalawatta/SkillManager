@@ -167,11 +167,8 @@ def run_shell_command(
     cwd: str | os.PathLike | None = None,
     original_command_str: str = "",
 ):
-    if intercept_cross_platform_command(
-        original_command_str or shlex.join(command), output_callback
-    ):
+    if intercept_cross_platform_command(original_command_str or shlex.join(command), output_callback):
         return
-
     run_process(command, output_callback, shell=False, cwd=cwd)
 
 
@@ -206,9 +203,7 @@ def run_skill_package_update(
         elif source.get("update_command"):
             cmd_str = source["update_command"]
             cmd_list = shlex.split(cmd_str, posix=sys.platform != "win32")
-            run_shell_command(
-                cmd_list, intercept_callback, cwd=staging_path, original_command_str=cmd_str
-            )
+            run_shell_command(cmd_list, intercept_callback, cwd=staging_path, original_command_str=cmd_str)
         else:
             run_git_package_update(source, intercept_callback)
 

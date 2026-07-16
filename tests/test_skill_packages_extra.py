@@ -273,6 +273,4 @@ def test_run_skill_package_update_verify_command(mock_shell, tmp_path):
     ):
         run_skill_package_update(source)
 
-        mock_shell.assert_called_with(
-            ["echo", "verified"], None, original_command_str="echo verified"
-        )
+    mock_shell.assert_called_with(["echo", "verified"], None, original_command_str="echo verified")
