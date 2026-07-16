@@ -12,11 +12,21 @@ Item {
 
     height: 44 // Fixed height for main header
     visible: mainCatName !== ""
+    activeFocusOnTab: true
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+            event.accepted = true
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
-        color: headerHover.hovered ? Theme.glassHover : "transparent"
+        color: root.activeFocus ? Theme.glassActive : (headerHover.hovered ? Theme.glassHover : "transparent")
         radius: Theme.radiusSmall
+        border.color: root.activeFocus ? Theme.accent : "transparent"
+        border.width: root.activeFocus ? 2 : 0
         anchors.margins: 2
     }
 
@@ -108,6 +118,7 @@ Item {
 
     SleekToolTip {
         id: headerToolTip
+        visible: headerHover.hovered || root.activeFocus
         text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
     }
 
