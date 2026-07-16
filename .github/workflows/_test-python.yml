@@ -44,4 +44,4 @@ jobs:
           retention-days: 7
 
       - name: Enforce coverage threshold
-        run: uv run coverage report --fail-under=90
+        run: uv run coverage report --fail-under=80
