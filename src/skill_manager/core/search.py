@@ -171,7 +171,12 @@ class SearchEngine:
                         # Perf: Use C-optimized extractOne instead of nested Python iteration
                         for qt in query_tokens:
                             if process is not None:
-                                match = process.extractOne(qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match)
+                                match = process.extractOne(
+                                    qt,
+                                    all_doc_tokens,
+                                    scorer=fuzz.ratio,
+                                    score_cutoff=max_token_match,
+                                )
                                 if match:
                                     max_token_match = match[1]
                             else:
