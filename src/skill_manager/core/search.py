@@ -10,10 +10,11 @@ import re
 from typing import Any
 
 try:
-    from rapidfuzz import fuzz
+    from rapidfuzz import fuzz, process
 except ImportError:
     # Fallback to basic matching if rapidfuzz is not available
     fuzz = None
+    process = None
 
 
 class SkillIndexer:
@@ -167,13 +168,19 @@ class SearchEngine:
                             max_token_match = 100
                             break
                     if max_token_match == 0:
+                        # Perf: Use C-optimized extractOne instead of nested Python iteration
                         for qt in query_tokens:
-                            for dt in all_doc_tokens:
-                                score = fuzz.ratio(qt, dt)
-                                if score > max_token_match:
-                                    max_token_match = score
-                                if max_token_match > 70:
-                                    break
+                            if process is not None:
+                                match = process.extractOne(qt, all_doc_tokens, scorer=fuzz.ratio, score_cutoff=max_token_match)
+                                if match:
+                                    max_token_match = match[1]
+                            else:
+                                for dt in all_doc_tokens:
+                                    score = fuzz.ratio(qt, dt)
+                                    if score > max_token_match:
+                                        max_token_match = score
+                                    if max_token_match > 70:
+                                        break
                             if max_token_match > 70:
                                 break
 
