@@ -28,7 +28,7 @@ Item {
     Accessible.role: Accessible.ComboBox
     Accessible.name: root.displayText
 
-    Keys.onPressed: function(event) {
+    Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             popup.opened ? popup.close() : popup.open()
             event.accepted = true

@@ -37,6 +37,9 @@ QtObject {
     readonly property color accent: darkMode ? "#3B82F6" : "#059669" // Modern Blue for Dark, Sage for Light
     readonly property color success: darkMode ? "#10B981" : "#10B981"
     readonly property color danger: darkMode ? "#EF4444" : "#DC2626"
+    readonly property color warning: darkMode ? "#F59E0B" : "#D97706"
+    readonly property color info: darkMode ? "#3B82F6" : "#2563EB"
+    readonly property color star: darkMode ? "#FBBF24" : "#D97706"
     
     // Aliases for compatibility
     readonly property color hoverBackground: glassHover

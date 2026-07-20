@@ -7,6 +7,15 @@ ComboBox {
     property bool keyboardNavigated: false
     
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+            return
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             keyboardNavigated = true
         }
@@ -141,6 +150,7 @@ ComboBox {
         }
     }
 
+    activeFocusOnTab: true
     Accessible.role: Accessible.ComboBox
     Accessible.name: control.displayText
 }
