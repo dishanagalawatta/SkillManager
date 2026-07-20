@@ -24,6 +24,7 @@ from skill_manager.core.diagnostics import (
     CATEGORY_REFRESH_BACKGROUND_START,
     CATEGORY_REFRESH_CANCELLED,
     CATEGORY_REFRESH_COMMITTED,
+    CATEGORY_STARTUP_CACHE_PREVIEW,
     get_diagnostic_logger,
 )
 from skill_manager.core.discovery import DiscoveryService
@@ -56,6 +57,9 @@ class DiscoveryController(BaseController):
         self.skillsDeleted.connect(self._on_skills_deleted)
         self._refresh_generation: int = 0
         self._refresh_lock = threading.Lock()
+        # Guards a stale cache preview from overwriting a newer committed
+        # full-scan: stores the generation of the last *final* load applied.
+        self._final_committed_generation: int | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -84,13 +88,20 @@ class DiscoveryController(BaseController):
         with self._refresh_lock:
             self._refresh_generation += 1
             gen = self._refresh_generation
+            # Reset: this cycle's preview may paint until its full scan commits.
+            self._final_committed_generation = None
 
         diag = get_diagnostic_logger()
         diag.log_event(
             "INFO",
             CATEGORY_REFRESH_BACKGROUND_START,
-            f"Discovery started (gen={gen}, force_full_scan={force_full_scan})",
-            data={"generation": gen, "force_full_scan": force_full_scan},
+            f"Discovery started (gen={gen}, force_full_scan={force_full_scan}, "
+            f"skip_discovery={skip_discovery})",
+            data={
+                "generation": gen,
+                "force_full_scan": force_full_scan,
+                "skip_discovery": skip_discovery,
+            },
         )
 
         if not silent:
@@ -99,19 +110,19 @@ class DiscoveryController(BaseController):
             self.app._set_status("Scanning skills...")
 
         if skip_discovery:
-            # Peer heartbeat: load from cache directly without scanning
-            if hasattr(self.app, "task_runner"):
-                self.app.task_runner.run(self._run_pipeline_from_cache, args=(gen,))
-            else:
-                threading.Thread(
-                    target=self._run_pipeline_from_cache, args=(gen,), daemon=True
-                ).start()
-        elif hasattr(self.app, "task_runner"):
-            self.app.task_runner.run(self._run_pipeline, args=(gen, force_full_scan))
+            # Cache-only load (peer heartbeat); full scan fills gaps if cache missing.
+            self._submit_background(self._run_pipeline_from_cache, gen, True, True)
         else:
-            threading.Thread(
-                target=self._run_pipeline, args=(gen, force_full_scan), daemon=True
-            ).start()
+            # Paint from cache first, then refresh via full scan that supersedes
+            # the preview. Cached rows are pre-ordered so visible items show first.
+            self._submit_background(self._run_pipeline_from_cache, gen, False, False)
+            self._submit_background(self._run_pipeline, gen, force_full_scan)
+
+    def _submit_background(self, target, *args) -> None:
+        if hasattr(self.app, "task_runner"):
+            self.app.task_runner.run(target, args=args)
+        else:
+            threading.Thread(target=target, args=args, daemon=True).start()
 
     def cancel_inflight(self) -> bool:
         """Bump the generation counter to discard any in-flight result.
@@ -197,12 +208,18 @@ class DiscoveryController(BaseController):
             traceback.print_exc()
             self._discoveryError.emit(f"Discovery failed: {exc}")
 
-    def _run_pipeline_from_cache(self, generation: int) -> None:
-        """Load from cache directly without running a discovery scan.
+    def _run_pipeline_from_cache(
+        self, generation: int, fallback_to_full: bool = True, is_final: bool = False
+    ) -> None:
+        """Paint the UI instantly from the on-disk JSON cache.
 
-        Used by the peer-heartbeat optimization: if a sibling instance
-        recently wrote the cache, skip the expensive filesystem scan and
-        load from disk directly.
+        Phase 1 of the two-phase startup. The cached rows are already
+        ordered by FilterEngine.sort_key (Special/favorites/visible-first),
+        so the items that display first are prioritized. ``is_final=False``
+        marks this as a *preview* the later full scan may supersede.
+
+        Falls back to a full discovery scan when the cache is missing or
+        invalid (``fallback_to_full``) so the app is never blank.
         """
         from skill_manager.core.persistence import load_cache
 
@@ -212,12 +229,15 @@ class DiscoveryController(BaseController):
             cached = load_cache()
             if cached is None:
                 logger.info("[HEARTBEAT] Cache miss — falling back to full discovery")
-                self._run_pipeline(generation, force_full_scan=False)
+                if fallback_to_full:
+                    self._run_pipeline(generation, force_full_scan=False)
                 return
 
             cache_state = CacheState.model_validate(cached)
 
-            prepared_states = self._build_prepared_states(cache_state, generation)
+            prepared_states = self._build_prepared_states(
+                cache_state, generation, is_final=is_final
+            )
 
             if self._is_cancelled(generation):
                 self._log_cancelled(generation)
@@ -229,6 +249,20 @@ class DiscoveryController(BaseController):
             self._discoveryPrepared.emit(prepared_states)
 
             elapsed = time.monotonic() - t0
+            diag = get_diagnostic_logger()
+            diag.log_event(
+                "INFO",
+                CATEGORY_STARTUP_CACHE_PREVIEW,
+                f"Cache preview painted (gen={generation}, "
+                f"skills={len(prepared_states['library'].all_skills)}, "
+                f"elapsed={elapsed:.3f}s)",
+                data={
+                    "generation": generation,
+                    "skill_count": len(prepared_states["library"].all_skills),
+                    "elapsed_seconds": round(elapsed, 3),
+                    "is_final": is_final,
+                },
+            )
             logger.info(
                 "[HEARTBEAT] Cache load complete: gen=%d, %d skills, %.2fs",
                 generation,
@@ -240,7 +274,8 @@ class DiscoveryController(BaseController):
             if self._is_cancelled(generation):
                 return
             logger.warning("[HEARTBEAT] Cache load failed, falling back to discovery: %s", exc)
-            self._run_pipeline(generation, force_full_scan=False)
+            if fallback_to_full:
+                self._run_pipeline(generation, force_full_scan=False)
 
     def _discover_all_background(
         self,
@@ -265,7 +300,10 @@ class DiscoveryController(BaseController):
     # ------------------------------------------------------------------
 
     def _build_prepared_states(
-        self, result: dict[str, Any] | CacheState, generation: int
+        self,
+        result: dict[str, Any] | CacheState,
+        generation: int,
+        is_final: bool = True,
     ) -> dict[str, PreparedModelState] | None:
         """Construct a dict of PreparedModelStates in the calling (background) thread.
 
@@ -389,6 +427,7 @@ class DiscoveryController(BaseController):
                 visible_rows=library_visible,
                 categories=categories,
                 status=status,
+                is_final=is_final,
                 generation=generation,
             ),
             "quick_copy": PreparedModelState(
@@ -398,6 +437,7 @@ class DiscoveryController(BaseController):
                 visible_rows=quick_copy_visible,
                 categories=categories,
                 status=status,
+                is_final=is_final,
                 generation=generation,
             ),
         }
@@ -446,6 +486,24 @@ class DiscoveryController(BaseController):
 
         library_prepared = prepared_states["library"]
         quick_copy_prepared = prepared_states["quick_copy"]
+
+        is_final = library_prepared.is_final
+
+        # A cache *preview* (is_final=False) must not overwrite a final
+        # full-load that already committed for this (or a newer) generation.
+        if not is_final:
+            with self._refresh_lock:
+                if (
+                    self._final_committed_generation is not None
+                    and self._final_committed_generation >= library_prepared.generation
+                ):
+                    diag.log_event(
+                        "INFO",
+                        CATEGORY_STARTUP_CACHE_PREVIEW,
+                        "Cache preview superseded by final load — skipped",
+                        data={"generation": library_prepared.generation},
+                    )
+                    return
 
         # ---- Update categories if changed ----
         if self.app._categories != library_prepared.categories:
@@ -501,6 +559,10 @@ class DiscoveryController(BaseController):
         self.app._library_model.replacePreparedState(library_prepared)
         self.app._quick_copy_model.replacePreparedState(quick_copy_prepared)
 
+        if is_final:
+            with self._refresh_lock:
+                self._final_committed_generation = library_prepared.generation
+
         # ---- Update client/project filters ----
         # These trigger _apply_filter which, while incubating, queues
         # the filter work onto _pending_signals.  The queue is drained
@@ -532,6 +594,7 @@ class DiscoveryController(BaseController):
                 "generation": library_prepared.generation,
                 "skill_count": len(library_prepared.all_skills),
                 "visible_count": len(library_prepared.visible_rows),
+                "phase": "final",
             },
         )
 

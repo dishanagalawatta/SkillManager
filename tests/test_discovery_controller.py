@@ -34,7 +34,72 @@ def controller(mock_app):
 def test_load_initial_data_success(controller, mock_app):
     mock_app.task_runner = MagicMock()
     controller.loadInitialData()
-    mock_app.task_runner.run.assert_called_once()
+    assert mock_app.task_runner.run.call_count == 2
+
+
+def test_load_initial_data_two_phase_submits_preview_and_full(controller, mock_app):
+    mock_app.task_runner = MagicMock()
+    controller.loadInitialData()
+    assert mock_app.task_runner.run.call_count == 2
+    first, second = mock_app.task_runner.run.call_args_list
+    # Phase 1: cache preview (is_final=False) paints the UI instantly
+    assert first.args[0].__func__ is controller._run_pipeline_from_cache.__func__
+    assert first.kwargs["args"] == (controller._refresh_generation, False, False)
+    # Phase 2: full discovery scan (is_final=True) refreshes in background
+    assert second.args[0].__func__ is controller._run_pipeline.__func__
+
+
+def test_commit_preview_skipped_when_final_already_committed(controller, mock_app):
+    # A stale cache preview (is_final=False, gen 5) must not clobber
+    # the final full-load (gen 5) that already committed.
+    controller._final_committed_generation = 5
+    state = PreparedModelState(
+        all_skills=[],
+        search_engine=MagicMock(),
+        all_filtered_skills=[],
+        visible_rows=[],
+        categories=[],
+        status="x",
+        generation=5,
+        is_final=False,
+    )
+    controller._commit_prepared_state(state)
+    mock_app._library_model.replacePreparedState.assert_not_called()
+
+
+def test_commit_final_sets_committed_generation(controller, mock_app):
+    controller._refresh_generation = 7
+    state = PreparedModelState(
+        all_skills=[],
+        search_engine=MagicMock(),
+        all_filtered_skills=[],
+        visible_rows=[],
+        categories=[],
+        status="x",
+        generation=7,
+        is_final=True,
+    )
+    controller._commit_prepared_state(state)
+    assert controller._final_committed_generation == 7
+    mock_app._library_model.replacePreparedState.assert_called_once()
+
+
+def test_commit_preview_commits_when_no_final_yet(controller, mock_app):
+    # First paint: nothing final committed yet, so the cache preview must paint.
+    assert controller._final_committed_generation is None
+    skill = Skill(name="S1", local_path="/p/s1", is_package=True, main_category="")
+    state = PreparedModelState(
+        all_skills=[skill],
+        search_engine=MagicMock(),
+        all_filtered_skills=[skill],
+        visible_rows=[skill],
+        categories=["Cat1"],
+        status="Finished",
+        generation=0,
+        is_final=False,
+    )
+    controller._commit_prepared_state(state)
+    mock_app._library_model.replacePreparedState.assert_called_once()
 
 
 def test_commit_prepared_state(controller, mock_app):

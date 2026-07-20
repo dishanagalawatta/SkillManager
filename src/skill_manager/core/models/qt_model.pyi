@@ -10,7 +10,7 @@ from PySide6.QtCore import (
     Slot,
 )
 
-from skill_manager.core.models.entities import FilterState, Skill
+from skill_manager.core.models.entities import FilterState, PreparedModelState, Skill
 from skill_manager.core.models.filter_engine import FilterEngine
 from skill_manager.core.search import SearchEngine
 
@@ -158,6 +158,10 @@ class SkillModel(QAbstractListModel):
     def get_known_paths(self) -> list[str]: ...
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]) -> None: ...
+    @Slot(PreparedModelState, result=bool)
+    def replacePreparedState(self, state: PreparedModelState) -> bool: ...
+    @Slot(str)
+    def refresh_emoji_for_path(self, local_path: str) -> None: ...
     @Slot(int, bool)
     def setSelected(self, row: int, selected: bool) -> None: ...
     @Slot()

@@ -16,7 +16,7 @@ from pathlib import Path
 os.environ["PYTHONWARNINGS"] = "ignore"
 
 import time
-from typing import Any
+from typing import Any, cast
 
 import sentry_sdk
 from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
@@ -281,7 +281,8 @@ class AppController(QObject):
         self._quick_copy_model = SkillModel(config=self._quick_copy_config)
 
         # 2. Basic Attribute Initialization
-        self._selected_skill = QQmlPropertyMap(self)
+        # create() avoids the deprecated QQmlPropertyMap(parent) ctor (Qt 6.11)
+        self._selected_skill = QQmlPropertyMap.create(self)
         self._is_loading = False
         self._status_message = ""
         self._discovered_projects = []
@@ -651,7 +652,7 @@ class AppController(QObject):
         ``text: root.skill.body_content``).
         """
         old = self._selected_skill
-        new_map = QQmlPropertyMap(self)
+        new_map = QQmlPropertyMap.create(self)
         for key, value in skill_dict.items():
             new_map.insert(key, value)
         self._selected_skill = new_map
@@ -1104,7 +1105,7 @@ class AppController(QObject):
 
     @Slot(str, str, list, str, result=str)
     def createCustomCommand(self, n, b, pl, cat) -> str:
-        return self.ops.createCustomCommand(n, b, pl, cat)
+        return str(self.ops.createCustomCommand(n, b, pl, cat))
 
     @Slot(str, result=str)
     def getCommandEmoji(self, path: str) -> str:
@@ -1116,13 +1117,13 @@ class AppController(QObject):
             self._config.clear_command_emoji(path)
         else:
             self._config.set_command_emoji(path, emoji)
-        self.skillModel.refresh_emoji_for_path(path)
+        cast(SkillModel, self.skillModel).refresh_emoji_for_path(path)
         logger.info("Command emoji set for %s", path)
 
     @Slot(str)
     def clearCommandEmoji(self, path: str) -> None:
         self._config.clear_command_emoji(path)
-        self.skillModel.refresh_emoji_for_path(path)
+        cast(SkillModel, self.skillModel).refresh_emoji_for_path(path)
         logger.info("Command emoji cleared for %s", path)
 
     @Slot(result=list)
@@ -1436,7 +1437,7 @@ class AppController(QObject):
         Called via ``app.aboutToQuit`` during the Qt event loop shutdown.
         Must not do heavy blocking I/O — those go in ``cleanup()``.
         """
-        sys.is_shutting_down = True
+        sys.__dict__["is_shutting_down"] = True
         logger.debug("[SHUTDOWN] on_quit entered")
         dump_diagnostics("on_quit enter")
 
@@ -1511,7 +1512,6 @@ def dump_diagnostics(reason: str) -> None:
     This runs during shutdown steps or from the watchdog thread to identify hangs.
     """
     try:
-        import contextlib
         import sys
         import time
         import traceback
