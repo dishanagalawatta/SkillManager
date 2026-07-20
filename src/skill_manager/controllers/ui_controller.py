@@ -312,7 +312,18 @@ class UIController(BaseController):
         if not path:
             return
         try:
-            os.startfile(path)
+            import subprocess
+            import sys as _sys
+
+            if _sys.platform == "win32":
+                import os as _os
+
+                _os.startfile(path)
+            elif _sys.platform == "darwin":
+                subprocess.run(["open", "--", path], check=True)
+            else:
+                safe_path = f"./{path}" if path.startswith("-") else path
+                subprocess.run(["xdg-open", safe_path], check=True)
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
