@@ -1,0 +1,21 @@
+{
+  "id": "mcp_screenshot",
+  "title": "sm_screenshot MCP tool + navigation IPC",
+  "type": "feature",
+  "status": "active",
+  "owner": "@dishanagalawatta",
+  "created": "2026-07-20T00:00:00Z",
+  "updated": "2026-07-20T00:00:00Z",
+  "current_phase": 1,
+  "current_task": "7",
+  "phases": {
+    "total": 1,
+    "completed": 1
+  },
+  "tasks": {
+    "total": 7,
+    "completed": 7
+  },
+  "commits": [],
+  "related_adrs": []
+}

@@ -39,6 +39,7 @@ dependencies = [
     "msgpack>=1.2.1",
     "joblib>=1.5.3",
     "psutil",
+    "mcp>=1.2.0",
 ]
 
 

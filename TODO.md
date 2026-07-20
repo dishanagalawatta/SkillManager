@@ -26,12 +26,15 @@ ytp
 
 ## To Do (Ready for Pickup)
 
-* [ ] Create a mcp to control app so that agent can access the app
+* [ ] Priority refresh
 * [ ] Update readme FIle (Revert)
 * [ ] See for winget approval
 * [ ] Posthog implementation review.
 
 ## In Progress
+
+* [ ] Create a mcp to control app so that agent can access the app
+  * [ ] Screenshots for agents
 
 ---
 
