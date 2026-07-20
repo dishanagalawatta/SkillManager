@@ -11,6 +11,9 @@ ListView {
 
     cacheBuffer: Math.max(height * 2, 1000)
 
+    // PERF: Reuse delegates instead of destroying/recreating them on scroll
+    reuseItems: true
+
     // Optimization: defer heavy layout generation while scrolling fast
     property bool isScrollingFast: false
     
