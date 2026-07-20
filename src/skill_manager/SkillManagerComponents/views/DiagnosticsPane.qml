@@ -138,8 +138,8 @@ Item {
                 Repeater {
                     model: [
                         {count: root.errorCount, color: Theme.danger},
-                        {count: root.warningCount, color: Theme.warning},
-                        {count: root.infoCount, color: Theme.info},
+                        {count: root.warningCount, color: "#F59E0B"},
+                        {count: root.infoCount, color: "#3B82F6"},
                         {count: root.debugCount, color: Theme.secondaryLabel}
                     ]
 

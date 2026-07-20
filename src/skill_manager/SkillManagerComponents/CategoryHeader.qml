@@ -87,7 +87,7 @@ Item {
             ColorOverlay {
                 anchors.fill: starIcon
                 source: starIcon
-                color: Theme.star
+                color: "#FFD700"
             }
         }
 
@@ -102,7 +102,7 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: 14
             font.weight: Font.Bold
-            color: root.mainCatName === "Special" ? Theme.star : Theme.label
+            color: root.mainCatName === "Special" ? "#FFD700" : Theme.label
             opacity: 0.9
         }
     }

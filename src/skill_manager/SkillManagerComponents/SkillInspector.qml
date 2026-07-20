@@ -170,7 +170,7 @@ Rectangle {
                     contentItem: Text {
                         text: starButton.text
                         font.pixelSize: 22
-                        color: (root._sel && root._sel.is_starred) ? Theme.star : Theme.secondaryLabel
+                        color: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         opacity: starButton.hovered ? 1.0 : 0.8

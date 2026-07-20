@@ -67,7 +67,7 @@ Window {
         x: selectionRect.x - 1; y: selectionRect.y - 1
         width: selectionRect.width + 2; height: selectionRect.height + 2
         color: "transparent"
-        border.color: Theme.info
+        border.color: "#0078D7"
         border.width: 1
         visible: selectionRect.width > 0
     }
