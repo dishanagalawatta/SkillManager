@@ -2,7 +2,7 @@
   "id": "mcp_screenshot",
   "title": "sm_screenshot MCP tool + navigation IPC",
   "type": "feature",
-  "status": "active",
+  "status": "complete",
   "owner": "@dishanagalawatta",
   "created": "2026-07-20T00:00:00Z",
   "updated": "2026-07-20T00:00:00Z",
@@ -16,6 +16,8 @@
     "total": 7,
     "completed": 7
   },
-  "commits": [],
+  "commits": [
+    "2b9ff60: feat: add sm_screenshot MCP tool (mcp_screenshot)"
+  ],
   "related_adrs": []
 }

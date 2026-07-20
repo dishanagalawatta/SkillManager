@@ -1,4 +1,4 @@
-# Plan: sm_screenshot MCP tool + navigation IPC
+# [x] Complete: sm_screenshot MCP tool + navigation IPC
 
 Design locked — see brainstorming Decision Log. Agents using the MCP server can
 now visually confirm the live SkillManager UI: navigate the running GUI to a
