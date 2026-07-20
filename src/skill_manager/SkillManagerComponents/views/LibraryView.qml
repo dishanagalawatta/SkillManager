@@ -54,16 +54,6 @@ Item {
         }
     }
 
-    Connections {
-        target: AppController.libraryModel
-        function onLayoutAboutToBeChanged() {
-            lv_listView.cacheBuffer = 0
-        }
-        function onLayoutChanged() {
-            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-        }
-    }
-
     // No forced reset on completion - use persistent state
 
     ColumnLayout {
@@ -393,6 +383,7 @@ Item {
             // Skill List
             SmoothListView {
                 id: lv_listView
+                objectName: "libraryList"
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
                 SplitView.minimumWidth: 300
@@ -433,24 +424,35 @@ Item {
                         lv_listView.cacheBuffer = 0 // Safely abort active incubators
                     }
                     function onLayoutChanged() {
-                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                        lv_listView._restoreScroll()
+                        // Defer the restore while the model is still incubating:
+                        // the reset fires mid-incubation, so restoring cacheBuffer
+                        // here re-triggers a delegate burst that races the in-flight
+                        // one ("Object or context destroyed during incubation").
+                        // The restore is performed in onIncubatingChanged instead.
+                        if (!AppController.libraryModel.incubating) {
+                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                            lv_listView._restoreScroll()
+                        }
                     }
                     function onModelAboutToBeReset() {
                         lv_listView.savedScrollPos = lv_listView.contentY
                         lv_listView.cacheBuffer = 0
                     }
                     function onModelReset() {
-                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                        lv_listView._restoreScroll()
+                        if (!AppController.libraryModel.incubating) {
+                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                            lv_listView._restoreScroll()
+                        }
                     }
                     function onAboutToMutateStructure() {
                         lv_listView.savedScrollPos = lv_listView.contentY
                         lv_listView.cacheBuffer = 0
                     }
                     function onStructureMutated() {
-                        lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                        lv_listView._restoreScroll()
+                        if (!AppController.libraryModel.incubating) {
+                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                            lv_listView._restoreScroll()
+                        }
                     }
                 }
 
@@ -461,6 +463,12 @@ Item {
                     function onIncubatingChanged() {
                         if (!AppController.libraryModel.incubating) {
                             AppController.libraryModel.onIncubationReady()
+                            // Incubation finished: now safe to re-enable the
+                            // off-screen cache buffer without racing live delegates.
+                            if (lv_listView.model) {
+                                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                                lv_listView._restoreScroll()
+                            }
                         }
                     }
                 }

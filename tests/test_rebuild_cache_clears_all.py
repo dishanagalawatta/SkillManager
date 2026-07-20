@@ -19,7 +19,7 @@ def _make_app(tmp_path):
 
 
 def test_rebuild_cache_clears_json_index(tmp_path):
-    """rebuildCache() deletes the JSON index cache file."""
+    """rebuildCache() deletes the JSON index and clears the granular diskcache."""
     from skill_manager.app import AppController
 
     json_cache = tmp_path / "skill_library_index.json"
@@ -27,14 +27,25 @@ def test_rebuild_cache_clears_json_index(tmp_path):
 
     app = _make_app(tmp_path)
 
+    # Isolate the granular diskcache so the JSON-focused assertion stays precise
+    # and the test never touches the real discovery cache on disk.
+    mock_dc = MagicMock()
+
     with (
         patch("skill_manager.core.config.SKILL_LIBRARY_CACHE_FILE", str(json_cache)),
         patch("skill_manager.app.os.path.exists", return_value=True),
         patch("skill_manager.app.os.remove") as mock_remove,
+        patch("skill_manager.core.discovery.get_discovery_cache") as mock_get_cache,
     ):
-        AppController.rebuildCache(app)
+        mock_get_cache.return_value.__enter__ = lambda s: mock_dc
+        mock_get_cache.return_value.__exit__ = MagicMock(return_value=False)
 
-        mock_remove.assert_called_once_with(str(json_cache))
+        AppController.rebuildCache(app)  # pyright: ignore[reportAttributeAccessIssue]
+
+        # JSON index must be deleted...
+        mock_remove.assert_any_call(str(json_cache))
+        # ...and the granular diskcache must be cleared.
+        mock_dc.clear.assert_called_once()
 
 
 def test_rebuild_cache_clears_granular_diskcache(tmp_path):
@@ -65,7 +76,7 @@ def test_rebuild_cache_clears_granular_diskcache(tmp_path):
         mock_get_cache.return_value.__enter__ = lambda s: mock_dc
         mock_get_cache.return_value.__exit__ = MagicMock(return_value=False)
 
-        AppController.rebuildCache(app)
+        AppController.rebuildCache(app)  # pyright: ignore[reportAttributeAccessIssue]
 
         # Verify cleared
         dc2 = Cache(str(discovery_cache_dir))
@@ -85,7 +96,7 @@ def test_rebuild_cache_resets_previous_skills(tmp_path):
         ),
         patch("skill_manager.app.os.path.exists", return_value=False),
     ):
-        AppController.rebuildCache(app)
+        AppController.rebuildCache(app)  # pyright: ignore[reportAttributeAccessIssue]
 
     assert app.discovery._previous_skills == {}
 
@@ -102,6 +113,6 @@ def test_rebuild_cache_triggers_load_initial_data(tmp_path):
         ),
         patch("skill_manager.app.os.path.exists", return_value=False),
     ):
-        AppController.rebuildCache(app)
+        AppController.rebuildCache(app)  # pyright: ignore[reportAttributeAccessIssue]
 
     app.discovery.loadInitialData.assert_called_once_with(force_full_scan=True, silent=True)

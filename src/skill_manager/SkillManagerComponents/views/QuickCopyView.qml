@@ -63,22 +63,6 @@ Item {
 
     Connections {
         target: AppController.quickCopyModel
-        function onLayoutAboutToBeChanged() {
-            qcv_skillList.cacheBuffer = 0
-        }
-        function onLayoutChanged() {
-            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-        }
-        function onAboutToMutateStructure() {
-            qcv_skillList.cacheBuffer = 0
-        }
-        function onStructureMutated() {
-            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-        }
-    }
-
-    Connections {
-        target: AppController.quickCopyModel
         function onSelectionStateChanged() {
             if (qcv_root._isInternalSelectionChange) return
 
@@ -662,24 +646,39 @@ Item {
                         qcv_skillList.cacheBuffer = 0
                     }
                     function onLayoutChanged() {
-                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                        qcv_skillList._restoreScroll()
+                        // Only re-enable incubation while the list is still live.
+                        // After cleanup() sets model = null (view teardown), a stray
+                        // layout signal must NOT restore cacheBuffer, or incubated
+                        // delegates race against the dying context.
+                        // Also defer the restore while the model is still incubating:
+                        // the reset fires mid-incubation, so restoring cacheBuffer
+                        // here re-triggers a delegate burst that races the in-flight
+                        // one ("Object or context destroyed during incubation").
+                        // The restore is performed in onIncubatingChanged instead.
+                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
+                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                            qcv_skillList._restoreScroll()
+                        }
                     }
                     function onModelAboutToBeReset() {
                         qcv_skillList.savedScrollPos = qcv_skillList.contentY
                         qcv_skillList.cacheBuffer = 0
                     }
                     function onModelReset() {
-                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                        qcv_skillList._restoreScroll()
+                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
+                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                            qcv_skillList._restoreScroll()
+                        }
                     }
                     function onAboutToMutateStructure() {
                         qcv_skillList.savedScrollPos = qcv_skillList.contentY
                         qcv_skillList.cacheBuffer = 0
                     }
                     function onStructureMutated() {
-                        qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                        qcv_skillList._restoreScroll()
+                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
+                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                            qcv_skillList._restoreScroll()
+                        }
                     }
                 }
 
@@ -690,6 +689,12 @@ Item {
                     function onIncubatingChanged() {
                         if (!AppController.quickCopyModel.incubating) {
                             AppController.quickCopyModel.onIncubationReady()
+                            // Incubation finished: now safe to re-enable the
+                            // off-screen cache buffer without racing live delegates.
+                            if (qcv_skillList.model) {
+                                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                                qcv_skillList._restoreScroll()
+                            }
                         }
                     }
                 }
