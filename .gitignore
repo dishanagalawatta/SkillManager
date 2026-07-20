@@ -54,6 +54,7 @@ tuf_repo/
 # ─── Agent / Local Tooling ──────────────────────────────────────
 # Per ADR-0016: .opencode/ is local agent config, never committed.
 .opencode/
+.omo/
 
 # ─── Secrets (never commit) ─────────────────────────────────────
 # .env contains live API tokens (PostHog, Sentry, etc.)

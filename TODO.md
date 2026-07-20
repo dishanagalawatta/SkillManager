@@ -26,6 +26,9 @@ ytp
 
 ## To Do (Ready for Pickup)
 
+* [ ] Custom command emoji change
+* [ ] Narrow window layout
+* [ ] Switch between latest projects
 * [ ] Priority refresh
 * [ ] Update readme FIle (Revert)
 * [ ] See for winget approval
@@ -34,7 +37,7 @@ ytp
 ## In Progress
 
 * [ ] Create a mcp to control app so that agent can access the app
-  * [ ] Screenshots for agents
+  * [X] Screenshots for agents
 
 ---
 
