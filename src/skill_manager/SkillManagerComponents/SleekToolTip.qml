@@ -14,24 +14,27 @@ ToolTip {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }
 
-    // Keyboard focus handler so the tooltip also surfaces for keyboard-only users.
-    FocusHandler {
-        id: focusHandler
-        parent: control.parent
-    }
+    // Keyboard focus: surface the tooltip when the owning control gains
+    // active/visual focus (keyboard-only users). Every focusable Item exposes
+    // these properties, so we read them off the parent instead of adding a
+    // FocusHandler (which is unavailable on this QtQuick version).
+    readonly property bool keyboardFocused:
+        (typeof control.parent !== "undefined" && control.parent !== null
+         && ("activeFocus" in control.parent)
+         && (control.parent.activeFocus || control.parent.visualFocus))
 
     Timer {
         id: delayTimer
         interval: control.delay
         running: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered)
-                 || (typeof focusHandler !== "undefined" && focusHandler !== null && focusHandler.activeFocus)
+                 || control.keyboardFocused
     }
 
     visible: control.text !== ""
              && !delayTimer.running
              && (
                  (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered)
-                 || (typeof focusHandler !== "undefined" && focusHandler !== null && focusHandler.activeFocus)
+                 || control.keyboardFocused
              )
 
     x: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered ? hoverHandler.point.position.x : 0) + 15
