@@ -10,7 +10,7 @@ Rectangle {
     signal sequenceCaptured(string sequence)
 
     radius: Theme.radiusButton
-    color: active ? Theme.glassActive : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
+    color: root.active ? Theme.glassActive : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
     border.color: (active || root.activeFocus) ? Theme.accent : Theme.glassBorder
     border.width: (active || root.activeFocus) ? 2 : 1
     height: 36
@@ -23,7 +23,7 @@ Rectangle {
 
     focus: active
     onActiveChanged: {
-        AppController.config_controller.isRecordingShortcut = active
+        AppController.config_controller.isRecordingShortcut = root.active
         if (active) root.forceActiveFocus()
     }
     
@@ -40,11 +40,11 @@ Rectangle {
 
         Text {
             Layout.fillWidth: true
-            text: active ? "Recording... (Click outside to cancel)" : (sequence || "Click to record shortcut")
-            color: active ? Theme.accent : (sequence ? Theme.label : Theme.secondaryLabel)
+            text: root.active ? "Recording... (Click outside to cancel)" : (root.sequence || "Click to record shortcut")
+            color: root.active ? Theme.accent : (root.sequence ? Theme.label : Theme.secondaryLabel)
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sizeBody
-            font.weight: (sequence && !active) ? Font.Bold : Font.Normal
+            font.weight: (root.sequence && !root.active) ? Font.Bold : Font.Normal
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -68,6 +68,8 @@ Rectangle {
                 root.active = true
                 root.forceActiveFocus()
                 event.accepted = true
+            } else {
+                event.accepted = false
             }
             return
         }
