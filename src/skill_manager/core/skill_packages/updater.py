@@ -1,6 +1,7 @@
 import os
 import shlex
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -167,7 +168,11 @@ def run_shell_command(
 ):
     if intercept_cross_platform_command(command, output_callback):
         return
-    run_process(command, output_callback, shell=True, cwd=cwd)
+
+    # SECURITY: Parse command string to list to prevent shell injection,
+    # avoiding shell=True while maintaining Windows .cmd/.bat compatibility.
+    command_list = shlex.split(command, posix=sys.platform != "win32")
+    run_process(command_list, output_callback, shell=False, cwd=cwd)
 
 
 def run_skill_package_update(
