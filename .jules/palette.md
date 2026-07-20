@@ -24,3 +24,6 @@
 ## 2026-06-29 - Consolidate Tooltips using Built-in Properties
 **Learning:** When custom QML controls (like `IconButton` in `skill_manager`) provide a built-in `tooltipText` property, manually nesting `SleekToolTip` elements and redefining `Accessible.name`/`Accessible.description` leads to verbose, redundant code that is prone to accessibility bugs (like missing `visualFocus` bindings or double-announcing).
 **Action:** Always favor using the built-in `tooltipText` property over manually nesting tooltip items.
+## 2024-05-18 - Keyboard Toggle for Custom Item Controls
+**Learning:** Custom `Item` controls used as toggles require `activeFocusOnTab: true`, a `Keys.onPressed` handler that explicitly sets `event.accepted = true` after responding to Space/Return/Enter keys, and `Accessible.role`/`Accessible.name` applied to the focusable `Item` itself rather than its child `MouseArea`. When a child `SleekToolTip` relies on the `MouseArea` hover, its `visible` binding must be explicitly written as `visible: logoMouseArea.containsMouse || parentItem.activeFocus` rather than simply `parent.containsMouse` if the logical "parent" for focus isn't the direct parent.
+**Action:** Always ensure `activeFocusOnTab`, `event.accepted = true` for keyboard interactions, and the correct `visible` condition for tooltips on custom interactive components.
