@@ -44,6 +44,7 @@ Dialog {
     property bool awaitingConflictResolution: false
     property var pendingArgs: ({})
     property var removalDialog: null
+    property string pendingEmoji: "\u26A1"
 
     function openWithContext() {
         editMode = false
@@ -52,6 +53,7 @@ Dialog {
         editCategoryValue = ""
         orphanCategory = ""
         awaitingConflictResolution = false
+        pendingEmoji = "\u26A1"
         cmdNameInput.text = ""
         cmdBodyInput.text = ""
         open()
@@ -69,6 +71,7 @@ Dialog {
                           && AppController.categories.indexOf(skill.category) === -1)
             ? skill.category : ""
         awaitingConflictResolution = false
+        pendingEmoji = AppController.getCommandEmoji(skill.local_path || "")
         cmdNameInput.text = skill.name || ""
         cmdBodyInput.text = skill.body_content || ""
         open()
@@ -138,6 +141,72 @@ Dialog {
             Layout.fillWidth: true
             Layout.margins: 24
             spacing: 20
+
+            // Emoji
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+
+                Text {
+                    text: "Emoji"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.secondaryLabel
+                    Layout.preferredWidth: 120
+                }
+
+                Rectangle {
+                    width: 44
+                    height: 44
+                    radius: Theme.radiusField
+                    color: emojiBtnHover.containsMouse ? Theme.glassHover : Theme.glassPill
+                    border.color: emojiBtnHover.containsMouse ? Theme.accent : Theme.glassBorder
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.pendingEmoji
+                        font.pixelSize: 24
+                    }
+
+                    HoverHandler {
+                        id: emojiBtnHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: emojiPicker.open()
+                    }
+                }
+
+                Text {
+                    text: "Tap to change"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeCaption
+                    color: Theme.secondaryLabel
+                    opacity: 0.6
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: "Reset"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    font.weight: Font.Medium
+                    color: resetEmojiHover.containsMouse ? Theme.accent : Theme.secondaryLabel
+                    visible: root.pendingEmoji !== "\u26A1"
+
+                    HoverHandler {
+                        id: resetEmojiHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: root.pendingEmoji = "\u26A1"
+                    }
+                }
+            }
 
             // Name and Category
             RowLayout {
@@ -330,13 +399,15 @@ Dialog {
                             root.pendingArgs.projectLabels,
                             ""
                         )
+                        AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
                     } else {
-                        AppController.createCustomCommand(
+                        let newPath = AppController.createCustomCommand(
                             root.pendingArgs.name,
                             root.pendingArgs.body,
                             root.pendingArgs.projectLabels,
                             root.pendingArgs.category
                         )
+                        AppController.setCommandEmoji(newPath, root.pendingEmoji)
                     }
                     root.accept()
                 }
@@ -363,6 +434,17 @@ Dialog {
     CommandRemovalConfirmDialog {
         id: removalConfirmDialog
         parent: Overlay.overlay
+    }
+
+    // Emoji picker
+    EmojiPicker {
+        id: emojiPicker
+        parent: Overlay.overlay
+        onEmojiSelected: (e) => {
+            root.pendingEmoji = e
+            if (e !== "\u26A1") AppController.addEmojiRecent(e)
+            emojiPicker.close()
+        }
     }
 
     // Conflict resolution dialog
@@ -499,6 +581,7 @@ Dialog {
                             root.pendingArgs.projectLabels,
                             "overwrite"
                         )
+                        AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
                         conflictDialog.accept()
                         root.awaitingConflictResolution = false
                         root.accept()
@@ -521,6 +604,7 @@ Dialog {
                             root.pendingArgs.projectLabels,
                             "rename"
                         )
+                        AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
                         conflictDialog.accept()
                         root.awaitingConflictResolution = false
                         root.accept()
@@ -551,6 +635,9 @@ Dialog {
             if (!root.awaitingConflictResolution) return
             if (oldPath !== root.pendingArgs.localPath) return
             root.awaitingConflictResolution = false
+            if (oldPath !== newPath) {
+                AppController.setCommandEmoji(newPath, root.pendingEmoji)
+            }
             root.accept()
         }
         function onCommandPendingRemovals(localPath, pendingRemovals) {

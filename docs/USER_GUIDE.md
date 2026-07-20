@@ -30,6 +30,7 @@ The Library is where you manage your source skills.
 > **Smart no-op.** If the destination file already contains the same content,
 > SkillManager skips the write and does not show the conflict dialog — even
 > when the target project is different from the source.
+- **Customize a command's emoji**: Each custom command shows a default ⚡ icon in the list. You can replace it with any emoji you like. Open the **Create Command** dialog (the emoji picker is available there), or edit an existing command and click the emoji button to open the picker. Choose an emoji and it saves immediately, overriding the default. To go back to the default, pick ⚡ from the picker or use the reset button. Recently used emojis appear at the top of the picker for quick reuse. Your custom emoji is stored in the app settings (not in the command's `.md` file), so it survives edits, renames, and redeploys. Note: this applies to commands only, not to skills.
 - **Copying to Projects**: Select one or multiple skills and use the "Copy to Projects" button to deploy them into specific project folders.
 - **Archive/Unarchive**: Archive skills you don't need while keeping them available for restoration.
 - **Star/Favorite**: Star important skills to pin them to the top of the list.

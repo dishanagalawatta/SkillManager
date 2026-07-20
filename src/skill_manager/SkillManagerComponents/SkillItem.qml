@@ -294,7 +294,7 @@ Item {
                                 if (!model) return ""
                                 if (model.isStarred && root.showStarredIcon) return "★"
                                 if (model.isCollection) return "📦"
-                                if (model.isCommand) return "⚡"
+                                if (model.isCommand) return model.emoji || "⚡"
                                 if (model.isScreenshot) return "🖼️"
                                 return AppController.getCategoryEmoji(model.category)
                             }

@@ -70,6 +70,7 @@ class SkillRecord(BaseModel):
     main_category: str = DEFAULT_MAIN_CATEGORY
     metadata: dict[str, Any] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
+    emoji: str | None = None
 
     @field_validator("name", "category", "local_path", mode="before")
     @classmethod

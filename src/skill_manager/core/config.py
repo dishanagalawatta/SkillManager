@@ -297,6 +297,57 @@ class ConfigManager:
         self.data.pop(key, None)
         self.save()
 
+    def get_command_emoji(self, local_path: str) -> str:
+        """Return the emoji override for a command, or the default ``⚡``."""
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            return "⚡"
+        normalized = os.path.normpath(local_path)
+        return overrides.get(normalized, "⚡")
+
+    def set_command_emoji(self, local_path: str, emoji: str) -> None:
+        """Store (or clear) an emoji override for a command.
+
+        An ``emoji`` of ``""`` or ``"⚡"`` clears any existing override.
+        """
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            overrides = {}
+        normalized = os.path.normpath(local_path)
+        if emoji in ("", "⚡"):
+            overrides.pop(normalized, None)
+        else:
+            overrides[normalized] = emoji
+        self.data["command_emoji_overrides"] = overrides
+        self.save()
+
+    def clear_command_emoji(self, local_path: str) -> None:
+        """Remove any emoji override for a command."""
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            return
+        normalized = os.path.normpath(local_path)
+        if overrides.pop(normalized, None) is not None:
+            self.data["command_emoji_overrides"] = overrides
+            self.save()
+
+    def get_emoji_recents(self) -> list[str]:
+        """Return the recent-emoji list (most-recent-first), capped at 16."""
+        recents = self.data.get("emoji_recents", [])
+        if not isinstance(recents, list):
+            return []
+        return recents[:16]
+
+    def add_emoji_recent(self, emoji: str) -> None:
+        """Insert an emoji at the front of the recents list, deduped, capped at 16."""
+        recents = self.data.get("emoji_recents", [])
+        if not isinstance(recents, list):
+            recents = []
+        recents = [e for e in recents if e != emoji]
+        recents.insert(0, emoji)
+        self.data["emoji_recents"] = recents[:16]
+        self.save()
+
 
 class ScopedConfigManager:
     """Wraps a parent ConfigManager and prefixes all keys with a namespace.
@@ -334,6 +385,22 @@ class ScopedConfigManager:
     @property
     def data(self):
         return self._parent.data
+
+    # --- Global emoji keys (NOT namespaced) ---
+    def get_command_emoji(self, local_path: str) -> str:
+        return self._parent.get_command_emoji(local_path)
+
+    def set_command_emoji(self, local_path: str, emoji: str) -> None:
+        self._parent.set_command_emoji(local_path, emoji)
+
+    def clear_command_emoji(self, local_path: str) -> None:
+        self._parent.clear_command_emoji(local_path)
+
+    def get_emoji_recents(self) -> list[str]:
+        return self._parent.get_emoji_recents()
+
+    def add_emoji_recent(self, emoji: str) -> None:
+        self._parent.add_emoji_recent(emoji)
 
 
 # Filter keys that are per-model and must be namespaced.

@@ -635,9 +635,15 @@ class OpsController(BaseController):
         if not send_paste_to_focused_window():
             self.app._set_status("Copied, but could not paste automatically")
 
-    @Slot(str, str, list, str)
-    def createCustomCommand(self, name: str, body: str, project_labels: "list[str]", category: str):
-        """Creates Custom Command .md files in one or more projects."""
+    @Slot(str, str, list, str, result=str)
+    def createCustomCommand(
+        self, name: str, body: str, project_labels: "list[str]", category: str
+    ) -> str:
+        """Creates Custom Command .md files in one or more projects.
+
+        Returns the local path of the first successfully created command
+        ``.md`` file (empty string if none were created).
+        """
         diag = get_diagnostic_logger()
         diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, projects={project_labels}")
         from skill_manager.core.commands import create_custom_command_files_multi
@@ -657,7 +663,7 @@ class OpsController(BaseController):
         if not created:
             msg = failed[0].message if failed else "Error: No projects selected"
             self.app._set_status(msg)
-            return
+            return ""
 
         self.app._set_status(f"Created command in {len(created)} project(s)")
 
@@ -724,6 +730,8 @@ class OpsController(BaseController):
                             )
                         ),
                     )
+
+        return str(created[0].path) if created else ""
 
     def _snapshot_affected_paths(self, affected_project_paths: set[Path]) -> set[str]:
         """Return local_paths in both models whose project_path matches an affected project."""
