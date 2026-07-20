@@ -10,8 +10,6 @@ ListView {
     }
 
     cacheBuffer: Math.max(height * 2, 1000)
-    // Optimization: reuse delegates for smoother list rendering
-    reuseItems: true
 
     // Optimization: defer heavy layout generation while scrolling fast
     property bool isScrollingFast: false
