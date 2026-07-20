@@ -10,6 +10,8 @@ ListView {
     }
 
     cacheBuffer: Math.max(height * 2, 1000)
+    reuseItems: true
+    // Perf: Enables item recycling, reducing memory allocation and object creation overhead in long lists
 
     // Optimization: defer heavy layout generation while scrolling fast
     property bool isScrollingFast: false
