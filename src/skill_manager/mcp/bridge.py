@@ -1,0 +1,802 @@
+"""Headless bridge between the MCP tool layer and the live SkillManager app.
+
+This module is the ONLY place that touches the PySide6/Qt application object.
+It lazily constructs a cached, headless ``AppController`` so that MCP tools can
+read application state without a display or a ``QQmlApplicationEngine``.
+
+Design rules (per project constraints):
+* Construct ``AppController(skip_initial_load=True)`` — no file watchers,
+  schedulers, or background discovery are started, keeping the bridge safe in
+  tests and CI.
+* Every public wrapper is defensive: it catches exceptions and never lets a
+  failure propagate to the caller as an unhandled crash.
+* Every call is recorded via ``capture_event("mcp_bridge_call", {"fn": ...})``.
+* Destructive operations (delete/deploy) only delegate to APIs that genuinely
+  exist; otherwise they raise ``NotImplementedError`` rather than guessing.
+"""
+
+from __future__ import annotations
+
+import base64
+import contextlib
+import ctypes
+import inspect
+import io
+import json
+import os
+import re
+import subprocess
+import threading
+import time
+import uuid
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from skill_manager.core.analytics import capture_event
+from skill_manager.core.diagnostics import get_diagnostic_logger
+
+# ---------------------------------------------------------------------------
+# Cached controller singleton
+# ---------------------------------------------------------------------------
+_APP_CONTROLLER: Any | None = None
+_APP_CONTROLLER_ERROR: str | None = None
+
+# Async job result buffers keyed by job_id.
+_JOBS: dict[str, dict[str, Any]] = {}
+
+# Project root (repo root) — used for subprocess-based tools (lint/test/build)
+# and for static analysis. Resolved relative to this file:
+#   src/skill_manager/mcp/bridge.py -> repo root is 4 levels up.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+# Cross-process IPC for sm_screenshot: the headless bridge cannot see the GUI
+# window, so it writes a navigate command the GUI watches and polls an ack.
+_MCP_ROOT = Path(__file__).resolve().parents[3] / "data" / "mcp"
+MCP_COMMANDS_DIR = _MCP_ROOT / "commands"
+MCP_ACKS_DIR = _MCP_ROOT / "acks"
+
+# Live GUI window title prefix (Main.qml: title: "Skill Manager").
+_WINDOW_TITLE_PREFIX = "skill manager"
+
+
+def _ensure_qapp() -> None:
+    """Ensure a QGuiApplication exists; create one headless if needed.
+
+    AppController.__init__ calls ``QGuiApplication.clipboard()``, so a Qt
+    application instance must be present before construction. We use the
+    offscreen platform to avoid requiring a display.
+    """
+    from PySide6.QtGui import QGuiApplication
+
+    if QGuiApplication.instance() is not None:
+        return
+
+    # Force a headless platform so construction works without a display.
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    # Skip any initial background load triggered by env-driven paths.
+    os.environ.setdefault("SKILL_MANAGER_SKIP_INITIAL_LOAD", "1")
+
+    # QApplication is a QGuiApplication subclass and satisfies clipboard().
+    from PySide6.QtWidgets import QApplication
+
+    QApplication([])  # type: ignore[arg-type]
+
+
+def get_app_controller() -> Any:
+    """Return the cached headless ``AppController``, constructing it on first use.
+
+    Returns the controller on success. If construction fails (e.g. missing
+    config in a bare environment), the error is cached and re-raised as a
+    ``RuntimeError`` carrying the underlying message so callers can degrade
+    gracefully.
+    """
+    global _APP_CONTROLLER, _APP_CONTROLLER_ERROR  # noqa: PLW0603
+
+    if _APP_CONTROLLER is not None:
+        return _APP_CONTROLLER
+    if _APP_CONTROLLER_ERROR is not None:
+        raise RuntimeError(f"AppController previously failed to construct: {_APP_CONTROLLER_ERROR}")
+
+    _ensure_qapp()
+    from skill_manager.app import AppController
+
+    try:
+        controller = AppController(skip_initial_load=True)
+    except Exception as exc:  # noqa: BLE001 - we must not crash the bridge
+        _APP_CONTROLLER_ERROR = str(exc)
+        raise RuntimeError(f"Failed to construct AppController: {exc}") from exc
+
+    _APP_CONTROLLER = controller
+    return _APP_CONTROLLER
+
+
+def _controller_or_none() -> Any | None:
+    """Best-effort controller access; returns None instead of raising."""
+    try:
+        return get_app_controller()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _log_call(fn: str) -> None:
+    """Record a bridge call via analytics (never raises)."""
+    with contextlib.suppress(Exception):
+        capture_event("mcp_bridge_call", {"fn": fn})
+
+
+# ---------------------------------------------------------------------------
+# Read-only state accessors
+# ---------------------------------------------------------------------------
+def list_skills(include_commands: bool = True, project_label: str = "") -> list[dict[str, Any]]:
+    """Enumerate skills from ``AppController._library_model``.
+
+    The model stores skills in ``_all_skills`` (a list of ``Skill`` dataclasses).
+    We read that list read-only and project a safe subset of fields. There is no
+    ``id``/``status``/``client_format`` field on ``Skill`` — we expose the real
+    attributes (name, local_path, category, is_package, client, etc.).
+    """
+    _log_call("list_skills")
+    controller = _controller_or_none()
+    if controller is None:
+        return []
+
+    model = controller._library_model  # noqa: SLF001 - intentional bridge access
+    skills: list[Any] = getattr(model, "_all_skills", []) or []
+
+    out: list[dict[str, Any]] = []
+    for skill in skills:
+        if not include_commands and getattr(skill, "is_command", False):
+            continue
+        if project_label and getattr(skill, "project_label", "") != project_label:
+            continue
+        out.append(
+            {
+                "name": getattr(skill, "name", ""),
+                "local_path": getattr(skill, "local_path", ""),
+                "category": getattr(skill, "category", ""),
+                "project_label": getattr(skill, "project_label", ""),
+                "is_package": getattr(skill, "is_package", False),
+                "is_command": getattr(skill, "is_command", False),
+                "is_starred": getattr(skill, "is_starred", False),
+                "is_archived": getattr(skill, "is_archived", False),
+                "client": getattr(skill, "client", ""),
+                "risk": getattr(skill, "risk", "Unknown"),
+                "source": getattr(skill, "source", "Unknown"),
+            }
+        )
+    return out
+
+
+def list_sources() -> list[str]:
+    """Return configured skill source directories."""
+    _log_call("list_sources")
+    controller = _controller_or_none()
+    if controller is None:
+        return []
+    sources: list[str] = getattr(controller, "_sources", []) or []
+    return list(sources)
+
+
+def list_projects() -> list[str]:
+    """Return configured project directories."""
+    _log_call("list_projects")
+    controller = _controller_or_none()
+    if controller is None:
+        return []
+    projects: list[str] = getattr(controller, "_projects", []) or []
+    return list(projects)
+
+
+def get_diagnostics(limit: int = 100) -> list[dict[str, Any]]:
+    """Return the most recent diagnostic ring-buffer events."""
+    _log_call("get_diagnostics")
+    try:
+        events = get_diagnostic_logger().get_recent_events(count=limit)
+        return [dict(e) for e in events]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def capture_errors(limit: int = 100) -> list[dict[str, Any]]:
+    """Return only error-level diagnostic events."""
+    _log_call("capture_errors")
+    events = get_diagnostics(limit=limit)
+    return [e for e in events if e.get("level") == "ERROR"]
+
+
+def get_health() -> dict[str, Any]:
+    """Return a health snapshot: Qt loop alive, controller present, model counts.
+
+    Never raises — on any failure it returns a degraded health dict.
+    """
+    _log_call("get_health")
+    health: dict[str, Any] = {
+        "healthy": False,
+        "qt_loop_alive": False,
+        "controller_present": False,
+        "diagnostic_health": "",
+        "model_counts": {},
+        "recent_errors": 0,
+        "degraded_reason": None,
+    }
+
+    try:
+        from PySide6.QtGui import QGuiApplication
+
+        health["qt_loop_alive"] = QGuiApplication.instance() is not None
+    except Exception as exc:  # noqa: BLE001
+        health["degraded_reason"] = f"qt_check_failed: {exc}"
+        return health
+
+    controller = _controller_or_none()
+    if controller is None:
+        health["degraded_reason"] = _APP_CONTROLLER_ERROR or "controller_unavailable"
+        return health
+
+    health["controller_present"] = True
+
+    try:
+        diag = get_diagnostic_logger()
+        health["diagnostic_health"] = diag.get_health_status()
+        counts = diag.get_diagnostic_counts()
+        health["recent_errors"] = counts.get("errors", 0)
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:
+        model = controller._library_model  # noqa: SLF001
+        skills: list[Any] = getattr(model, "_all_skills", []) or []
+        health["model_counts"] = {
+            "library_skills": len(skills),
+            "sources": len(list_sources()),
+            "projects": len(list_projects()),
+        }
+    except Exception:  # noqa: BLE001
+        pass
+
+    health["healthy"] = bool(
+        health["qt_loop_alive"]
+        and health["controller_present"]
+        and health["diagnostic_health"] != "red"
+    )
+    return health
+
+
+def dump_state() -> dict[str, Any]:
+    """Serialize a safe subset of AppController state."""
+    _log_call("dump_state")
+    controller = _controller_or_none()
+    if controller is None:
+        return {"available": False, "reason": _APP_CONTROLLER_ERROR or "no_controller"}
+
+    state: dict[str, Any] = {"available": True}
+    try:
+        state["sources"] = list_sources()
+        state["projects"] = list_projects()
+        state["project_aliases"] = dict(getattr(controller, "_project_aliases", {}) or {})
+        state["client_format"] = getattr(controller, "_client_format", "")
+        state["default_client"] = controller._config.get(  # noqa: SLF001
+            "default_client", "Last Selected"
+        )
+        model = controller._library_model  # noqa: SLF001
+        skills: list[Any] = getattr(model, "_all_skills", []) or []
+        state["model_counts"] = {
+            "library_skills": len(skills),
+            "stats_up_to_date": getattr(controller, "_stats_up_to_date", 0),
+            "stats_outdated": getattr(controller, "_stats_outdated", 0),
+            "stats_missing": getattr(controller, "_stats_missing", 0),
+        }
+        # Config keys (names only — never values, which may include secrets).
+        try:
+            cfg_data = controller._config.data  # noqa: SLF001
+            state["config_keys"] = sorted(cfg_data.keys()) if isinstance(cfg_data, dict) else []
+        except Exception:  # noqa: BLE001
+            state["config_keys"] = []
+    except Exception as exc:  # noqa: BLE001
+        state["error"] = str(exc)
+    return state
+
+
+def inspect_controller(name: str) -> dict[str, Any]:
+    """Introspect the public surface of a sub-controller (read-only, safe)."""
+    _log_call("inspect_controller")
+    controller = _controller_or_none()
+    if controller is None:
+        return {"name": name, "found": False, "reason": "no_controller"}
+
+    target = getattr(controller, name, None)
+    if target is None:
+        return {"name": name, "found": False, "reason": "attribute_not_found"}
+
+    methods: list[str] = []
+    signals: list[str] = []
+    for attr in dir(target):
+        if attr.startswith("_"):
+            continue
+        try:
+            member = getattr(target, attr)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(member, (staticmethod, classmethod)) or callable(member):
+            # Signals in PySide6 are instances of Signal; detect by name pattern
+            # or by being a non-callable bound signal. We treat anything with a
+            # connect() method that is not a plain function as a signal.
+            if hasattr(member, "connect") and not inspect.isfunction(member):
+                signals.append(attr)
+            else:
+                methods.append(attr)
+        elif hasattr(member, "connect"):
+            signals.append(attr)
+
+    return {
+        "name": name,
+        "found": True,
+        "type": type(target).__name__,
+        "methods": sorted(methods),
+        "signals": sorted(signals),
+    }
+
+
+def static_analyze(pattern: str, path: str = "src") -> list[dict[str, Any]]:
+    """Safe grep over the repo, respecting ``.gitignore`` via pathspec.
+
+    Returns a list of ``{"file", "line", "text"}`` dicts. Uses ``pathspec`` when
+    available (matching the project's gitignore semantics); otherwise falls back
+    to skipping ``.git`` and common junk directories.
+    """
+    _log_call("static_analyze")
+    root = _REPO_ROOT / path
+    if not root.exists():
+        return []
+
+    try:
+        compiled = re.compile(pattern)
+    except re.error as exc:
+        return [{"error": f"invalid_pattern: {exc}"}]
+
+    spec = _load_gitignore(root)
+
+    matches: list[dict[str, Any]] = []
+    try:
+        for file_path in _walk(root):
+            rel = file_path.relative_to(_REPO_ROOT)
+            if spec is not None and spec.match_file(str(rel)):
+                continue
+            try:
+                with file_path.open("r", encoding="utf-8", errors="ignore") as fh:
+                    for lineno, line in enumerate(fh, start=1):
+                        if compiled.search(line):
+                            matches.append(
+                                {
+                                    "file": str(rel).replace(os.sep, "/"),
+                                    "line": lineno,
+                                    "text": line.rstrip("\n"),
+                                }
+                            )
+            except (OSError, UnicodeDecodeError):
+                continue
+    except Exception as exc:  # noqa: BLE001
+        return [{"error": str(exc)}]
+
+    return matches
+
+
+def _load_gitignore(root: Path) -> Any | None:  # noqa: ARG001
+    """Build a pathspec matcher from the repo .gitignore, if present."""
+    gitignore = _REPO_ROOT / ".gitignore"
+    if not gitignore.exists():
+        return None
+    try:
+        import pathspec  # type: ignore[import-not-found]
+
+        patterns = [
+            line.strip()
+            for line in gitignore.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    except Exception:  # noqa: BLE001 - pathspec may be absent; degrade gracefully
+        return None
+
+
+def _walk(root: Path) -> Any:
+    """Yield files under root, skipping .git and obvious junk dirs."""
+    skip_dirs = {".git", "__pycache__", ".venv", "venv", "node_modules", "build", "dist"}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        for fname in filenames:
+            yield Path(dirpath) / fname
+
+
+# ---------------------------------------------------------------------------
+# Async job dispatch (fire-and-forget via BackgroundTaskRunner)
+# ---------------------------------------------------------------------------
+def run_async_job(func: Callable[..., Any], *args: Any, **kwargs: Any) -> str:
+    """Dispatch ``func`` on a background thread, returning a job_id.
+
+    ``BackgroundTaskRunner.run`` is fire-and-forget (returns None), so we keep
+    our own result buffer keyed by ``job_id``. Use :func:`get_job` to poll.
+    """
+    _log_call("run_async_job")
+    job_id = uuid.uuid4().hex
+    _JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+        "result": None,
+        "error": None,
+    }
+
+    def _wrapper() -> None:
+        try:
+            result = func(*args, **kwargs)
+            _JOBS[job_id]["result"] = result
+            _JOBS[job_id]["status"] = "done"
+        except Exception as exc:  # noqa: BLE001
+            _JOBS[job_id]["error"] = str(exc)
+            _JOBS[job_id]["status"] = "error"
+
+    try:
+        controller = _controller_or_none()
+        if controller is not None and hasattr(controller, "task_runner"):
+            controller.task_runner.run(_wrapper)  # type: ignore[arg-type]
+        else:
+            # Fallback: run in a plain daemon thread if no controller.
+            threading.Thread(target=_wrapper, daemon=True).start()
+    except Exception as exc:  # noqa: BLE001
+        _JOBS[job_id]["error"] = str(exc)
+        _JOBS[job_id]["status"] = "error"
+
+    return job_id
+
+
+def get_job(job_id: str) -> dict[str, Any] | None:
+    """Return the job buffer for ``job_id`` (or None if unknown)."""
+    _log_call("get_job")
+    return _JOBS.get(job_id)
+
+
+# ---------------------------------------------------------------------------
+# Destructive operations — only delegate to real, safe public APIs
+# ---------------------------------------------------------------------------
+def delete_skill(skill_id: str) -> dict[str, Any]:
+    """Delete a skill by name or local_path.
+
+    Resolves ``skill_id`` to a ``local_path`` via the library model, then calls
+    the real public ``OpsController.deleteSkill(path)``. Raises ``ValueError``
+    if the skill cannot be resolved (we never guess/invent a path).
+    """
+    _log_call("delete_skill")
+    controller = _controller_or_none()
+    if controller is None:
+        raise RuntimeError("AppController unavailable; cannot delete skill.")
+
+    model = controller._library_model  # noqa: SLF001
+    skills: list[Any] = getattr(model, "_all_skills", []) or []
+
+    resolved: str | None = None
+    for skill in skills:
+        name = getattr(skill, "name", "")
+        path = getattr(skill, "local_path", "")
+        if skill_id in (name, path) or skill_id == path:
+            resolved = path
+            break
+
+    if not resolved:
+        raise ValueError(
+            f"Skill id {skill_id!r} did not resolve to a known local_path; "
+            "refusing to guess a deletion target."
+        )
+
+    ops = getattr(controller, "ops", None)
+    if ops is None or not hasattr(ops, "deleteSkill"):
+        raise NotImplementedError("OpsController.deleteSkill is not available in this build.")
+
+    ops.deleteSkill(resolved)  # type: ignore[attr-defined]
+    return {
+        "deleted": True,
+        "skill_id": skill_id,
+        "resolved_path": resolved,
+        "message": f"Dispatched deletion for {resolved}",
+    }
+
+
+def deploy(skill_id: str, target: str) -> dict[str, Any]:  # noqa: ARG001
+    """Deploy a skill/package to a target.
+
+    NOT IMPLEMENTED: there is no deploy API anywhere in the codebase. We raise
+    rather than invent a destructive operation.
+    """
+    _log_call("deploy")
+    raise NotImplementedError(
+        "deploy() is not supported: no deploy API exists in SkillManager. "
+        "Implement an explicit OpsController/UpdateController deploy method "
+        "before wiring this tool."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Subprocess-based dev tools (lint / test / build)
+# ---------------------------------------------------------------------------
+def _run_subprocess(cmd: list[str], cwd: Path | None = None) -> dict[str, Any]:
+    """Run a command, returning a structured result. Never raises."""
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        return {
+            "returncode": proc.returncode,
+            "stdout": proc.stdout or "",
+            "stderr": proc.stderr or "",
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "returncode": -1,
+            "stdout": exc.stdout if isinstance(exc.stdout, str) else "",
+            "stderr": f"timeout after {exc.timeout}s",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"returncode": -1, "stdout": "", "stderr": str(exc)}
+
+
+def run_lint(path: str = "src", fix: bool = False) -> dict[str, Any]:
+    """Run ``uv run ruff`` over the given path."""
+    _log_call("run_lint")
+    cmd = ["uv", "run", "ruff", "check"]
+    if fix:
+        cmd.append("--fix")
+    cmd.append(path)
+    result = _run_subprocess(cmd, cwd=_REPO_ROOT)
+    result["passed"] = result["returncode"] == 0
+    return result
+
+
+def run_tests(target: str = "", parallel: bool = True) -> dict[str, Any]:
+    """Run pytest, optionally scoped to a single file/node id."""
+    _log_call("run_tests")
+    cmd = ["uv", "run", "pytest"]
+    if parallel:
+        cmd += ["-n", "auto"]
+    if target:
+        cmd.append(target)
+    result = _run_subprocess(cmd, cwd=_REPO_ROOT)
+    result["passed"] = result["returncode"] == 0
+    return result
+
+
+def run_build(target: str = "") -> dict[str, Any]:
+    """Run the application build."""
+    _log_call("run_build")
+    cmd = ["uv", "run", "skill-manager-build"]
+    if target:
+        cmd.append(target)
+    result = _run_subprocess(cmd, cwd=_REPO_ROOT)
+    result["success"] = result["returncode"] == 0
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Cross-process window capture + navigation (sm_screenshot)
+# ---------------------------------------------------------------------------
+class _BITMAPINFOHEADER(ctypes.Structure):  # noqa: N801 - Win32 struct name
+    """Minimal BITMAPINFOHEADER for GetDIBits capture."""
+
+    _fields_ = [
+        ("biSize", ctypes.c_uint32),
+        ("biWidth", ctypes.c_int32),
+        ("biHeight", ctypes.c_int32),
+        ("biPlanes", ctypes.c_uint16),
+        ("biBitCount", ctypes.c_uint16),
+        ("biCompression", ctypes.c_uint32),
+        ("biSizeImage", ctypes.c_uint32),
+        ("biXPelsPerMeter", ctypes.c_int32),
+        ("biYPelsPerMeter", ctypes.c_int32),
+        ("biClrUsed", ctypes.c_uint32),
+        ("biClrImportant", ctypes.c_uint32),
+    ]
+
+
+def _enum_top_level_windows() -> list[int]:
+    hwnds: list[int] = []
+    try:
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        enum_proc = ctypes.WINFUNCTYPE(  # type: ignore[attr-defined]
+            ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p
+        )
+
+        def _callback(hwnd: int, _lparam: int) -> bool:
+            hwnds.append(hwnd)
+            return True
+
+        user32.EnumWindows(enum_proc(_callback), 0)
+    except Exception:  # noqa: BLE001 - never crash the bridge
+        return []
+    return hwnds
+
+
+def _get_window_title(hwnd: int) -> str:
+    try:
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length <= 0:
+            return ""
+        buf = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buf, length + 1)
+        return buf.value or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _get_window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    try:
+        from skill_manager.utils.win32 import RECT
+
+        rect = RECT()
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            return None
+        return (rect.left, rect.top, rect.right, rect.bottom)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _find_skill_manager_window() -> int | None:
+    try:
+        for hwnd in _enum_top_level_windows():
+            title = _get_window_title(hwnd)
+            if title and title.lower().startswith(_WINDOW_TITLE_PREFIX):
+                return hwnd
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def _capture_window_to_image(hwnd: int, width: int, height: int) -> Any | None:
+    try:
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        gdi32 = ctypes.windll.gdi32  # type: ignore[attr-defined]
+
+        hwnd_dc = user32.GetWindowDC(hwnd)
+        if not hwnd_dc:
+            return None
+        mfc_dc = gdi32.CreateCompatibleDC(hwnd_dc)
+        if not mfc_dc:
+            user32.ReleaseDC(hwnd, hwnd_dc)
+            return None
+        bitmap = gdi32.CreateCompatibleBitmap(hwnd_dc, width, height)
+        if not bitmap:
+            gdi32.DeleteDC(mfc_dc)
+            user32.ReleaseDC(hwnd, hwnd_dc)
+            return None
+        gdi32.SelectObject(mfc_dc, bitmap)
+
+        pw_render_full_content = 0x00000002
+        src_copy = 0x00CC0020
+        if not user32.PrintWindow(hwnd, mfc_dc, pw_render_full_content):
+            gdi32.BitBlt(mfc_dc, 0, 0, width, height, hwnd_dc, 0, 0, src_copy)
+
+        bmi = _BITMAPINFOHEADER()
+        bmi.biSize = ctypes.sizeof(_BITMAPINFOHEADER)
+        bmi.biWidth = width
+        bmi.biHeight = -height  # top-down
+        bmi.biPlanes = 1
+        bmi.biBitCount = 32
+        bmi.biCompression = 0  # BI_RGB
+
+        buf_size = width * height * 4
+        buf = ctypes.create_string_buffer(buf_size)
+        gdi32.GetDIBits(mfc_dc, bitmap, 0, height, buf, ctypes.byref(bmi), 0)
+
+        from PIL import Image  # type: ignore[import-not-found]
+
+        image = Image.frombytes("RGBA", (width, height), buf.raw)
+        image = image.convert("RGB")
+
+        gdi32.DeleteObject(bitmap)
+        gdi32.DeleteDC(mfc_dc)
+        user32.ReleaseDC(hwnd, hwnd_dc)
+        return image
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _pil_image_to_base64(image: Any) -> str | None:
+    try:
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def capture_app_window() -> tuple[str | None, int, int]:
+    """Capture the live SkillManager GUI window cross-process via Win32.
+
+    Enumerates top-level windows, matches the title prefix "Skill Manager",
+    captures it with PrintWindow (fallback BitBlt), and returns
+    ``(base64_png, width, height)``. Returns ``(None, 0, 0)`` when no
+    matching window exists or capture fails, so the tool can report ok:false.
+    """
+    _log_call("capture_app_window")
+    try:
+        hwnd = _find_skill_manager_window()
+        if hwnd is None:
+            return (None, 0, 0)
+        rect = _get_window_rect(hwnd)
+        if rect is None:
+            return (None, 0, 0)
+        left, top, right, bottom = rect
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        image = _capture_window_to_image(hwnd, width, height)
+        if image is None:
+            return (None, 0, 0)
+        b64 = _pil_image_to_base64(image)
+        if b64 is None:
+            return (None, 0, 0)
+        return (b64, width, height)
+    except Exception:  # noqa: BLE001
+        return (None, 0, 0)
+
+
+def _wait_for_ack(cmd_id: str, acks_dir: Path, timeout: float) -> dict[str, Any]:
+    ack_path = acks_dir / f"{cmd_id}.json"
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if ack_path.exists():
+            try:
+                return json.loads(ack_path.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                return {"ok": False, "error": "invalid ack payload"}
+        time.sleep(0.02)
+    return {"ok": False}
+
+
+def send_navigation_command(view: str, timeout: float = 1.0) -> dict[str, Any]:
+    """Write a navigate command for the live GUI and poll for its ack.
+
+    Best-effort and non-fatal: writes ``data/mcp/commands/<id>.json`` with
+    ``{action:"navigate", view, id}`` and waits up to ``timeout`` seconds for
+    ``data/mcp/acks/<id>.json``. Returns the ack dict, or ``{"ok": False}``
+    on timeout / any error.
+    """
+    _log_call("send_navigation_command")
+    try:
+        commands_dir = MCP_COMMANDS_DIR
+        acks_dir = MCP_ACKS_DIR
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        acks_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd_id = uuid.uuid4().hex
+        command = {"action": "navigate", "view": view, "id": cmd_id}
+        (commands_dir / f"{cmd_id}.json").write_text(json.dumps(command), encoding="utf-8")
+        return _wait_for_ack(cmd_id, acks_dir, timeout)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
+__all__ = [
+    "get_app_controller",
+    "list_skills",
+    "list_sources",
+    "list_projects",
+    "get_diagnostics",
+    "capture_errors",
+    "get_health",
+    "dump_state",
+    "inspect_controller",
+    "static_analyze",
+    "run_async_job",
+    "get_job",
+    "delete_skill",
+    "deploy",
+    "run_lint",
+    "run_tests",
+    "run_build",
+    "capture_app_window",
+    "send_navigation_command",
+]

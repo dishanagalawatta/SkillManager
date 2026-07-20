@@ -5,10 +5,12 @@ Usage: python run.py
 
 import contextlib
 import ctypes
+import json
 import logging
 import os
 import sys
 import threading
+from pathlib import Path
 
 # Suppress all Python warnings (especially loky resource_tracker warnings in child processes)
 os.environ["PYTHONWARNINGS"] = "ignore"
@@ -18,7 +20,15 @@ from typing import Any
 
 import sentry_sdk
 from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
-from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import (  # noqa: E402
+    Property,
+    QFileSystemWatcher,
+    QObject,
+    Qt,
+    QTimer,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, QQmlPropertyMap, qmlRegisterSingletonInstance
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -114,6 +124,95 @@ def _handle_qml_warning(msg):
     """
     msg_str = msg.toString() if hasattr(msg, "toString") else str(msg)
     logger.warning(f"QML Warning: {msg_str}")
+
+
+class CommandChannel(QObject):
+    """File-based IPC channel for cross-process GUI navigation.
+
+    The MCP bridge (headless, offscreen) cannot see or move the real GUI
+    window, so it writes a JSON navigate command into ``data/mcp/commands/``
+    which this channel watches via ``QFileSystemWatcher``. On a command it
+    switches the live view on the Qt thread and writes an acknowledgement
+    into ``data/mcp/acks/<id>.json``. Setup is best-effort: if the
+    watcher or directories cannot be created (headless/CI), it degrades to
+    a no-op rather than crashing ``AppController``.
+    """
+
+    VALID_VIEWS = ("QuickCopy", "Library", "Updates", "Settings")
+
+    def __init__(self, app_controller):
+        super().__init__()
+        self.app = app_controller
+        self._watcher = None
+        self._commands_dir = None
+        self._acks_dir = None
+        self._setup()
+
+    def _setup(self) -> None:
+        try:
+            base = Path(__file__).resolve().parents[2] / "data" / "mcp"
+            commands_dir = base / "commands"
+            acks_dir = base / "acks"
+            commands_dir.mkdir(parents=True, exist_ok=True)
+            acks_dir.mkdir(parents=True, exist_ok=True)
+            self._commands_dir = commands_dir
+            self._acks_dir = acks_dir
+            self._watcher = QFileSystemWatcher()
+            self._watcher.directoryChanged.connect(self._on_directory_changed)
+            self._watcher.addPath(str(commands_dir))
+        except Exception as exc:  # noqa: BLE001 - degrade, never crash
+            logger.warning("CommandChannel disabled (headless/CI?): %s", exc)
+            self._watcher = None
+
+    def _on_directory_changed(self, _path: str) -> None:
+        if self._commands_dir is None:
+            return
+        try:
+            files = sorted(
+                self._commands_dir.glob("*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except Exception:  # noqa: BLE001
+            return
+        if not files:
+            return
+        try:
+            data = json.loads(files[0].read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return
+        self._handle_command(data)
+
+    def _handle_command(self, data: dict) -> None:
+        cmd_id = data.get("id")
+        if data.get("action") != "navigate":
+            self._write_ack(cmd_id, ok=False, error=f"unknown action: {data.get('action')!r}")
+            return
+        view = data.get("view")
+        if view not in self.VALID_VIEWS:
+            self._write_ack(cmd_id, ok=False, error=f"invalid view: {view!r}")
+            return
+        # directoryChanged fires on the Qt thread, so this runs on-thread.
+        self._apply_view(cmd_id, view)
+
+    def _apply_view(self, cmd_id, view) -> None:
+        try:
+            self.app.ui.currentView = view
+        except Exception as exc:  # noqa: BLE001
+            self._write_ack(cmd_id, ok=False, error=str(exc))
+            return
+        self._write_ack(cmd_id, ok=True, view=view)
+
+    def _write_ack(self, cmd_id, ok, error=None, view=None) -> None:
+        if not cmd_id or self._acks_dir is None:
+            return
+        ack = {"ok": ok}
+        if view is not None:
+            ack["view"] = view
+        if error is not None:
+            ack["error"] = error
+        with contextlib.suppress(Exception):
+            (self._acks_dir / f"{cmd_id}.json").write_text(json.dumps(ack), encoding="utf-8")
 
 
 class AppController(QObject):
@@ -236,6 +335,15 @@ class AppController(QObject):
         # assignable to ``AppController`` even though they are the same class.
         # Runtime is unaffected — these are not local re-bindings, just construction.
         self.ui = UIController(self)  # type: ignore[arg-type]
+
+        # Navigation IPC channel for the MCP sm_screenshot tool (file-based).
+        # Guarded: degrades to None if the watcher/dirs cannot be set up
+        # (headless/CI), so it never crashes AppController.
+        try:
+            self.command_channel = CommandChannel(self)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("CommandChannel init failed: %s", exc)
+            self.command_channel = None
         self.config_mgr = ConfigController(self)  # type: ignore[arg-type]
         self.ops = OpsController(self)  # type: ignore[arg-type]
         self.screenshot_provider = ScreenshotImageProvider()
@@ -1437,10 +1545,57 @@ def _bring_existing_window_to_front() -> None:
         ctypes.windll.user32.SetForegroundWindow(hwnd)
 
 
+def _run_mcp_mode() -> None:  # pragma: no cover
+    """Launch the MCP stdio server in headless mode (no GUI, no QML engine).
+
+    Uses a dedicated mutex (``SkillManagerMcpMutex``) so it never collides with
+    a running GUI instance. Constructs a headless ``QGuiApplication`` (offscreen
+    platform when no display is available) and a ``skip_initial_load``
+    ``AppController``, then runs the MCP server over stdio. On exit it cleans up
+    the controller and terminates the process.
+    """
+    allow_write = "--mcp-allow-write" in sys.argv
+
+    # Dedicated mutex — distinct from the GUI's SkillManagerAppMutex so a GUI
+    # instance and an MCP instance can run side by side.
+    global _app_mutex
+    _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerMcpMutex")
+
+    # Force a headless platform when no display is present so construction
+    # works in CI / SSH / service contexts. Set BEFORE QGuiApplication exists.
+    if not os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+    from PySide6.QtGui import QGuiApplication
+
+    app = QGuiApplication(sys.argv)
+    app.setApplicationName("SkillManagerMCP")
+
+    controller = AppController(skip_initial_load=True)
+    app.aboutToQuit.connect(controller.on_quit)
+
+    from skill_manager.mcp import run_mcp_server
+
+    try:
+        run_mcp_server(allow_write=allow_write)
+    finally:
+        controller.cleanup()
+        sys.exit(0)
+
+
 def main():  # pragma: no cover
     import multiprocessing
 
     multiprocessing.freeze_support()
+
+    # ----------------------------------------------------------------------
+    # MCP stdio mode (headless). Runs the MCP server instead of the GUI.
+    # Uses its OWN mutex name so it never conflicts with a running GUI
+    # instance. The GUI launch path below is left completely untouched.
+    # ----------------------------------------------------------------------
+    if "--mcp" in sys.argv:
+        _run_mcp_mode()
+        return
 
     # Initialize Sentry as early as possible
     sentry_sdk.init(

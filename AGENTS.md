@@ -91,6 +91,8 @@
 | Test (single file) | `uv run pytest tests/test_config.py` |
 | All checks | `python scripts/dev_test.py` |
 | Build | `uv run skill-manager-build` |
+| MCP server (read) | `uv run skill-manager --mcp` |
+| MCP server (write) | `uv run skill-manager --mcp --mcp-allow-write` |
 
 ## Cross-references
 
