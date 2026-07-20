@@ -227,6 +227,7 @@ class AppController(QObject):
     projectsChanged = Signal()
     discoveredProjectsChanged = Signal()
     currentProjectChanged = Signal()
+    lastProjectChanged = Signal()
     clientFormatChanged = Signal()
     categoriesChanged = Signal()
     clientFormatsChanged = Signal()
@@ -321,6 +322,10 @@ class AppController(QObject):
 
         # Shared project state (syncs across all project selectors)
         self._current_project_label = ""
+
+        # Second project slot enabling the top-bar cycle button to toggle
+        # back and forth between the two most-recently-used projects.
+        self._last_project_label = self._config.get("last_project_label", "")
 
         # Updates and Syncing State
         self._stats_up_to_date = 0
@@ -559,19 +564,64 @@ class AppController(QObject):
     def currentProject(self, label):
         self.setCurrentProject(label)
 
+    @Property(str, notify=lastProjectChanged)
+    def lastProject(self):
+        return self._last_project_label
+
     @Slot(str)
     def setCurrentProject(self, label):
-        if self._current_project_label != label:
-            # Warn if the label doesn't match any known project.
-            if label and label not in self.config_mgr.projectLabels:
-                logger.warning(
-                    "setCurrentProject: label %r not in projectLabels; "
-                    "filter will show an empty list until a valid project is selected",
-                    label,
-                )
-            self._current_project_label = label
-            self._quick_copy_model.projectFilter = label
-            self.currentProjectChanged.emit()
+        self._set_current_project(label, record_last=True)
+
+    def _set_current_project(self, label, record_last=True):
+        old = self._current_project_label
+        if old == label:
+            return
+        # Only a switch between two valid projects updates the "last" slot,
+        # so the cycle button always toggles between real projects.
+        if (
+            record_last
+            and old
+            and label
+            and old in self.config_mgr.projectLabels
+            and label in self.config_mgr.projectLabels
+            and old != label
+        ):
+            self._set_last_project(old)
+        if label and label not in self.config_mgr.projectLabels:
+            logger.warning(
+                "setCurrentProject: label %r not in projectLabels; "
+                "filter will show an empty list until a valid project is selected",
+                label,
+            )
+        self._current_project_label = label
+        self._quick_copy_model.projectFilter = label
+        self.currentProjectChanged.emit()
+
+    def _set_last_project(self, label):
+        if self._last_project_label == label:
+            return
+        self._last_project_label = label
+        self._config.set("last_project_label", label)
+        self.lastProjectChanged.emit()
+
+    @Slot()
+    def cycleProject(self):
+        """Toggle the current project with the previously-selected one."""
+        last = self._last_project_label
+        if not last:
+            logger.info("cycleProject: no previous project to switch to")
+            return
+        if last not in self.config_mgr.projectLabels:
+            # Stale reference (e.g. project removed) — clear it.
+            self._set_last_project("")
+            return
+        current = self._current_project_label
+        self._last_project_label = current
+        self._config.set("last_project_label", current)
+        self.lastProjectChanged.emit()
+        self._current_project_label = last
+        self._quick_copy_model.projectFilter = last
+        self.currentProjectChanged.emit()
 
     # --- Core Properties ---
 

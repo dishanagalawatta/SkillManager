@@ -44,6 +44,7 @@ The Library is where you manage your source skills.
 The Quick Copy view is designed for daily workflow efficiency when working within a specific project.
 
 - **Project Context**: Use the top dropdown to select the project you are currently working on. The view updates to show only skills installed in that project.
+- **Quick-Switch Button**: The swap icon in the top bar instantly toggles between the currently selected project and the previously selected one. Its tooltip shows the target project. This is handy when you bounce between two projects — click it repeatedly to cycle back and forth. The last project is remembered across app restarts.
 - **One-Click Copy**: Click the "Copy Reference" button next to any skill. This copies a formatted reference (e.g., `@.agents/skills/my-skill/SKILL.md`) directly to your clipboard.
 - **Client Format**: Choose your preferred AI agent format (Antigravity, Gemini CLI, Codex, Plain Text). This changes the syntax used for copying references.
 - **Custom Collections**: Create custom groups of skills for quick batch reference copying.
