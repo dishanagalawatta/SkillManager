@@ -64,6 +64,7 @@ class SkillModel(QAbstractListModel):
     SubCategoryNameRole = Qt.ItemDataRole.UserRole + 24
     IsPackageRole = Qt.ItemDataRole.UserRole + 25
     IsScreenshotRole = Qt.ItemDataRole.UserRole + 26
+    EmojiRole = Qt.ItemDataRole.UserRole + 27
 
     _ALL_ROLES = [
         NameRole,
@@ -92,6 +93,7 @@ class SkillModel(QAbstractListModel):
         SubCategoryNameRole,
         IsPackageRole,
         IsScreenshotRole,
+        EmojiRole,
     ]
 
     filterChanged = Signal()
@@ -227,6 +229,12 @@ class SkillModel(QAbstractListModel):
             return skill.is_package
         if role == self.IsScreenshotRole:
             return skill.is_screenshot
+        if role == self.EmojiRole:
+            if not skill.is_command:
+                return None
+            if self._config is None:
+                return "⚡"
+            return self._config.get_command_emoji(skill.local_path)
 
         return None
 
@@ -258,6 +266,7 @@ class SkillModel(QAbstractListModel):
             self.SubCategoryNameRole: QByteArray(b"subCategoryName"),
             self.IsPackageRole: QByteArray(b"isPackage"),
             self.IsScreenshotRole: QByteArray(b"isScreenshot"),
+            self.EmojiRole: QByteArray(b"emoji"),
         }
 
     # Properties
@@ -1020,6 +1029,19 @@ class SkillModel(QAbstractListModel):
         skill directories without doing a full rescan.
         """
         return [s.local_path for s in self._all_skills if s.local_path]
+
+    @Slot(str)
+    def refresh_emoji_for_path(self, local_path: str) -> None:
+        """Emit ``dataChanged`` for the ``EmojiRole`` of the row matching ``local_path``.
+
+        Used by ``AppController`` after an emoji override is set/cleared so the
+        visible delegate re-reads the new value without a full model reset.
+        """
+        normalized = os.path.normpath(local_path)
+        for i, skill in enumerate(self._filtered_skills):
+            if os.path.normpath(skill.local_path) == normalized:
+                self.dataChanged.emit(self.index(i, 0), self.index(i, 0), [self.EmojiRole])
+                break
 
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]):

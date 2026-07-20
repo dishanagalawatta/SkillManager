@@ -1052,9 +1052,36 @@ class AppController(QObject):
     def notify_command_updated(self, old_path: str, new_path: str) -> None:
         self.commandUpdateCompleted.emit(old_path, new_path)
 
-    @Slot(str, str, list, str)
-    def createCustomCommand(self, n, b, pl, cat):
-        self.ops.createCustomCommand(n, b, pl, cat)
+    @Slot(str, str, list, str, result=str)
+    def createCustomCommand(self, n, b, pl, cat) -> str:
+        return self.ops.createCustomCommand(n, b, pl, cat)
+
+    @Slot(str, result=str)
+    def getCommandEmoji(self, path: str) -> str:
+        return self._config.get_command_emoji(path)
+
+    @Slot(str, str)
+    def setCommandEmoji(self, path: str, emoji: str) -> None:
+        if emoji in ("", "⚡"):
+            self._config.clear_command_emoji(path)
+        else:
+            self._config.set_command_emoji(path, emoji)
+        self.skillModel.refresh_emoji_for_path(path)
+        logger.info("Command emoji set for %s", path)
+
+    @Slot(str)
+    def clearCommandEmoji(self, path: str) -> None:
+        self._config.clear_command_emoji(path)
+        self.skillModel.refresh_emoji_for_path(path)
+        logger.info("Command emoji cleared for %s", path)
+
+    @Slot(result=list)
+    def getEmojiRecents(self) -> list[str]:
+        return self._config.get_emoji_recents()
+
+    @Slot(str)
+    def addEmojiRecent(self, emoji: str) -> None:
+        self._config.add_emoji_recent(emoji)
 
     @Slot(str, result=list)
     def commandProjectsForPath(self, lp):

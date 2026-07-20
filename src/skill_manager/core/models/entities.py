@@ -31,6 +31,7 @@ class Skill:
     client: str = ""
     main_category: str = "⚙️ System & Workflow"
     tags: list[str] = field(default_factory=list)
+    emoji: str | None = None
 
     # UI/Sorting flags (consumed by the model layer's sort/group logic)
     section_name: str | None = None
@@ -97,6 +98,7 @@ class Skill:
             client=data.get("client", ""),
             main_category=data.get("main_category", "⚙️ System & Workflow"),
             tags=data.get("tags", []),
+            emoji=data.get("emoji"),
         )
 
     @classmethod
@@ -135,6 +137,7 @@ class Skill:
             client=data.get("client", ""),
             main_category=data.get("main_category", "⚙️ System & Workflow"),
             tags=data.get("tags", []),
+            emoji=data.get("emoji"),
         )
 
 

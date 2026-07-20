@@ -30,6 +30,7 @@ DiagnosticsPane 1.0 views/DiagnosticsPane.qml
 KeySequenceCapture 1.0 KeySequenceCapture.qml
 
 CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml
+EmojiPicker 1.0 EmojiPicker.qml
 SourceEditDialog 1.0 dialogs/SourceEditDialog.qml
 ProjectRenameDialog 1.0 dialogs/ProjectRenameDialog.qml
 FolderPickerNative 1.0 dialogs/FolderPickerNative.qml

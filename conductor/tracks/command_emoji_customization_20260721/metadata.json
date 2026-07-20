@@ -1,0 +1,6 @@
+{
+  "name": "command_emoji_customization",
+  "created": "2026-07-21",
+  "status": "done",
+  "description": "Let users customize the emoji shown for commands via the Create/Edit Custom Command dialog. Override stored in config.json keyed by command path; never writes the command source file. Built-in QML emoji picker (no new dependency)."
+}
