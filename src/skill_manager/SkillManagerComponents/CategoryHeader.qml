@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import App 1.0
 
-Item {
+FocusScope {
     id: root
     width: parent.width
 
@@ -12,11 +12,21 @@ Item {
 
     height: 44 // Fixed height for main header
     visible: mainCatName !== ""
+    activeFocusOnTab: true
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+            event.accepted = true
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
-        color: headerHover.hovered ? Theme.glassHover : "transparent"
+        color: root.visualFocus ? Theme.glassActive : (headerHover.hovered ? Theme.glassHover : "transparent")
         radius: Theme.radiusSmall
+        border.color: root.visualFocus ? Theme.accent : "transparent"
+        border.width: root.visualFocus ? 2 : 0
         anchors.margins: 2
     }
 
@@ -108,6 +118,7 @@ Item {
 
     SleekToolTip {
         id: headerToolTip
+        visible: headerHover.hovered || root.visualFocus
         text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
     }
 
