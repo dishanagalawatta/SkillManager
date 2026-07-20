@@ -18,6 +18,8 @@ Item {
         if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
             event.accepted = true
+        } else {
+            event.accepted = false
         }
     }
 
@@ -40,8 +42,6 @@ Item {
             source: root.isMainCollapsed ?
                     AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
                     AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
-            width: 14
-            height: 14
             Layout.preferredWidth: 14
             Layout.preferredHeight: 14
             Layout.alignment: Qt.AlignVCenter
@@ -60,7 +60,7 @@ Item {
                 let parts = root.mainCatName.split(" ");
                 return parts.length > 0 ? parts[0] : "";
             }
-            font.pixelSize: 20
+            font.pixelSize: Theme.sizeSectionTitle
             opacity: root.isMainCollapsed ? 0.7 : 1.0
             Layout.alignment: Qt.AlignVCenter
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -68,8 +68,8 @@ Item {
 
         Item {
             visible: root.mainCatName === "Special"
-            width: 20
-            height: 20
+            Layout.preferredWidth: 20
+            Layout.preferredHeight: 20
             Layout.alignment: Qt.AlignVCenter
             
             Image {
@@ -87,7 +87,7 @@ Item {
             ColorOverlay {
                 anchors.fill: starIcon
                 source: starIcon
-                color: "#FFD700"
+                color: Theme.accent
             }
         }
 
@@ -100,9 +100,9 @@ Item {
                 return spaceIdx !== -1 ? root.mainCatName.substring(spaceIdx + 1) : root.mainCatName;
             }
             font.family: Theme.fontFamily
-            font.pixelSize: 14
+            font.pixelSize: Theme.sizeBody
             font.weight: Font.Bold
-            color: root.mainCatName === "Special" ? "#FFD700" : Theme.label
+            color: root.mainCatName === "Special" ? Theme.accent : Theme.label
             opacity: 0.9
         }
     }
