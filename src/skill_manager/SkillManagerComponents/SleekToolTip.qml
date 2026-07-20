@@ -14,13 +14,25 @@ ToolTip {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }
 
+    // Keyboard focus handler so the tooltip also surfaces for keyboard-only users.
+    FocusHandler {
+        id: focusHandler
+        parent: control.parent
+    }
+
     Timer {
         id: delayTimer
         interval: control.delay
-        running: typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered
+        running: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered)
+                 || (typeof focusHandler !== "undefined" && focusHandler !== null && focusHandler.activeFocus)
     }
 
-    visible: typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered && control.text !== "" && !delayTimer.running
+    visible: control.text !== ""
+             && !delayTimer.running
+             && (
+                 (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered)
+                 || (typeof focusHandler !== "undefined" && focusHandler !== null && focusHandler.activeFocus)
+             )
 
     x: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered ? hoverHandler.point.position.x : 0) + 15
     y: (typeof hoverHandler !== "undefined" && hoverHandler !== null && hoverHandler.hovered ? hoverHandler.point.position.y : 0) + 15
