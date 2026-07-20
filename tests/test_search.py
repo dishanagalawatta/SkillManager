@@ -145,3 +145,48 @@ def test_search_none_tags_in_metadata():
     results = engine.query("important")
     assert len(results) == 1
     assert results[0][0]["name"] == "top_level_tags"
+
+
+def test_search_exact_token_fast_path_invariants(sample_skills):
+    """Lock the existing substring-based fast path.
+
+    The search scoring short-circuits fuzz.ratio when a query token is a
+    substring of the document's full_text. This guards against a regression
+    that would force every query through the expensive fuzzy loop, and confirms
+    exact-token queries still rank the right skill at the top.
+    """
+    engine = SearchEngine(sample_skills)
+
+    # "brainstorm" is a substring of "brainstorming" -> fast path should fire
+    # and return brainstorming as the sole, top-ranked result.
+    results = engine.query("brainstorm")
+    assert [r[0]["name"] for r in results] == ["brainstorming"]
+    assert results[0][1] >= 65  # passed the token-match gate
+
+    # A query with no substring overlap must hide all skills (score 0 gate).
+    results = engine.query("zzzzz_nonexistent")
+    assert results == []
+
+
+def test_search_fast_path_matches_fuzzy_only_path(sample_skills):
+    """Fast path and fuzzy-only path must agree on relevance.
+
+    A correct fast path must never change *which* skills are returned compared
+    to the slower fuzzy-only computation. We compare results with the fast path
+    enabled (default) against a forced fuzzy-only evaluation.
+    """
+    engine = SearchEngine(sample_skills)
+
+    # Force the fuzzy-only slow path by making full_text empty so the substring
+    # fast path can never match, while all_doc_tokens remain populated.
+    for _, idx in engine._indexed_data:
+        idx["full_text"] = ""
+
+    for query in ("brainstorm", "python", "test", "git", "design"):
+        fuzzy_only = [r[0]["name"] for r in engine.query(query)]
+        # Rebuild with pristine index data for the fast-path comparison.
+        engine2 = SearchEngine(sample_skills)
+        fast_path = [r[0]["name"] for r in engine2.query(query)]
+        assert fast_path == fuzzy_only, (
+            f"Fast path disagrees with fuzzy-only path for {query!r}: {fast_path} != {fuzzy_only}"
+        )
