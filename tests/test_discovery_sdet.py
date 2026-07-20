@@ -33,7 +33,7 @@ def controller(mock_app):
 class TestDiscoveryControllerSDET:
     def test_load_initial_data_triggers_task(self, controller, mock_app):
         controller.loadInitialData()
-        mock_app.task_runner.run.assert_called_once()
+        assert mock_app.task_runner.run.call_count == 2
 
     @patch("skill_manager.controllers.discovery_controller.DiscoveryService")
     def test_discover_all_background_success(self, mock_service_class, controller, mock_app):

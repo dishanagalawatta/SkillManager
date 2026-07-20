@@ -716,11 +716,7 @@ class OpsController(BaseController):
                 )
                 logger.info("[CARRY CREATE] Found missing skills: %s", missing)
                 if missing:
-                    from dataclasses import asdict
-
-                    missing_dicts = [
-                        asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing
-                    ]
+                    missing_dicts = list(missing)
                     QTimer.singleShot(
                         0,
                         self,
@@ -975,11 +971,7 @@ class OpsController(BaseController):
                     )
                     logger.info("[CARRY UPDATE] Found missing skills: %s", missing)
                     if missing:
-                        from dataclasses import asdict
-
-                        missing_dicts = [
-                            asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing
-                        ]
+                        missing_dicts = list(missing)
                         QTimer.singleShot(
                             0,
                             self,
@@ -1541,7 +1533,7 @@ class OpsController(BaseController):
                 quick_doc = text_edit.property("textDocument")
         if quick_doc is None and hasattr(text_edit, "textDocument"):
             with contextlib.suppress(RuntimeError):
-                quick_doc = text_edit.textDocument()
+                quick_doc = getattr(text_edit, "textDocument", lambda: None)()
 
         if quick_doc is None:
             logger.warning("applySkillHighlights: textDocument() returned None")
@@ -1586,7 +1578,7 @@ class OpsController(BaseController):
                 quick_doc = text_edit.property("textDocument")
         if quick_doc is None and hasattr(text_edit, "textDocument"):
             with contextlib.suppress(RuntimeError):
-                quick_doc = text_edit.textDocument()
+                quick_doc = getattr(text_edit, "textDocument", lambda: None)()
 
         if quick_doc is None:
             return

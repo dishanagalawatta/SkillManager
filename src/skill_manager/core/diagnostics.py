@@ -89,6 +89,7 @@ CATEGORY_REFRESH_CANCELLED = "refresh_cancelled"
 CATEGORY_REFRESH_COMMITTED = "refresh_committed"
 CATEGORY_REFRESH_BACKGROUND_START = "refresh_background_start"
 CATEGORY_CACHE_REBUILD_ASYNC = "cache_rebuild_async"
+CATEGORY_STARTUP_CACHE_PREVIEW = "startup_cache_preview"
 
 # ---------------------------------------------------------------------------
 # Helpers
