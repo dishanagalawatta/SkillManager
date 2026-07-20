@@ -5,6 +5,7 @@ Usage: Accessed via AppController.ui
 
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -308,11 +309,24 @@ class UIController(BaseController):
 
     @Slot(str)
     def openPath(self, path: str):
-        """Opens a file or folder using system default application."""
+        """Opens a file or folder using the system default application.
+
+        SECURITY: system open commands on macOS/Linux are susceptible to
+        argument injection when the path begins with a hyphen (e.g. ``--help``
+        or tool-specific flags). We isolate the path as a positional argument:
+        ``open -- <path>`` on macOS and ``./<path>`` prefix on Linux.
+        Windows ``os.startfile`` does not parse a command line and is safe.
+        """
         if not path:
             return
         try:
-            os.startfile(path)
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", "--", path], check=True)
+            else:
+                safe_path = f"./{path}" if path.startswith("-") else path
+                subprocess.run(["xdg-open", safe_path], check=True)
             self.app._set_status(f"Opened: {os.path.basename(path)}")
         except Exception as e:
             self.app._set_status(f"Failed to open {path}: {e}")
