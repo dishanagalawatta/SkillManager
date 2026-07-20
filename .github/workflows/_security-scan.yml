@@ -24,14 +24,27 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      # Audit third-party dependencies only. The project's own package
-      # (`skill-manager`) is editable-installed via `uv sync` but is NOT
-      # published to PyPI, so pip-audit cannot resolve it and would otherwise
-      # fail the entire run with "Dependency not found on PyPI". `--skip-editable`
-      # excludes the self-package from the audit scope. The scan is intentionally
-      # informational (`continue-on-error`): transitive CVEs in build/dev tooling
-      # (e.g. pillow, setuptools) are surfaced in the logs for human review
-      # without red-lighting the release pipeline.
+      # Audit ONLY the runtime/production dependency surface.
+      #
+      # Why not `pip-audit` against the whole venv?
+      #   - The project's own package (`skill-manager`) is editable-installed via
+      #     `uv sync` but is NOT published to PyPI, so auditing the environment
+      #     fails with "Dependency not found on PyPI".
+      #   - The full venv also pulls in dev/build tooling (click, pillow,
+      #     setuptools via pyinstaller / python-semantic-release) that is NEVER
+      #     shipped to end users, producing false-positive production-risk CVEs.
+      #
+      # The canonical uv + pip-audit pattern: export the locked *runtime* requirements
+      # (--no-dev) and audit that file. This scopes the scan to exactly what the
+      # application actually ships. `continue-on-error` remains a safety net, but the
+      # audit is now expected to pass cleanly since no runtime dep carries a known CVE.
+      - name: Export runtime requirements
+        run: uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements-audit.txt
+
       - name: Run pip-audit
-        run: uv run pip-audit --desc --skip-editable --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
+        run: uv run pip-audit --desc -r requirements-audit.txt --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
         continue-on-error: true
+
+      - name: Clean up audit artifacts
+        if: always()
+        run: rm -f requirements-audit.txt
