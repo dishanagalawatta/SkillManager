@@ -36,9 +36,10 @@ ytp
 
 * [ ] Create a mcp to control app so that agent can access the app
   * [X] Screenshots for agents
-* [ ] Custom command emoji change
+* [X] Custom command emoji change
   * [ ] Chnage possitons properly
-* [ ] Switch between latest projects
+* [X] Switch between latest projects
+  * [ ] Change position
 
 ---
 

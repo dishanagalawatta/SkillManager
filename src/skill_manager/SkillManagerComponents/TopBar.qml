@@ -76,6 +76,17 @@ Rectangle {
             Item { Layout.fillWidth: true }
         }
         
+        IconButton {
+            objectName: "cycleProjectButton"
+            buttonSize: 34
+            iconSource: AppController.ui_controller.getAssetUri("ui/swap-projects-icon.svg")
+            tooltipText: AppController.lastProject !== ""
+                ? ("Switch to " + AppController.lastProject)
+                : "No previous project"
+            enabled: AppController.lastProject !== ""
+            onClicked: AppController.cycleProject()
+        }
+
         Rectangle {
             id: statusPill
             objectName: "topStatusPill"

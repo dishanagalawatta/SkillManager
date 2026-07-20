@@ -42,6 +42,7 @@ class AppController(QObject):
     projectsChanged: ClassVar[SignalInstance]
     discoveredProjectsChanged: ClassVar[SignalInstance]
     currentProjectChanged: ClassVar[SignalInstance]
+    lastProjectChanged: ClassVar[SignalInstance]
     clientFormatChanged: ClassVar[SignalInstance]
     categoriesChanged: ClassVar[SignalInstance]
     clientFormatsChanged: ClassVar[SignalInstance]
@@ -102,6 +103,7 @@ class AppController(QObject):
 
     # --- Proxy Properties (QML compat) ---
     currentProject: str
+    lastProject: str
     currentView: str
     windowWidth: int
     windowHeight: int
@@ -178,6 +180,7 @@ class AppController(QObject):
 
     def __init__(self, skip_initial_load: bool = ..., config: Any = ...) -> None: ...
     def setCurrentProject(self, label: str) -> None: ...
+    def cycleProject(self) -> None: ...
     def setDefaultClient(self, f: str) -> None: ...
     def load_initial_data(self) -> None: ...
     def getLogoSource(self, f: str) -> str: ...

@@ -66,6 +66,8 @@ a property on `AppController` and is independently testable.
 | `statusMessage` | `str` | yes | Human-readable status text. |
 | `selectedSkill` | `QVariant` | yes | Currently selected skill entity, or `None`. |
 | `selectedSource` | `QVariant` | yes | Currently selected source. |
+| `currentProject` | `str` | yes | Currently selected project label; drives the Quick Copy filter. |
+| `lastProject` | `str` | yes | Previously selected project label. The top-bar cycle button toggles between this and `currentProject`. Persisted across restarts. |
 
 ## 4. Q_INVOKABLE / Slot Surface (selected)
 
@@ -85,6 +87,8 @@ a property on `AppController` and is independently testable.
 | `updateCustomCommandFull(lp: str, n: str, b: str, cat: str, project_labels: QStringList, on_conflict: str)` | `str` | Update a custom command; rewrites every project copy. |
 | `commandProjectsForPath(local_path: str) → QStringList` | `QStringList` | Returns project labels that hold a copy of the command. |
 | `deleteCustomCommand(command_name: str, project_labels: QStringList)` | `None` | Removes command from all listed projects. |
+| `setCurrentProject(label: str)` | `None` | Set the active project; the prior project is recorded as `lastProject`. |
+| `cycleProject()` | `None` | Swap `currentProject` and `lastProject`. No-op when no previous project exists. |
 
 **Side effect.** `updateCustomCommandFull` and `createCustomCommand` may
 emit `selectedSkillChanged` as a side effect of refreshing the
@@ -109,6 +113,8 @@ and
 | `isLoadingChanged()` | — | `isLoading` property changed. |
 | `projectSynced(projectId, ok)` | `str, bool` | A background sync completed. |
 | `commandSkillsCarryPrompt(cmdJson, projPath, skillsJson)` | `str, str, str` | Commands copied; skills missing in target. Show carry dialog. |
+| `currentProjectChanged()` | — | `currentProject` changed (selection or cycle swap). |
+| `lastProjectChanged()` | — | `lastProject` changed (new previous project recorded or cycle swap). |
 
 **Invariant.** Any mutation that calls `addOrUpdateSkills` (or
 `setSkills`) after changing a skill's data MUST call
