@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -28,10 +29,15 @@ Item {
     Accessible.role: Accessible.ComboBox
     Accessible.name: root.displayText
 
-    Keys.onPressed: function(event) {
+    Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             popup.opened ? popup.close() : popup.open()
             event.accepted = true
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+        } else {
+            event.accepted = false
         }
     }
 
@@ -79,10 +85,10 @@ Item {
 
             Text {
                 Layout.fillWidth: true
-                text: displayText
+                text: root.displayText
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
-                color: selectedValues.length > 0 ? Theme.label : Theme.secondaryLabel
+                color: root.selectedValues.length > 0 ? Theme.label : Theme.secondaryLabel
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
             }
@@ -151,7 +157,7 @@ Item {
                         id: allCheck
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
-                        checkState: allSelected ? Qt.Checked : Qt.Unchecked
+                        checkState: root.allSelected ? Qt.Checked : Qt.Unchecked
                         iconSize: 9
                         onToggled: root.toggleAll(checkState !== Qt.Checked)
                     }
@@ -188,6 +194,7 @@ Item {
                 model: root.model
 
                 delegate: Rectangle {
+                    id: delegateRoot
                     required property string modelData
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
@@ -203,14 +210,14 @@ Item {
                             id: itemCheck
                             Layout.preferredWidth: 20
                             Layout.preferredHeight: 20
-                            checkState: root.selectedValues.indexOf(modelData) >= 0 ? Qt.Checked : Qt.Unchecked
+                            checkState: root.selectedValues.indexOf(delegateRoot.modelData) >= 0 ? Qt.Checked : Qt.Unchecked
                             iconSize: 9
-                            onToggled: root.toggleItem(modelData)
+                            onToggled: root.toggleItem(delegateRoot.modelData)
                         }
 
                         Text {
                             Layout.fillWidth: true
-                            text: modelData
+                            text: delegateRoot.modelData
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             color: Theme.label
