@@ -164,9 +164,6 @@ class SearchEngine:
                 if max_token_match == 0:
                     for qt in query_tokens:
                         for dt in all_doc_tokens:
-                            if qt == dt:
-                                max_token_match = 100
-                                break
                             score = fuzz.ratio(qt, dt)
                             if score > max_token_match:
                                 max_token_match = score
