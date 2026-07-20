@@ -18,10 +18,14 @@ ToolTip {
     // active/visual focus (keyboard-only users). Every focusable Item exposes
     // these properties, so we read them off the parent instead of adding a
     // FocusHandler (which is unavailable on this QtQuick version).
-    readonly property bool keyboardFocused:
-        (typeof control.parent !== "undefined" && control.parent !== null
-         && ("activeFocus" in control.parent)
-         && (control.parent.activeFocus || control.parent.visualFocus))
+    readonly property bool keyboardFocused: {
+        var p = control.parent
+        if (typeof p === "undefined" || p === null)
+            return false
+        if (!("activeFocus" in p))
+            return false
+        return !!(p.activeFocus || p.visualFocus)
+    }
 
     Timer {
         id: delayTimer
