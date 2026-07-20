@@ -44,6 +44,15 @@ Rectangle {
                 Layout.preferredHeight: 32
                 activeFocusOnTab: true
 
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.color: logoItem.activeFocus ? Theme.accent : Theme.glassBorder
+                    border.width: logoItem.activeFocus ? 2 : 1
+                    radius: 4
+                    visible: logoItem.activeFocus
+                }
+
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         root.isCollapsed = !root.isCollapsed
