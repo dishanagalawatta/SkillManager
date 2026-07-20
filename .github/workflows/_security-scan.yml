@@ -24,6 +24,14 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      # Audit third-party dependencies only. The project's own package
+      # (`skill-manager`) is editable-installed via `uv sync` but is NOT
+      # published to PyPI, so pip-audit cannot resolve it and would otherwise
+      # fail the entire run with "Dependency not found on PyPI". `--skip-editable`
+      # excludes the self-package from the audit scope. The scan is intentionally
+      # informational (`continue-on-error`): transitive CVEs in build/dev tooling
+      # (e.g. pillow, setuptools) are surfaced in the logs for human review
+      # without red-lighting the release pipeline.
       - name: Run pip-audit
-        run: uv run pip-audit --desc --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
+        run: uv run pip-audit --desc --skip-editable --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
         continue-on-error: true
