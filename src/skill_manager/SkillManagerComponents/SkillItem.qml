@@ -50,21 +50,30 @@ Item {
                 anchors.rightMargin: 12
                 spacing: 6
 
-                Image {
-                    source: root.isSubCollapsed ?
-                            AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
-                            AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
-                    width: 10
-                    height: 10
-                    Layout.preferredWidth: 10
-                    Layout.preferredHeight: 10
+                Item {
+                    Layout.preferredWidth: 14
+                    Layout.preferredHeight: 14
                     Layout.alignment: Qt.AlignVCenter
-                    sourceSize.width: 40
-                    sourceSize.height: 40
-                    fillMode: Image.PreserveAspectFit
-                    opacity: 0.5
-                    horizontalAlignment: Image.AlignHCenter
-                    verticalAlignment: Image.AlignHCenter
+
+                    Image {
+                        id: expandSubIconImg
+                        source: root.isSubCollapsed ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg")
+                        anchors.fill: parent
+                        sourceSize.width: 40
+                        sourceSize.height: 40
+                        fillMode: Image.PreserveAspectFit
+                        horizontalAlignment: Image.AlignHCenter
+                        verticalAlignment: Image.AlignHCenter
+                        visible: false
+                    }
+
+                    ColorOverlay {
+                        anchors.fill: expandSubIconImg
+                        source: expandSubIconImg
+                        color: Theme.label
+                    }
                 }
                 
                 Text {
@@ -288,20 +297,40 @@ Item {
                         radius: Theme.radiusField
                         color: model && model.isStarred ? Theme.selectedRow : (model && model.isCollection ? Theme.glassActive : (model && model.isCommand ? Theme.glassHover : Theme.glassPill))
                         
+                        Image {
+                            id: starImg
+                            anchors.centerIn: parent
+                            width: root.compactRows ? 14 : 18
+                            height: root.compactRows ? 14 : 18
+                            source: AppController.ui_controller.getAssetUri("ui/star-filled.svg")
+                            sourceSize.width: 32
+                            sourceSize.height: 32
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            visible: model && model.isStarred && root.showStarredIcon
+                        }
+
+                        ColorOverlay {
+                            anchors.fill: starImg
+                            source: starImg
+                            color: "#FFD700"
+                            visible: starImg.visible
+                        }
+
                         Text {
                             anchors.centerIn: parent
                             text: {
                                 if (!model) return ""
-                                if (model.isStarred && root.showStarredIcon) return "★"
                                 if (model.isCollection) return "📦"
                                 if (model.isCommand) return model.emoji || "⚡"
                                 if (model.isScreenshot) return "🖼️"
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily
-                            font.pixelSize: root.compactRows ? ((model && model.isStarred) ? 12 : 14) : ((model && model.isStarred) ? 16 : 18)
+                            font.pixelSize: root.compactRows ? 14 : 18
                             font.weight: Font.Bold
-                            color: (model && (model.isStarred || model.isCommand)) ? Theme.accent : Theme.label
+                            color: (model && model.isCommand) ? Theme.accent : Theme.label
+                            visible: !(model && model.isStarred && root.showStarredIcon)
                         }
                     }
 

@@ -178,7 +178,7 @@ Window {
         width: toolboxRow.implicitWidth + 24
         height: 40
         color: "#2D2D2D"
-        radius: 6
+        radius: height / 2
         border.color: "#444"
 
         Row {

@@ -59,6 +59,10 @@ Dialog {
         open()
     }
 
+    function prefillBody(text) {
+        cmdBodyInput.text = text
+    }
+
     function openForEdit(skill) {
         editMode = true
         editLocalPath = skill.local_path || ""
@@ -142,72 +146,6 @@ Dialog {
             Layout.margins: 24
             spacing: 20
 
-            // Emoji
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
-
-                Text {
-                    text: "Emoji"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeMetadata
-                    color: Theme.secondaryLabel
-                    Layout.preferredWidth: 120
-                }
-
-                Rectangle {
-                    width: 44
-                    height: 44
-                    radius: Theme.radiusField
-                    color: emojiBtnHover.containsMouse ? Theme.glassHover : Theme.glassPill
-                    border.color: emojiBtnHover.containsMouse ? Theme.accent : Theme.glassBorder
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.pendingEmoji
-                        font.pixelSize: 24
-                    }
-
-                    HoverHandler {
-                        id: emojiBtnHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: emojiPicker.open()
-                    }
-                }
-
-                Text {
-                    text: "Tap to change"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeCaption
-                    color: Theme.secondaryLabel
-                    opacity: 0.6
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                    text: "Reset"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeMetadata
-                    font.weight: Font.Medium
-                    color: resetEmojiHover.containsMouse ? Theme.accent : Theme.secondaryLabel
-                    visible: root.pendingEmoji !== "\u26A1"
-
-                    HoverHandler {
-                        id: resetEmojiHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: root.pendingEmoji = "\u26A1"
-                    }
-                }
-            }
-
             // Name and Category
             RowLayout {
                 Layout.fillWidth: true
@@ -216,26 +154,88 @@ Dialog {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
-                    Text { text: "Command Name"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    TextField {
-                        id: cmdNameInput
-                        placeholderText: "e.g. PR Template"
-                        Accessible.role: Accessible.EditableText
-                        Accessible.name: "Command Name"
+                    
+                    RowLayout {
                         Layout.fillWidth: true
-                        selectByMouse: true
-                        font.family: Theme.fontFamily
-                        color: Theme.label
-                        placeholderTextColor: Theme.secondaryLabel
-                        leftPadding: 16
-                        rightPadding: 16
-                        topPadding: 12
-                        bottomPadding: 12
-                        background: Rectangle {
+                        Text { 
+                            text: "Command Name"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeMetadata
+                            color: Theme.secondaryLabel 
+                            Layout.fillWidth: true
+                        }
+                        Text {
+                            text: "Reset Emoji"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                            font.weight: Font.Medium
+                            color: resetEmojiHover.containsMouse ? Theme.accent : Theme.secondaryLabel
+                            visible: root.pendingEmoji !== "\u26A1"
+
+                            HoverHandler {
+                                id: resetEmojiHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                onTapped: root.pendingEmoji = "\u26A1"
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            width: cmdNameInput.implicitHeight
+                            height: cmdNameInput.implicitHeight
                             radius: Theme.radiusField
-                            color: parent.activeFocus ? Theme.glassActive : Theme.glassHover
-                            border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
-                            border.width: parent.activeFocus ? 2 : 1
+                            color: emojiBtnHover.containsMouse ? Theme.glassHover : Theme.glassPill
+                            border.color: emojiBtnHover.containsMouse ? Theme.accent : Theme.glassBorder
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: root.pendingEmoji
+                                font.pixelSize: 20
+                            }
+
+                            HoverHandler {
+                                id: emojiBtnHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                onTapped: emojiPicker.open()
+                            }
+                            
+                            SleekToolTip {
+                                text: "Change Emoji"
+                                visible: emojiBtnHover.containsMouse
+                            }
+                        }
+
+                        TextField {
+                            id: cmdNameInput
+                            placeholderText: "e.g. PR Template"
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: "Command Name"
+                            Layout.fillWidth: true
+                            selectByMouse: true
+                            font.family: Theme.fontFamily
+                            color: Theme.label
+                            placeholderTextColor: Theme.secondaryLabel
+                            leftPadding: 16
+                            rightPadding: 16
+                            topPadding: 12
+                            bottomPadding: 12
+                            background: Rectangle {
+                                radius: Theme.radiusField
+                                color: parent.activeFocus ? Theme.glassActive : Theme.glassHover
+                                border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
+                                border.width: parent.activeFocus ? 2 : 1
+                            }
                         }
                     }
                 }

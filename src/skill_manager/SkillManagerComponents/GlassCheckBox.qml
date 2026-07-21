@@ -9,6 +9,9 @@ Item {
     property string tooltipText: checkState === Qt.Unchecked ? "Select All" : "Clear Selection"
     property int buttonSize: 28
     property int iconSize: 12
+    property color checkedColor: Theme.accent
+    property color checkedHoverColor: Theme.alpha(Theme.accent, 0.8)
+    property color iconColor: "white"
 
     signal toggled()
 
@@ -21,23 +24,26 @@ Item {
     Keys.onReturnPressed: (event) => { control.toggled(); event.accepted = true; }
     Keys.onEnterPressed: (event) => { control.toggled(); event.accepted = true; }
 
+    // If true, the checkbox acts purely as a 'clear' button when checked/partially checked
+    property bool isClearAction: false
+
     Rectangle {
         id: bgRect
         anchors.fill: parent
         radius: width / 2
         
-        // Background color logic: Accent for active states, glass for inactive
         color: {
-            if (control.checkState === Qt.Checked || control.checkState === Qt.PartiallyChecked) {
-                return mouseArea.pressed ? Theme.alpha(Theme.accent, 0.8) : Theme.accent
+            if (control.checkState === Qt.Checked && !control.isClearAction) {
+                return mouseArea.pressed ? control.checkedHoverColor : control.checkedColor
             }
             return mouseArea.pressed ? Theme.glassActive : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
         }
         
         border.color: {
+            if (control.checkState === Qt.PartiallyChecked || (control.isClearAction && control.checkState === Qt.Checked)) return "transparent"
             if (control.activeFocus) return Theme.accent
-            if (control.checkState === Qt.Checked || control.checkState === Qt.PartiallyChecked) {
-                return "transparent"
+            if (control.checkState === Qt.Checked) {
+                return control.checkedColor === "transparent" ? Theme.glassBorder : "transparent"
             }
             return mouseArea.containsMouse ? Theme.accent : Theme.alpha(Theme.label, 0.15)
         }
@@ -67,24 +73,34 @@ Item {
                 sourceSize.height: 32
                 fillMode: Image.PreserveAspectFit
                 smooth: true
-                visible: control.checkState === Qt.Checked
+                visible: control.checkState === Qt.Checked && !control.isClearAction
             }
             
             ColorOverlay {
                 anchors.fill: iconImg
                 source: iconImg
-                color: "white"
-                visible: control.checkState === Qt.Checked
+                color: control.iconColor
+                visible: iconImg.visible
             }
             
-            // Refined minus sign for partially checked
-            Rectangle {
+            Image {
+                id: minusImg
                 anchors.centerIn: parent
-                width: 8
-                height: 2
-                radius: 1
-                color: "white"
-                visible: control.checkState === Qt.PartiallyChecked
+                width: control.buttonSize
+                height: control.buttonSize
+                source: AppController.ui_controller.getAssetUri("ui/close-circle-broken.svg")
+                sourceSize.width: 32
+                sourceSize.height: 32
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                visible: control.checkState === Qt.PartiallyChecked || (control.isClearAction && control.checkState === Qt.Checked)
+            }
+            
+            ColorOverlay {
+                anchors.fill: minusImg
+                source: minusImg
+                color: control.iconColor
+                visible: minusImg.visible
             }
         }
     }

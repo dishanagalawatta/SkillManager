@@ -109,23 +109,7 @@ ScrollView {
             Layout.fillWidth: true
             Layout.bottomMargin: -8
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 4
-                Text {
-                    text: "Keyboard Shortcuts"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeHeading
-                    font.weight: Font.Bold
-                    color: Theme.label
-                }
-                Text {
-                    text: "Manage custom key bindings for actions across the app."
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    color: Theme.secondaryLabel
-                }
-            }
+
 
             ActionButton {
                 Layout.preferredHeight: 36

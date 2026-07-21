@@ -65,22 +65,7 @@ Item {
         spacing: 20
 
         // Header
-        ColumnLayout {
-            spacing: 4
-            Text {
-                text: "Settings"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeHeading
-                font.weight: Font.Bold
-                color: Theme.label
-            }
-            Text {
-                text: "Configure application preferences and appearance."
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                color: Theme.secondaryLabel
-            }
-        }
+
 
         GlassPill {
             Layout.fillWidth: true

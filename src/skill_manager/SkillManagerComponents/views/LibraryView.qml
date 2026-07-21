@@ -13,8 +13,7 @@ Item {
     property bool showCommandInspector: false
 
     function focusSearch() {
-        lv_searchInput.forceActiveFocus()
-        lv_searchInput.selectAll()
+        // Handled globally in TopBar now
     }
     
     function scrollToTop() {
@@ -84,8 +83,6 @@ Item {
 
             Item { Layout.fillWidth: true }
             
-
-
             GlassDropdown {
                 id: lv_categoryDrop
                 model: ["All Categories"].concat(AppController.categories)
@@ -98,13 +95,13 @@ Item {
                     AppController.ui_controller.setViewFilterForView("Library", "category", cat)
                 }
             }
-
             GlassSearchInput {
                 id: lv_searchInput
                 objectName: "librarySearchInput"
                 Layout.preferredWidth: 250
                 onDebouncedTextChanged: (text) => AppController.libraryModel.filterText = text
             }
+
             GlassToggleButton {
                 text: "Show Archived"
                 checked: AppController.libraryModel.showArchived
@@ -148,18 +145,15 @@ Item {
                     role: "ghost"
                     tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
                     onClicked: (mouse) => AppController.libraryModel.toggleAll()
-                    contentItem: Image {
-                        source: AppController.libraryModel.isAllExpanded ?
-                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
-                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
-                        width: 16
-                        height: 16
-                        sourceSize.width: 72
-                        sourceSize.height: 72
-                        fillMode: Image.PreserveAspectFit
-                        opacity: lv_toggleAllBtn.hovered ? 1.0 : 0.7
-                        horizontalAlignment: Image.AlignHCenter
-                        verticalAlignment: Image.AlignVCenter
+                    iconSize: 18
+                    iconSource: AppController.libraryModel.isAllExpanded ?
+                            AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                            AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                    background: Rectangle {
+                        radius: 12
+                        color: lv_toggleAllBtn.hovered ? Theme.glassHover : "transparent"
+                        border.color: Theme.alpha(Theme.label, 0.15)
+                        border.width: 1
                     }
                 }
 
@@ -175,6 +169,7 @@ Item {
                     id: lv_selectCheck
                     Layout.preferredWidth: 24
                     Layout.preferredHeight: 24
+                    isClearAction: true
 
                     checkState: {
                         let count = AppController.libraryModel.visibleSelectedCount;
@@ -216,7 +211,7 @@ Item {
                     }
 
                     Text {
-                        text: AppController.libraryModel.selectedCount === 1 ? "Skill selected" : "Skills selected"
+                        text: "selected"
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.label
@@ -231,15 +226,7 @@ Item {
                     spacing: 8
                     
                     // Always Visible Actions
-                    ActionButton {
-                        id: lv_refreshBtn
-                        buttonHeight: 32
-                        labelText: "Refresh"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
-                        role: "secondary"
-                        tooltipText: "Refresh skill library (detects file changes)"
-                        onClicked: (mouse) => AppController.refreshSkills("manual-button", false)
-                    }
+
 
                     ActionButton {
                         id: lv_addCommandBtn

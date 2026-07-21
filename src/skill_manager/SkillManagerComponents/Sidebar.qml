@@ -130,7 +130,7 @@ Rectangle {
         }
 
         SidebarButton {
-            iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
+            iconSource: AppController.ui_controller.getAssetUri("ui/folder-sync-icon.svg")
             labelText: "Updates"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"

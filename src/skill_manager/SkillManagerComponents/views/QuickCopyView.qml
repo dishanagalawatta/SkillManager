@@ -18,8 +18,7 @@ Item {
     property var editingCollectionProjects: []
 
     function focusSearch() {
-        searchInput.forceActiveFocus()
-        searchInput.selectAll()
+        // Handled globally in TopBar
     }
 
     function scrollToTop() {
@@ -36,11 +35,10 @@ Item {
     }
 
     Component.onCompleted: {
-        // Mode is handled by AppController currentView setter
-        // satisfied test check: searchInput.text = AppController.quickCopyModel.filterText
+        // Mode is handled by AppController currentView
+        // Update top bar search input if needed, handled globally
         var m = AppController.quickCopyModel
         if (m) {
-            searchInput.text = m.filterText
             qcv_skillList.model = m
             qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
         }
@@ -102,44 +100,154 @@ Item {
             Layout.fillWidth: true
             spacing: 20
 
-            ColumnLayout {
-                spacing: 4
-                RowLayout {
-                    spacing: 12
-                    Text {
-                        text: "Quick Copy"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeHeading
-                        font.weight: Font.Bold
-                        color: Theme.label
-                    }
-                }
-                Text {
-                    text: "Select and copy skills to your clipboard instantly."
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.sizeBody
-                    color: Theme.secondaryLabel
-                }
-            }
-
-            Flow {
-                id: headerControls
+            GlassPill {
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                spacing: 12
-                layoutDirection: Qt.RightToLeft
+                implicitHeight: headerControls.implicitHeight + 16
+                radius: 22
 
-                // Fixed Controls Group (Right-most)
                 RowLayout {
-                    id: fixedControls
+                    id: headerControls
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 4
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 8
                     spacing: 12
-                    layoutDirection: Qt.LeftToRight // Keep internal items left-to-right
 
                     // Filter Group
                     RowLayout {
                         spacing: 12
                         
-                        GlassCollectionDropdown {
+                        IconButton {
+                            id: qcv_toggleAllBtn
+                            buttonSize: 24
+                            tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
+                            onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
+                            iconSize: 18
+                            iconSource: AppController.quickCopyModel.isAllExpanded ?
+                                    AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                    AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                            background: Rectangle {
+                                radius: 12
+                                color: qcv_toggleAllBtn.hovered ? Theme.glassHover : "transparent"
+                                border.color: Theme.alpha(Theme.label, 0.15)
+                                border.width: 1
+                            }
+                        }
+
+                        GlassCheckBox {
+                            id: qcv_selectCheck
+                            buttonSize: 24
+                            Layout.alignment: Qt.AlignVCenter
+                            checkedColor: Theme.glassPill
+                            checkedHoverColor: Theme.glassHover
+                            iconColor: Theme.label
+                            isClearAction: true
+                            
+                            checkState: {
+                                let count = AppController.quickCopyModel.visibleSelectedCount;
+                                let total = AppController.quickCopyModel.visibleSelectableCount;
+                                if (count === 0) return Qt.Unchecked;
+                                if (count >= total && total > 0) return Qt.Checked;
+                                return Qt.PartiallyChecked;
+                            }
+
+                            onToggled: {
+                                if (checkState === Qt.Unchecked) {
+                                    AppController.quickCopyModel.selectAll();
+                                } else {
+                                    AppController.quickCopyModel.clearSelection();
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            id: qcv_infoGroup
+                            spacing: 8
+                            visible: AppController.quickCopyModel.selectedCount > 0
+                            
+                            Rectangle {
+                                Layout.preferredWidth: Math.max(24, qcvCountText.implicitWidth + 16)
+                                Layout.preferredHeight: 24
+                                radius: 12
+                                color: Theme.glassPill
+                                border.color: Theme.glassBorder
+                                border.width: 1
+                                Text {
+                                    id: qcvCountText
+                                    anchors.centerIn: parent
+                                    text: AppController.quickCopyModel.selectedCount.toString()
+                                    color: Theme.label
+                                    font.family: Theme.fontFamily
+                                    font.weight: Font.Bold
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            Text {
+                                text: "selected"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                color: Theme.label
+                                font.weight: Font.Medium
+                            }
+                        }
+
+                        IconButton {
+                            id: barDeleteBtn
+                            buttonSize: 32
+                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                            tooltipText: "Delete Selected Skills"
+                            role: "destructive"
+                            flat: true
+                            enabled: AppController.quickCopyModel.selectedCount > 0
+                            onClicked: (mouse) => AppController.ops_controller.deleteSelectedSkills()
+                        }
+
+                        IconButton {
+                            id: barAddCombinedBtn
+                            buttonSize: 32
+                            iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
+                            tooltipText: "Add Selected Skills..."
+                            enabled: AppController.quickCopyModel.selectedCount > 0
+                            onClicked: qcv_addMenu.popup(barAddCombinedBtn, 0, barAddCombinedBtn.height + 4)
+                        }
+
+                        GlassMenu {
+                            id: qcv_addMenu
+                            GlassMenuItem {
+                                text: "Add to Collection"
+                                iconSource: AppController.ui_controller.getAssetUri("ui/collection-icon.svg")
+                                onTriggered: {
+                                    qcv_root.isEditingCollection = true
+                                    qcv_root.editingCollectionName = ""
+                                    qcv_root.editingCollectionProjects = []
+                                }
+                            }
+                            GlassMenuItem {
+                                text: "Add to Agent Command"
+                                iconSource: AppController.ui_controller.getAssetUri("ui/command-icon.svg")
+                                onTriggered: {
+                                    qcv_commandDialog.openWithContext()
+                                    var names = AppController.quickCopyModel.getSelectedNames()
+                                    var refs = ""
+                                    for (var i = 0; i < names.length; i++) {
+                                        refs += "@" + names[i] + "\n"
+                                    }
+                                    qcv_commandDialog.prefillBody(refs)
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+                        
+                        RowLayout {
+                            visible: !qcv_root.isEditingCollection
+                            spacing: 12
+
+                            GlassCollectionDropdown {
                             id: qcv_collectionDrop
                             Layout.preferredWidth: 160
                             onCollectionSelected: (collectionName) => {
@@ -194,6 +302,25 @@ Item {
                                 }
                             }
                         }
+
+                        IconButton {
+                            objectName: "cycleProjectButton"
+                            buttonSize: 32 // matching dropdown height conceptually
+                            iconSource: AppController.ui_controller.getAssetUri("ui/transfer-icon.svg")
+                            tooltipText: AppController.lastProject !== ""
+                                ? ("Switch to " + AppController.lastProject)
+                                : "No previous project"
+                            enabled: AppController.lastProject !== ""
+                            onClicked: AppController.cycleProject()
+                        }
+                    }
+
+                    Rectangle {
+                        width: 1
+                        height: 16
+                        color: Theme.separator
+                        Layout.leftMargin: 4
+                        Layout.rightMargin: 4
                     }
 
                     // Client Format Group
@@ -240,333 +367,136 @@ Item {
                             }
                         }
                     }
-                }
 
-                // Search Group (Flexible, Left-most on first line)
-                GlassSearchInput {
-                    id: searchInput
-                    objectName: "quickCopySearchInput"
-                    // Dynamic width: Fill remaining space on the line, or take full width if too small
-                    readonly property real minSearchWidth: 200
-                    readonly property real fixedWidth: fixedControls.width + headerControls.spacing
-
-                    width: {
-                        let available = headerControls.width - fixedWidth;
-                        return available >= minSearchWidth ? available : headerControls.width;
-                    }
-
-                    onDebouncedTextChanged: (text) => {
-                        AppController.quickCopyModel.filterText = text
-                    }
-                }
-
-            }
-        }
-
-
-
-        // Selection Action Bar
-        Rectangle {
-            id: selectionBar
-            Layout.fillWidth: true
-            Layout.preferredHeight: 48
-            visible: true
-            color: Theme.alpha(Theme.accent, 0.06) // Subtle accent background
-            radius: Theme.radiusCard
-            border.color: Theme.alpha(Theme.accent, 0.19)
-            border.width: 1
-            clip: true
-            
-            RowLayout {
-                id: qcv_selectionLayout
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                anchors.topMargin: 8
-                anchors.bottomMargin: 8
-                spacing: 12
-                // LEFT: Toggle All
-                IconButton {
-                    id: qcv_toggleAllBtn
-                    buttonSize: 24
-                    role: "ghost"
-                    tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
-                    onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
-                    contentItem: Image {
-                        source: AppController.quickCopyModel.isAllExpanded ?
-                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg") :
-                                AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg")
-                        width: 16
-                        height: 16
-                        sourceSize.width: 72
-                        sourceSize.height: 72
-                        fillMode: Image.PreserveAspectFit
-                        opacity: qcv_toggleAllBtn.hovered ? 1.0 : 0.7
-                        horizontalAlignment: Image.AlignHCenter
-                        verticalAlignment: Image.AlignVCenter
-                    }
-                }
-
-                Rectangle {
-                    width: 1
-                    height: 16
-                    color: Theme.separator
-                    Layout.leftMargin: 4
-                    Layout.rightMargin: 4
-                }
-
-                GlassCheckBox {
-                    id: qcv_selectCheck
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
-                    
-                    checkState: {
-                        let count = AppController.quickCopyModel.visibleSelectedCount;
-                        let total = AppController.quickCopyModel.visibleSelectableCount;
-                        if (count === 0) return Qt.Unchecked;
-                        if (count >= total && total > 0) return Qt.Checked;
-                        return Qt.PartiallyChecked;
-                    }
-
-                    onToggled: {
-                        if (checkState === Qt.Unchecked) {
-                            AppController.quickCopyModel.selectAll();
-                        } else {
-                            AppController.quickCopyModel.clearSelection();
-                        }
-                    }
-                }
-
-                // LEFT: Selection Count & Info
-                RowLayout {
-                    id: qcv_infoGroup
-                    spacing: 12
-                    visible: AppController.quickCopyModel.selectedCount > 0
-                    
                     Rectangle {
-                        Layout.preferredWidth: Math.max(24, qcvCountText.implicitWidth + 16)
-                        Layout.preferredHeight: 24
-                        radius: height / 2
-                        color: Theme.accent
-                        Text {
-                            id: qcvCountText
-                            anchors.centerIn: parent
-                            text: AppController.quickCopyModel.selectedCount.toString()
-                            color: "white"
-                            font.family: Theme.fontFamily
-                            font.weight: Font.Bold
-                            font.pixelSize: 11
-                        }
+                        width: 1
+                        height: 16
+                        color: Theme.separator
+                        Layout.leftMargin: 4
+                        Layout.rightMargin: 4
                     }
 
-                    Text {
-                        text: AppController.quickCopyModel.selectedCount === 1 ? "Skill selected" : "Skills selected"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.label
-                        font.weight: Font.Medium
+                    IconButton {
+                        id: barCopyBtn
+                        buttonSize: 32
+                        role: "primary-outline"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
+                        tooltipText: AppController.quickCopyModel.selectedCount > 0 ? ("Copy Selected (" + AppController.quickCopyModel.selectedCount + ")") : "Copy (No selection)"
+                        enabled: AppController.quickCopyModel.selectedCount > 0
+                        opacity: enabled ? 1.0 : 0.5
+                        objectName: "copySelectedBtn"
+                        onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
                     }
-                }
-                
-                Item { Layout.fillWidth: true }
-                
-                // Action Buttons
-                RowLayout {
-                    id: qcv_buttonGroup
-                    spacing: 8
-                    
-                    // Regular Mode Actions
+                        }
+
+                    // Fixed Controls Group (Right-most)
                     RowLayout {
-                        spacing: 8
-                        visible: !qcv_root.isEditingCollection
+                        id: fixedControls
+                        spacing: 12
+                        layoutDirection: Qt.LeftToRight // Keep internal items left-to-right
 
-                        ActionButton {
-                            id: barRefreshBtn
-                            objectName: "quickCopyRefreshBtn"
-                            buttonHeight: 32
-                            labelText: "Refresh"
-                            iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
-                            role: "secondary"
-                            tooltipText: "Refresh skill library (detects file changes)"
-                            onClicked: (mouse) => AppController.refreshSkills("manual-button", false)
-                        }
-
-                        ActionButton {
-                            id: barScreenshotBtn
-                            objectName: "quickCopyScreenshotBtn"
-                            buttonHeight: 32
-                            labelText: "Screenshot"
-                            iconSource: AppController.ui_controller.getAssetUri("ui/screenshot-icon.svg")
-                            role: "secondary"
-                            onClicked: (mouse) => AppController.screenshot_controller.takeScreenshot()
-                        }
-
-                        ActionButton {
-                            id: barAddCommandBtn
-                            buttonHeight: 32
-                            labelText: "Add Command"
-                            iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
-                            role: "secondary"
-                            onClicked: (mouse) => qcv_commandDialog.openWithContext()
-                        }
-
-                        // Selection-specific actions
+                        // Edit Collection Mode
                         RowLayout {
                             spacing: 8
-                            visible: AppController.quickCopyModel.selectedCount > 0
-                            
-                            ActionButton {
-                                id: barAddToColBtn
-                                buttonHeight: 32
-                                labelText: "Add to Collection"
-                                role: "secondary"
-                                onClicked: (mouse) => {
-                                    qcv_root.isEditingCollection = true
-                                    qcv_root.editingCollectionName = ""
+                            visible: qcv_root.isEditingCollection
+
+                            TextField {
+                                id: qcv_colNameField
+                                Layout.preferredHeight: 32
+                                Layout.preferredWidth: 150
+                                placeholderText: "Collection Name"
+                                Accessible.role: Accessible.EditableText
+                                Accessible.name: placeholderText
+                                text: qcv_root.editingCollectionName
+                                color: Theme.label
+                                placeholderTextColor: Theme.secondaryLabel
+                                background: Rectangle {
+                                    radius: Theme.radiusField
+                                    color: Theme.glassPill
+                                    border.color: Theme.glassBorder
                                 }
+                                onTextChanged: qcv_root.editingCollectionName = text
                             }
 
-                            ActionButton {
-                                id: barDeleteBtn
-                                buttonHeight: 32
-                                objectName: "quickCopyDeleteSelectedBtn"
-                                labelText: "Delete"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
-                                role: "destructive"
-                                onClicked: (mouse) => {
-                                    var selectedPaths = AppController.quickCopyModel.getSelectedPaths() || []
-                                    var allProjects = []
-                                    for (var i = 0; i < selectedPaths.length; i++) {
-                                        var path = selectedPaths[i]
-                                        var isCmd = path.endsWith(".md") || path.indexOf("/commands/") >= 0 || path.indexOf("\\commands\\") >= 0
-                                        var holders = isCmd ? (AppController.commandProjectsForPath(path) || []) : (AppController.skillProjectsForPath(path) || [])
-                                        for (var j = 0; j < holders.length; j++) {
-                                            if (allProjects.indexOf(holders[j]) === -1) allProjects.push(holders[j])
-                                        }
-                                    }
-                                    if (allProjects.length === 0 && AppController.currentProject) {
-                                        allProjects.push(AppController.currentProject)
-                                    }
-                                    qcv_cmdDeleteDialog.openBulkSkill(AppController.quickCopyModel.selectedCount, allProjects, selectedPaths, AppController.quickCopyModel.getSelectedNames())
-                                }
+                            GlassMultiSelect {
+                                id: qcv_colProjectSelect
+                                Layout.preferredWidth: 160
+                                Layout.preferredHeight: 32
+                                model: AppController.projectLabels
+                                selectedValues: qcv_root.editingCollectionProjects
+                                placeholderText: "Select projects..."
+                                allLabel: "All Projects"
+                                onSelectionChanged: qcv_root.editingCollectionProjects = selectedValues
                             }
 
-                            Rectangle {
-                                objectName: "quickCopyDestructiveDivider"
-                                width: 1
-                                height: 16
-                                color: Theme.separator
-                                Layout.leftMargin: 4
-                                Layout.rightMargin: 4
-                            }
-
-                            ActionButton {
-                                id: barCopyBtn
-                                buttonHeight: 32
-                                objectName: "copySelectedBtn"
-                                labelText: "Copy"
+                            IconButton {
+                                id: qcv_saveColBtn
+                                buttonSize: 32
+                                iconSize: 12
+                                iconSource: AppController.ui_controller.getAssetUri("ui/check-icon.svg")
                                 role: "primary"
-                                onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
-                            }
-                        }
-                    }
+                                tooltipText: "Save collection"
+                                flat: true
+                                enabled: qcv_root.editingCollectionName !== "" && qcv_root.editingCollectionProjects.length > 0
+                                onClicked: (mouse) => {
+                                    let paths = AppController.quickCopyModel.getSelectedPaths()
+                                    let projects = qcv_colProjectSelect.selectedValues
 
-                    // Edit Collection Mode
-                    RowLayout {
-                        spacing: 8
-                        visible: qcv_root.isEditingCollection
+                                    AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, projects)
 
-                        TextField {
-                            id: qcv_colNameField
-                            Layout.preferredHeight: 32
-                            Layout.preferredWidth: 150
-                            placeholderText: "Collection Name"
-                            Accessible.role: Accessible.EditableText
-                            Accessible.name: placeholderText
-                            text: qcv_root.editingCollectionName
-                            color: Theme.label
-                            placeholderTextColor: Theme.secondaryLabel
-                            background: Rectangle {
-                                radius: Theme.radiusField
-                                color: Theme.glassPill
-                                border.color: Theme.glassBorder
-                            }
-                            onTextChanged: qcv_root.editingCollectionName = text
-                        }
+                                    let missingJson = AppController.config_controller.checkMissingSkills(qcv_root.editingCollectionName)
+                                    let missing = JSON.parse(missingJson)
 
-                        GlassMultiSelect {
-                            id: qcv_colProjectSelect
-                            Layout.preferredWidth: 160
-                            Layout.preferredHeight: 32
-                            model: AppController.projectLabels
-                            selectedValues: qcv_root.editingCollectionProjects
-                            placeholderText: "Select projects..."
-                            allLabel: "All Projects"
-                            onSelectionChanged: qcv_root.editingCollectionProjects = selectedValues
-                        }
-
-                        IconButton {
-                            id: qcv_saveColBtn
-                            buttonSize: 32
-                            iconSize: 12
-                            iconSource: AppController.ui_controller.getAssetUri("ui/check-icon.svg")
-                            role: "primary"
-                            tooltipText: "Save collection"
-                            flat: true
-                            enabled: qcv_root.editingCollectionName !== "" && qcv_root.editingCollectionProjects.length > 0
-                            onClicked: (mouse) => {
-                                let paths = AppController.quickCopyModel.getSelectedPaths()
-                                let projects = qcv_colProjectSelect.selectedValues
-
-                                AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, projects)
-
-                                let missingJson = AppController.config_controller.checkMissingSkills(qcv_root.editingCollectionName)
-                                let missing = JSON.parse(missingJson)
-
-                                let realMissing = {}
-                                for (let k in missing) {
-                                    if (Array.isArray(missing[k]) && missing[k].length > 0) {
-                                        realMissing[k] = missing[k]
-                                    }
-                                }
-
-                                if (Object.keys(realMissing).length > 0) {
-                                    qcv_missingSkillsDialog.currentCallback = function(action, checkedProjects) {
-                                        if (action === "copy") {
-                                            AppController.config_controller.copyMissingSkills(qcv_root.editingCollectionName, checkedProjects)
-                                        } else if (action === "remove_projects") {
-                                            AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, [])
+                                    let realMissing = {}
+                                    for (let k in missing) {
+                                        if (Array.isArray(missing[k]) && missing[k].length > 0) {
+                                            realMissing[k] = missing[k]
                                         }
                                     }
-                                    qcv_missingSkillsDialog.openWithMissing(qcv_root.editingCollectionName, realMissing)
-                                } else {
-                                    AppController.config_controller.setStatus("All skills already present in selected projects")
+
+                                    if (Object.keys(realMissing).length > 0) {
+                                        qcv_missingSkillsDialog.currentCallback = function(action, checkedProjects) {
+                                            if (action === "copy") {
+                                                AppController.config_controller.copyMissingSkills(qcv_root.editingCollectionName, checkedProjects)
+                                            } else if (action === "remove_projects") {
+                                                AppController.config_controller.saveCustomCollection(qcv_root.editingCollectionName, paths, [])
+                                            }
+                                        }
+                                        qcv_missingSkillsDialog.openWithMissing(qcv_root.editingCollectionName, realMissing)
+                                    } else {
+                                        AppController.config_controller.setStatus("All skills already present in selected projects")
+                                    }
+
+                                    qcv_root.isEditingCollection = false
+                                    qcv_root.editingCollectionName = ""
+                                    qcv_root.editingCollectionProjects = []
                                 }
-
-                                qcv_root.isEditingCollection = false
-                                qcv_root.editingCollectionName = ""
-                                qcv_root.editingCollectionProjects = []
                             }
-                        }
 
-                        IconButton {
-                            id: qcv_cancelColBtn
-                            buttonSize: 32
-                            iconSize: 10
-                            iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
-                            role: "destructive"
-                            tooltipText: "Cancel collection editing"
-                            flat: true
-                            onClicked: (mouse) => {
-                                qcv_root.isEditingCollection = false
-                                qcv_root.editingCollectionName = ""
-                                qcv_root.editingCollectionProjects = []
+                            IconButton {
+                                id: qcv_cancelColBtn
+                                buttonSize: 32
+                                iconSize: 10
+                                iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
+                                role: "destructive"
+                                tooltipText: "Cancel collection editing"
+                                flat: true
+                                onClicked: (mouse) => {
+                                    qcv_root.isEditingCollection = false
+                                    qcv_root.editingCollectionName = ""
+                                    qcv_root.editingCollectionProjects = []
+                                }
                             }
                         }
                     }
                 }
-            }
+
+
+
+            } // End of GlassPill
         }
+
+
 
         // Main Content Area
         SplitView {

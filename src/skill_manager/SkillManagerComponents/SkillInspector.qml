@@ -159,25 +159,17 @@ Rectangle {
                 }
                 IconButton {
                     id: starButton
-                    text: (root._sel && root._sel.is_starred) ? "★" : "☆"
+                    iconSource: (root._sel && root._sel.is_starred) 
+                        ? AppController.ui_controller.getAssetUri("ui/star-filled.svg") 
+                        : AppController.ui_controller.getAssetUri("ui/star-outline.svg")
+                    customIconColor: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
+                    iconSize: 22
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     visible: root._sel && root._sel.local_path !== undefined
                     onClicked: (mouse) => AppController.ops_controller.toggleCurrentSkillStarred()
                     tooltipText: (root._sel && root._sel.is_starred) ? "Unstar Skill" : "Star Skill"
-                    
-                    contentItem: Text {
-                        text: starButton.text
-                        font.pixelSize: 22
-                        color: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        opacity: starButton.hovered ? 1.0 : 0.8
-                        
-                        Behavior on color { ColorAnimation { duration: 200 } }
-                        Behavior on opacity { NumberAnimation { duration: 200 } }
-                    }
                     
                     background: Rectangle {
                         color: starButton.hovered ? Theme.glassHover : "transparent"

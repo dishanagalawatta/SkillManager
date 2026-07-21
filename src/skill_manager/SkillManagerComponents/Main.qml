@@ -334,5 +334,65 @@ Window {
                 }
             }
         }
+
+        Rectangle {
+            id: statusToast
+            objectName: "topStatusPill"
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 24
+            implicitWidth: statusTextRow.implicitWidth + 32
+            height: 34
+            radius: Theme.radiusPill
+            color: Theme.alpha(Theme.glassPill, 0.95)
+            border.color: Theme.glassBorder
+            border.width: 1
+            opacity: AppController.statusMessage !== "" ? 1 : 0
+            z: 100
+
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+            Behavior on color { ColorAnimation { duration: 150 } }
+
+            RowLayout {
+                id: statusTextRow
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 8
+
+                Rectangle {
+                    width: 7
+                    height: 7
+                    radius: 4
+                    color: AppController.isLoading ? Theme.selectedRowBorder : Theme.secondaryLabel
+                    opacity: AppController.isLoading ? 1 : 0.75
+                }
+
+                Text {
+                    id: statusText
+                    objectName: "topStatusText"
+                    text: AppController.statusMessage
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            Connections {
+                target: AppController
+                function onStatusMessageChanged() {
+                    statusToast.opacity = 1
+                    statusTimer.restart()
+                }
+            }
+
+            Timer {
+                id: statusTimer
+                interval: 5000
+                onTriggered: statusToast.opacity = 0
+            }
+        }
     }
 }

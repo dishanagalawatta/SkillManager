@@ -146,6 +146,7 @@ Rectangle {
                         color: nameField.activeFocus ? Theme.glassHover : "transparent"
                         border.color: nameField.activeFocus ? Theme.glassBorder : "transparent"
                     }
+                    leftPadding: 0
                     selectByMouse: true
                     readOnly: true
 
