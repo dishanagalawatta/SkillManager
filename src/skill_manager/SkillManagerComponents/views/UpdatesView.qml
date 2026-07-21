@@ -96,10 +96,8 @@ Item {
         // Bulk Action Bar (Redesigned as Pebble Bar)
         GlassPill {
             Layout.fillWidth: true
-            Layout.preferredHeight: 44
-            Layout.leftMargin: 16
-            Layout.rightMargin: 16
-            radius: 22 // Pebble style
+            Layout.preferredHeight: 48
+            radius: 24
             
             RowLayout {
                 anchors.fill: parent

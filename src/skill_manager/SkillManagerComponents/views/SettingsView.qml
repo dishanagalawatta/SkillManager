@@ -70,7 +70,7 @@ Item {
         GlassPill {
             Layout.fillWidth: true
             Layout.preferredHeight: 48
-            radius: Theme.radiusPill
+            radius: 24
 
             RowLayout {
                 anchors.fill: parent
@@ -96,7 +96,7 @@ Item {
                     }
                     background: Rectangle {
                         color: generalTab.checked ? Theme.glassHover : "transparent"
-                        radius: Theme.radiusPill - 4
+                        radius: 20
                     }
                 }
                 TabButton {
@@ -118,7 +118,7 @@ Item {
                     }
                     background: Rectangle {
                         color: shortcutsTab.checked ? Theme.glassHover : "transparent"
-                        radius: Theme.radiusPill - 4
+                        radius: 20
                     }
                 }
                 TabButton {
@@ -140,7 +140,7 @@ Item {
                     }
                     background: Rectangle {
                         color: aboutTab.checked ? Theme.glassHover : "transparent"
-                        radius: Theme.radiusPill - 4
+                        radius: 20
                     }
                 }
             }
