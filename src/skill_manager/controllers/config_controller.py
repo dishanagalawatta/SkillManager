@@ -643,6 +643,9 @@ class ConfigController(BaseController):
             paths = entry["paths"] if isinstance(entry, dict) and "paths" in entry else entry
             self.app.skillModel.clearSelection()
             self.app.skillModel.selectByPaths(paths)  # type: ignore[arg-type]
+            if hasattr(self.app, "_quick_copy_model"):
+                self.app._quick_copy_model.clearSelection()
+                self.app._quick_copy_model.selectByPaths(paths)
             self.app._set_status(f"Applied collection: {name}")
 
     @Slot(str, result=list)

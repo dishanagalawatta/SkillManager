@@ -197,7 +197,8 @@ Item {
 
                         IconButton {
                             id: barDeleteBtn
-                            buttonSize: 32
+                            visible: !qcv_root.isEditingCollection
+                            buttonSize: 28
                             iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                             tooltipText: "Delete Selected Skills"
                             role: "destructive"
@@ -208,18 +209,29 @@ Item {
 
                         IconButton {
                             id: barAddCombinedBtn
-                            buttonSize: 32
+                            visible: !qcv_root.isEditingCollection
+                            buttonSize: 28
                             iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
-                            tooltipText: "Add Selected Skills..."
-                            enabled: AppController.quickCopyModel.selectedCount > 0
+                            tooltipText: AppController.quickCopyModel.selectedCount > 0 ? "Add Selected Skills..." : "Create New..."
                             onClicked: qcv_addMenu.popup(barAddCombinedBtn, 0, barAddCombinedBtn.height + 4)
                         }
 
                         GlassMenu {
                             id: qcv_addMenu
                             GlassMenuItem {
-                                text: "Add to Collection"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/collection-icon.svg")
+                                text: "+ Collection"
+                                opacity: AppController.quickCopyModel.selectedCount > 1 ? 1.0 : 0.4
+                                iconSource: AppController.ui_controller.getAssetUri("ui/notes-minimalistic-bold-duotone.svg")
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: AppController.quickCopyModel.selectedCount <= 1
+                                    hoverEnabled: true
+                                    onClicked: {
+                                        AppController._set_status("Select at least 2 items to create a collection")
+                                    }
+                                }
+
                                 onTriggered: {
                                     qcv_root.isEditingCollection = true
                                     qcv_root.editingCollectionName = ""
@@ -227,8 +239,8 @@ Item {
                                 }
                             }
                             GlassMenuItem {
-                                text: "Add to Agent Command"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/command-icon.svg")
+                                text: "+ Command"
+                                iconSource: AppController.ui_controller.getAssetUri("ui/magic-stick-3-bold-duotone.svg")
                                 onTriggered: {
                                     qcv_commandDialog.openWithContext()
                                     var names = AppController.quickCopyModel.getSelectedNames()
@@ -248,9 +260,9 @@ Item {
                             spacing: 12
 
                             GlassCollectionDropdown {
-                            id: qcv_collectionDrop
-                            Layout.preferredWidth: 160
-                            onCollectionSelected: (collectionName) => {
+                                id: qcv_collectionDrop
+                                Layout.preferredWidth: 180
+                                onCollectionSelected: (collectionName) => {
                                 if (collectionName === "All Collections") {
                                     qcv_root._isInternalSelectionChange = true
                                     AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", "")
@@ -269,14 +281,20 @@ Item {
                                 qcv_root.editingCollectionProjects = AppController.config_controller.getCollectionProjects(collectionName)
                                 qcv_root._isInternalSelectionChange = true
                                 AppController.config_controller.applyCollectionSelection(collectionName)
-                                AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", collectionName)
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", "")
+                                if (qcv_root.editingCollectionProjects.length > 0) {
+                                    AppController.setCurrentProject(qcv_root.editingCollectionProjects[0])
+                                } else {
+                                    AppController.setCurrentProject("All Projects")
+                                }
                                 qcv_root._isInternalSelectionChange = false
                             }
                         }
 
                         GlassDropdown {
                             id: qcv_categoryDrop
-                            Layout.preferredWidth: 130
+                            Layout.preferredWidth: 160
+                            iconSource: "ui/cosmetic-bold-duotone.svg"
                             model: ["All Categories"].concat(AppController.categories)
                             currentIndex: {
                                 let idx = model.indexOf(AppController.quickCopyModel.categoryFilter);
@@ -290,7 +308,8 @@ Item {
 
                         GlassDropdown {
                             id: qcv_projectDrop
-                            Layout.preferredWidth: 150
+                            Layout.preferredWidth: 180
+                            iconSource: "ui/folder-security-bold.svg"
                             model: AppController.projectLabels
                             currentIndex: {
                                 let idx = model.indexOf(AppController.currentProject);
@@ -316,6 +335,7 @@ Item {
                     }
 
                     Rectangle {
+                        visible: !qcv_root.isEditingCollection
                         width: 1
                         height: 16
                         color: Theme.separator
@@ -325,6 +345,7 @@ Item {
 
                     // Client Format Group
                     RowLayout {
+                        visible: !qcv_root.isEditingCollection
                         spacing: 8
                         Repeater {
                             model: AppController.clientFormats
@@ -358,7 +379,7 @@ Item {
                                 }
                                 background: Rectangle {
                                     radius: width / 2
-                                    color: isSelected ? Theme.alpha(Theme.accent, 0.20) : (clientBtn.hovered ? Theme.glassHover : "transparent")
+                                    color: clientBtn.hovered ? Theme.glassHover : "transparent"
                                     border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
                                     border.width: 1
                                 }
@@ -369,6 +390,7 @@ Item {
                     }
 
                     Rectangle {
+                        visible: !qcv_root.isEditingCollection
                         width: 1
                         height: 16
                         color: Theme.separator
@@ -378,6 +400,7 @@ Item {
 
                     IconButton {
                         id: barCopyBtn
+                        visible: !qcv_root.isEditingCollection
                         buttonSize: 32
                         role: "primary-outline"
                         iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
@@ -420,8 +443,9 @@ Item {
 
                             GlassMultiSelect {
                                 id: qcv_colProjectSelect
-                                Layout.preferredWidth: 160
+                                Layout.preferredWidth: 180
                                 Layout.preferredHeight: 32
+                                iconSource: "ui/folder-security-bold.svg"
                                 model: AppController.projectLabels
                                 selectedValues: qcv_root.editingCollectionProjects
                                 placeholderText: "Select projects..."
@@ -431,10 +455,11 @@ Item {
 
                             IconButton {
                                 id: qcv_saveColBtn
-                                buttonSize: 32
-                                iconSize: 12
-                                iconSource: AppController.ui_controller.getAssetUri("ui/check-icon.svg")
-                                role: "primary"
+                                buttonSize: 28
+                                iconSize: 24
+                                iconSource: AppController.ui_controller.getAssetUri("ui/check-circle-bold.svg")
+                                role: "ghost"
+                                customIconColor: Theme.accent
                                 tooltipText: "Save collection"
                                 flat: true
                                 enabled: qcv_root.editingCollectionName !== "" && qcv_root.editingCollectionProjects.length > 0
@@ -475,9 +500,9 @@ Item {
 
                             IconButton {
                                 id: qcv_cancelColBtn
-                                buttonSize: 32
-                                iconSize: 10
-                                iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
+                                buttonSize: 28
+                                iconSize: 24
+                                iconSource: AppController.ui_controller.getAssetUri("ui/close-circle-broken.svg")
                                 role: "destructive"
                                 tooltipText: "Cancel collection editing"
                                 flat: true

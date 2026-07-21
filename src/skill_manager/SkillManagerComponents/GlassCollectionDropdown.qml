@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 ComboBox {
@@ -91,15 +92,41 @@ ComboBox {
         smooth: true
     }
 
-    contentItem: Text {
-        leftPadding: 12
-        rightPadding: control.indicator.width + control.spacing
-        text: control.displayText
-        font.family: Theme.fontFamily
-        font.pixelSize: 13
-        color: Theme.label
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
+    contentItem: RowLayout {
+        spacing: 6
+        Item {
+            width: 14
+            Layout.leftMargin: 12
+            Layout.fillHeight: true
+            Image {
+                id: iconImage
+                source: AppController.ui_controller.getAssetUri("ui/notes-minimalistic-bold-duotone.svg")
+                width: 14
+                height: 14
+                sourceSize.width: 14
+                sourceSize.height: 14
+                anchors.verticalCenter: parent.verticalCenter
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.8
+                visible: false
+            }
+            ColorOverlay {
+                anchors.fill: iconImage
+                source: iconImage
+                color: Theme.accent
+                opacity: 0.8
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            Layout.rightMargin: control.indicator.width + control.spacing
+            text: control.displayText
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            color: Theme.label
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
     }
 
     background: Rectangle {
@@ -115,8 +142,9 @@ ComboBox {
     }
 
     popup: Popup {
+        x: (control.width - width) / 2
         y: control.height + 4
-        width: control.width
+        width: Math.max(control.width, 180)
         padding: 6
         implicitHeight: Math.min(dropdownList.implicitHeight + topPadding + bottomPadding, 250)
 

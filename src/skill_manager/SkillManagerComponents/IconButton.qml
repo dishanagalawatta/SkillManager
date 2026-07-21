@@ -63,7 +63,6 @@ Button {
                 if (control.customIconColor.a > 0) return control.customIconColor
                 if (!control.enabled) return Theme.secondaryLabel
                 if (control.role === "primary") return "white"
-                if (control.role === "primary-outline") return Theme.accent
                 if (control.role === "destructive") return Theme.danger
                 return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
             }
@@ -76,7 +75,7 @@ Button {
         color: {
             if (!control.enabled) return Theme.disabledControl
             if (control.role === "primary") return control.down ? Theme.glassActive : Theme.accent
-            if (control.role === "primary-outline") return control.down ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.accent, 0.1)
+            if (control.role === "primary-outline") return control.down ? Theme.alpha(Theme.accent, 0.2) : (control.hovered ? Theme.alpha(Theme.accent, 0.1) : "transparent")
             if (control.role === "destructive") return control.hovered || control.down ? Theme.dangerHover : "transparent"
             if (control.role === "ghost") return control.hovered || control.down ? Theme.glassHover : "transparent"
             return control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 Item {
@@ -58,6 +59,8 @@ Item {
         selectionChanged()
     }
 
+    property string iconSource: ""
+
     Rectangle {
         id: trigger
         anchors.fill: parent
@@ -81,7 +84,32 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 12
             anchors.rightMargin: 8
-            spacing: 4
+            spacing: 6
+
+            Item {
+                width: root.iconSource !== "" ? 14 : 0
+                visible: root.iconSource !== ""
+                Layout.fillHeight: true
+                Image {
+                    id: iconImage
+                    source: root.iconSource !== "" ? AppController.ui_controller.getAssetUri(root.iconSource) : ""
+                    width: 14
+                    height: 14
+                    sourceSize.width: 14
+                    sourceSize.height: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    fillMode: Image.PreserveAspectFit
+                    opacity: 0.8
+                    visible: false
+                }
+                ColorOverlay {
+                    anchors.fill: iconImage
+                    source: iconImage
+                    color: Theme.accent
+                    opacity: 0.8
+                    visible: root.iconSource !== ""
+                }
+            }
 
             Text {
                 Layout.fillWidth: true
@@ -93,37 +121,22 @@ Item {
                 elide: Text.ElideRight
             }
 
-            Canvas {
-                id: arrowCanvas
-                Layout.preferredWidth: 12
-                Layout.preferredHeight: 8
-                contextType: "2d"
-
-                onAvailableChanged: {
-                    if (available) requestPaint()
-                }
-
-                onPaint: {
-                    if (!context) return
-                    context.reset()
-                    context.moveTo(0, 0)
-                    context.lineTo(width, 0)
-                    context.lineTo(width / 2, height)
-                    context.closePath()
-                    context.fillStyle = Theme.secondaryLabel
-                    context.fill()
-                }
-
-                Connections {
-                    target: Theme
-                    function onSecondaryLabelChanged() { arrowCanvas.requestPaint() }
-                }
+            Image {
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                source: AppController.ui_controller.getAssetUri("ui/dropdown-arrow-icon.svg")
+                sourceSize.width: 32
+                sourceSize.height: 32
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                Layout.alignment: Qt.AlignVCenter
             }
         }
     }
 
     Popup {
         id: popup
+        x: (root.width - width) / 2
         y: root.height + 4
         width: Math.max(root.width, 180)
         padding: 5
