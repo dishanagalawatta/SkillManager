@@ -102,8 +102,8 @@ Item {
 
             GlassPill {
                 Layout.fillWidth: true
-                implicitHeight: headerControls.implicitHeight + 16
-                radius: 22
+                Layout.preferredHeight: 48
+                radius: 24
 
                 RowLayout {
                     id: headerControls
