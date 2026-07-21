@@ -79,28 +79,16 @@ ComboBox {
         }
     }
 
-    indicator: Canvas {
-        id: canvas
-        x: control.width - width - control.rightPadding
+    indicator: Image {
+        x: control.width - width - control.rightPadding - 2
         y: control.topPadding + ((control.height - control.topPadding - control.bottomPadding) - height) / 2
-        width: 12
-        height: 8
-        contextType: "2d"
-
-        onPaint: {
-            context.reset();
-            context.moveTo(0, 0);
-            context.lineTo(width, 0);
-            context.lineTo(width / 2, height);
-            context.closePath();
-            context.fillStyle = Theme.secondaryLabel;
-            context.fill();
-        }
-
-        Connections {
-            target: Theme
-            function onSecondaryLabelChanged() { canvas.requestPaint() }
-        }
+        width: 16
+        height: 16
+        source: AppController.ui_controller.getAssetUri("ui/dropdown-arrow-icon.svg")
+        sourceSize.width: 32
+        sourceSize.height: 32
+        fillMode: Image.PreserveAspectFit
+        smooth: true
     }
 
     contentItem: Text {

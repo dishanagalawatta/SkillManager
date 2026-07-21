@@ -38,19 +38,30 @@ Item {
         anchors.rightMargin: 12
         spacing: 8
 
-        Image {
-            source: root.isMainCollapsed ?
-                    AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/expand-arrow-icon-dark.svg" : "ui/expand-arrow-icon-light.svg") :
-                    AppController.ui_controller.getAssetUri(Theme.darkMode ? "ui/collapse-arrow-icon-dark.svg" : "ui/collapse-arrow-icon-light.svg")
-            Layout.preferredWidth: 14
-            Layout.preferredHeight: 14
+        Item {
+            Layout.preferredWidth: 18
+            Layout.preferredHeight: 18
             Layout.alignment: Qt.AlignVCenter
-            sourceSize.width: 56
-            sourceSize.height: 56
-            fillMode: Image.PreserveAspectFit
-            opacity: 0.7
-            horizontalAlignment: Image.AlignHCenter
-            verticalAlignment: Image.AlignVCenter
+
+            Image {
+                id: expandIconImg
+                source: root.isMainCollapsed ?
+                        AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg") :
+                        AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg")
+                anchors.fill: parent
+                sourceSize.width: 56
+                sourceSize.height: 56
+                fillMode: Image.PreserveAspectFit
+                horizontalAlignment: Image.AlignHCenter
+                verticalAlignment: Image.AlignVCenter
+                visible: false
+            }
+
+            ColorOverlay {
+                anchors.fill: expandIconImg
+                source: expandIconImg
+                color: Theme.label
+            }
         }
 
         Text {

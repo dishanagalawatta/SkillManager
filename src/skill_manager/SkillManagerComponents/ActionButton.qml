@@ -46,7 +46,7 @@ Button {
                         if (control.role === "primary") return "white"
                         if (control.role === "danger") return "white"
                         if (control.role === "destructive") return Theme.danger
-                        return control.hovered || control.down ? Theme.label : Theme.accent
+                        return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                     }
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -71,7 +71,7 @@ Button {
                         if (control.role === "primary") return "white"
                         if (control.role === "danger") return "white"
                         if (control.role === "destructive") return Theme.danger
-                        return control.hovered || control.down ? Theme.label : Theme.accent
+                        return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                     }
                     visible: control.iconSource !== ""
                 }
@@ -88,7 +88,7 @@ Button {
                     if (control.role === "primary") return "white"
                     if (control.role === "danger") return "white"
                     if (control.role === "destructive") return Theme.danger
-                    return control.hovered || control.down ? Theme.label : Theme.accent
+                    return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                 }
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -111,9 +111,9 @@ Button {
             if (!control.enabled) return Theme.glassBorder
             if (control.role === "danger") return control.visualFocus ? Theme.label : "transparent"
             if (control.role === "destructive") return control.hovered || control.down ? Theme.danger : "transparent"
-            return control.hovered || control.down ? Theme.glassBorder : "transparent"
+            return control.hovered || control.down ? Theme.separator : Theme.glassBorder
         }
-        border.width: control.visualFocus ? 2 : (control.role === "primary" || control.role === "danger" ? 0 : (control.hovered || !control.enabled ? 1 : 0))
+        border.width: control.visualFocus ? 2 : (control.role === "primary" || control.role === "danger" ? 0 : 1)
         opacity: control.enabled ? 1.0 : 0.65
     }
 
