@@ -1347,8 +1347,6 @@ class AppController(QObject):
 
     @Slot(str)
     def _set_status(self, msg):
-        if getattr(self, "_status_message", "") == msg:
-            return
         self._status_message = msg
         self.statusMessageChanged.emit()
         logger.info(f"Status: {msg}")

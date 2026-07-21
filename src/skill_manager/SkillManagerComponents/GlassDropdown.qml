@@ -1,5 +1,7 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import App 1.0
 
 ComboBox {
@@ -56,15 +58,46 @@ ComboBox {
         smooth: true
     }
 
-    contentItem: Text {
-        leftPadding: 12
-        rightPadding: control.indicator.width + control.spacing
-        text: control.displayText
-        font.family: Theme.fontFamily
-        font.pixelSize: 13
-        color: Theme.label
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
+    property string iconSource: ""
+
+    contentItem: RowLayout {
+        spacing: 6
+        Item {
+            width: control.iconSource !== "" ? 14 : 0
+            visible: control.iconSource !== ""
+            Layout.leftMargin: 12
+            Layout.fillHeight: true
+            Image {
+                id: iconImage
+                source: control.iconSource !== "" ? AppController.ui_controller.getAssetUri(control.iconSource) : ""
+                width: 14
+                height: 14
+                sourceSize.width: 14
+                sourceSize.height: 14
+                anchors.verticalCenter: parent.verticalCenter
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.8
+                visible: false
+            }
+            ColorOverlay {
+                anchors.fill: iconImage
+                source: iconImage
+                color: Theme.accent
+                opacity: 0.8
+                visible: control.iconSource !== ""
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            Layout.rightMargin: control.indicator.width + control.spacing
+            Layout.leftMargin: control.iconSource !== "" ? 0 : 12
+            text: control.displayText
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            color: Theme.label
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
     }
 
     background: Rectangle {
