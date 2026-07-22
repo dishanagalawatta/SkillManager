@@ -9,7 +9,7 @@
 
 - **Singleton** `Theme.qml` provides all semantic tokens
 - Two modes: `darkMode: true/false`
-- Matte Graphite palette — no glass noise (`glassNoiseOpacity: 0.0`)
+- Warm Stone palette (Light Mode) and Matte Graphite (Dark Mode) — reduced eye strain, no glass noise (`glassNoiseOpacity: 0.0`)
 - All colors, sizes, and spacing referenced via `Theme.xxx`
 - **No hardcoded values** in any QML component
 
@@ -22,6 +22,15 @@
 | Border | `glassBorder`, `glassInnerBorder`, `separator` |
 | Accent | `accentBlue`, `accentGreen`, `accentRed`, `accentYellow` |
 | State | `selectedRow`, `selectedRowHover`, `disabledControl` |
+
+### QML UI Conventions
+
+- **Ribbons (`GlassPill`)**: Must use `Layout.preferredHeight: 48` and `radius: 24` to form a perfect pill. Do not apply external left/right margins directly to `GlassPill`.
+- **Inner Controls**: Elements inside ribbons (e.g., `TabButton`, inner rectangles) should use `radius: 20` to perfectly contour the outer pill. `RowLayout` inside the pill should typically use `anchors.margins: 4`.
+- **Buttons**: Prefer `IconButton` with `solar:` icons over text-heavy `ActionButton`s inside compact ribbons.
+- **Roles**: Use `role: "primary-outline"` instead of solid filled `role: "primary"` for secondary or auxiliary actions to reduce visual weight.
+- **Toggles**: Use `IconButton` with dynamic `iconSource` (e.g., swapping between `bold-duotone` and `broken`) instead of `GlassToggleButton`.
+- **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
 
 ## Architectural Patterns
 

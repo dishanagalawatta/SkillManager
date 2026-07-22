@@ -12,6 +12,7 @@ Rectangle {
 
     color: Theme.glassPill
     radius: Theme.radiusPill
+    clip: true
     border.width: 1
     border.color: Theme.glassOuterBorder
 

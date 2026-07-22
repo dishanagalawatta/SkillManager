@@ -8,31 +8,31 @@ QtObject {
     property bool darkMode: false
 
     // --- Colors ---
-    // Modern Graphite (Solid Matte) - High Clarity
-    readonly property color appBackground: darkMode ? "#121214" : "#F5F7F9"
+    // Warm Stone (Solid Matte) - Eye Comfort & Clarity
+    readonly property color appBackground: darkMode ? "#121214" : "#FAFAF9"
     readonly property real glassNoiseOpacity: 0.0 // True matte finish
     
     // Material System
     readonly property color glassPill: darkMode ? "#1E1E22" : "#FFFFFF"
-    readonly property color glassHover: darkMode ? "#2D2D34" : "#E8EAEF"
-    readonly property color glassActive: darkMode ? "#3C3C46" : "#FFFFFF"
-    readonly property color sidebarBackground: darkMode ? "#0F0F11" : "#F5F7F9"
+    readonly property color glassHover: darkMode ? "#2D2D34" : "#F5F5F4"
+    readonly property color glassActive: darkMode ? "#3C3C46" : "#E7E5E4"
+    readonly property color sidebarBackground: darkMode ? "#0F0F11" : "#F5F5F4"
     
     // Border System (Solid for matte surfaces)
-    readonly property color glassBorder: darkMode ? "#2A2A30" : Qt.rgba(0.0, 0.0, 0.0, 0.08)
+    readonly property color glassBorder: darkMode ? "#2A2A30" : Qt.rgba(0.0, 0.0, 0.0, 0.06)
     readonly property color glassInnerBorder: "transparent"
     readonly property color glassOuterBorder: glassBorder
     
-    readonly property color glassShadow: darkMode ? Qt.rgba(0.0, 0.0, 0.0, 0.5) : Qt.rgba(0.0, 0.0, 0.0, 0.12)
-    readonly property color separator: darkMode ? "#26262B" : Qt.rgba(0.0, 0.0, 0.0, 0.08)
-    readonly property color disabledControl: darkMode ? "#1D1D21" : "#EEF1F4"
-    readonly property color selectedRow: darkMode ? "#1E293B" : "#DDF5EA"
-    readonly property color selectedRowHover: darkMode ? "#2A3B56" : "#CFF0E2"
+    readonly property color glassShadow: darkMode ? Qt.rgba(0.0, 0.0, 0.0, 0.5) : Qt.rgba(0.0, 0.0, 0.0, 0.04)
+    readonly property color separator: darkMode ? "#26262B" : Qt.rgba(0.0, 0.0, 0.0, 0.05)
+    readonly property color disabledControl: darkMode ? "#1D1D21" : "#F5F5F4"
+    readonly property color selectedRow: darkMode ? "#1E293B" : "#ECFDF5"
+    readonly property color selectedRowHover: darkMode ? "#2A3B56" : "#D1FAE5"
     readonly property color selectedRowBorder: darkMode ? "#3B82F6" : accent
-    readonly property color dangerHover: darkMode ? "#3F1A1A" : "#FEE2E2"
+    readonly property color dangerHover: darkMode ? "#3F1A1A" : "#FEF2F2"
     
-    readonly property color label: darkMode ? "#F3F4F6" : "#111827"
-    readonly property color secondaryLabel: darkMode ? "#9CA3AF" : "#6B7280"
+    readonly property color label: darkMode ? "#F3F4F6" : "#292524"
+    readonly property color secondaryLabel: darkMode ? "#9CA3AF" : "#78716C"
     
     readonly property color accent: darkMode ? "#3B82F6" : "#059669" // Modern Blue for Dark, Sage for Light
     readonly property color success: darkMode ? "#10B981" : "#10B981"

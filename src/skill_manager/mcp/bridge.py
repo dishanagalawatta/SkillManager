@@ -26,6 +26,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -519,15 +520,22 @@ def deploy(skill_id: str, target: str) -> dict[str, Any]:  # noqa: ARG001
 # Subprocess-based dev tools (lint / test / build)
 # ---------------------------------------------------------------------------
 def _run_subprocess(cmd: list[str], cwd: Path | None = None) -> dict[str, Any]:
-    """Run a command, returning a structured result. Never raises."""
+    """Run a command, returning a structured result. Never raises.
+
+    Uses ``CREATE_NO_WINDOW`` on Windows to prevent console windows
+    from flashing when subprocesses (uv, ruff, pytest) are launched
+    from the MCP server in GUI mode.
+    """
     try:
-        proc = subprocess.run(
-            cmd,
-            cwd=str(cwd) if cwd else None,
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
+        kwargs: dict[str, Any] = {
+            "cwd": str(cwd) if cwd else None,
+            "capture_output": True,
+            "text": True,
+            "timeout": 600,
+        }
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        proc = subprocess.run(cmd, **kwargs)
         return {
             "returncode": proc.returncode,
             "stdout": proc.stdout or "",
@@ -713,32 +721,100 @@ def _pil_image_to_base64(image: Any) -> str | None:
         return None
 
 
-def capture_app_window() -> tuple[str | None, int, int]:
+def _resize_window(hwnd: int, new_width: int, new_height: int) -> tuple[int, int, int, int] | None:
+    """Resize a window via ``SetWindowPos`` and return the previous rect.
+
+    Returns ``(left, top, width, height)`` of the old geometry, or ``None``
+    on failure. The caller should restore the original geometry after capture.
+    """
+    try:
+        old_rect = _get_window_rect(hwnd)
+        if old_rect is None:
+            return None
+        left, top, right, bottom = old_rect
+        old_w = right - left
+        old_h = bottom - top
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        swp_nozorder = 0x0004
+        swp_noactivate = 0x0010
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            left,
+            top,
+            new_width,
+            new_height,
+            swp_nozorder | swp_noactivate,
+        )
+        # Small settle delay for the UI to repaint
+        time.sleep(0.15)
+        return (left, top, old_w, old_h)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _restore_window(hwnd: int, left: int, top: int, width: int, height: int) -> None:
+    """Restore a window to its previous position and size."""
+    try:
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        swp_nozorder = 0x0004
+        swp_noactivate = 0x0010
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            left,
+            top,
+            width,
+            height,
+            swp_nozorder | swp_noactivate,
+        )
+        time.sleep(0.15)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def capture_app_window(
+    resize_width: int | None = None,
+    resize_height: int | None = None,
+) -> tuple[str | None, int, int]:
     """Capture the live SkillManager GUI window cross-process via Win32.
 
     Enumerates top-level windows, matches the title prefix "Skill Manager",
     captures it with PrintWindow (fallback BitBlt), and returns
     ``(base64_png, width, height)``. Returns ``(None, 0, 0)`` when no
     matching window exists or capture fails, so the tool can report ok:false.
+
+    If ``resize_width`` and ``resize_height`` are provided, the window is
+    temporarily resized before capture and restored afterward. This enables
+    visual validation at different window sizes via MCP.
     """
     _log_call("capture_app_window")
     try:
         hwnd = _find_skill_manager_window()
         if hwnd is None:
             return (None, 0, 0)
-        rect = _get_window_rect(hwnd)
-        if rect is None:
-            return (None, 0, 0)
-        left, top, right, bottom = rect
-        width = max(1, right - left)
-        height = max(1, bottom - top)
-        image = _capture_window_to_image(hwnd, width, height)
-        if image is None:
-            return (None, 0, 0)
-        b64 = _pil_image_to_base64(image)
-        if b64 is None:
-            return (None, 0, 0)
-        return (b64, width, height)
+
+        restore_rect: tuple[int, int, int, int] | None = None
+        if resize_width is not None and resize_height is not None:
+            restore_rect = _resize_window(hwnd, resize_width, resize_height)
+
+        try:
+            rect = _get_window_rect(hwnd)
+            if rect is None:
+                return (None, 0, 0)
+            left, top, right, bottom = rect
+            width = max(1, right - left)
+            height = max(1, bottom - top)
+            image = _capture_window_to_image(hwnd, width, height)
+            if image is None:
+                return (None, 0, 0)
+            b64 = _pil_image_to_base64(image)
+            if b64 is None:
+                return (None, 0, 0)
+            return (b64, width, height)
+        finally:
+            if restore_rect is not None:
+                _restore_window(hwnd, *restore_rect)
     except Exception:  # noqa: BLE001
         return (None, 0, 0)
 
@@ -779,6 +855,28 @@ def send_navigation_command(view: str, timeout: float = 1.0) -> dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
+def send_debug_overlay_command(enabled: bool, timeout: float = 1.0) -> dict[str, Any]:
+    """Toggle the QuickCopyView ribbon debug overlay on the live GUI via IPC.
+
+    Best-effort: writes ``data/mcp/commands/<id>.json`` with
+    ``{action:"set_debug_overlay", enabled, id}`` and polls for the ack.
+    Returns ``{"ok": False}`` on timeout / error.
+    """
+    _log_call("send_debug_overlay_command")
+    try:
+        commands_dir = MCP_COMMANDS_DIR
+        acks_dir = MCP_ACKS_DIR
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        acks_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd_id = uuid.uuid4().hex
+        command = {"action": "set_debug_overlay", "enabled": enabled, "id": cmd_id}
+        (commands_dir / f"{cmd_id}.json").write_text(json.dumps(command), encoding="utf-8")
+        return _wait_for_ack(cmd_id, acks_dir, timeout)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 __all__ = [
     "get_app_controller",
     "list_skills",
@@ -799,4 +897,5 @@ __all__ = [
     "run_build",
     "capture_app_window",
     "send_navigation_command",
+    "send_debug_overlay_command",
 ]

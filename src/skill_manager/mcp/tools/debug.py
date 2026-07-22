@@ -33,6 +33,7 @@ from skill_manager.mcp.bridge import (
     capture_errors as _bridge_capture_errors,
     dump_state as _bridge_dump_state,
     inspect_controller as _bridge_inspect_controller,
+    send_debug_overlay_command as _bridge_send_debug_overlay,
 )
 from skill_manager.mcp.models import ToolResult
 
@@ -65,6 +66,10 @@ class _CaptureErrorsArgs(BaseModel):
     limit: int = Field(default=100, ge=1, description="Max number of errors.")
 
 
+class _ToggleDebugOverlayArgs(BaseModel):
+    enabled: bool = Field(True, description="Enable or disable the ribbon debug overlay.")
+
+
 # ---------------------------------------------------------------------------
 # Tool schemas (valid JSON-schema input schemas)
 # ---------------------------------------------------------------------------
@@ -92,6 +97,17 @@ CAPTURE_ERRORS_SCHEMA: dict[str, Any] = {
             "default": 100,
             "minimum": 1,
             "description": "Maximum number of error events to return.",
+        }
+    },
+}
+
+TOGGLE_DEBUG_OVERLAY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "enabled": {
+            "type": "boolean",
+            "description": "Enable (true) or disable (false) the ribbon debug overlay.",
+            "default": True,
         }
     },
 }
@@ -127,6 +143,19 @@ def _handle_capture_errors(limit: int) -> ToolResult:
     return _ok("sm_capture_errors", {"errors": errors})
 
 
+def _handle_toggle_debug_overlay(enabled: bool) -> ToolResult:
+    """Toggle the QuickCopyView ribbon debug overlay on the live GUI.
+
+    Writes an IPC command for the GUI process to pick up.  Returns the
+    bridge result dict (including the ack status on success).
+    """
+    try:
+        result = _bridge_send_debug_overlay(enabled=enabled)
+    except Exception as exc:  # noqa: BLE001 - surface as ToolResult, never crash
+        return _err("sm_toggle_debug_overlay", str(exc))
+    return _ok("sm_toggle_debug_overlay", result)
+
+
 # ---------------------------------------------------------------------------
 # Public dispatch surface
 # ---------------------------------------------------------------------------
@@ -151,6 +180,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "SkillManager diagnostic ring buffer."
         ),
         "inputSchema": CAPTURE_ERRORS_SCHEMA,
+    },
+    "sm_toggle_debug_overlay": {
+        "description": (
+            "Toggle the QuickCopyView ribbon debug overlay on the live GUI. "
+            "Writes an IPC command to enable/disable the green debug text "
+            "showing threshold values (RCW, HW, RGE, HCE, IM)."
+        ),
+        "inputSchema": TOGGLE_DEBUG_OVERLAY_SCHEMA,
     },
 }
 
@@ -183,10 +220,19 @@ def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
         )
         return _handle_capture_errors(parsed.limit)
 
+    def _dispatch_toggle_debug_overlay(args: dict[str, Any]) -> ToolResult:
+        parsed = _ToggleDebugOverlayArgs(**args)
+        capture_event(
+            "mcp_tool_call",
+            {"tool": "sm_toggle_debug_overlay", "args": {"enabled": parsed.enabled}},
+        )
+        return _handle_toggle_debug_overlay(parsed.enabled)
+
     return {
         "sm_dump_state": _dispatch_dump_state,
         "sm_inspect_controller": _dispatch_inspect_controller,
         "sm_capture_errors": _dispatch_capture_errors,
+        "sm_toggle_debug_overlay": _dispatch_toggle_debug_overlay,
     }
 
 
@@ -215,6 +261,7 @@ __all__ = [
     "DUMP_STATE_SCHEMA",
     "INSPECT_CONTROLLER_SCHEMA",
     "CAPTURE_ERRORS_SCHEMA",
+    "TOGGLE_DEBUG_OVERLAY_SCHEMA",
     "TOOL_SCHEMAS",
     "get_handlers",
 ]

@@ -8,33 +8,32 @@ def _patch_subprocess():
     if not hasattr(subprocess, "CREATE_NO_WINDOW"):
         return
 
-    original_popen = subprocess.Popen
+    try:
+        _orig_init = subprocess.Popen.__init__
 
-    class NoWindowPopen(original_popen):
-        def __init__(self, *args, **kwargs):
-            kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
-            super().__init__(*args, **kwargs)
+        def _patched_init(self, *args, **kwargs):  # type: ignore[misc]
+            kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+            return _orig_init(self, *args, **kwargs)
 
-    subprocess.Popen = NoWindowPopen
+        subprocess.Popen.__init__ = _patched_init  # type: ignore[method-assign]
+    except (TypeError, AttributeError):
+        _orig_popen = subprocess.Popen
+
+        class _NoWindowPopen(_orig_popen):  # type: ignore[valid-type]
+            def __init__(self, *args, **kwargs):
+                kwargs["creationflags"] = (
+                    kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                )  # type: ignore[attr-defined]
+                super().__init__(*args, **kwargs)
+
+        subprocess.Popen = _NoWindowPopen
 
 
 def _disable_qml_disk_cache():
-    # Force-disable Qt's on-disk QML compilation cache for the current process.
-    # The cache can hold stale .qmlc files that mismatch the current QML source
-    # (e.g. after adding/removing components), producing cryptic load errors
-    # like "Cannot assign object of type X to list property 'data'".
-    # This must run before PySide6 / QtQuick modules are imported.
     os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 
 def is_dev_mode() -> bool:
-    """Detect if running via 'uv run' or in development mode.
-
-    Checks:
-    1. SKILL_MANAGER_DEV_MODE env var
-    2. sys.frozen (PyInstaller)
-    3. src/ directory layout (uv run / editable install)
-    """
     if os.environ.get("SKILL_MANAGER_DEV_MODE"):
         return True
     if getattr(sys, "frozen", False):
@@ -48,7 +47,6 @@ def is_dev_mode() -> bool:
     return False
 
 
-# Execute patches before any other imports happen!
 _patch_subprocess()
 _disable_qml_disk_cache()
 
@@ -72,7 +70,18 @@ def setup_logging():
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
+def _redirect_qml_log():
+    """Redirect stderr (QML console.log goes here) to a log file."""
+    log_path = DATA_DIR / "qml_console.log"
+    try:
+        fh = open(log_path, "w", encoding="utf-8")
+        sys.stderr = fh
+    except OSError:
+        pass  # best-effort
+
+
 def main():
+
     import multiprocessing
 
     multiprocessing.freeze_support()
@@ -82,6 +91,7 @@ def main():
         force_clear_qml_disk_cache()
 
     setup_logging()
+    _redirect_qml_log()
 
     # Initialize diagnostic logger
     from skill_manager.core.config import ConfigManager

@@ -142,7 +142,11 @@ def _make_png_b64(size=(10, 10), color="blue"):
 
 def test_handler_capture_success(monkeypatch):
     b64 = _make_png_b64()
-    monkeypatch.setattr(tools_screenshot, "_bridge_capture_app_window", lambda: (b64, 10, 10))
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window",
+        lambda *a, **kw: (b64, 10, 10),
+    )
     monkeypatch.setattr(
         tools_screenshot, "_bridge_send_navigation_command", lambda v: {"ok": True, "view": v}
     )
@@ -160,7 +164,9 @@ def test_handler_capture_success(monkeypatch):
 
 
 def test_handler_no_gui_returns_ok_false(monkeypatch):
-    monkeypatch.setattr(tools_screenshot, "_bridge_capture_app_window", lambda: (None, 0, 0))
+    monkeypatch.setattr(
+        tools_screenshot, "_bridge_capture_app_window", lambda *a, **kw: (None, 0, 0)
+    )
     handlers = tools_screenshot.get_handlers()
     result = handlers["sm_screenshot"]({})
 
@@ -179,7 +185,11 @@ def test_handler_invalid_view(monkeypatch):
 
 def test_handler_save_true_writes_png(monkeypatch, tmp_path):
     b64 = _make_png_b64()
-    monkeypatch.setattr(tools_screenshot, "_bridge_capture_app_window", lambda: (b64, 10, 10))
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window",
+        lambda *a, **kw: (b64, 10, 10),
+    )
     monkeypatch.setattr(
         tools_screenshot, "_bridge_send_navigation_command", lambda v: {"ok": True, "view": v}
     )
