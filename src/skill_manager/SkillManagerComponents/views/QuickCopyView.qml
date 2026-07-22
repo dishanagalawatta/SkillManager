@@ -44,12 +44,18 @@ Item {
     readonly property int _wClient:    32
     readonly property int _spacing:    8
 
-    // Info group width (selection count badge + "selected" label)
-    property int _infoGroupWidth: {
+    // Info group width — returns [badgeOnly, fullWidth] via two properties
+    // Badge-only width (no "selected" label)
+    property int _infoBadgeWidth: {
         if (AppController.quickCopyModel.selectedCount === 0) return 0
         var str = AppController.quickCopyModel.selectedCount.toString()
         var badgeW = Math.max(24, str.length * 10 + 16)
-        return badgeW + 8 + 50  // badge + spacing + "selected" text
+        return badgeW + 4  // badge + minimal margin
+    }
+    // Full width including "selected" label
+    property int _infoGroupWidth: {
+        if (AppController.quickCopyModel.selectedCount === 0) return 0
+        return _infoBadgeWidth + 4 + 50  // badge + spacing + "selected" text
     }
 
     // Calculate total width of all visible items at a given collapse phase
@@ -64,7 +70,11 @@ Item {
         w += _wSelect; n++
 
         // InfoGroup (visible when selection active)
-        if (_infoGroupWidth > 0) { w += _infoGroupWidth; n++ }
+        // When phase >= 1, hide "selected" label to save ~54px
+        if (_infoGroupWidth > 0) {
+            w += (phase >= 1) ? _infoBadgeWidth : _infoGroupWidth
+            n++
+        }
 
         // Delete — hidden from phase 1
         if (phase < 1) { w += _wDelete; n++ }
@@ -308,6 +318,7 @@ Item {
 
                             Text {
                                 text: "selected"
+                                visible: qcv_root._collapsePhase < 1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                                 color: Theme.label
@@ -319,9 +330,15 @@ Item {
                         id: qcv_overflowBtn
                         visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase >= 1
                         iconText: "⋮"
-                        iconSize: 24
-                        buttonSize: 32
+                        iconSize: 20
+                        buttonSize: 28
                         role: "ghost"
+                        background: Rectangle {
+                            radius: 14
+                            color: parent.hovered || parent.down ? Theme.glassHover : "transparent"
+                            border.color: Theme.glassBorder
+                            border.width: 1
+                        }
                         onClicked: qcv_overflowMenu.popup(qcv_overflowBtn, 0, qcv_overflowBtn.height + 4)
                     }
 
@@ -384,6 +401,24 @@ Item {
                         // Spacer to push center controls to the center
                         Item { Layout.fillWidth: true }
                     
+                        GlassDropdown {
+                            id: qcv_categoryDrop
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 7
+                            iconOnlyMode: qcv_root._collapsePhase >= 2
+                            Layout.minimumWidth: qcv_root._collapsePhase >= 2 ? 36 : 70
+                            Layout.maximumWidth: qcv_root._collapsePhase >= 2 ? 36 : 160
+                            iconSource: "ui/cosmetic-bold-duotone.svg"
+                            model: ["All Categories"].concat(AppController.categories)
+                            currentIndex: {
+                                let idx = model.indexOf(AppController.quickCopyModel.categoryFilter);
+                                return idx === -1 ? 0 : idx;
+                            }
+                            onActivated: (index) => {
+                                let cat = index === 0 ? "" : currentText
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "category", cat)
+                            }
+                        }
+
                         GlassCollectionDropdown {
                                 visible: !qcv_root.isEditingCollection
                                 id: qcv_collectionDrop
@@ -416,24 +451,6 @@ Item {
                                     AppController.setCurrentProject("All Projects")
                                 }
                                 qcv_root._isInternalSelectionChange = false
-                            }
-                        }
-
-                            GlassDropdown {
-                            id: qcv_categoryDrop
-                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 7
-                            iconOnlyMode: qcv_root._collapsePhase >= 2
-                            Layout.minimumWidth: qcv_root._collapsePhase >= 2 ? 36 : 70
-                            Layout.maximumWidth: qcv_root._collapsePhase >= 2 ? 36 : 160
-                            iconSource: "ui/cosmetic-bold-duotone.svg"
-                            model: ["All Categories"].concat(AppController.categories)
-                            currentIndex: {
-                                let idx = model.indexOf(AppController.quickCopyModel.categoryFilter);
-                                return idx === -1 ? 0 : idx;
-                            }
-                            onActivated: (index) => {
-                                let cat = index === 0 ? "" : currentText
-                                AppController.ui_controller.setViewFilterForView("QuickCopy", "category", cat)
                             }
                         }
 
@@ -564,7 +581,7 @@ Item {
                                 buttonSize: 28
                                 iconSize: 24
                                 iconSource: AppController.ui_controller.getAssetUri("ui/check-circle-bold.svg")
-                                role: "ghost"
+                        role: "secondary"
                                 customIconColor: Theme.accent
                                 tooltipText: "Save collection"
                                 flat: true
