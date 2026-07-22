@@ -16,6 +16,8 @@ Button {
 
     Layout.preferredWidth: buttonSize
     Layout.preferredHeight: buttonSize
+    Layout.minimumWidth: buttonSize
+    Layout.minimumHeight: buttonSize
     implicitWidth: buttonSize
     implicitHeight: buttonSize
     padding: 0

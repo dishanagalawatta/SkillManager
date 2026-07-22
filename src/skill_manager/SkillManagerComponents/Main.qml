@@ -42,7 +42,7 @@ Window {
             }
         })
     }
-    minimumWidth: 1050
+    minimumWidth: 350
     minimumHeight: 650
 
     Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }

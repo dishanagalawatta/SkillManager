@@ -23,7 +23,7 @@ Item {
 
     signal selectionChanged()
 
-    implicitWidth: 160
+    implicitWidth: root.iconOnlyMode ? 36 : 160
     implicitHeight: 36
 
     activeFocusOnTab: true
@@ -60,6 +60,7 @@ Item {
     }
 
     property string iconSource: ""
+    property bool iconOnlyMode: false
 
     Rectangle {
         id: trigger
@@ -82,7 +83,7 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 12
+            anchors.leftMargin: root.iconOnlyMode ? (root.width - 14) / 2 : 12
             anchors.rightMargin: 8
             spacing: 6
 
@@ -112,6 +113,7 @@ Item {
             }
 
             Text {
+                visible: !root.iconOnlyMode
                 Layout.fillWidth: true
                 text: root.displayText
                 font.family: Theme.fontFamily
@@ -129,6 +131,7 @@ Item {
                 sourceSize.height: 32
                 fillMode: Image.PreserveAspectFit
                 smooth: true
+                visible: !root.iconOnlyMode
                 Layout.alignment: Qt.AlignVCenter
             }
         }

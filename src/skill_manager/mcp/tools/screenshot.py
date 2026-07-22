@@ -65,6 +65,23 @@ SCREENSHOT_SCHEMA: dict[str, Any] = {
                 "include its path in the result."
             ),
         },
+        "width": {
+            "type": "integer",
+            "default": None,
+            "description": (
+                "Optional: resize the window to this width before capture. "
+                "Window is restored to its original size afterward. "
+                "Use together with height to test responsive layouts."
+            ),
+        },
+        "height": {
+            "type": "integer",
+            "default": None,
+            "description": (
+                "Optional: resize the window to this height before capture. "
+                "Window is restored to its original size afterward."
+            ),
+        },
     },
 }
 
@@ -111,8 +128,13 @@ def _save_png(b64: str) -> str | None:
         return None
 
 
-def _handle_screenshot(navigate: str | None = None, save: bool = False) -> ToolResult:
-    """Capture the live GUI, optionally navigating first."""
+def _handle_screenshot(
+    navigate: str | None = None,
+    save: bool = False,
+    width: int | None = None,
+    height: int | None = None,
+) -> ToolResult:
+    """Capture the live GUI, optionally navigating or resizing first."""
     try:
         navigated = False
         if navigate:
@@ -122,7 +144,10 @@ def _handle_screenshot(navigate: str | None = None, save: bool = False) -> ToolR
             navigated = bool(ack.get("ok")) if isinstance(ack, dict) else False
             time.sleep(_SETTLE_DELAY)
 
-        b64, width, height = _bridge_capture_app_window()
+        b64, captured_w, captured_h = _bridge_capture_app_window(
+            resize_width=width,
+            resize_height=height,
+        )
         if b64 is None:
             return _err(
                 "sm_screenshot",
@@ -131,8 +156,9 @@ def _handle_screenshot(navigate: str | None = None, save: bool = False) -> ToolR
 
         data: dict[str, Any] = {
             "image_b64": b64,
-            "width": width,
-            "height": height,
+            "width": captured_w,
+            "height": captured_h,
+            "resize_requested": width is not None and height is not None,
             "view": navigate if navigate else _current_view(),
             "navigated": navigated,
         }
@@ -159,11 +185,26 @@ def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
     def _dispatch(args: dict[str, Any]) -> ToolResult:
         navigate = args.get("navigate")
         save = bool(args.get("save", False))
+        width = args.get("width")
+        height = args.get("height")
         capture_event(
             "mcp_tool_call",
-            {"tool": "sm_screenshot", "args": {"navigate": navigate, "save": save}},
+            {
+                "tool": "sm_screenshot",
+                "args": {
+                    "navigate": navigate,
+                    "save": save,
+                    "width": width,
+                    "height": height,
+                },
+            },
         )
-        return _handle_screenshot(navigate=navigate, save=save)
+        return _handle_screenshot(
+            navigate=navigate,
+            save=save,
+            width=width,
+            height=height,
+        )
 
     return {"sm_screenshot": _dispatch}
 

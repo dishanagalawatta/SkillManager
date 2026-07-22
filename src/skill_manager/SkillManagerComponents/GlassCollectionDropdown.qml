@@ -87,16 +87,18 @@ ComboBox {
         height: 16
         source: AppController.ui_controller.getAssetUri("ui/dropdown-arrow-icon.svg")
         sourceSize.width: 32
-        sourceSize.height: 32
         fillMode: Image.PreserveAspectFit
         smooth: true
+        visible: !control.iconOnlyMode
     }
+
+    property bool iconOnlyMode: false
 
     contentItem: RowLayout {
         spacing: 6
         Item {
             width: 14
-            Layout.leftMargin: 12
+            Layout.leftMargin: control.iconOnlyMode ? (control.width - 14) / 2 : 12
             Layout.fillHeight: true
             Image {
                 id: iconImage
@@ -118,6 +120,7 @@ ComboBox {
             }
         }
         Text {
+            visible: !control.iconOnlyMode
             Layout.fillWidth: true
             Layout.rightMargin: control.indicator.width + control.spacing
             text: control.displayText
@@ -130,7 +133,7 @@ ComboBox {
     }
 
     background: Rectangle {
-        implicitWidth: 160
+        implicitWidth: control.iconOnlyMode ? 36 : 160
         implicitHeight: 36
         radius: Theme.radiusPill
         color: control.hovered ? Theme.glassHover : Theme.glassPill

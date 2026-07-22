@@ -30,6 +30,14 @@
 - **Type hints**: Use `pyright` with `.pyrightconfig.json` settings
 - **QML**: Follow `Theme.qml` semantic tokens; no hardcoded colors/sizes
 
+### QML UI Conventions
+- **Ribbons (`GlassPill`)**: Must use `Layout.preferredHeight: 48` and `radius: 24` to form a perfect pill. Do not apply external left/right margins directly to `GlassPill`.
+- **Inner Controls**: Elements inside ribbons (e.g., `TabButton`, inner rectangles) should use `radius: 20` to perfectly contour the outer pill. `RowLayout` inside the pill should typically use `anchors.margins: 4`.
+- **Buttons**: Prefer `IconButton` with `solar:` icons over text-heavy `ActionButton`s inside compact ribbons.
+- **Roles**: Use `role: "primary-outline"` instead of solid filled `role: "primary"` for secondary or auxiliary actions to reduce visual weight.
+- **Toggles**: Use `IconButton` with dynamic `iconSource` (e.g., swapping between `bold-duotone` and `broken`) instead of `GlassToggleButton`.
+- **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
+
 ### Testing
 
 - **Framework**: pytest + pytest-qt + pytest-cov
@@ -100,3 +108,5 @@
 - [`conductor/workflow.md`](conductor/workflow.md) — track lifecycle
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contribution guidelines
 - [`ADR_INDEX.md`](ADR_INDEX.md) — architecture decisions
+
+- **UI Validation**: MUST use `multimodal-looker` subagent (via `look_at` MCP tool) to validate visually after every UI change involving layout, positioning, or visibility. Never rely solely on static mathematical validation. Capture a full-desktop screenshot via PowerShell (`Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $bitmap.Save(...)`) then pass to `look_at` for analysis. Do NOT mark UI work complete without MCP visual validation evidence.

@@ -16,6 +16,126 @@ Item {
     property bool showImageInspector: false
     property bool showCommandInspector: false
     property var editingCollectionProjects: []
+    // === Dynamic Collapse System ===
+    // Collapse phases (0 = all expanded, 8 = most collapsed):
+    //   0: All expanded
+    //   1: Delete + Add → overflow (⋮ button appears where Delete was)
+    //   2: Category dropdown → 36px icon
+    //   3: Collection dropdown → 36px icon
+    //   4: Project dropdown → 36px icon
+    //   5: Client format logos → single dropdown button
+    //   6: ToggleAll → overflow
+    //   7: Category icon → overflow
+    //   8: Project icon → overflow
+    //
+    // Always visible: CopyBtn, CycleProject, SelectCheck, SelectedCount badge,
+    //   Client format dropdown (after phase 5), Collection icon (always visible)
+
+    // Fixed item widths (px)
+    readonly property int _wToggle:    24
+    readonly property int _wSelect:    24
+    readonly property int _wDelete:    28
+    readonly property int _wAdd:       28
+    readonly property int _wOverflow:  32
+    readonly property int _wDropFull:  160
+    readonly property int _wDropIcon:  36
+    readonly property int _wCycle:     32
+    readonly property int _wCopy:      32
+    readonly property int _wClient:    32
+    readonly property int _spacing:    8
+
+    // Info group width (selection count badge + "selected" label)
+    property int _infoGroupWidth: {
+        if (AppController.quickCopyModel.selectedCount === 0) return 0
+        var str = AppController.quickCopyModel.selectedCount.toString()
+        var badgeW = Math.max(24, str.length * 10 + 16)
+        return badgeW + 8 + 50  // badge + spacing + "selected" text
+    }
+
+    // Calculate total width of all visible items at a given collapse phase
+    function _calcWidth(phase) {
+        var w = 0
+        var n = 0  // visible item count (for RowLayout spacing)
+
+        // ToggleAll
+        if (phase < 6) { w += _wToggle; n++ }
+
+        // SelectCheck (always visible)
+        w += _wSelect; n++
+
+        // InfoGroup (visible when selection active)
+        if (_infoGroupWidth > 0) { w += _infoGroupWidth; n++ }
+
+        // Delete — hidden from phase 1
+        if (phase < 1) { w += _wDelete; n++ }
+
+        // Add — hidden from phase 1
+        if (phase < 1) { w += _wAdd; n++ }
+
+        // Overflow — visible from phase 1
+        if (phase >= 1) { w += _wOverflow; n++ }
+
+        // Collection — full width before phase 3, icon from phase 3
+        w += (phase < 3) ? _wDropFull : _wDropIcon; n++
+
+        // Category — full before phase 2, icon before phase 7, hidden phase 7+
+        if (phase < 7) { w += (phase < 2) ? _wDropFull : _wDropIcon; n++ }
+
+        // Project — full before phase 4, icon before phase 8, hidden phase 8+
+        if (phase < 8) { w += (phase < 4) ? _wDropFull : _wDropIcon; n++ }
+
+        // CycleProject (always visible)
+        w += _wCycle; n++
+
+        // Client format logos (expanded) or single dropdown
+        if (phase < 5) {
+            var cfCount = AppController.clientFormats.length
+            if (cfCount > 0) {
+                w += cfCount * _wClient + Math.max(0, cfCount - 1) * 8
+                n++
+            }
+        } else {
+            w += _wClient; n++
+        }
+
+        // CopyBtn (always visible)
+        w += _wCopy; n++
+
+        // RowLayout spacing between visible items
+        w += Math.max(0, n - 1) * _spacing
+
+        return w
+    }
+
+    // Current collapse phase — computed on every width change.
+    // Picks the most expanded phase that fits within headerControls.width.
+    property int _collapsePhase: {
+        var avail = headerControls.width
+        // Start at 0 (most expanded) and stop at the first phase that fits
+        for (var p = 0; p <= 8; p++) {
+            if (_calcWidth(p) <= avail) return p
+        }
+        return 8  // safety fallback
+    }
+
+    // Debug overlay toggle
+    property bool debugLayout: AppController.debugOverlayEnabled
+
+    onWidthChanged: {
+        if (debugLayout && qcv_root.width % 2 === 0) {
+            qcv_root.dumpDebug()
+        }
+    }
+
+    function dumpDebug() {
+        var msg = "QML_DEBUG W:" + qcv_root.width
+            + " HW:" + headerControls.width
+            + " CP:" + qcv_root._collapsePhase
+            + " IGW:" + qcv_root._infoGroupWidth
+            + " DL:" + (qcv_root.debugLayout ? 1 : 0)
+            + " CF:" + AppController.clientFormats.length
+        console.log(msg)
+    }
 
     function focusSearch() {
         // Handled globally in TopBar
@@ -102,26 +222,26 @@ Item {
 
             GlassPill {
                 Layout.fillWidth: true
+                Layout.minimumWidth: 200
                 Layout.preferredHeight: 48
                 radius: 24
 
-                RowLayout {
+                Item {
                     id: headerControls
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
+                    anchors.fill: parent
                     anchors.margins: 4
                     anchors.leftMargin: 16
-                    anchors.rightMargin: 8
-                    spacing: 12
+                    anchors.rightMargin: 16 // Increased to completely clear the rounded corner of the GlassPill
 
-                    // Filter Group
                     RowLayout {
-                        spacing: 12
-                        
+                        id: qcv_headerLayout
+                        anchors.fill: parent
+                        spacing: qcv_root._spacing
+
+                    // Filter Group (Flattened)
                         IconButton {
                             id: qcv_toggleAllBtn
+                            visible: qcv_root._collapsePhase < 6
                             buttonSize: 24
                             tooltipText: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
                             onClicked: (mouse) => AppController.quickCopyModel.toggleAll()
@@ -196,8 +316,18 @@ Item {
                         }
 
                         IconButton {
+                        id: qcv_overflowBtn
+                        visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase >= 1
+                        iconText: "⋮"
+                        iconSize: 24
+                        buttonSize: 32
+                        role: "ghost"
+                        onClicked: qcv_overflowMenu.popup(qcv_overflowBtn, 0, qcv_overflowBtn.height + 4)
+                    }
+
+                        IconButton {
                             id: barDeleteBtn
-                            visible: !qcv_root.isEditingCollection
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 1
                             buttonSize: 28
                             iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
                             tooltipText: "Delete Selected Skills"
@@ -209,7 +339,7 @@ Item {
 
                         IconButton {
                             id: barAddCombinedBtn
-                            visible: !qcv_root.isEditingCollection
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 1
                             buttonSize: 28
                             iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
                             tooltipText: AppController.quickCopyModel.selectedCount > 0 ? "Add Selected Skills..." : "Create New..."
@@ -226,16 +356,13 @@ Item {
                                 MouseArea {
                                     anchors.fill: parent
                                     enabled: AppController.quickCopyModel.selectedCount <= 1
-                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        AppController._set_status("Select at least 2 items to create a collection")
+                                        qcv_addMenu.close()
+                                        qcv_root.isEditingCollection = true
+                                        qcv_root.editingCollectionName = ""
+                                        qcv_root.editingCollectionProjects = []
                                     }
-                                }
-
-                                onTriggered: {
-                                    qcv_root.isEditingCollection = true
-                                    qcv_root.editingCollectionName = ""
-                                    qcv_root.editingCollectionProjects = []
                                 }
                             }
                             GlassMenuItem {
@@ -252,16 +379,17 @@ Item {
                                 }
                             }
                         }
+                    // Filter Group ends, Dropdowns start
 
+                        // Spacer to push center controls to the center
                         Item { Layout.fillWidth: true }
-                        
-                        RowLayout {
-                            visible: !qcv_root.isEditingCollection
-                            spacing: 12
-
-                            GlassCollectionDropdown {
+                    
+                        GlassCollectionDropdown {
+                                visible: !qcv_root.isEditingCollection
                                 id: qcv_collectionDrop
-                                Layout.preferredWidth: 180
+                                iconOnlyMode: qcv_root._collapsePhase >= 3
+                                Layout.minimumWidth: qcv_root._collapsePhase >= 3 ? 36 : 70
+                                Layout.maximumWidth: qcv_root._collapsePhase >= 3 ? 36 : 180
                                 onCollectionSelected: (collectionName) => {
                                 if (collectionName === "All Collections") {
                                     qcv_root._isInternalSelectionChange = true
@@ -291,9 +419,12 @@ Item {
                             }
                         }
 
-                        GlassDropdown {
+                            GlassDropdown {
                             id: qcv_categoryDrop
-                            Layout.preferredWidth: 160
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 7
+                            iconOnlyMode: qcv_root._collapsePhase >= 2
+                            Layout.minimumWidth: qcv_root._collapsePhase >= 2 ? 36 : 70
+                            Layout.maximumWidth: qcv_root._collapsePhase >= 2 ? 36 : 160
                             iconSource: "ui/cosmetic-bold-duotone.svg"
                             model: ["All Categories"].concat(AppController.categories)
                             currentIndex: {
@@ -308,7 +439,10 @@ Item {
 
                         GlassDropdown {
                             id: qcv_projectDrop
-                            Layout.preferredWidth: 180
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 8
+                            iconOnlyMode: qcv_root._collapsePhase >= 4
+                            Layout.minimumWidth: qcv_root._collapsePhase >= 4 ? 36 : 70
+                            Layout.maximumWidth: qcv_root._collapsePhase >= 4 ? 36 : 180
                             iconSource: "ui/folder-security-bold.svg"
                             model: AppController.projectLabels
                             currentIndex: {
@@ -324,7 +458,8 @@ Item {
 
                         IconButton {
                             objectName: "cycleProjectButton"
-                            buttonSize: 32 // matching dropdown height conceptually
+                            visible: !qcv_root.isEditingCollection
+                            buttonSize: 32
                             iconSource: AppController.ui_controller.getAssetUri("ui/transfer-icon.svg")
                             tooltipText: AppController.lastProject !== ""
                                 ? ("Switch to " + AppController.lastProject)
@@ -332,89 +467,57 @@ Item {
                             enabled: AppController.lastProject !== ""
                             onClicked: AppController.cycleProject()
                         }
-                    }
 
-                    Rectangle {
-                        visible: !qcv_root.isEditingCollection
-                        width: 1
-                        height: 16
-                        color: Theme.separator
-                        Layout.leftMargin: 4
-                        Layout.rightMargin: 4
-                    }
-
-                    // Client Format Group
-                    RowLayout {
-                        visible: !qcv_root.isEditingCollection
-                        spacing: 8
-                        Repeater {
-                            model: AppController.clientFormats
-                            delegate: IconButton {
-                                id: clientBtn
-                                buttonSize: 32
-                                property bool isSelected: modelData === AppController.clientFormat
-                                onClicked: (mouse) => AppController.ui_controller.setClientFormat(modelData)
-                                contentItem: Item {
-                                    implicitWidth: clientBtn.buttonSize
-                                    implicitHeight: clientBtn.buttonSize
-                                    Image {
-                                        id: clientImg
-                                        anchors.centerIn: parent
-                                        source: AppController.ui_controller.getLogoSource(modelData)
-                                        width: 16
-                                        height: 16
-                                        sourceSize.width: 16
-                                        sourceSize.height: 16
-                                        fillMode: Image.PreserveAspectFit
-                                        opacity: clientBtn.isSelected ? 1.0 : 0.5
-                                        visible: modelData !== "OpenCode"
-                                    }
-                                    ColorOverlay {
-                                        anchors.fill: clientImg
-                                        source: clientImg
-                                        color: Theme.label
-                                        visible: modelData === "OpenCode"
-                                        opacity: clientBtn.isSelected ? 1.0 : 0.5
-                                    }
-                                }
-                                background: Rectangle {
-                                    radius: width / 2
-                                    color: clientBtn.hovered ? Theme.glassHover : "transparent"
-                                    border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
-                                    border.width: 1
-                                }
-                                ToolTip.visible: clientBtn.hovered || clientBtn.visualFocus
-                                ToolTip.text: modelData
+                    GlassMenu {
+                        id: qcv_overflowMenu
+                        GlassMenuItem {
+                            visible: qcv_root._collapsePhase >= 1
+                            text: "Delete Selected"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                            enabled: AppController.quickCopyModel.selectedCount > 0
+                            onTriggered: AppController.ops_controller.deleteSelectedSkills()
+                        }
+                        GlassMenuItem {
+                            visible: qcv_root._collapsePhase >= 1
+                            text: AppController.quickCopyModel.selectedCount > 0 ? "Add Selected..." : "Create New..."
+                            iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
+                            onTriggered: qcv_addMenu.popup(qcv_overflowBtn, 0, qcv_overflowBtn.height + 4)
+                        }
+                        GlassMenuItem {
+                            visible: qcv_root._collapsePhase >= 6
+                            text: AppController.quickCopyModel.isAllExpanded ? "Collapse All" : "Expand All"
+                            iconSource: AppController.quickCopyModel.isAllExpanded ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                            onTriggered: AppController.quickCopyModel.toggleAll()
+                        }
+                        GlassMenuItem {
+                            visible: qcv_root._collapsePhase >= 7
+                            text: "Category: " + (AppController.quickCopyModel.categoryFilter !== ""
+                                ? AppController.quickCopyModel.categoryFilter : "All Categories")
+                            iconSource: AppController.ui_controller.getAssetUri("ui/cosmetic-bold-duotone.svg")
+                            onTriggered: {
+                                let cats = AppController.categories;
+                                let current = AppController.quickCopyModel.categoryFilter;
+                                let idx = current === "" ? -1 : cats.indexOf(current);
+                                let nextCat = (idx + 1) < cats.length ? cats[idx + 1] : "";
+                                AppController.ui_controller.setViewFilterForView("QuickCopy", "category", nextCat)
                             }
                         }
-                    }
-
-                    Rectangle {
-                        visible: !qcv_root.isEditingCollection
-                        width: 1
-                        height: 16
-                        color: Theme.separator
-                        Layout.leftMargin: 4
-                        Layout.rightMargin: 4
-                    }
-
-                    IconButton {
-                        id: barCopyBtn
-                        visible: !qcv_root.isEditingCollection
-                        buttonSize: 32
-                        role: "primary-outline"
-                        iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
-                        tooltipText: AppController.quickCopyModel.selectedCount > 0 ? ("Copy Selected (" + AppController.quickCopyModel.selectedCount + ")") : "Copy (No selection)"
-                        enabled: AppController.quickCopyModel.selectedCount > 0
-                        opacity: enabled ? 1.0 : 0.5
-                        objectName: "copySelectedBtn"
-                        onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
-                    }
+                        GlassMenuItem {
+                            visible: qcv_root._collapsePhase >= 8
+                            text: "Project: " + AppController.currentProject
+                            iconSource: AppController.ui_controller.getAssetUri("ui/folder-security-bold.svg")
+                            onTriggered: AppController.cycleProject()
                         }
+                    }
 
-                    // Fixed Controls Group (Right-most)
+
+
+                    // Fixed Controls Group (Right-most) — only visible during edit
                     RowLayout {
                         id: fixedControls
+                        visible: qcv_root.isEditingCollection
                         spacing: 12
                         layoutDirection: Qt.LeftToRight // Keep internal items left-to-right
 
@@ -443,7 +546,10 @@ Item {
 
                             GlassMultiSelect {
                                 id: qcv_colProjectSelect
-                                Layout.preferredWidth: 180
+                                iconOnlyMode: qcv_root._collapsePhase >= 3
+                                Layout.fillWidth: qcv_root._collapsePhase < 3
+                                Layout.minimumWidth: qcv_root._collapsePhase >= 3 ? 36 : 100
+                                Layout.maximumWidth: qcv_root._collapsePhase >= 3 ? 36 : 180
                                 Layout.preferredHeight: 32
                                 iconSource: "ui/folder-security-bold.svg"
                                 model: AppController.projectLabels
@@ -513,15 +619,141 @@ Item {
                                 }
                             }
                         }
-                    }
-                }
+                    } // <-- CLOSE Fixed Controls Group
 
+                        // Client Format - Expanded (5 logo buttons)
+                        RowLayout {
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase < 5
+                            spacing: 8
+                            Repeater {
+                                model: AppController.clientFormats
+                                delegate: IconButton {
+                                    id: clientBtn
+                                    buttonSize: 32
+                                    property bool isSelected: modelData === AppController.clientFormat
+                                    onClicked: (mouse) => AppController.ui_controller.setClientFormat(modelData)
+                                    contentItem: Item {
+                                        implicitWidth: clientBtn.buttonSize
+                                        implicitHeight: clientBtn.buttonSize
+                                        Image {
+                                            id: clientImg
+                                            anchors.centerIn: parent
+                                            source: AppController.ui_controller.getLogoSource(modelData)
+                                            width: 16
+                                            height: 16
+                                            sourceSize.width: 16
+                                            sourceSize.height: 16
+                                            fillMode: Image.PreserveAspectFit
+                                            opacity: clientBtn.isSelected ? 1.0 : 0.5
+                                            visible: modelData !== "OpenCode"
+                                        }
+                                        ColorOverlay {
+                                            anchors.fill: clientImg
+                                            source: clientImg
+                                            color: Theme.label
+                                            visible: modelData === "OpenCode"
+                                            opacity: clientBtn.isSelected ? 1.0 : 0.5
+                                        }
+                                    }
+                                    background: Rectangle {
+                                        radius: width / 2
+                                        color: clientBtn.hovered ? Theme.glassHover : "transparent"
+                                        border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
+                                        border.width: 1
+                                    }
+                                    ToolTip.visible: clientBtn.hovered || clientBtn.visualFocus
+                                    ToolTip.text: modelData
+                                }
+                            }
+                        }
 
+                        // Client Format - Dropdown (single button)
+                        IconButton {
+                            id: qcv_clientFormatDropBtn
+                            visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase >= 5
+                            buttonSize: 32
+                            tooltipText: "Format: " + AppController.clientFormat
+                            onClicked: qcv_clientFormatMenu.popup(qcv_clientFormatDropBtn, 0, qcv_clientFormatDropBtn.height + 4)
+                            contentItem: Item {
+                                implicitWidth: qcv_clientFormatDropBtn.buttonSize
+                                implicitHeight: qcv_clientFormatDropBtn.buttonSize
+                                Image {
+                                    id: activeClientImg
+                                    anchors.centerIn: parent
+                                    source: AppController.ui_controller.getLogoSource(AppController.clientFormat)
+                                    width: 16
+                                    height: 16
+                                    sourceSize.width: 16
+                                    sourceSize.height: 16
+                                    fillMode: Image.PreserveAspectFit
+                                    visible: AppController.clientFormat !== "OpenCode"
+                                }
+                                ColorOverlay {
+                                    anchors.fill: activeClientImg
+                                    source: activeClientImg
+                                    color: Theme.label
+                                    visible: AppController.clientFormat === "OpenCode"
+                                }
+                            }
+                            GlassMenu {
+                                id: qcv_clientFormatMenu
+                                Repeater {
+                                    model: AppController.clientFormats
+                                    delegate: GlassMenuItem {
+                                        text: modelData
+                                        iconSource: AppController.ui_controller.getLogoSource(modelData)
+                                        colorizeIcon: modelData === "OpenCode"
+                                        onTriggered: AppController.ui_controller.setClientFormat(modelData)
+                                    }
+                                }
+                            }
+                        }
 
+                        // Copy button
+                        IconButton {
+                            id: barCopyBtn
+                            visible: !qcv_root.isEditingCollection
+                            buttonSize: 32
+                            role: "primary-outline"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
+                            tooltipText: AppController.quickCopyModel.selectedCount > 0 ? ("Copy Selected (" + AppController.quickCopyModel.selectedCount + ")") : "Copy (No selection)"
+                            enabled: AppController.quickCopyModel.selectedCount > 0
+                            opacity: enabled ? 1.0 : 0.5
+                            objectName: "copySelectedBtn"
+                            onClicked: (mouse) => AppController.ops_controller.copySelectedSkillsToClipboard()
+                        }
+                    } // <-- CLOSE qcv_headerLayout
+                 } // <-- CLOSE headerControls
             } // End of GlassPill
+        } // End of Header RowLayout
+
+        // Debug overlay: live threshold values visible in MCP screenshots
+        // Also logs to console.log (captured in DATA_DIR/qml_console.log)
+        Rectangle {
+            onVisibleChanged: { if (visible) { qcv_root.dumpDebug() } }
+            Component.onCompleted: { qcv_root.dumpDebug() }
+            visible: qcv_root.debugLayout
+            height: 36
+            Layout.fillWidth: true
+            color: "#cc000000"
+            radius: 3
+            TextEdit {
+                anchors.fill: parent
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                color: "#00ff00"
+                font.family: "Consolas"
+                font.bold: true
+                font.pixelSize: 14
+                verticalAlignment: Text.AlignVCenter
+                readOnly: true
+                selectByMouse: true
+                text: "CP:" + qcv_root._collapsePhase
+                    + " HW:" + headerControls.width
+                    + " IGW:" + qcv_root._infoGroupWidth
+                    + " CF:" + AppController.clientFormats.length
+            }
         }
-
-
 
         // Main Content Area
         SplitView {
@@ -561,7 +793,7 @@ Item {
                 objectName: "quickCopyList"
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
-                SplitView.minimumWidth: 300
+                SplitView.minimumWidth: 100
 
                 model: null
 

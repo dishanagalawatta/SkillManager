@@ -185,15 +185,20 @@ class CommandChannel(QObject):
 
     def _handle_command(self, data: dict) -> None:
         cmd_id = data.get("id")
-        if data.get("action") != "navigate":
-            self._write_ack(cmd_id, ok=False, error=f"unknown action: {data.get('action')!r}")
-            return
-        view = data.get("view")
-        if view not in self.VALID_VIEWS:
-            self._write_ack(cmd_id, ok=False, error=f"invalid view: {view!r}")
-            return
-        # directoryChanged fires on the Qt thread, so this runs on-thread.
-        self._apply_view(cmd_id, view)
+        action = data.get("action")
+
+        if action == "navigate":
+            view = data.get("view")
+            if view not in self.VALID_VIEWS:
+                self._write_ack(cmd_id, ok=False, error=f"invalid view: {view!r}")
+                return
+            self._apply_view(cmd_id, view)
+        elif action == "set_debug_overlay":
+            enabled = bool(data.get("enabled", True))
+            self.app.debugOverlayEnabled = enabled
+            self._write_ack(cmd_id, ok=True)
+        else:
+            self._write_ack(cmd_id, ok=False, error=f"unknown action: {action!r}")
 
     def _apply_view(self, cmd_id, view) -> None:
         try:
@@ -236,6 +241,20 @@ class AppController(QObject):
     updateResultsChanged = Signal()
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
+
+    # Debug overlay — toggled via CLI --debug-overlay or MCP sm_toggle_debug_overlay.
+    debugOverlayEnabledChanged = Signal()
+
+    @Property(bool, notify=debugOverlayEnabledChanged)
+    def debugOverlayEnabled(self):  # type: ignore[no-redef]
+        return self._debug_overlay_enabled
+
+    @debugOverlayEnabled.setter  # type: ignore[func-attr,no-redef]
+    def debugOverlayEnabled(self, val):
+        if self._debug_overlay_enabled != val:
+            self._debug_overlay_enabled = val
+            self._config.set("debug_overlay_enabled", val)
+            self.debugOverlayEnabledChanged.emit()
 
     @Property(bool, constant=True)
     def isTesting(self):
@@ -285,6 +304,9 @@ class AppController(QObject):
         self._selected_skill = QQmlPropertyMap.create(self)
         self._is_loading = False
         self._status_message = ""
+        # Startup debug-overlay flag: --debug-overlay enables the ribbon debug
+        # overlay in QuickCopyView without needing the MCP toggle.
+        self._debug_overlay_enabled = "--debug-overlay" in sys.argv
         self._discovered_projects = []
         self._last_poll_ts = 0.0
         self._categories = []

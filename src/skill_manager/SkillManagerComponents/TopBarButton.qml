@@ -10,6 +10,7 @@ Button {
     property string iconText: ""
     property string iconSource: ""
     property string labelText: ""
+    property bool showLabel: true
 
     padding: 0
     implicitHeight: 36
@@ -66,7 +67,7 @@ Button {
                 font.pixelSize: Theme.sizeBody
                 font.weight: control.active ? Font.Bold : Font.Normal
                 color: control.active ? Theme.label : Theme.secondaryLabel
-                visible: control.labelText !== ""
+                visible: control.labelText !== "" && control.showLabel
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 Layout.alignment: Qt.AlignVCenter

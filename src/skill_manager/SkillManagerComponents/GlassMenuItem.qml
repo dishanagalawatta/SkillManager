@@ -9,6 +9,7 @@ MenuItem {
     property string shortcut: ""
     property bool showIcon: true
     property bool isCompact: false
+    property bool colorizeIcon: true
 
     implicitWidth: 200
     implicitHeight: 40
@@ -47,7 +48,7 @@ MenuItem {
                 anchors.fill: iconImg
                 source: iconImg
                 color: control.highlighted ? Theme.label : Theme.secondaryLabel
-                visible: control.iconSource !== ""
+                visible: control.iconSource !== "" && control.colorizeIcon
             }
         }
 

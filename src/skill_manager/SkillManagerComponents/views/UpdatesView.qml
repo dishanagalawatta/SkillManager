@@ -168,7 +168,7 @@ Item {
             // Left Pane: Packages Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.45
-                SplitView.minimumWidth: 280
+                SplitView.minimumWidth: 100
                 Layout.fillHeight: true
                 spacing: 16
 
@@ -403,7 +403,7 @@ Item {
             // Right Pane: Projects Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.55
-                SplitView.minimumWidth: 320
+                SplitView.minimumWidth: 100
                 Layout.fillHeight: true
                 spacing: 16
 

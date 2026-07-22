@@ -27,6 +27,8 @@ ytp
 ## To Do (Ready for Pickup)
 
 * [ ] Narrow window layout
+* [ ] automatic copy to clipboard when screenshot taken
+* [ ] automatic adding and removing to selected items on screenshot
 * [ ] Priority refresh
 * [ ] Update readme FIle (Revert)
 * [ ] See for winget approval
@@ -44,6 +46,8 @@ ytp
 ---
 
 # 4. Bug Tracker
+
+* [ ] repace same screenshot when taking new one
 
 ---
 
