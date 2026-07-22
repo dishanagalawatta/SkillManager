@@ -1,6 +1,6 @@
 # Ribbon Collapse System
 
-> **Scope**: `QuickCopyView.qml` — the responsive ribbon that adapts to window width.
+> **Scope**: `QuickCopyView.qml` and `TopBar.qml` — responsive ribbons that adapt to window width.
 
 ---
 
@@ -137,3 +137,85 @@ sm_toggle_debug_overlay({ "enabled": true })
 - **Items never "jump" when there's space** — the system is purely needs-based.
 - **Collection is always visible** — it collapses to icon-only but never goes to overflow.
 - **Overflow `⋮` is where Delete was** — between InfoGroup and (Delete/Add), so it naturally takes Delete's slot.
+
+---
+
+## 6. TopBar Collapse
+
+**Scope**: `TopBar.qml` — the top navigation bar.
+
+Phases are independent from QuickCopyView — TopBar has its own `_topPhase` (0–3) and `_topCalcWidth()`.
+
+| Phase | Action | Width Saved |
+|-------|--------|-------------|
+| **0** | All expanded (nav labels, search bar, refresh) | — |
+| **1** | Search bar (300px) → search icon (28px) | ~172px |
+| **2** | Nav buttons collapse to icon-only (5× icons) | ~266px (label text) |
+| **3** | Refresh + Settings → overflow `⋮` (where Refresh was) | ~72px |
+
+### Other nav buttons (Snap, QuickCopy, Library, Updates)
+
+Always visible on nav bar — never go to overflow. At phase 2+ they become icon-only.
+
+### Overflow menu items (phase 3 only)
+
+- **Refresh** — `AppController.refreshSkills()`
+- **Settings** — navigates to Settings view (hidden when `currentView === "Settings"`)
+
+### Width Calculation (`_topCalcWidth`)
+
+```
+Fixed widths:
+  Snap / QuickCopy / Library / Updates / Settings labels: 76 / 96 / 80 / 84 / 90
+  Nav button icon-only: 40 each
+  Refresh: 32
+  Search icon: 28
+  Overflow btn: 36
+  Search input: Math.min(200, root.width * 0.3)  [phase 0 only]
+  + 40 margins, 24 outer spacing, 4 nav spacing, 8 action spacing
+
+Phase 0: nav_labels(426) + margins(40) + spacing(28) + refresh(32) + search(dynamic) + action_spacing(8)
+Phase 1: nav_labels(426) + margins(40) + spacing(28) + refresh(32) + search_icon(28) + action_spacing(8)
+Phase 2: nav_icons×5(200) + margins(40) + spacing(28) + refresh(32) + search_icon(28) + action_spacing(8)
+Phase 3: nav_icons×4(160) + margins(40) + spacing(24) + overflow(36) + search_icon(28) + action_spacing(8)
+```
+
+### Phase selection (most expanded first)
+
+```qml
+property int _topPhase: {
+    if (_topCalcWidth(0) <= root.width) return 0
+    if (_topCalcWidth(1) <= root.width) return 1
+    if (_topCalcWidth(2) <= root.width) return 2
+    return 3
+}
+```
+
+### Layout (left → right)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  RowLayout (anchors.leftMargin:20, rightMargin:20, spacing:24)  │
+│                                                             │
+│  Nav RowLayout (fillWidth)                                  │
+│  [📷 Snap] [⚡ Quick Copy] [📚 Library] [🔄 Updates] [⚙️ Settings]  │
+│  ── all visible, showLabel = phase<2                       │
+│  ── Settings hidden at phase 3+                             │
+│  [spacer]                                                   │
+│                                                             │
+│  Actions RowLayout (spacing:8)                              │
+│  [🔄 Refresh]  (visible phase<3)                            │
+│  [⋮ Overflow]  (visible phase>=3, where Refresh was)        │
+│  [🔍 SearchInput] (visible phase<1, fillWidth, max 200px)   │
+│  [🔍 SearchIcon] (visible phase>=1, 28px)                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key differences from QuickCopyView collapse
+
+| Aspect | QuickCopyView | TopBar |
+|--------|---------------|--------|
+| Overflow position | Between InfoGroup and Delete | Replaces Refresh in actions section |
+| Nav items to overflow | Multiple per phase | Only Settings at phase 3 |
+| Hidden items | Yes, hidden per phase | Nav always visible (except Settings at phase 3) |
+| Search | N/A | Collapses bar→icon at phase 1 |
