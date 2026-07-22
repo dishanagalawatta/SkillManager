@@ -88,8 +88,8 @@ Iterates from 0→8 (most→least expanded), returning the first phase that fits
 │  │  [⋮] OverflowBtn     ← phase 1+, takes Delete's slot          │  │
 │  │  [🗑] Delete          ← phase 0 only                           │  │
 │  │  [+⋁] Add            ← phase 0 only                           │  │
-│  │  [▢] Collection      ← always, icon phase 3+                  │  │
 │  │  [▢] Category        ← phase <7, icon phase 2+                │  │
+│  │  [▢] Collection      ← always, icon phase 3+                  │  │
 │  │  [▢] Project         ← phase <8, icon phase 4+                │  │
 │  │  [↺] Cycle Project   ← always                                 │  │
 │  │  [spacer]                                                      │  │
