@@ -457,12 +457,23 @@ Rectangle {
 
     // Collapse handle (vertical bar on the left when collapsed)
     Rectangle {
+        id: collapsedHandle
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 32
         visible: root.isCollapsed
         color: "transparent"
+        activeFocusOnTab: true
+        border.color: collapsedHandle.activeFocus ? Theme.accent : "transparent"
+        border.width: collapsedHandle.activeFocus ? 2 : 0
+
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.isCollapsed = false
+                event.accepted = true
+            }
+        }
         
         Text {
             anchors.centerIn: parent
@@ -481,12 +492,12 @@ Rectangle {
 
             SleekToolTip {
                 text: "Expand Inspector"
-                visible: parent.containsMouse
+                visible: collapseMouseArea.containsMouse || collapsedHandle.activeFocus
             }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Expand Inspector"
         }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: "Expand Inspector"
     }
 
     Behavior on width {
