@@ -4,3 +4,6 @@
 ## 2026-07-10 - Fast-path exact match with list membership
 **Learning:** Checking `if qt in all_doc_tokens:` where `all_doc_tokens` is a list of pre-computed string tokens acts as a fast, exact match check evaluated in C, whereas `qt in string` is a substring check. This is an optimal, fully isolated fast-path prior to executing expensive `fuzz.ratio` loops that rely on early-exit thresholds.
 **Action:** When replacing loops that require early termination (`max_score > 70: break`), use list membership (`qt in list`) to short-circuit exact matches in a preliminary loop before executing the nested `fuzz.ratio` loops.
+## 2025-02-14 - Cache path calculations in quick_copy.py
+**Learning:** During the file discovery process and quick copying operations, `project_root_for_project` and `skill_base_relative` are called heavily on the same paths, which adds redundant path resolution overhead. Applying `@lru_cache` significantly reduces this overhead.
+**Action:** Use `@lru_cache` on repetitive path resolution functions like `project_root_for_project` and `skill_base_relative` to memoize the results for hot paths.
