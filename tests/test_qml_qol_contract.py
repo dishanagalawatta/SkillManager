@@ -200,7 +200,7 @@ def test_dark_polish_tokens_drive_shared_components():
     assert "Theme.selectedRowHover" in skill_item
     assert "Theme.selectedRowBorder" in skill_item
     assert "Theme.selectedRow" in toggle
-    assert "Accessible.description: tooltipText" in toggle
+    assert 'Accessible.name: tooltipText !== "" ? tooltipText : text' in toggle
     assert "color: Theme.label" in top_bar
 
 
