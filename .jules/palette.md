@@ -27,3 +27,7 @@
 ## 2024-05-18 - Keyboard Toggle for Custom Item Controls
 **Learning:** Custom `Item` controls used as toggles require `activeFocusOnTab: true`, a `Keys.onPressed` handler that explicitly sets `event.accepted = true` after responding to Space/Return/Enter keys, and `Accessible.role`/`Accessible.name` applied to the focusable `Item` itself rather than its child `MouseArea`. When a child `SleekToolTip` relies on the `MouseArea` hover, its `visible` binding must be explicitly written as `visible: logoMouseArea.containsMouse || parentItem.activeFocus` rather than simply `parent.containsMouse` if the logical "parent" for focus isn't the direct parent.
 **Action:** Always ensure `activeFocusOnTab`, `event.accepted = true` for keyboard interactions, and the correct `visible` condition for tooltips on custom interactive components.
+## 2024-05-19 - Removed Duplicate Accessible.description
+
+**Learning:** When creating reusable QML components with `Accessible.name` derived from a property (like `text` or `tooltipText`), explicitly setting `Accessible.description` to the exact same value causes screen readers to double-announce the action.
+**Action:** Always verify that `Accessible.description` provides additional context. If it merely mirrors `Accessible.name`, omit it entirely to ensure a clean, single announcement.
