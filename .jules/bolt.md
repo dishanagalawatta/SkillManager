@@ -4,3 +4,7 @@
 ## 2026-07-10 - Fast-path exact match with list membership
 **Learning:** Checking `if qt in all_doc_tokens:` where `all_doc_tokens` is a list of pre-computed string tokens acts as a fast, exact match check evaluated in C, whereas `qt in string` is a substring check. This is an optimal, fully isolated fast-path prior to executing expensive `fuzz.ratio` loops that rely on early-exit thresholds.
 **Action:** When replacing loops that require early termination (`max_score > 70: break`), use list membership (`qt in list`) to short-circuit exact matches in a preliminary loop before executing the nested `fuzz.ratio` loops.
+
+## 2024-07-23 - Search Engine Scoring Loop Optimization
+**Learning:** In `src/skill_manager/core/search.py`, fast-path exact-match evaluations (`if qt in all_doc_tokens`) inside the fuzzy scoring loop must be cleanly separated from substring match fallbacks (`if qt in index_data["full_text"]`). Overriding the exact score conditionally for substring matches breaks the `threshold` filtering by inflating substring partial match scores artificially.
+**Action:** When implementing multiple fast-paths in search scoring loops, strictly order the checks by evaluating C-optimized exact list membership (`qt in all_doc_tokens`) before evaluating substring checks to maximize performance while preserving partial match capabilities and correct score assignments.

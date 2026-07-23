@@ -155,16 +155,16 @@ class SearchEngine:
             if all_doc_tokens:
                 max_token_match = 0
 
-                # Fast path: check all query tokens for exact substring matches first
+                # Fast path: check all query tokens for exact token matches first
                 for qt in query_tokens:
-                    if qt in index_data["full_text"]:
+                    if qt in all_doc_tokens:
                         max_token_match = 100
                         break
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
                     for qt in query_tokens:
-                        if qt in all_doc_tokens:
+                        if qt in index_data["full_text"]:
                             max_token_match = 100
                             break
                     if max_token_match == 0:
