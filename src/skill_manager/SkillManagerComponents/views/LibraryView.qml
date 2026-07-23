@@ -11,8 +11,89 @@ Item {
 
     property bool showImageInspector: false
     property bool showCommandInspector: false
-    property bool iconOnlyMode: lv_root.width < 700
-    property bool compactMode: lv_root.width < 600
+
+    // ── Dynamic Collapse Phases (0 = fully expanded) ──────────────
+    //   0: All expanded
+    //   1: "selected" text → hidden
+    //   2: Delete + Add → overflow (⋮ appears where Delete was)
+    //   3: Category dropdown → icon-only
+    //   4: Project dropdown → icon-only
+    //   5: Show Archived → overflow
+    //   6: Archive → overflow
+    //   7: ToggleAll → overflow
+    //   8: Category icon → overflow
+    //
+    // Always visible: selectCheck, count badge, project (icon), tempCopy, copyBtn
+
+    readonly property int _wToggle:      24
+    readonly property int _wSelect:      24
+    readonly property int _wDelete:      24
+    readonly property int _wAdd:         24
+    readonly property int _wOverflow:    32
+    readonly property int _wDropFull:   140   // category/project full dropdown
+    readonly property int _wDropIcon:    36   // category/project icon
+    readonly property int _wArchive:     24
+    readonly property int _wShowArchived: 24
+    readonly property int _wDivider:      9   // 1px + 4+4 margins
+    readonly property int _wTempCopy:    24
+    readonly property int _wCopy:        24
+    readonly property int _wSelectedText: 50
+
+    property int _badgeWidth: {
+        if (AppController.libraryModel.selectedCount === 0) return 0
+        var str = AppController.libraryModel.selectedCount.toString()
+        return Math.max(24, str.length * 10 + 16) + 4
+    }
+
+    function _calcLibWidth(phase) {
+        var m = 24    // 16 left + 8 right margin
+        var os = 12   // outer spacing between LEFT/CENTER/RIGHT
+        var ls = 12   // LEFT group inner spacing
+        var cs = 8    // CENTER group inner spacing
+        var rs = 8    // RIGHT group inner spacing
+
+        var lw = 0, ln = 0  // left group
+        var cw = 0, cn = 0  // center group
+        var rw = 0, rn = 0  // right group
+
+        // LEFT
+        if (phase < 7) { lw += _wToggle; ln++ }
+        lw += _wSelect; ln++
+        if (AppController.libraryModel.selectedCount > 0) { lw += _badgeWidth; ln++ }
+        if (phase < 1 && AppController.libraryModel.selectedCount > 0) { lw += _wSelectedText; ln++ }
+        if (phase < 2) { lw += _wDelete; ln++ }
+        if (phase < 2) { lw += _wAdd; ln++ }
+        if (phase >= 2) { lw += _wOverflow; ln++ }
+
+        // CENTER
+        if (phase < 8) {
+            cw += (phase < 3) ? _wDropFull : _wDropIcon; cn++
+        }
+        if (phase < 6) { cw += _wArchive; cn++ }
+        if (phase < 5) { cw += _wShowArchived; cn++ }
+
+        // RIGHT
+        rw += (phase < 4) ? _wDropFull : _wDropIcon; rn++
+        rw += _wDivider; rn++
+        rw += _wTempCopy; rn++
+        rw += _wCopy; rn++
+
+        // Spacing
+        if (ln > 1) lw += (ln - 1) * ls
+        if (cn > 1) cw += (cn - 1) * cs
+        if (rn > 1) rw += (rn - 1) * rs
+
+        return m + lw + os + cw + os + rw
+    }
+
+    property int _libPhase: {
+        var avail = lv_root.width - 24  // 16 left + 8 right margins
+        // Scan from most-expanded (0) up to most-collapsed (8)
+        for (var p = 0; p <= 8; p++) {
+            if (_calcLibWidth(p) <= avail) return p
+        }
+        return 8
+    }
 
     function focusSearch() {
         // Handled globally in TopBar now
@@ -81,131 +162,157 @@ Item {
                     anchors.margins: 4
                     anchors.leftMargin: 16
                     anchors.rightMargin: 8
-                    spacing: lv_root.compactMode ? 6 : 12
+                    spacing: lv_root._libPhase >= 4 ? 6 : 12
 
-                    // LEFT: Toggle All
-                IconButton {
-                    id: lv_toggleAllBtn
-                    buttonSize: 24
-                    role: "ghost"
-                    tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
-                    onClicked: (mouse) => AppController.libraryModel.toggleAll()
-                    iconSize: 18
-                    iconSource: AppController.libraryModel.isAllExpanded ?
-                            AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
-                            AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
-                    background: Rectangle {
-                        radius: 12
-                        color: lv_toggleAllBtn.hovered ? Theme.glassHover : "transparent"
-                        border.color: Theme.alpha(Theme.label, 0.15)
-                        border.width: 1
-                    }
-                }
+                    // ── LEFT GROUP ────────────────────────────────────────
+                    RowLayout {
+                        spacing: lv_root._libPhase >= 4 ? 6 : 12
 
-
-
-                GlassCheckBox {
-                    id: lv_selectCheck
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
-                    isClearAction: true
-
-                    checkState: {
-                        let count = AppController.libraryModel.visibleSelectedCount;
-                        let total = AppController.libraryModel.visibleSelectableCount;
-                        if (count === 0) return Qt.Unchecked;
-                        if (count >= total && total > 0) return Qt.Checked;
-                        return Qt.PartiallyChecked;
-                    }
-
-                    onToggled: {
-                        if (checkState === Qt.Unchecked) {
-                            AppController.libraryModel.selectAll();
-                        } else {
-                            AppController.libraryModel.clearSelection();
+                    IconButton {
+                        id: lv_toggleAllBtn
+                        visible: lv_root._libPhase < 7
+                        buttonSize: 24
+                        role: "ghost"
+                        tooltipText: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
+                        onClicked: (mouse) => AppController.libraryModel.toggleAll()
+                        iconSize: 18
+                        iconSource: AppController.libraryModel.isAllExpanded ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                        background: Rectangle {
+                            radius: 12
+                            color: lv_toggleAllBtn.hovered ? Theme.glassHover : "transparent"
+                            border.color: Theme.alpha(Theme.label, 0.15)
+                            border.width: 1
                         }
                     }
-                }
 
-
-                // LEFT: Selection Count
-                RowLayout {
-                    spacing: 12
-                    visible: AppController.libraryModel.selectedCount > 0
-                    
-                    Rectangle {
-                        Layout.preferredWidth: Math.max(24, libCountText.implicitWidth + 16)
+                    GlassCheckBox {
+                        id: lv_selectCheck
+                        buttonSize: 24
+                        Layout.preferredWidth: 24
                         Layout.preferredHeight: 24
-                        radius: height / 2
-                        color: Theme.accent
-                        Text {
-                            id: libCountText
-                            anchors.centerIn: parent
-                            text: AppController.libraryModel.selectedCount.toString()
-                            color: "white"
-                            font.family: Theme.fontFamily
-                            font.weight: Font.Bold
-                            font.pixelSize: 11
+                        isClearAction: true
+
+                        checkState: {
+                            let count = AppController.libraryModel.visibleSelectedCount;
+                            let total = AppController.libraryModel.visibleSelectableCount;
+                            if (count === 0) return Qt.Unchecked;
+                            if (count >= total && total > 0) return Qt.Checked;
+                            return Qt.PartiallyChecked;
                         }
-                    }
 
-                    Text {
-                        text: "selected"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.label
-                        font.weight: Font.Medium
-                        visible: !lv_root.compactMode
-                    }
-                }
-
-                IconButton {
-                    id: lv_deleteBtn
-                    visible: !lv_root.compactMode
-                    buttonSize: 28
-                    iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
-                    tooltipText: "Delete Selected Skills"
-                    role: "destructive"
-                    flat: true
-                    enabled: AppController.libraryModel.selectedCount > 0
-                    onClicked: (mouse) => {
-                        var selectedPaths = AppController.libraryModel.getSelectedPaths() || []
-                        var allProjects = []
-                        for (var i = 0; i < selectedPaths.length; i++) {
-                            var path = selectedPaths[i]
-                            var isCmd = path.endsWith(".md") || path.indexOf("/commands/") >= 0 || path.indexOf("\\commands\\") >= 0
-                            var holders = isCmd ? (AppController.commandProjectsForPath(path) || []) : (AppController.skillProjectsForPath(path) || [])
-                            for (var j = 0; j < holders.length; j++) {
-                                if (allProjects.indexOf(holders[j]) === -1) allProjects.push(holders[j])
+                        onToggled: {
+                            if (checkState === Qt.Unchecked) {
+                                AppController.libraryModel.selectAll();
+                            } else {
+                                AppController.libraryModel.clearSelection();
                             }
                         }
-                        if (allProjects.length === 0 && AppController.currentProject) {
-                            allProjects.push(AppController.currentProject)
-                        }
-                        lv_cmdDeleteDialog.openBulkSkill(AppController.libraryModel.selectedCount, allProjects, selectedPaths, AppController.libraryModel.getSelectedNames())
                     }
-                }
 
-                IconButton {
-                    id: lv_addCommandBtn
-                    visible: !lv_root.compactMode
-                    buttonSize: 28
-                    iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
-                    tooltipText: "Add Command"
-                    onClicked: (mouse) => lv_commandDialog.openWithContext()
-                }
-                
-                // Right Controls Group
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-                    
+                    // Selection Count
+                    RowLayout {
+                        spacing: 12
+                        visible: AppController.libraryModel.selectedCount > 0
+
+                        Rectangle {
+                            Layout.preferredWidth: Math.max(24, libCountText.implicitWidth + 16)
+                            Layout.preferredHeight: 24
+                            radius: 12
+                            color: Theme.glassPill
+                            border.color: Theme.glassBorder
+                            border.width: 1
+                            Text {
+                                id: libCountText
+                                anchors.centerIn: parent
+                                text: AppController.libraryModel.selectedCount.toString()
+                                color: Theme.label
+                                font.family: Theme.fontFamily
+                                font.weight: Font.Bold
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Text {
+                            text: "selected"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            color: Theme.label
+                            font.weight: Font.Medium
+                            visible: lv_root._libPhase < 1
+                        }
+                    }
+
+                    IconButton {
+                        id: lv_deleteBtn
+                        visible: lv_root._libPhase < 2
+                        buttonSize: 24
+                        iconSize: 18
+                        iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                        tooltipText: "Delete Selected Skills"
+                        role: "destructive"
+                        flat: true
+                        enabled: AppController.libraryModel.selectedCount > 0
+                        onClicked: (mouse) => {
+                            var selectedPaths = AppController.libraryModel.getSelectedPaths() || []
+                            var allProjects = []
+                            for (var i = 0; i < selectedPaths.length; i++) {
+                                var path = selectedPaths[i]
+                                var isCmd = path.endsWith(".md") || path.indexOf("/commands/") >= 0 || path.indexOf("\\commands\\") >= 0
+                                var holders = isCmd ? (AppController.commandProjectsForPath(path) || []) : (AppController.skillProjectsForPath(path) || [])
+                                for (var j = 0; j < holders.length; j++) {
+                                    if (allProjects.indexOf(holders[j]) === -1) allProjects.push(holders[j])
+                                }
+                            }
+                            if (allProjects.length === 0 && AppController.currentProject) {
+                                allProjects.push(AppController.currentProject)
+                            }
+                            lv_cmdDeleteDialog.openBulkSkill(AppController.libraryModel.selectedCount, allProjects, selectedPaths, AppController.libraryModel.getSelectedNames())
+                        }
+                    }
+
+                    IconButton {
+                        id: lv_addCommandBtn
+                        visible: lv_root._libPhase < 2
+                        buttonSize: 24
+                        iconSize: 18
+                        iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
+                        tooltipText: "Add Command"
+                        onClicked: (mouse) => lv_commandDialog.openWithContext()
+                    }
+
+                    // Overflow (replaces Delete position)
+                    IconButton {
+                        id: lv_overflowBtn
+                        visible: lv_root._libPhase >= 2
+                        iconText: "⋮"
+                        iconSize: 20
+                        buttonSize: 28
+                        role: "ghost"
+                        background: Rectangle {
+                            radius: 14
+                            color: parent.hovered || parent.down ? Theme.glassHover : "transparent"
+                            border.color: Theme.glassBorder
+                            border.width: 1
+                        }
+                        onClicked: lv_overflowMenu.popup(lv_overflowBtn, 0, lv_overflowBtn.height + 4)
+                    }
+                    }
+
+                    // ── SPACER ────────────────────────────────────────────
+                    Item { Layout.fillWidth: true }
+
+                    // ── CENTER GROUP ──────────────────────────────────────
+                    RowLayout {
+                        spacing: 8
+
                     GlassDropdown {
                         id: lv_categoryDrop
-                        iconOnlyMode: lv_root.iconOnlyMode
-                        Layout.fillWidth: !lv_root.iconOnlyMode
-                        Layout.minimumWidth: lv_root.iconOnlyMode ? 36 : 100
-                        Layout.maximumWidth: lv_root.iconOnlyMode ? 36 : 160
+                        iconOnlyMode: lv_root._libPhase >= 3
+                        visible: lv_root._libPhase < 8
+                        Layout.minimumWidth: lv_root._libPhase >= 3 ? 36 : 100
+                        Layout.maximumWidth: lv_root._libPhase >= 3 ? 36 : 160
                         iconSource: "ui/cosmetic-bold-duotone.svg"
                         model: ["All Categories"].concat(AppController.categories)
                         currentIndex: {
@@ -218,148 +325,128 @@ Item {
                         }
                     }
 
+                    IconButton {
+                        id: lv_archiveBtn
+                        buttonSize: 24
+                        iconSize: 18
+                        visible: AppController.libraryModel.selectedCount > 0 && lv_root._libPhase < 6
+                        iconSource: AppController.ui_controller.getAssetUri("ui/inbox-in-bold-duotone.svg")
+                        tooltipText: "Archive"
+                        onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
+                    }
 
-                    
-                    // Action Buttons
-                    // Always Visible Actions
+                    IconButton {
+                        id: lv_showArchived
+                        buttonSize: 24
+                        iconSize: 18
+                        visible: lv_root._libPhase < 5
+                        iconSource: AppController.libraryModel.showArchived ?
+                            AppController.ui_controller.getAssetUri("ui/box-broken.svg") :
+                            AppController.ui_controller.getAssetUri("ui/box-bold-duotone.svg")
+                        tooltipText: AppController.libraryModel.showArchived ? "Hide Archived" : "Show Archived"
+                        onClicked: (mouse) => AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived
+                    }
+                    }
 
+                    // ── SPACER ────────────────────────────────────────────
+                    Item { Layout.fillWidth: true }
 
+                    // ── RIGHT GROUP ───────────────────────────────────────
+                    RowLayout {
+                        spacing: lv_root._libPhase >= 4 ? 4 : 8
+                        Layout.alignment: Qt.AlignRight
 
-                        GlassDropdown {
-                            id: lv_projectDrop
-                            iconOnlyMode: lv_root.iconOnlyMode
-                            Layout.fillWidth: !lv_root.iconOnlyMode
-                            Layout.minimumWidth: lv_root.iconOnlyMode ? 36 : 70
-                            Layout.maximumWidth: lv_root.iconOnlyMode ? 36 : 180
-                            iconSource: "ui/folder-security-bold.svg"
-                            visible: AppController.libraryModel.selectedCount > 0
-                            model: AppController.projectLabels
-                            enabled: AppController.projects.length > 0
-                            currentIndex: {
-                                let idx = model.indexOf(AppController.currentProject);
-                                return Math.max(0, idx);
-                            }
-                            onActivated: (index) => {
-                                if (index >= 0 && index < AppController.projectLabels.length) {
-                                    AppController.setCurrentProject(AppController.projectLabels[index])
-                                }
+                    GlassDropdown {
+                        id: lv_projectDrop
+                        iconOnlyMode: lv_root._libPhase >= 4
+                        Layout.minimumWidth: lv_root._libPhase >= 4 ? 36 : 70
+                        Layout.maximumWidth: lv_root._libPhase >= 4 ? 36 : 180
+                        iconSource: "ui/folder-security-bold.svg"
+                        model: AppController.projectLabels
+                        enabled: AppController.projects.length > 0
+                        currentIndex: {
+                            let idx = model.indexOf(AppController.currentProject);
+                            return Math.max(0, idx);
+                        }
+                        onActivated: (index) => {
+                            if (index >= 0 && index < AppController.projectLabels.length) {
+                                AppController.setCurrentProject(AppController.projectLabels[index])
                             }
                         }
+                    }
 
+                    Rectangle {
+                        objectName: "libraryDestructiveDivider"
+                        width: 1
+                        height: 16
+                        color: Theme.separator
+                        Layout.leftMargin: 4
+                        Layout.rightMargin: 4
+                    }
 
+                    IconButton {
+                        id: lv_tempCopyBtn
+                        buttonSize: 24
+                        iconSize: 18
+                        role: "secondary"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/file-right-broken.svg")
+                        enabled: AppController.projects.length > 0
+                        tooltipText: enabled ? "Copy Temp" : "Add a project in Updates before copying skills."
+                        onClicked: (mouse) => {
+                            let path = AppController.config_controller.getProjectPath(AppController.currentProject)
+                            if (path) {
+                                AppController.ops_controller.copySelectedSkillsToProjectTemporarily(path)
+                            }
+                        }
+                    }
 
-                        IconButton {
-                            id: lv_archiveBtn
-                            buttonSize: 28
-                            visible: AppController.libraryModel.selectedCount > 0 && !lv_root.compactMode
+                    IconButton {
+                        id: lv_copyBtn
+                        buttonSize: 24
+                        iconSize: 18
+                        role: "primary-outline"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/file-right-bold-duotone.svg")
+                        enabled: AppController.projects.length > 0
+                        tooltipText: enabled ? "Copy to Project" : "Add a project in Updates before copying skills."
+                        onClicked: (mouse) => {
+                            let path = AppController.config_controller.getProjectPath(AppController.currentProject)
+                            if (path) {
+                                AppController.ops_controller.copySelectedSkillsToProject(path)
+                            }
+                        }
+                    }
+                    }
+
+                    GlassMenu {
+                        id: lv_overflowMenu
+                        GlassMenuItem {
+                            text: "Delete Selected"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                            enabled: AppController.libraryModel.selectedCount > 0
+                            onTriggered: lv_deleteBtn.clicked()
+                        }
+                        GlassMenuItem {
+                            text: "Add Command"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
+                            onTriggered: lv_commandDialog.openWithContext()
+                        }
+                        GlassMenuItem {
+                            text: "Show Archived"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/box-bold-duotone.svg")
+                            onTriggered: { AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived }
+                        }
+                        GlassMenuItem {
+                            text: "Archive"
                             iconSource: AppController.ui_controller.getAssetUri("ui/inbox-in-bold-duotone.svg")
-                            tooltipText: "Archive"
-                            onClicked: (mouse) => lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
+                            enabled: AppController.libraryModel.selectedCount > 0
+                            onTriggered: lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
                         }
-
-                        IconButton {
-                            id: lv_showArchived
-                            buttonSize: 28
-                            iconSource: AppController.libraryModel.showArchived ? 
-                                AppController.ui_controller.getAssetUri("ui/box-broken.svg") : 
-                                AppController.ui_controller.getAssetUri("ui/box-bold-duotone.svg")
-                            tooltipText: AppController.libraryModel.showArchived ? "Hide Archived" : "Show Archived"
-                            onClicked: (mouse) => AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived
+                        GlassMenuItem {
+                            text: AppController.libraryModel.isAllExpanded ? "Collapse All" : "Expand All"
+                            iconSource: AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                            onTriggered: AppController.libraryModel.toggleAll()
                         }
-
-
-
-                        Rectangle {
-                            objectName: "libraryDestructiveDivider"
-                            visible: AppController.libraryModel.selectedCount > 0 && !lv_root.compactMode
-                            width: 1
-                            height: 16
-                            color: Theme.separator
-                            Layout.leftMargin: 4
-                            Layout.rightMargin: 4
-                        }
-
-                        IconButton {
-                            id: lv_tempCopyBtn
-                            visible: AppController.libraryModel.selectedCount > 0 && !lv_root.compactMode
-                            buttonSize: 28
-                            role: "secondary"
-                            iconSource: AppController.ui_controller.getAssetUri("ui/file-right-broken.svg")
-                            enabled: AppController.projects.length > 0
-                            tooltipText: enabled ? "Copy Temp" : "Add a project in Updates before copying skills."
-                            onClicked: (mouse) => {
-                                let path = AppController.config_controller.getProjectPath(AppController.currentProject)
-                                if (path) {
-                                    AppController.ops_controller.copySelectedSkillsToProjectTemporarily(path)
-                                }
-                            }
-                        }
-
-                        IconButton {
-                            id: lv_copyBtn
-                            visible: AppController.libraryModel.selectedCount > 0 && !lv_root.compactMode
-                            buttonSize: 28
-                            role: "primary-outline"
-                            iconSource: AppController.ui_controller.getAssetUri("ui/file-right-bold-duotone.svg")
-                            enabled: AppController.projects.length > 0
-                            tooltipText: enabled ? "Copy to Project" : "Add a project in Updates before copying skills."
-                            onClicked: (mouse) => {
-                                let path = AppController.config_controller.getProjectPath(AppController.currentProject)
-                                if (path) {
-                                    AppController.ops_controller.copySelectedSkillsToProject(path)
-                                }
-                            }
-                        }
-                        
-                        IconButton {
-                            id: lv_overflowBtn
-                            visible: lv_root.compactMode
-                            iconText: "⋮"
-                            iconSize: 24
-                            buttonSize: 32
-                            role: "ghost"
-                            onClicked: lv_overflowMenu.popup(lv_overflowBtn, 0, lv_overflowBtn.height + 4)
-                        }
-
-                        GlassMenu {
-                            id: lv_overflowMenu
-                            GlassMenuItem {
-                                text: "Delete Selected"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
-                                enabled: AppController.libraryModel.selectedCount > 0
-                                onTriggered: lv_deleteBtn.clicked()
-                            }
-                            GlassMenuItem {
-                                text: "Add Command"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/layout-grid-add-icon.svg")
-                                onTriggered: lv_commandDialog.openWithContext()
-                            }
-                            GlassMenuItem {
-                                text: "Archive"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/inbox-in-bold-duotone.svg")
-                                enabled: AppController.libraryModel.selectedCount > 0
-                                onTriggered: lv_archiveConfirmDialog.confirmBulk(AppController.libraryModel.selectedCount, () => AppController.ops_controller.archiveSelectedSkills())
-                            }
-                            GlassMenuItem {
-                                text: "Copy Temp"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/file-right-broken.svg")
-                                enabled: AppController.libraryModel.selectedCount > 0 && AppController.projects.length > 0
-                                onTriggered: {
-                                    let path = AppController.config_controller.getProjectPath(AppController.currentProject)
-                                    if (path) AppController.ops_controller.copySelectedSkillsToProjectTemporarily(path)
-                                }
-                            }
-                            GlassMenuItem {
-                                text: "Copy to Project"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/file-right-bold-duotone.svg")
-                                enabled: AppController.libraryModel.selectedCount > 0 && AppController.projects.length > 0
-                                onTriggered: {
-                                    let path = AppController.config_controller.getProjectPath(AppController.currentProject)
-                                    if (path) AppController.ops_controller.copySelectedSkillsToProject(path)
-                                }
-                            }
-                        }
-                }
+                    }
             }
         }
         }
