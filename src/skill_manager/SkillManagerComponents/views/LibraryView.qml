@@ -18,6 +18,9 @@ Item {
     //   2: Delete + Add → overflow (⋮ appears where Delete was)
     //   3: Category dropdown → icon-only
     //   4: Project dropdown → icon-only
+
+    // Inspectors: when parent is ≤800px wide, show as centered popup instead of side panel
+    readonly property bool _usePopupMode: lv_root.width <= 800
     //   5: Show Archived → overflow
     //   6: Archive → overflow
     //   7: ToggleAll → overflow
@@ -451,45 +454,12 @@ Item {
         }
         }
 
-        // Library Content
-        SplitView {
-            id: lv_splitView
+        // Skill List
+        SmoothListView {
+            id: lv_listView
+            objectName: "libraryList"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            orientation: Qt.Horizontal
-            
-            handle: Rectangle {
-                implicitWidth: 12
-                color: "transparent"
-                
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 2
-                    height: 40
-                    radius: 1
-                    color: splitHandleArea.containsMouse ? Theme.accent : Theme.separator
-                    opacity: splitHandleArea.containsMouse ? 1.0 : 0.3
-                    Behavior on color { ColorAnimation { duration: 150 } }
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                }
-                
-                MouseArea {
-                    id: splitHandleArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.SizeHorCursor
-                    Accessible.role: Accessible.Splitter
-                    Accessible.name: "Resize Splitter"
-                }
-            }
-
-            // Skill List
-            SmoothListView {
-                id: lv_listView
-                objectName: "libraryList"
-                SplitView.fillWidth: true
-                SplitView.fillHeight: true
-                SplitView.minimumWidth: 100
                 model: null
                 clip: true
                 spacing: 0
@@ -617,73 +587,115 @@ Item {
                 }
             }
 
-            // Inspector Pane (commands)
-            CommandInspector {
-                id: lv_commandInspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                editDialog: lv_commandDialog
-                visible: targetWidth > 0 && lv_root.showCommandInspector
+    }
 
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
-                }
-                onClosed: {
+    // ── Inspector Overlay Layer (replaces SplitView inline inspectors) ──────
+    Item {
+        id: inspectorOverlay
+        anchors.fill: parent
+        visible: lv_inspector.visible || lv_commandInspector.visible || lv_imageInspector.visible
+        z: 10
+
+        // Backdrop — dark overlay in popup mode, invisible in side-panel mode
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(0, 0, 0, 0.45)
+            visible: lv_root._usePopupMode
+            opacity: lv_root._usePopupMode ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
                     lv_root.showCommandInspector = false
-                    AppController.ui_controller.selectSkill(-1)
-                }
-                onDeleteRequested: (name, path, isCommand) => {
-                    var holders = AppController.commandProjectsForPath(path) || []
-                    if (holders.length === 0) holders = [AppController.currentProject || ""]
-                    lv_cmdDeleteDialog.openForCommand(name, holders)
-                }
-            }
-
-            // Inspector Pane (skills)
-            SkillInspector {
-                id: lv_inspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                visible: targetWidth > 0 && !lv_root.showImageInspector && !lv_root.showCommandInspector
-
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
-                }
-                onClosed: AppController.ui_controller.selectSkill(-1)
-            }
-
-            // Image Inspector (for screenshots)
-            ImageInspector {
-                id: lv_imageInspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                visible: targetWidth > 0 && lv_root.showImageInspector
-
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
-                }
-                onClosed: {
                     lv_root.showImageInspector = false
                     AppController.ui_controller.selectSkill(-1)
                 }
+            }
+        }
+
+        // Shared calculator for popup geometry
+        readonly property int _popupW: Math.min(parent.width * 0.92, 560)
+        readonly property int _popupH: Math.min(parent.height * 0.88, 700)
+        readonly property int _popupX: Math.round((parent.width - _popupW) / 2)
+        readonly property int _popupY: Math.round((parent.height - _popupH) / 2)
+
+        // Side-panel (wide mode) — positioned at right edge, full height
+        readonly property int _panelX: parent.width - _panelW
+        readonly property int _panelW: {
+            var p = AppController.ui_controller.inspectorWidth
+            // Use the active inspector's targetWidth as reference
+            var tw = lv_root.showImageInspector
+                ? lv_imageInspector.targetWidth
+                : lv_root.showCommandInspector
+                    ? lv_commandInspector.targetWidth
+                    : lv_inspector.targetWidth
+            return p > 0 ? Math.max(p, tw) : tw
+        }
+
+        // ── CommandInspector ──────────────────────────────────────
+        CommandInspector {
+            id: lv_commandInspector
+            skill: AppController.selectedSkill
+            editDialog: lv_commandDialog
+            visible: targetWidth > 0 && lv_root.showCommandInspector
+            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
+            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
+            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
+            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
+
+            onWidthChanged: {
+                if (visible && width > 0 && !lv_root._usePopupMode) {
+                    AppController.ui_controller.setInspectorWidth(width)
+                }
+            }
+            onClosed: {
+                lv_root.showCommandInspector = false
+                AppController.ui_controller.selectSkill(-1)
+            }
+            onDeleteRequested: (name, path, isCommand) => {
+                var holders = AppController.commandProjectsForPath(path) || []
+                if (holders.length === 0) holders = [AppController.currentProject || ""]
+                lv_cmdDeleteDialog.openForCommand(name, holders)
+            }
+        }
+
+        // ── SkillInspector ────────────────────────────────────────
+        SkillInspector {
+            id: lv_inspector
+            skill: AppController.selectedSkill
+            visible: targetWidth > 0 && !lv_root.showImageInspector && !lv_root.showCommandInspector
+            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
+            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
+            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
+            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
+
+            onWidthChanged: {
+                if (visible && width > 0 && !lv_root._usePopupMode) {
+                    AppController.ui_controller.setInspectorWidth(width)
+                }
+            }
+            onClosed: AppController.ui_controller.selectSkill(-1)
+        }
+
+        // ── ImageInspector ────────────────────────────────────────
+        ImageInspector {
+            id: lv_imageInspector
+            skill: AppController.selectedSkill
+            visible: targetWidth > 0 && lv_root.showImageInspector
+            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
+            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
+            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
+            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
+
+            onWidthChanged: {
+                if (visible && width > 0 && !lv_root._usePopupMode) {
+                    AppController.ui_controller.setInspectorWidth(width)
+                }
+            }
+            onClosed: {
+                lv_root.showImageInspector = false
+                AppController.ui_controller.selectSkill(-1)
             }
         }
     }

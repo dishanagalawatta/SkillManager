@@ -31,6 +31,7 @@ from PySide6.QtCore import (  # noqa: E402
 )
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, QQmlPropertyMap, qmlRegisterSingletonInstance
+from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 
 import skill_manager
@@ -130,20 +131,26 @@ class CommandChannel(QObject):
     """File-based IPC channel for cross-process GUI navigation.
 
     The MCP bridge (headless, offscreen) cannot see or move the real GUI
-    window, so it writes a JSON navigate command into ``data/mcp/commands/``
-    which this channel watches via ``QFileSystemWatcher``. On a command it
-    switches the live view on the Qt thread and writes an acknowledgement
-    into ``data/mcp/acks/<id>.json``. Setup is best-effort: if the
-    watcher or directories cannot be created (headless/CI), it degrades to
+    window, so it writes a JSON command into ``data/mcp/commands/``.
+    This channel polls the directory every 200ms via ``QTimer`` (primary,
+    reliable on all platforms) and also uses ``QFileSystemWatcher`` (secondary
+    optimisation for near-instant notification). On a command it switches
+    the live view on the Qt thread and writes an acknowledgement into
+    ``data/mcp/acks/<id>.json``. Processed command files are deleted
+    immediately to avoid re-processing; stale ack files are cleaned up.
+    Setup is best-effort: if directories cannot be created it degrades to
     a no-op rather than crashing ``AppController``.
     """
 
     VALID_VIEWS = ("QuickCopy", "Library", "Updates", "Settings")
+    _POLL_INTERVAL_MS = 200
+    _STALE_AGE = 30.0  # seconds — ack files older than this are removed on poll
 
     def __init__(self, app_controller):
         super().__init__()
         self.app = app_controller
         self._watcher = None
+        self._timer = None
         self._commands_dir = None
         self._acks_dir = None
         self._setup()
@@ -157,31 +164,70 @@ class CommandChannel(QObject):
             acks_dir.mkdir(parents=True, exist_ok=True)
             self._commands_dir = commands_dir
             self._acks_dir = acks_dir
-            self._watcher = QFileSystemWatcher()
-            self._watcher.directoryChanged.connect(self._on_directory_changed)
-            self._watcher.addPath(str(commands_dir))
-        except Exception as exc:  # noqa: BLE001 - degrade, never crash
-            logger.warning("CommandChannel disabled (headless/CI?): %s", exc)
-            self._watcher = None
 
-    def _on_directory_changed(self, _path: str) -> None:
+            # Primary: QTimer-based polling (reliable on Windows, works everywhere).
+            self._timer = QTimer(self)
+            self._timer.timeout.connect(self._poll_commands)
+            self._timer.start(self._POLL_INTERVAL_MS)
+
+            # Secondary: QFileSystemWatcher (near-instant when it works).
+            try:
+                self._watcher = QFileSystemWatcher()
+                self._watcher.directoryChanged.connect(self._poll_commands)
+                self._watcher.addPath(str(commands_dir))
+            except Exception:  # noqa: BLE001 — degraded: poll-only
+                self._watcher = None
+
+        except Exception as exc:  # noqa: BLE001 — degrade, never crash
+            logger.warning("CommandChannel disabled (headless/CI?): %s", exc)
+            self._commands_dir = None
+
+    def _poll_commands(self) -> None:
+        """Check for new command files and process every pending one.
+
+        Processes command files in FIFO order (oldest first). Each is
+        deleted immediately after processing to prevent re-processing.
+        Stale ack files are pruned on each poll cycle.
+        """
         if self._commands_dir is None:
             return
+
+        self._prune_stale_acks()
+
         try:
             files = sorted(
                 self._commands_dir.glob("*.json"),
                 key=lambda p: p.stat().st_mtime,
-                reverse=True,
             )
         except Exception:  # noqa: BLE001
             return
         if not files:
             return
-        try:
-            data = json.loads(files[0].read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
+
+        for cmd_file in files:
+            try:
+                data = json.loads(cmd_file.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001 — invalid JSON, skip
+                cmd_file.unlink(missing_ok=True)
+                continue
+            self._handle_command(data)
+            cmd_file.unlink(missing_ok=True)
+
+    def _prune_stale_acks(self) -> None:
+        """Remove ack files older than ``_STALE_AGE`` seconds."""
+        if self._acks_dir is None:
             return
-        self._handle_command(data)
+        now = time.monotonic()
+        try:
+            for p in self._acks_dir.glob("*.json"):
+                try:
+                    age = now - p.stat().st_mtime
+                    if age > self._STALE_AGE:
+                        p.unlink()
+                except OSError:
+                    pass
+        except Exception:  # noqa: BLE001
+            pass
 
     def _handle_command(self, data: dict) -> None:
         cmd_id = data.get("id")
@@ -197,8 +243,47 @@ class CommandChannel(QObject):
             enabled = bool(data.get("enabled", True))
             self.app.debugOverlayEnabled = enabled
             self._write_ack(cmd_id, ok=True)
+        elif action == "capture_screenshot":
+            self._capture_screenshot(cmd_id)
         else:
             self._write_ack(cmd_id, ok=False, error=f"unknown action: {action!r}")
+
+    def _capture_screenshot(self, cmd_id: str | None) -> None:
+        """Grab the QML window content via the render engine (works minimised)."""
+        if not cmd_id:
+            return
+        try:
+            engine = getattr(self.app, "_qml_engine", None)
+            if engine is None:
+                self._write_ack(cmd_id, ok=False, error="no QML engine")
+                return
+            roots = engine.rootObjects()
+            if not roots:
+                self._write_ack(cmd_id, ok=False, error="no QML root objects")
+                return
+            window = roots[0]
+            if not isinstance(window, QQuickWindow):
+                self._write_ack(cmd_id, ok=False, error="root object is not a QQuickWindow")
+                return
+
+            image = window.grabWindow()
+            if image.isNull():
+                self._write_ack(cmd_id, ok=False, error="grabWindow returned null image")
+                return
+
+            if self._commands_dir is None:
+                self._write_ack(cmd_id, ok=False, error="commands dir not available")
+                return
+            captures_dir = self._commands_dir.parent / "captures"
+            captures_dir.mkdir(parents=True, exist_ok=True)
+            out_path = captures_dir / f"{cmd_id}.png"
+            if not image.save(str(out_path)):
+                self._write_ack(cmd_id, ok=False, error="failed to save PNG")
+                return
+
+            self._write_ack(cmd_id, ok=True, capture_path=str(out_path.resolve()))
+        except Exception as exc:  # noqa: BLE001
+            self._write_ack(cmd_id, ok=False, error=str(exc))
 
     def _apply_view(self, cmd_id, view) -> None:
         try:
@@ -208,14 +293,15 @@ class CommandChannel(QObject):
             return
         self._write_ack(cmd_id, ok=True, view=view)
 
-    def _write_ack(self, cmd_id, ok, error=None, view=None) -> None:
+    def _write_ack(self, cmd_id, ok, error=None, view=None, **extra) -> None:
         if not cmd_id or self._acks_dir is None:
             return
-        ack = {"ok": ok}
+        ack: dict[str, object] = {"ok": ok}
         if view is not None:
             ack["view"] = view
         if error is not None:
             ack["error"] = error
+        ack.update(extra)
         with contextlib.suppress(Exception):
             (self._acks_dir / f"{cmd_id}.json").write_text(json.dumps(ack), encoding="utf-8")
 
@@ -241,6 +327,10 @@ class AppController(QObject):
     updateResultsChanged = Signal()
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
+
+    # QML engine — set by main() after construction. Used by CommandChannel._capture_screenshot
+    # to grab the live window via QQuickWindow::grabWindow() (works minimised, no colour cast).
+    _qml_engine: QQmlApplicationEngine | None = None
 
     # Debug overlay — toggled via CLI --debug-overlay or MCP sm_toggle_debug_overlay.
     debugOverlayEnabledChanged = Signal()
@@ -1690,6 +1780,12 @@ def main():  # pragma: no cover
     # Uses its OWN mutex name so it never conflicts with a running GUI
     # instance. The GUI launch path below is left completely untouched.
     # ----------------------------------------------------------------------
+    if "--mcp-light" in sys.argv:
+        from skill_manager.mcp import run_mcp_server_light
+
+        run_mcp_server_light()
+        return
+
     if "--mcp" in sys.argv:
         _run_mcp_mode()
         return
@@ -1809,6 +1905,7 @@ def main():  # pragma: no cover
     qmlRegisterSingletonInstance(FontDatabaseBridge, "App", 1, 0, "FontDB", font_bridge)  # type: ignore[arg-type]
 
     engine = QQmlApplicationEngine()
+    controller._qml_engine = engine
     engine.addImageProvider("screenshot", controller.screenshot_provider)
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("fontDB", font_bridge)

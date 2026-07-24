@@ -12,9 +12,20 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     pass
 
-from skill_manager.mcp.server import create_mcp_server, run_mcp_server
+from skill_manager.mcp.server import (
+    create_mcp_server,
+    create_mcp_server_light,
+    run_mcp_server,
+    run_mcp_server_light,
+)
 
-__all__ = ["create_mcp_server", "run_mcp_server", "start_mcp_if_requested"]
+__all__ = [
+    "create_mcp_server",
+    "create_mcp_server_light",
+    "run_mcp_server",
+    "run_mcp_server_light",
+    "start_mcp_if_requested",
+]
 
 
 def start_mcp_if_requested(argv: list[str] | None = None) -> bool:
