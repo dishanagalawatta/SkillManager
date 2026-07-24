@@ -22,9 +22,14 @@ from skill_manager.mcp.models import ToolResult
 # ---------------------------------------------------------------------------
 def test_capture_app_window_success(monkeypatch):
     img = Image.new("RGB", (100, 50), "red")
+    # IPC path: mock send_capture_command to fail fast (no live GUI in test).
+    monkeypatch.setattr(
+        bridge, "send_capture_command", lambda **kw: {"ok": False, "error": "no GUI"}
+    )
+    # Win32 fallback path: mock window + capture.
     monkeypatch.setattr(bridge, "_find_skill_manager_window", lambda: 123)
     monkeypatch.setattr(bridge, "_get_window_rect", lambda _h: (0, 0, 100, 50))
-    monkeypatch.setattr(bridge, "_capture_window_to_image", lambda _h, w, ht: img)
+    monkeypatch.setattr(bridge, "_capture_window_to_image", lambda *a, **kw: img)
 
     b64, width, height = bridge.capture_app_window()
 

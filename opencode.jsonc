@@ -1,5 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "skillmanager": {
+      "type": "local",
+      "command": ["uv", "run", "skill-manager", "--mcp-light"],
+      "enabled": true
+    }
+  },
   // LSP servers. Disabled by default in opencode — must be enabled explicitly.
   // All entries here are fully-explicit; no built-in auto-load.
   "lsp": {

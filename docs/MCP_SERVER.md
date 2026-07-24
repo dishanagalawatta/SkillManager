@@ -93,6 +93,15 @@ All tools return structured JSON, names prefixed `sm_`.
   that section first through a file-based IPC channel; `save=true` also writes the
   PNG to `.agents/screenshots/`. GUI not running → `ok=false`.
 
+**GUI Interaction** (always on, Windows-only)
+- `sm_mouse_move` — move the system cursor to absolute screen pixel coordinates.
+- `sm_mouse_click` — click a mouse button at optional (x, y); supports
+  left/right/middle and double-click.
+- `sm_type_text` — type text (alphanumeric, symbols, Enter, Tab) into the
+  currently focused window.
+- `sm_get_window_info` — return the live SkillManager window geometry (left, top,
+  right, bottom, width, height) for calculating click targets.
+
 **Write** (gated `--mcp-allow-write`)
 - `sm_delete_skill`, `sm_deploy` — delegate to `OpsController`/`AppController`.
   Audit-log each call. Refuse AGENTS.md-excluded paths.
@@ -151,9 +160,24 @@ workspace and the `skill-manager` command is on PATH.
 }
 ```
 
-- `skillmanager` — read-only tools (build / analyze / monitor / debug).
+- `skillmanager` — all read-only tools (build / analyze / monitor / debug / screenshot / gui).
 - `skillmanager-write` — same plus mutating tools `sm_delete_skill`, `sm_deploy`.
   Only add this entry when the agent is trusted to modify skills/deployments.
+
+For **opencode**, the server can be configured in `opencode.jsonc` instead:
+
+```jsonc
+{
+  "mcp": {
+    "skillmanager": {
+      "type": "local",
+      "command": ["uv", "run", "skill-manager", "--mcp"],
+      "enabled": true,
+      "description": "SkillManager MCP server"
+    }
+  }
+}
+```
 
 ### Tool reference
 
@@ -175,6 +199,10 @@ workspace and the `skill-manager` command is on PATH.
 | `sm_inspect_controller` | List a controller's public methods/signals | No |
 | `sm_capture_errors` | Return in-memory / Sentry error buffer | No |
 | `sm_screenshot` | Capture the live GUI window as base64 PNG; optional `navigate`/`save` | No |
+| `sm_mouse_move` | Move the system cursor to (x, y) screen coordinates | No |
+| `sm_mouse_click` | Click left/right/middle mouse button, optional (x, y), double-click | No |
+| `sm_type_text` | Type text into the currently focused window | No |
+| `sm_get_window_info` | Return live GUI window geometry + HWND | No |
 | `sm_delete_skill` | Delete a skill (delegates to `OpsController`) | Yes (`--mcp-allow-write`) |
 | `sm_deploy` | Deploy a skill to a target project | Yes (`--mcp-allow-write`) |
 
@@ -227,3 +255,50 @@ This keeps the MCP server headless and never touches `ScreenshotController`
 (the in-app annotation tool, which is blank when headless). Capture uses Win32
 `PrintWindow` with a `PW_RENDERFULLCONTENT` fallback to `BitBlt` + `GetDIBits`
 (via `ctypes` + `PIL`), so it works even if the window is partially obscured.
+
+### `sm_mouse_click` / `sm_mouse_move` — GUI interaction
+
+These tools operate on the **running** SkillManager desktop window by sending
+Win32 mouse events cross-process. They do not require the MCP server to own
+the window — they work with any visible desktop window.
+
+**`sm_mouse_move` parameters**
+
+| Param | Type | Required | Notes |
+|-------|------|----------|-------|
+| `x` | integer | Yes | Absolute screen X coordinate |
+| `y` | integer | Yes | Absolute screen Y coordinate |
+
+**`sm_mouse_click` parameters**
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `x` | integer | — | Optional: move cursor here first; omit to click at current position |
+| `y` | integer | — | Optional: paired with `x` |
+| `button` | string | `"left"` | One of `"left"`, `"right"`, `"middle"` |
+| `double` | boolean | `false` | Double-click when `true` |
+
+**`sm_type_text` parameters**
+
+| Param | Type | Required | Notes |
+|-------|------|----------|-------|
+| `text` | string | Yes | Text to type. Supports A-Z, 0-9, common symbols, Space, Enter, Tab. Shift-key modulation handled automatically. |
+
+**`sm_get_window_info` response**
+
+Returns the SkillManager window's current geometry. Use the coordinates to
+calculate click targets relative to the window:
+
+```json
+{ "ok": true, "tool": "sm_get_window_info",
+  "data": { "ok": true, "hwnd": 123456, "left": 100, "top": 200,
+            "right": 1152, "bottom": 950, "width": 1052, "height": 750 } }
+```
+
+**Typical workflow**
+
+1. `sm_get_window_info` → get window position
+2. `sm_screenshot` → capture current view
+3. Calculate click target: `screen_x = window.left + offset_x`, `screen_y = window.top + offset_y`
+4. `sm_mouse_click(x=screen_x, y=screen_y)` → click the target
+5. `sm_screenshot` → verify result

@@ -37,6 +37,39 @@ class ToolResult(BaseModel):
     error: str | None = None
 
 
+def ok(tool: str, data: dict[str, Any] | None = None) -> ToolResult:
+    """Build a successful ``ToolResult``."""
+    return ToolResult(ok=True, tool=tool, data=data)
+
+
+def err(tool: str, error: str) -> ToolResult:
+    """Build a failed ``ToolResult``."""
+    return ToolResult(ok=False, tool=tool, error=error)
+
+
+def tool_annotations(
+    *,
+    read_only_hint: bool = True,
+    destructive_hint: bool = True,
+    idempotent_hint: bool = False,
+    open_world_hint: bool = True,
+) -> dict[str, bool]:
+    """Build a standard tool annotations dict for MCP ``Tool`` objects.
+
+    Annotations are hints that help clients understand tool behaviour:
+    - ``readOnlyHint``: tool does not modify its environment.
+    - ``destructiveHint``: tool may perform destructive updates.
+    - ``idempotentHint``: repeated calls with same args have no additional effect.
+    - ``openWorldHint``: tool interacts with external entities.
+    """
+    return {
+        "readOnlyHint": read_only_hint,
+        "destructiveHint": destructive_hint,
+        "idempotentHint": idempotent_hint,
+        "openWorldHint": open_world_hint,
+    }
+
+
 class Job(BaseModel):
     """Result buffer for a fire-and-forget async job dispatched via the bridge."""
 

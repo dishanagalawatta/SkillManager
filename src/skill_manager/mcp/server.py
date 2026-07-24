@@ -26,7 +26,7 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import CallToolResult, TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
 from skill_manager.core.analytics import capture_event
 from skill_manager.mcp.models import ToolResult
@@ -62,6 +62,10 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
         TOOL_SCHEMAS as DEBUG_SCHEMAS,
         get_handlers as debug_handlers,
     )
+    from skill_manager.mcp.tools.gui import (
+        TOOL_SCHEMAS as GUI_SCHEMAS,
+        get_handlers as gui_handlers,
+    )
     from skill_manager.mcp.tools.monitor import (
         TOOL_SCHEMAS as MONITOR_SCHEMAS,
         get_handlers as monitor_handlers,
@@ -84,6 +88,7 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
         (MONITOR_SCHEMAS, monitor_handlers()),
         (DEBUG_SCHEMAS, debug_handlers()),
         (SCREENSHOT_SCHEMAS, screenshot_handlers()),
+        (GUI_SCHEMAS, gui_handlers()),
         (WRITE_SCHEMAS, write_handlers(allow_write)),
     ):
         schemas.update(module_schemas)
@@ -96,6 +101,12 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
                 name=name,
                 description=meta["description"],
                 inputSchema=meta["inputSchema"],
+                annotations=ToolAnnotations(
+                    readOnlyHint=meta.get("annotations", {}).get("readOnlyHint", True),
+                    destructiveHint=meta.get("annotations", {}).get("destructiveHint", True),
+                    idempotentHint=meta.get("annotations", {}).get("idempotentHint", False),
+                    openWorldHint=meta.get("annotations", {}).get("openWorldHint", True),
+                ),
             )
             for name, meta in schemas.items()
         ]
@@ -120,7 +131,7 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
         except Exception as exc:  # noqa: BLE001 - envelope all failures
             return _error_result(name, str(exc))
 
-        return _normalize_result(name, result)
+        return _normalize_result(result)
 
     return server
 
@@ -138,19 +149,15 @@ def _error_result(tool: str, error: str) -> CallToolResult:
     )
 
 
-def _normalize_result(tool: str, result: Any) -> CallToolResult:
+def _normalize_result(result: Any) -> CallToolResult:
     """Normalize a handler return value into a ``CallToolResult``.
 
-    Handlers may return a ``CallToolResult`` (analyze/monitor/debug via the
-    server), a ``list[TextContent]`` (analyze handlers), a ``ToolResult``
-    (monitor/debug/build/write), or a plain ``dict`` (build/write envelopes).
+    All tool handlers now return ``ToolResult``. This function also accepts
+    ``CallToolResult`` (for backward compat) and falls back to wrapping
+    unexpected types as plain text.
     """
     if isinstance(result, CallToolResult):
         return result
-
-    if isinstance(result, list):
-        # analyze handlers return list[TextContent]; wrap as-is.
-        return CallToolResult(content=result)
 
     if isinstance(result, ToolResult):
         payload = result.model_dump()
@@ -159,17 +166,9 @@ def _normalize_result(tool: str, result: Any) -> CallToolResult:
             structuredContent=payload,
         )
 
-    if isinstance(result, dict):
-        return CallToolResult(
-            content=[TextContent(type="text", text=json.dumps(result, default=str))],
-            structuredContent=result,
-        )
-
-    # Fallback: wrap any other scalar as text.
-    payload = {"ok": True, "tool": tool, "data": result}
+    # Fallback: wrap any unexpected type as plain text.
     return CallToolResult(
-        content=[TextContent(type="text", text=json.dumps(payload, default=str))],
-        structuredContent=payload,
+        content=[TextContent(type="text", text=json.dumps(result, default=str))],
     )
 
 
@@ -239,4 +238,88 @@ def _run_in_thread(server: Server[Any]) -> None:
         loop.call_soon_threadsafe(loop.stop)
 
 
-__all__ = ["create_mcp_server", "run_mcp_server"]
+# ---------------------------------------------------------------------------
+# Lightweight (no-Qt) variant — for cross-process Win32 tools only
+# ---------------------------------------------------------------------------
+
+
+def create_mcp_server_light() -> Server[Any]:
+    """Construct a lightweight MCP server with only cross-process GUI tools.
+
+    Registers only ``screenshot`` and ``gui`` tool modules — these use raw
+    Win32 API (``PrintWindow``, ``SetCursorPos``, ``SendInput``, etc.) and
+    file-based IPC for navigation. They require **no** ``QGuiApplication``,
+    ``AppController``, or Qt event loop, so this server starts instantly
+    and never hangs.
+
+    Returns:
+        A fully-wired :class:`Server` instance ready to ``run()`` over stdio.
+    """
+    server: Server[Any] = Server("SkillManager-Light")
+
+    from skill_manager.mcp.tools.gui import (
+        TOOL_SCHEMAS as GUI_SCHEMAS,
+        get_handlers as gui_handlers,
+    )
+    from skill_manager.mcp.tools.screenshot import (
+        TOOL_SCHEMAS as SCREENSHOT_SCHEMAS,
+        get_handlers as screenshot_handlers,
+    )
+
+    schemas: dict[str, dict[str, Any]] = {}
+    handlers: dict[str, Any] = {}
+    for module_schemas, module_handlers in (
+        (SCREENSHOT_SCHEMAS, screenshot_handlers()),
+        (GUI_SCHEMAS, gui_handlers()),
+    ):
+        schemas.update(module_schemas)
+        handlers.update(module_handlers)
+
+    @server.list_tools()
+    async def _list_tools() -> list[Tool]:
+        return [
+            Tool(
+                name=name,
+                description=meta["description"],
+                inputSchema=meta["inputSchema"],
+            )
+            for name, meta in schemas.items()
+        ]
+
+    @server.call_tool()
+    async def _call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
+        args: dict[str, Any] = arguments or {}
+        handler = handlers.get(name)
+        if handler is None:
+            return _error_result(name, f"unknown tool: {name!r}")
+        try:
+            result = handler(args)
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as exc:
+            return _error_result(name, str(exc))
+        return _normalize_result(result)
+
+    return server
+
+
+def run_mcp_server_light() -> None:
+    """Run the lightweight (no-Qt) MCP server over stdio.
+
+    Uses a pure asyncio event loop on the main thread. No ``QGuiApplication``,
+    no ``AppController``, no hotkey system — instant startup.
+
+    Available tools: ``sm_screenshot``, ``sm_mouse_move``, ``sm_mouse_click``,
+    ``sm_type_text``, ``sm_get_window_info``, ``sm_toggle_debug_overlay``,
+    ``sm_get_window_rect``.
+    """
+    server = create_mcp_server_light()
+    asyncio.run(_run_stdio(server))
+
+
+__all__ = [
+    "create_mcp_server",
+    "create_mcp_server_light",
+    "run_mcp_server",
+    "run_mcp_server_light",
+]
