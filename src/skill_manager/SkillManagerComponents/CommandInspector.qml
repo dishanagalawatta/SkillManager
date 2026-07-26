@@ -9,6 +9,10 @@ Rectangle {
     readonly property var _sel: AppController.selectedSkill || ({})
     property var skill: _sel
     property bool isCollapsed: false
+    // Controlled externally (e.g. from LibraryView overlay) to gate visibility.
+    // Also gates internal ColumnLayout content. The overlay directly sets
+    // `visible` on this root to bypass QML's visible binding staleness issue.
+    property bool overlayVisible: true
     property var editDialog: null
     property var dependencyList: []
     property var referenceRanges: []
@@ -122,7 +126,7 @@ Rectangle {
             x: 12
             y: 12
             spacing: 16
-            visible: !root.isCollapsed && root._sel.local_path !== undefined
+            visible: root.overlayVisible && !root.isCollapsed && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
 
             Behavior on opacity { NumberAnimation { duration: 200 } }

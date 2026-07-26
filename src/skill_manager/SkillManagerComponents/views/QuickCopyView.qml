@@ -15,7 +15,29 @@ Item {
     property bool _isInternalSelectionChange: false
     property bool showImageInspector: false
     property bool showCommandInspector: false
+    property bool showSkillInspector: false
     property var editingCollectionProjects: []
+
+    // A skill is "valid" when selectedSkill has a real local_path
+    readonly property bool selectedSkillValid:
+        AppController.selectedSkill
+        && AppController.selectedSkill.local_path !== undefined
+        && AppController.selectedSkill.local_path !== ""
+
+    // Debouncer for setInspectorWidth — saves width only 150ms after the
+    // user stops dragging the SplitView splitter, avoiding Python interop
+    // on every resize pixel.
+    property int _qc_debouncedWidth: 0
+    Timer {
+        id: qcv_widthDebouncer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            if (qcv_root._qc_debouncedWidth > 0) {
+                AppController.ui_controller.setInspectorWidth(qcv_root._qc_debouncedWidth)
+            }
+        }
+    }
     // === Dynamic Collapse System ===
     // Collapse phases (0 = all expanded, 8 = most collapsed):
     //   0: All expanded
@@ -772,45 +794,16 @@ Item {
             }
         }
 
-        // Main Content Area
-        SplitView {
-            id: qcv_splitView
+        // Main Content Area — inline inspectors removed, moved to overlay layer below
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            orientation: Qt.Horizontal
-            
-            handle: Rectangle {
-                implicitWidth: 12
-                color: "transparent"
-                
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 2
-                    height: 40
-                    radius: 1
-                    color: qcv_splitHandleArea.containsMouse ? Theme.accent : Theme.separator
-                    opacity: qcv_splitHandleArea.containsMouse ? 1.0 : 0.3
-                    Behavior on color { ColorAnimation { duration: 150 } }
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                }
-                
-                MouseArea {
-                    id: qcv_splitHandleArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.SizeHorCursor
-                    Accessible.role: Accessible.Splitter
-                    Accessible.name: "Resize Splitter"
-                }
-            }
 
             // Skill List
             SmoothListView {
                 id: qcv_skillList
                 objectName: "quickCopyList"
-                SplitView.fillWidth: true
-                SplitView.fillHeight: true
-                SplitView.minimumWidth: 100
+                anchors.fill: parent
 
                 model: null
 
@@ -940,78 +933,97 @@ Item {
                     }
                     onInspectImageRequested: {
                         qcv_root.showImageInspector = true
+                        qcv_root.showCommandInspector = false
+                        qcv_root.showSkillInspector = false
                     }
                 }
             }
 
-            // Command Inspector
-            CommandInspector {
-                id: qcv_commandInspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                editDialog: qcv_commandDialog
-                visible: targetWidth > 0 && qcv_root.showCommandInspector
+        }
+    }
 
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
-                }
-                onClosed: {
-                    qcv_root.showCommandInspector = false
-                    AppController.ui_controller.selectSkill(-1)
-                }
-                onDeleteRequested: (name, path, isCommand) => {
-                    var holders = AppController.commandProjectsForPath(path) || []
-                    if (holders.length === 0) holders = [AppController.currentProject || ""]
-                    qcv_cmdDeleteDialog.openForCommand(name, holders)
+    // ── Inspector Overlay Layer (replaces SplitView inline inspectors) ──────
+    Item {
+        id: qcv_inspectorOverlay
+        anchors.fill: parent
+        // Depends on root flags, NOT inspector visible properties, to avoid
+        // QML's binding staleness bug where `visible` bindings do not
+        // re-evaluate when their dependency changes.
+        visible: qcv_root.selectedSkillValid && (qcv_root.showSkillInspector || qcv_root.showCommandInspector || qcv_root.showImageInspector)
+        z: 10
+
+        // Side-panel position — QuickCopyView always uses side-panel mode
+        readonly property int _qcPanelX: parent.width - _qcPanelW
+        readonly property int _qcPanelW: {
+            var p = AppController.ui_controller.inspectorWidth
+            var baseMin = qcv_root.showImageInspector ? 440
+                        : qcv_root.showCommandInspector ? 400
+                        : 400
+            var computed = Math.max(baseMin, qcv_root.width * 0.5)
+            return p > 0 ? Math.max(p, computed) : computed
+        }
+
+        // ── CommandInspector ──────────────────────────────────────
+        CommandInspector {
+            id: qcv_commandInspector
+            skill: AppController.selectedSkill
+            editDialog: qcv_commandDialog
+            overlayVisible: qcv_root.selectedSkillValid && qcv_root.showCommandInspector
+            x: qcv_inspectorOverlay._qcPanelX
+            y: 0
+            width: qcv_inspectorOverlay._qcPanelW
+            height: parent.height
+
+            onWidthChanged: {
+                if (visible && width > 0) {
+                    qcv_root._qc_debouncedWidth = width
+                    qcv_widthDebouncer.restart()
                 }
             }
+            onClosed: AppController.ui_controller.selectSkill(-1)
+        }
 
-            // Overlay Inspector (skills)
-            SkillInspector {
-                id: qcv_inspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                isQuickCopy: true
-                visible: targetWidth > 0 && !qcv_root.showImageInspector && !qcv_root.showCommandInspector
+        // ── SkillInspector ────────────────────────────────────────
+        SkillInspector {
+            id: qcv_inspector
+            skill: AppController.selectedSkill
+            isQuickCopy: true
+            overlayVisible: qcv_root.selectedSkillValid && qcv_root.showSkillInspector
+            x: qcv_inspectorOverlay._qcPanelX
+            y: 0
+            width: qcv_inspectorOverlay._qcPanelW
+            height: parent.height
 
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
+            onWidthChanged: {
+                if (visible && width > 0) {
+                    qcv_root._qc_debouncedWidth = width
+                    qcv_widthDebouncer.restart()
                 }
-                onClosed: AppController.ui_controller.selectSkill(-1)
             }
+            onClosed: {
+                qcv_root.showSkillInspector = false
+                AppController.ui_controller.selectSkill(-1)
+            }
+        }
 
-            // Image Inspector (for screenshots)
-            ImageInspector {
-                id: qcv_imageInspector
-                SplitView.fillHeight: true
-                SplitView.preferredWidth: {
-                    var p = AppController.ui_controller.inspectorWidth
-                    return p > 0 ? Math.max(p, targetWidth) : targetWidth
-                }
-                skill: AppController.selectedSkill
-                visible: targetWidth > 0 && qcv_root.showImageInspector
+        // ── ImageInspector ────────────────────────────────────────
+        ImageInspector {
+            id: qcv_imageInspector
+            skill: AppController.selectedSkill
+            x: qcv_inspectorOverlay._qcPanelX
+            y: 0
+            width: qcv_inspectorOverlay._qcPanelW
+            height: parent.height
 
-                onWidthChanged: {
-                    if (visible && width > 0) {
-                        AppController.ui_controller.setInspectorWidth(width)
-                    }
+            onWidthChanged: {
+                if (visible && width > 0) {
+                    qcv_root._qc_debouncedWidth = width
+                    qcv_widthDebouncer.restart()
                 }
-                onClosed: {
-                    qcv_root.showImageInspector = false
-                    AppController.ui_controller.selectSkill(-1)
-                }
+            }
+            onClosed: {
+                qcv_root.showImageInspector = false
+                AppController.ui_controller.selectSkill(-1)
             }
         }
     }
@@ -1021,16 +1033,17 @@ Item {
         target: AppController
         function onSelectedSkillChanged() {
             var skill = AppController.selectedSkill
-            if (skill && skill.is_command) {
-                qcv_root.showCommandInspector = true
-                qcv_root.showImageInspector = false
-            } else if (skill && skill.is_screenshot) {
-                qcv_root.showCommandInspector = false
-                qcv_root.showImageInspector = true
-            } else {
-                qcv_root.showCommandInspector = false
-                qcv_root.showImageInspector = false
-            }
+            var isCommand = !!(skill && skill.is_command)
+            var isScreenshot = !!(skill && skill.is_screenshot)
+            var showSkill = !isCommand && !isScreenshot && qcv_root.selectedSkillValid
+            qcv_root.showCommandInspector = isCommand
+            qcv_root.showImageInspector = isScreenshot
+            qcv_root.showSkillInspector = showSkill
+            // Set visible imperatively on each inspector to bypass QML's
+            // binding staleness bug for the `visible` property.
+            qcv_commandInspector.visible = isCommand
+            qcv_imageInspector.visible = isScreenshot
+            qcv_inspector.visible = showSkill
         }
     }
 

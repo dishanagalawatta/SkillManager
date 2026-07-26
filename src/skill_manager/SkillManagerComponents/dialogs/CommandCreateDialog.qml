@@ -212,7 +212,7 @@ Dialog {
                             
                             SleekToolTip {
                                 text: "Change Emoji"
-                                visible: emojiBtnHover.containsMouse
+                                visible: emojiBtnHover.containsMouse === true
                             }
                         }
 
