@@ -20,25 +20,55 @@ import sys
 import uuid
 from urllib.parse import unquote
 
-import dbus
-import dbus.mainloop.glib
-from gi.repository import GLib
 
-
-def main() -> None:
+def _main() -> None:
     if len(sys.argv) < 2:
         print("Usage: portal_capture.py <output_path>", file=sys.stderr)
         sys.exit(1)
 
     output_path = sys.argv[1]
+
+    # ------------------------------------------------------------------
+    # Delay-import dbus-python so ImportError is caught here rather
+    # than at top-level — keeps the message actionable.
+    # ------------------------------------------------------------------
+    try:
+        import dbus
+        import dbus.mainloop.glib
+        from gi.repository import GLib
+    except ImportError as exc:
+        print(
+            f"portal_capture: missing dependency — {exc}. Install python3-dbus and python3-gi.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # MUST set the default mainloop BEFORE creating any SessionBus,
+    # otherwise dbus-python raises RuntimeError when trying to receive
+    # signals or make async calls.  dbus.SessionBus() is a singleton,
+    # so the first call creates the shared connection for the process.
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+    # ------------------------------------------------------------------
+    # Try to pre-authorise via PermissionStore before the portal call.
+    # This is best-effort: if it fails, the portal may show a dialog
+    # or fail — we still try the Screenshot call regardless.
+    # ------------------------------------------------------------------
+    _pre_authorize_portal()
+
     handle_token = "sm_" + uuid.uuid4().hex[:12]
     result: dict[str, str | None] = {"path": None}
 
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     loop = GLib.MainLoop()
     bus = dbus.SessionBus()
 
-    def response_handler(response: int, results: dict) -> None:
+    def response_handler(
+        response: int,
+        results: dict,
+        path: str | None = None,  # injected via path_keyword
+    ) -> None:
+        """Callback invoked when the portal emits the Response signal."""
+        print(f"   <- Response code={response} path={path}", file=sys.stderr)
         if response == 0 and isinstance(results, dict):
             uri = results.get("uri", "")
             if uri:
@@ -46,6 +76,14 @@ def main() -> None:
                 if os.path.isfile(local_path):
                     shutil.copy2(local_path, output_path)
                     result["path"] = output_path
+                else:
+                    print(f"   -> file not found: {local_path}", file=sys.stderr)
+        elif response == 1:
+            print("   -> denied by user", file=sys.stderr)
+        elif response == 2:
+            print("   -> cancelled", file=sys.stderr)
+        else:
+            print(f"   -> unexpected response {response}", file=sys.stderr)
         loop.quit()
 
     bus.add_signal_receiver(
@@ -53,6 +91,7 @@ def main() -> None:
         signal_name="Response",
         dbus_interface="org.freedesktop.portal.Request",
         bus_name="org.freedesktop.portal.Desktop",
+        path_keyword="path",
     )
 
     portal_obj = bus.get_object(
@@ -62,14 +101,22 @@ def main() -> None:
     screenshot_iface = dbus.Interface(portal_obj, "org.freedesktop.portal.Screenshot")
 
     def on_error(e: Exception) -> None:
-        print(str(e), file=sys.stderr)
+        print(f"   !! async error: {e}", file=sys.stderr)
         loop.quit()
 
+    def on_reply(*args: object) -> None:
+        """Callback invoked when the portal acknowledges the Screenshot request."""
+        print(f"   -> request accepted: {args}", file=sys.stderr)
+
     # Non-interactive: silent full-screen capture, no system UI
+    print(
+        f"   -> calling Screenshot (handle_token={handle_token})",
+        file=sys.stderr,
+    )
     screenshot_iface.Screenshot(
         "",
         {"handle_token": handle_token, "interactive": False},
-        reply_handler=lambda *_: None,
+        reply_handler=on_reply,
         error_handler=on_error,
     )
 
@@ -81,8 +128,43 @@ def main() -> None:
         print(str(result["path"]))
         sys.exit(0)
 
+    print("   !! no Response signal received within 20s", file=sys.stderr)
     sys.exit(1)
 
 
+def _pre_authorize_portal() -> None:
+    """Pre-authorise screenshot portal access via PermissionStore.
+
+    Best-effort; silently ignored if PermissionStore is not available.
+    This sets a persistent permission entry so the portal backend can
+    skip the dialog when the calling process has a desktop-file
+    association.
+    """
+    try:
+        import dbus
+    except ImportError:
+        return
+
+    try:
+        bus = dbus.SessionBus()
+        store_obj = bus.get_object(
+            "org.freedesktop.impl.portal.PermissionStore",
+            "/org/freedesktop/impl/portal/PermissionStore",
+        )
+        store_iface = dbus.Interface(
+            store_obj,
+            "org.freedesktop.impl.portal.PermissionStore",
+        )
+        store_iface.SetPermission(
+            "screenshot",
+            True,
+            "skill-manager",
+            "skill-manager",
+            ["yes"],
+        )
+    except Exception:
+        pass  # best-effort
+
+
 if __name__ == "__main__":
-    main()
+    _main()

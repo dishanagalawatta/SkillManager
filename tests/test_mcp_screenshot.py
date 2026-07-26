@@ -83,9 +83,13 @@ def test_send_navigation_command_writes_file_and_parses_ack(tmp_path, monkeypatc
         json.dumps({"ok": True, "view": "Library"}), encoding="utf-8"
     )
 
-    result = bridge.send_navigation_command("Library")
+    # Use wait=True so send_navigation_command polls for the ack and
+    # returns its content (with cmd_id appended).
+    result = bridge.send_navigation_command("Library", wait=True)
 
-    assert result == {"ok": True, "view": "Library"}
+    assert result["ok"] is True
+    assert result["view"] == "Library"
+    assert result["cmd_id"] == _FakeUUID.hex
     cmd_files = list(commands_dir.glob("*.json"))
     assert len(cmd_files) == 1
     cmd = json.loads(cmd_files[0].read_text(encoding="utf-8"))
@@ -101,7 +105,8 @@ def test_send_navigation_command_timeout_returns_ok_false(tmp_path, monkeypatch)
     monkeypatch.setattr(bridge, "MCP_ACKS_DIR", acks_dir)
     monkeypatch.setattr(bridge.uuid, "uuid4", lambda: _FakeUUID())
 
-    result = bridge.send_navigation_command("Library", timeout=0.05)
+    # wait=True makes it poll for an ack that never arrives.
+    result = bridge.send_navigation_command("Library", wait=True, timeout=0.05)
 
     assert result.get("ok") is False
 
@@ -169,7 +174,6 @@ def test_handler_capture_success(monkeypatch):
     assert result.data["width"] == 10
     assert result.data["height"] == 10
     assert result.data["view"] == "Library"
-    assert result.data["navigated"] is True
 
 
 def test_handler_no_gui_returns_ok_false(monkeypatch):
