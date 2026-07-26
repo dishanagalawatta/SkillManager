@@ -350,6 +350,175 @@ def test_cancel_capture_emits_signal(controller):
     assert controller.current_full_pixmap is None
 
 
+def test_pre_authorize_portal_sets_permission():
+    """_pre_authorize_portal calls SetPermission with correct args."""
+    from unittest.mock import MagicMock, patch
+
+    from PySide6.QtDBus import QDBus
+
+    from skill_manager.controllers.screenshot_controller import _pre_authorize_portal
+
+    mock_bus = MagicMock()
+    mock_bus.isConnected.return_value = True
+
+    mock_interface = MagicMock()
+    mock_interface.isValid.return_value = True
+
+    with patch(
+        "skill_manager.controllers.screenshot_controller.QDBusInterface",
+        return_value=mock_interface,
+    ):
+        _pre_authorize_portal(mock_bus)
+
+        mock_interface.callWithArgumentList.assert_called_once_with(
+            QDBus.AutoDetect,
+            "SetPermission",
+            ["screenshot", True, "skill-manager", "skill-manager", ["yes"]],
+        )
+
+
+def test_pre_authorize_portal_skips_if_bus_not_connected():
+    """_pre_authorize_portal does nothing if D-Bus is not connected."""
+    from unittest.mock import MagicMock, patch
+
+    from skill_manager.controllers.screenshot_controller import _pre_authorize_portal
+
+    mock_bus = MagicMock()
+    mock_bus.isConnected.return_value = False
+
+    with patch(
+        "skill_manager.controllers.screenshot_controller.QDBusInterface",
+    ) as mock_iface_cls:
+        _pre_authorize_portal(mock_bus)
+        mock_iface_cls.assert_not_called()
+
+
+def test_find_portal_python_uses_system_python():
+    """_find_portal_python prefers /usr/bin/python3 when it has dbus."""
+    from unittest.mock import patch
+
+    from skill_manager.controllers.screenshot_controller import _find_portal_python
+
+    with (
+        patch("os.path.isfile", return_value=True),
+        patch(
+            "skill_manager.controllers.screenshot_controller.subprocess.run",
+        ) as mock_run,
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "ok"
+        mock_run.return_value = mock_proc
+
+        result = _find_portal_python()
+
+        assert result == "/usr/bin/python3"
+        # Must verify the system Python has dbus
+        args = mock_run.call_args[0][0]
+        assert args[0] == "/usr/bin/python3"
+        assert "import dbus" in args[2]
+
+
+def test_find_portal_python_falls_back_to_venv():
+    """_find_portal_python falls back to sys.executable when /usr/bin/python3 lacks dbus."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from skill_manager.controllers.screenshot_controller import _find_portal_python
+
+    # First call: /usr/bin/python3 fails. Second call: sys.executable succeeds.
+    results = iter(
+        [
+            MagicMock(returncode=1, stdout=""),
+            MagicMock(returncode=0, stdout="ok"),
+        ]
+    )
+
+    with (
+        patch("os.path.isfile", return_value=True),
+        patch(
+            "skill_manager.controllers.screenshot_controller.subprocess.run",
+        ) as mock_run,
+    ):
+        mock_run.side_effect = lambda *a, **kw: next(results)
+
+        result = _find_portal_python()
+
+        assert result == sys.executable
+        assert mock_run.call_count == 2
+
+
+def test_find_portal_python_returns_none_when_no_python_has_dbus():
+    """_find_portal_python returns None when no candidate has dbus."""
+    from unittest.mock import MagicMock, patch
+
+    from skill_manager.controllers.screenshot_controller import _find_portal_python
+
+    with (
+        patch("os.path.isfile", return_value=True),
+        patch(
+            "skill_manager.controllers.screenshot_controller.subprocess.run",
+        ) as mock_run,
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 1
+        mock_proc.stdout = ""
+        mock_run.return_value = mock_proc
+
+        result = _find_portal_python()
+
+        assert result is None
+
+
+def test_find_portal_python_skips_nonexistent_files():
+    """_find_portal_python skips candidates that don't exist on disk."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from skill_manager.controllers.screenshot_controller import _find_portal_python
+
+    with (
+        patch("os.path.isfile", side_effect=lambda p: p == sys.executable),
+        patch(
+            "skill_manager.controllers.screenshot_controller.subprocess.run",
+        ) as mock_run,
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "ok"
+        mock_run.return_value = mock_proc
+
+        result = _find_portal_python()
+
+        assert result == sys.executable
+        # Only sys.executable was tested (skipped /usr/bin/python3)
+        assert mock_run.call_count == 1
+
+
+def test_find_portal_python_skips_duplicates():
+    """_find_portal_python does not test the same candidate twice."""
+    from unittest.mock import MagicMock, patch
+
+    from skill_manager.controllers.screenshot_controller import _find_portal_python
+
+    with (
+        patch("os.path.isfile", return_value=True),
+        patch(
+            "skill_manager.controllers.screenshot_controller.subprocess.run",
+        ) as mock_run,
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 1
+        mock_proc.stdout = ""
+        mock_run.return_value = mock_proc
+
+        result = _find_portal_python()
+
+        assert result is None
+        # Should only test unique candidates
+        assert mock_run.call_count <= 3
+
+
 def test_cancel_capture_no_pixmap(controller):
     """cancelCapture() should not fail if called with no current pixmap."""
     called = False

@@ -30,54 +30,54 @@ def test_create_mcp_server_write_returns_server() -> None:
     assert server is not None
 
 
-def test_register_all_tools_on_fresh_server() -> None:
-    """Every register_*_tools function decorates a fresh Server without raising."""
-    server = Server("test")
+def test_every_tool_module_exports_schemas_and_handlers() -> None:
+    """Every tool module exposes ``TOOL_SCHEMAS`` and ``get_handlers()``.
 
-    from skill_manager.mcp.tools.analyze import register_analyze_tools
-    from skill_manager.mcp.tools.build import register_build_tools
-    from skill_manager.mcp.tools.debug import register_debug_tools
-    from skill_manager.mcp.tools.monitor import register_monitor_tools
-    from skill_manager.mcp.tools.write import register_write_tools
+    The MCP server refactored from per-function ``register_*_tools()`` to
+    a data-driven pattern: each module declares its schemas in a dict and
+    exposes a ``get_handlers()`` factory.  ``server.py`` imports these and
+    wires them into ``Server.list_tools()`` / ``Server.call_tool()``.
+    """
+    from skill_manager.mcp.tools import (
+        analyze,
+        build,
+        debug,
+        gui,
+        monitor,
+        screenshot,
+        write,
+    )
 
-    register_build_tools(server)
-    register_analyze_tools(server)
-    register_monitor_tools(server)
-    register_debug_tools(server)
-    register_write_tools(server, allow_write=False)
-
-    # If we reached here, all five registrations succeeded.
-    assert server is not None
-
-
-def test_register_write_tools_with_allow_write_true() -> None:
-    """register_write_tools accepts allow_write=True without raising."""
-    server = Server("test-write")
-
-    from skill_manager.mcp.tools.write import register_write_tools
-
-    register_write_tools(server, allow_write=True)
-
-    assert server is not None
+    for mod in (analyze, build, debug, gui, monitor, screenshot, write):
+        assert hasattr(mod, "TOOL_SCHEMAS"), f"{mod.__name__} missing TOOL_SCHEMAS"
+        assert hasattr(mod, "get_handlers"), f"{mod.__name__} missing get_handlers()"
+        assert isinstance(mod.TOOL_SCHEMAS, dict), f"{mod.__name__}.TOOL_SCHEMAS must be a dict"
+        # get_handlers returns a dict mapping tool names to callables
+        handlers = mod.get_handlers()
+        assert isinstance(handlers, dict), f"{mod.__name__}.get_handlers() must return a dict"
+        assert set(handlers) == set(mod.TOOL_SCHEMAS), (
+            f"{mod.__name__}: keys in get_handlers() {set(handlers)} "
+            f"don't match TOOL_SCHEMAS {set(mod.TOOL_SCHEMAS)}"
+        )
 
 
 def test_expected_tool_names_declared() -> None:
-    """Each module exposes its expected tool names in its schema/registry dict."""
+    """Each module exposes its expected tool names in TOOL_SCHEMAS."""
     from skill_manager.mcp.tools import analyze, build, write
 
-    assert set(build._TOOL_SCHEMAS) == {
+    assert set(build.TOOL_SCHEMAS) == {
         "sm_lint",
         "sm_run_tests",
         "sm_build",
         "sm_job_status",
     }
-    assert set(analyze._HANDLERS) == {
+    assert set(analyze.TOOL_SCHEMAS) == {
         "sm_list_skills",
         "sm_list_sources",
         "sm_list_projects",
         "sm_static_analyze",
     }
-    assert set(write._TOOL_SCHEMAS) == {"sm_delete_skill", "sm_deploy"}
+    assert set(write.TOOL_SCHEMAS) == {"sm_delete_skill", "sm_deploy"}
 
 
 @pytest.mark.parametrize("allow_write", [False, True])

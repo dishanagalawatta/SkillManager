@@ -529,7 +529,18 @@ class OpsController(BaseController):
             return
         selected = self.app._selected_skill
         if hasattr(selected, "value") and selected.value("local_path"):
-            self.copySkillReference({k: selected.value(k) for k in selected.keys()})  # noqa: SIM118
+            # Build a plain dict from the QQmlPropertyMap, converting each
+            # key through str() to avoid PySide6 std::shared_ptr<char>
+            # conversion errors (broken in some Qt/PySide6 versions).
+            keys = list(selected.keys())
+            data = {}
+            for k in keys:
+                sk = str(k)
+                try:
+                    data[sk] = selected.value(sk)
+                except (RuntimeError, TypeError):
+                    continue
+            self.copySkillReference(data)
             return
         if isinstance(selected, dict) and selected.get("local_path"):
             self.copySkillReference(selected)

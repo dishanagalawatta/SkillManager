@@ -13,6 +13,8 @@ import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from skill_manager.core import discovery
 from skill_manager.core.discovery import _hash_child_names, compute_dir_fingerprint
 
@@ -132,7 +134,18 @@ def test_memo_miss_when_dir_changes(tmp_path: Path) -> None:
 def test_memo_key_is_normcase_insensitive(tmp_path: Path) -> None:
     """On case-insensitive filesystems (Windows), the memo must be keyed
     by normcase so that 'Foo' and 'foo' share a cache entry.
+
+    Skipped on case-sensitive filesystems (Linux) where ``Path(str(d).upper())``
+    refers to a non-existent directory.
     """
+    import sys
+
+    # Detect case-insensitive filesystem: on Linux (the CI host), /tmp is
+    # almost always case-sensitive, so the uppercased path won't exist and
+    # compute_dir_fingerprint returns ''.  Skip on case-sensitive FS.
+    if sys.platform != "win32" and not Path(str(tmp_path).upper()).exists():
+        pytest.skip("case-insensitive normcase test requires case-insensitive FS")
+
     d = tmp_path / "src"
     d.mkdir()
     _make_skill_dir(d, "alpha")

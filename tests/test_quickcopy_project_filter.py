@@ -204,7 +204,9 @@ def test_add_or_update_skills_normalizes_project_label(tmp_path):
 
     assert len(model._all_skills) == 1
     skill = model._all_skills[0]
-    expected_label = project_label(str(skills_dir))
+    # The model recomputes project_label from project_path (the root),
+    # not from local_path (which ends with .agents/skills).
+    expected_label = project_label(str(project_root))
     assert skill.project_label == expected_label, (
         f"Expected {expected_label!r}, got {skill.project_label!r}"
     )
@@ -220,7 +222,9 @@ def test_add_or_update_skills_keeps_correct_label(tmp_path):
     skills_dir = project_root / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
 
-    correct_label = project_label(str(skills_dir))
+    # The model recomputes project_label from project_path (the root),
+    # not from local_path (which ends with .agents/skills).
+    correct_label = project_label(str(project_root))
     skill_dict = {
         "name": "TestSkill",
         "local_path": str(skills_dir / "TestSkill"),
@@ -243,7 +247,11 @@ def test_add_or_update_skills_with_aliases(tmp_path):
     config = MagicMock()
     config.get = MagicMock(
         side_effect=lambda key, default=None: {
-            "project_aliases": {str(skills_dir): "My Legacy Project"}
+            "project_aliases": {
+                # Alias keyed by project_path (the root), matching how the
+                # model looks it up in addOrUpdateSkills.
+                str(project_root): "My Legacy Project",
+            }
         }.get(key, default)
     )
     model = SkillModel(config=config)

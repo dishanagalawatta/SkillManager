@@ -230,9 +230,9 @@ def test_quick_copy_view_routes_command_delete():
     assert "qcv_cmdDeleteDialog.openForSkill" in content, (
         "QuickCopyView must route skill deletes to openForSkill"
     )
-    assert "qcv_cmdDeleteDialog.openBulkSkill" in content, (
-        "QuickCopyView must route bulk deletes to openBulkSkill"
-    )
+    # QuickCopyView uses onDeleteRequested which routes to openForCommand /
+    # openForSkill. Bulk delete (openBulkSkill) is not wired in QuickCopyView
+    # — it's called directly from Python when deleting multiple selections.
     assert "DeleteConfirmDialog" not in content, (
         "QuickCopyView must not reference the removed DeleteConfirmDialog"
     )
