@@ -587,6 +587,8 @@ def _delete_validation_error(source_path, project_path):
     return ""
 
 
+# Perf: Memoizes path resolution for project root lookups in hot discovery loops
+@lru_cache(maxsize=2048)
 def project_root_for_project(project_path):
     parts = project_path.parts
     for marker in (".agents", ".codex", ".gemini"):
@@ -606,6 +608,8 @@ def project_root_for_project(project_path):
     return project_path
 
 
+# Perf: Memoizes relative path calculation during repeated file walking
+@lru_cache(maxsize=2048)
 def skill_base_relative(project_path):
     root = project_root_for_project(project_path)
     try:
