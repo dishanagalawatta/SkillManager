@@ -84,24 +84,36 @@ def _check_persisted_width_binding(inspector_type: str, view_content: str) -> No
 
 
 def _check_width_save_handler(inspector_type: str, view_content: str) -> None:
-    """Check that an inspector saves width changes to ui_controller."""
-    marker = "AppController.ui_controller.setInspectorWidth(width)"
-    assert marker in view_content, f"{inspector_type} missing width save handler"
+    """Check that an inspector saves width changes to ui_controller via debounce.
+
+    The debounce pattern stores the width in a temporary property and restarts
+    a single-shot Timer, avoiding Python interop on every resize pixel.
+    """
+    markers = [
+        "AppController.ui_controller.setInspectorWidth(width)",  # old direct pattern
+        "_debouncedWidth = width",  # LibraryView debounce
+        "_qc_debouncedWidth = width",  # QuickCopyView debounce
+    ]
+    assert any(m in view_content for m in markers), (
+        f"{inspector_type} missing width save handler (direct or debounced) in view"
+    )
 
 
 def test_library_view_inspectors_persist_width() -> None:
-    """Verify that all three inspectors in LibraryView use persisted width binding and save on change."""
+    """Verify that all three inspectors in LibraryView use overlay-based width from inspectorWidth and save on change."""
     view_path: Path = QML_DIR / "views" / "LibraryView.qml"
     content: str = view_path.read_text(encoding="utf-8")
+    assert "AppController.ui_controller.inspectorWidth" in content
     for insp in ("CommandInspector", "SkillInspector", "ImageInspector"):
-        _check_persisted_width_binding(insp, content)
         _check_width_save_handler(insp, content)
 
 
 def test_quick_copy_view_inspectors_persist_width() -> None:
-    """Verify that all three inspectors in QuickCopyView use persisted width binding and save on change."""
+    """Verify that all three inspectors in QuickCopyView use overlay-based width (inspectorWidth via _qcPanelW) and save on change."""
     view_path: Path = QML_DIR / "views" / "QuickCopyView.qml"
     content: str = view_path.read_text(encoding="utf-8")
+    # In overlay mode, _qcPanelW references inspectorWidth centrally
+    assert "AppController.ui_controller.inspectorWidth" in content
+    assert "_qcPanelW" in content
     for insp in ("CommandInspector", "SkillInspector", "ImageInspector"):
-        _check_persisted_width_binding(insp, content)
         _check_width_save_handler(insp, content)
