@@ -30,6 +30,8 @@ def test_capture_app_window_success(monkeypatch):
     monkeypatch.setattr(bridge, "_find_skill_manager_window", lambda: 123)
     monkeypatch.setattr(bridge, "_get_window_rect", lambda _h: (0, 0, 100, 50))
     monkeypatch.setattr(bridge, "_capture_window_to_image", lambda *a, **kw: img)
+    # Force Windows path for this test (Win32 fallback).
+    monkeypatch.setattr("sys.platform", "win32")
 
     b64, width, height = bridge.capture_app_window()
 
@@ -42,6 +44,7 @@ def test_capture_app_window_success(monkeypatch):
 
 def test_capture_app_window_no_window(monkeypatch):
     monkeypatch.setattr(bridge, "_find_skill_manager_window", lambda: None)
+    monkeypatch.setattr("sys.platform", "win32")
 
     b64, width, height = bridge.capture_app_window()
 
@@ -53,6 +56,7 @@ def test_capture_app_window_no_window(monkeypatch):
 def test_capture_app_window_no_matching_title(monkeypatch):
     monkeypatch.setattr(bridge, "_enum_top_level_windows", lambda: [1, 2, 3])
     monkeypatch.setattr(bridge, "_get_window_title", lambda _h: "Notepad")
+    monkeypatch.setattr("sys.platform", "win32")
 
     b64, width, height = bridge.capture_app_window()
 
