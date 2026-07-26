@@ -201,14 +201,27 @@ def test_save_screenshot_skips_categories_changed_when_already_present(
     mock_app.categoriesChanged.emit.assert_not_called()
 
 
-def test_save_screenshot_no_project(controller, mock_app):
+def test_save_screenshot_no_project_fallback_to_cwd(controller, mock_app, tmp_path):
+    """When no project is configured, save to CWD/.agents/screenshots/ instead of failing."""
     mock_app.quickCopyModel.projectFilter = ""
     mock_app.projects = []
+    mock_app.clientFormat = "Antigravity"
     full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
     controller.current_full_pixmap = full_pixmap
 
-    controller.saveScreenshot(QRect(0, 0, 10, 10), [])
-    mock_app._set_status.assert_called_with("No project selected to save screenshot.")
+    original_cwd = os.getcwd()
+    os.chdir(str(tmp_path))
+    try:
+        with patch("PySide6.QtGui.QGuiApplication.clipboard"):
+            controller.saveScreenshot(QRect(0, 0, 10, 10), [])
+            save_dir = tmp_path / ".agents" / "screenshots"
+            assert save_dir.is_dir(), "save dir should have been created"
+            # Verify a file was saved there
+            png_files = list(save_dir.glob("Screenshot_*.png"))
+            assert len(png_files) >= 1
+    finally:
+        os.chdir(original_cwd)
 
 
 def test_clear_selection_default_shortcut():
@@ -352,6 +365,136 @@ def test_cancel_capture_no_pixmap(controller):
 
     assert called
     assert controller.current_full_pixmap is None
+
+
+def test_take_screenshot_null_pixmap_on_linux_shows_overlay_immediately(controller, mock_app):
+    """Wayland: grabWindow returns null, overlay shown immediately without pre-capturing."""
+    mock_app._set_status = MagicMock()
+    with (
+        patch("PySide6.QtGui.QGuiApplication.primaryScreen") as mock_screen,
+        patch("sys.platform", "linux"),
+    ):
+        screen = MagicMock()
+        mock_screen.return_value = screen
+        screen.grabWindow.return_value = MagicMock(isNull=lambda: True)
+
+        overlay_shown = False
+        cancelled = False
+
+        def on_show():
+            nonlocal overlay_shown
+            overlay_shown = True
+
+        def on_cancel():
+            nonlocal cancelled
+            cancelled = True
+
+        controller.showOverlay.connect(on_show)
+        controller.captureCancelled.connect(on_cancel)
+
+        controller.takeScreenshot()
+
+        assert overlay_shown, "Overlay should show immediately on Wayland"
+        assert not cancelled, "Should not cancel - capture deferred to save"
+        assert controller._wayland_deferred, "Wayland deferred flag should be set"
+        mock_app.screenshot_provider.set_pixmap.assert_not_called()
+        assert not controller.screenshotValid
+
+
+def test_save_screenshot_deferred_portal_succeeds(controller, mock_app, tmp_path):
+    """Wayland deferred: saveScreenshot triggers portal capture, crops, saves."""
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = project_path
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "Antigravity"
+    mock_app.ops = MagicMock()
+    mock_app._set_status = MagicMock()
+
+    controller._wayland_deferred = True
+
+    full_pixmap = MagicMock(spec=QPixmap)
+    full_pixmap.isNull.return_value = False
+    full_pixmap.width.return_value = 200
+    full_pixmap.height.return_value = 100
+
+    with (
+        patch(
+            "skill_manager.controllers.screenshot_controller._portal_capture",
+            return_value="/tmp/screen.png",
+        ),
+        patch(
+            "skill_manager.controllers.screenshot_controller.QPixmap",
+            return_value=full_pixmap,
+        ),
+        patch("PySide6.QtGui.QGuiApplication.clipboard"),
+    ):
+        controller.saveScreenshot(QRect(10, 10, 50, 50), [])
+
+    assert not controller._wayland_deferred
+    assert controller.current_full_pixmap is full_pixmap
+
+
+def test_save_screenshot_deferred_all_strategies_fail(controller, mock_app):
+    """Wayland deferred: all capture strategies fail, captureCancelled emitted."""
+    mock_app._set_status = MagicMock()
+    controller._wayland_deferred = True
+    controller.current_full_pixmap = None
+
+    with (
+        patch(
+            "skill_manager.controllers.screenshot_controller._portal_capture",
+            return_value=None,
+        ),
+        patch(
+            "skill_manager.controllers.screenshot_controller._gnome_screenshot_capture",
+            return_value=None,
+        ),
+    ):
+        cancelled = False
+
+        def on_cancel():
+            nonlocal cancelled
+            cancelled = True
+
+        controller.captureCancelled.connect(on_cancel)
+
+        controller.saveScreenshot(QRect(0, 0, 10, 10), [])
+
+    assert not controller._wayland_deferred
+    assert cancelled, "captureCancelled must be emitted on deferred capture failure"
+    assert mock_app._set_status.call_count >= 1
+
+
+def test_take_screenshot_null_pixmap_non_linux(controller, mock_app):
+    """On non-Linux, null pixmap skips overlay (no fallback attempted)."""
+    mock_app._set_status = MagicMock()
+    with (
+        patch("PySide6.QtGui.QGuiApplication.primaryScreen") as mock_screen,
+        patch("sys.platform", "win32"),
+    ):
+        screen = MagicMock()
+        mock_screen.return_value = screen
+        screen.grabWindow.return_value = MagicMock(isNull=lambda: True)
+
+        overlay_shown = False
+        cancelled = False
+
+        def on_show():
+            nonlocal overlay_shown
+            overlay_shown = True
+
+        def on_cancel():
+            nonlocal cancelled
+            cancelled = True
+
+        controller.showOverlay.connect(on_show)
+        controller.captureCancelled.connect(on_cancel)
+
+        controller.takeScreenshot()
+
+        assert not overlay_shown
+        assert cancelled, "captureCancelled must be emitted so QML restores the hidden window"
+        mock_app._set_status.assert_called_once()
 
 
 def test_save_screenshot_refreshes_selection(controller, mock_app, tmp_path):
