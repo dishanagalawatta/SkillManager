@@ -931,10 +931,20 @@ def capture_app_window(
     only — IPC capture always grabs at the window's current resolution).
     """
     _log_call("capture_app_window")
-    # Primary: IPC capture via live Qt GUI CommandChannel.
-    # Only attempted when the window is found (live GUI process running).
+
+    # ── Primary: IPC capture via live Qt GUI CommandChannel ──────────
+    # IPC writes a JSON command file that the Qt GUI picks up via QTimer
+    # polling — no platform-specific window handles needed.  On Linux we
+    # always try it first since _find_skill_manager_window() uses Win32
+    # and returns None.  On Windows the hwnd check avoids sending commands
+    # when no window is present.
     hwnd_for_ipc = _find_skill_manager_window()
-    if hwnd_for_ipc is not None and resize_width is None and resize_height is None:
+    should_try_ipc = (
+        resize_width is None
+        and resize_height is None
+        and (hwnd_for_ipc is not None or sys.platform != "win32")
+    )
+    if should_try_ipc:
         ack = send_capture_command(wait=True, timeout=3.0)
         if ack.get("ok"):
             capture_path: str | None = ack.get("capture_path")
@@ -949,7 +959,19 @@ def capture_app_window(
                 except Exception:  # noqa: BLE001 — bad PNG, fall through
                     pass
 
-    # ── Fallback: Win32 PrintWindow + CreateDIBSection ───────────────
+    # ── Fallback: platform-native capture ────────────────────────────
+    if sys.platform == "win32":
+        result = _fallback_capture_win32(resize_width, resize_height)
+    else:
+        result = _fallback_capture_linux()
+    return result
+
+
+def _fallback_capture_win32(
+    resize_width: int | None = None,
+    resize_height: int | None = None,
+) -> tuple[str | None, int, int]:
+    """Win32 PrintWindow + CreateDIBSection fallback for Windows only."""
     try:
         hwnd = _find_skill_manager_window()
         if hwnd is None:
@@ -988,6 +1010,20 @@ def capture_app_window(
                 _restore_window(hwnd, *restore_rect)
     except Exception:  # noqa: BLE001
         return (None, 0, 0)
+
+
+def _fallback_capture_linux() -> tuple[str | None, int, int]:
+    """Linux fallback — the IPC path is the primary capture method.
+
+    On Wayland, cross-process window capture without portal infrastructure
+    is not possible from a headless process.  The IPC path
+    (``send_capture_command``) will already have been tried in
+    ``capture_app_window`` and succeeds when the Qt GUI is running.
+    """
+    get_diagnostic_logger().log_event(
+        "INFO", "capture_linux", "No native capture; IPC is primary path"
+    )
+    return (None, 0, 0)
 
 
 def _wait_for_ack(cmd_id: str, acks_dir: Path, timeout: float) -> dict[str, Any]:
@@ -1129,13 +1165,20 @@ def send_mouse_move(x: int, y: int) -> dict[str, Any]:
     on failure.
     """
     _log_call("send_mouse_move")
-    try:
-        result = ctypes.windll.user32.SetCursorPos(x, y)  # type: ignore[attr-defined]
-        if not result:
-            return {"ok": False, "error": "SetCursorPos returned 0"}
+    if sys.platform == "win32":
+        try:
+            result = ctypes.windll.user32.SetCursorPos(x, y)  # type: ignore[attr-defined]
+            if not result:
+                return {"ok": False, "error": "SetCursorPos returned 0"}
+            return {"ok": True}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+    # Linux: try ydotool / pyautogui
+    from skill_manager.utils.linux import move_mouse as _linux_move_mouse
+
+    if _linux_move_mouse(x, y):
         return {"ok": True}
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": str(exc)}
+    return {"ok": False, "error": "No mouse injection tool available (try ydotool)"}
 
 
 def send_mouse_click(
@@ -1153,38 +1196,58 @@ def send_mouse_click(
     on failure.
     """
     _log_call("send_mouse_click")
-    try:
-        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    if sys.platform == "win32":
+        try:
+            user32 = ctypes.windll.user32  # type: ignore[attr-defined]
 
-        if x is not None and y is not None and not user32.SetCursorPos(x, y):
-            return {"ok": False, "error": "SetCursorPos failed"}
+            if x is not None and y is not None and not user32.SetCursorPos(x, y):
+                return {"ok": False, "error": "SetCursorPos failed"}
 
-        flags: dict[str, tuple[int, int]] = {
-            "left": (0x0002, 0x0004),
-            "right": (0x0008, 0x0010),
-            "middle": (0x0020, 0x0040),
-        }
-        down_flag, up_flag = flags.get(button, (0x0002, 0x0004))
+            flags: dict[str, tuple[int, int]] = {
+                "left": (0x0002, 0x0004),
+                "right": (0x0008, 0x0010),
+                "middle": (0x0020, 0x0040),
+            }
+            down_flag, up_flag = flags.get(button, (0x0002, 0x0004))
 
-        for _ in range(2 if double else 1):
-            user32.mouse_event(down_flag, 0, 0, 0, 0)
-            user32.mouse_event(up_flag, 0, 0, 0, 0)
+            for _ in range(2 if double else 1):
+                user32.mouse_event(down_flag, 0, 0, 0, 0)
+                user32.mouse_event(up_flag, 0, 0, 0, 0)
 
+            return {"ok": True}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+    # Linux: try ydotool / pyautogui
+    from skill_manager.utils.linux import click_mouse as _linux_click
+
+    if _linux_click(x, y, button):
         return {"ok": True}
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": str(exc)}
+    return {"ok": False, "error": "No mouse injection tool available (try ydotool)"}
 
 
 def send_type_text(text: str) -> dict[str, Any]:
-    """Type ``text`` into the currently focused window via ``SendInput``.
+    """Type ``text`` into the currently focused window.
 
-    Handles Shift-key modulation for uppercase letters and common symbols.
-    Non-printable characters and unicode beyond basic Latin are skipped.
+    On Windows uses ``SendInput`` (handles Shift-key modulation etc.).
+    On Linux tries ``ydotool`` or ``pyautogui``.
 
     Best-effort: returns ``{"ok": True, "chars": N}`` on success,
     ``{"ok": False, "error": ...}`` on failure.
     """
     _log_call("send_type_text")
+    if sys.platform == "win32":
+        return _send_type_text_win32(text)
+    # Linux: try ydotool / pyautogui
+    from skill_manager.utils.linux import type_text as _linux_type
+
+    chars = _linux_type(text)
+    if chars > 0:
+        return {"ok": True, "chars": chars}
+    return {"ok": False, "error": "No keyboard injection tool available (try ydotool)"}
+
+
+def _send_type_text_win32(text: str) -> dict[str, Any]:
+    """Type ``text`` via Win32 ``SendInput``."""
     try:
         user32 = ctypes.windll.user32  # type: ignore[attr-defined]
 
@@ -1286,32 +1349,59 @@ def send_type_text(text: str) -> dict[str, Any]:
 def get_window_info() -> dict[str, Any]:
     """Return the live SkillManager window's geometry and DPI.
 
+    On Windows uses Win32 ``GetWindowRect``.  On Linux uses
+    ``xdotool`` / ``wmctrl`` if available.
+
     Returns ``{"ok": True, "window": {left, top, right, bottom, width, height}}``
     or ``{"ok": False, "error": ...}`` if the window is not found.
     """
     _log_call("get_window_info")
-    try:
-        hwnd = _find_skill_manager_window()
-        if hwnd is None:
-            return {"ok": False, "error": "SkillManager window not found"}
+    if sys.platform == "win32":
+        try:
+            hwnd = _find_skill_manager_window()
+            if hwnd is None:
+                return {"ok": False, "error": "SkillManager window not found"}
 
-        rect = _get_window_rect(hwnd)
-        if rect is None:
-            return {"ok": False, "error": "GetWindowRect failed"}
+            rect = _get_window_rect(hwnd)
+            if rect is None:
+                return {"ok": False, "error": "GetWindowRect failed"}
 
-        left, top, right, bottom = rect
-        return {
-            "ok": True,
-            "hwnd": hwnd,
-            "left": left,
-            "top": top,
-            "right": right,
-            "bottom": bottom,
-            "width": right - left,
-            "height": bottom - top,
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": str(exc)}
+            left, top, right, bottom = rect
+            return {
+                "ok": True,
+                "hwnd": hwnd,
+                "left": left,
+                "top": top,
+                "right": right,
+                "bottom": bottom,
+                "width": right - left,
+                "height": bottom - top,
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
+    # Linux: try xdotool / wmctrl
+    from skill_manager.utils.linux import find_window_by_title, get_window_geometry
+
+    wid = find_window_by_title("Skill Manager")
+    if wid is None:
+        return {"ok": False, "error": "SkillManager window not found (no xdotool/wmctrl)"}
+
+    geo = get_window_geometry(wid)
+    if geo is None:
+        return {"ok": False, "error": "Could not query window geometry on Linux"}
+
+    left, top, width, height = geo["left"], geo["top"], geo["width"], geo["height"]
+    return {
+        "ok": True,
+        "window_id": wid,
+        "left": left,
+        "top": top,
+        "right": left + width,
+        "bottom": top + height,
+        "width": width,
+        "height": height,
+    }
 
 
 __all__ = [
