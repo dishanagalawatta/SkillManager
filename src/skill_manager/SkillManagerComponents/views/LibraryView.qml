@@ -11,6 +11,13 @@ Item {
 
     property bool showImageInspector: false
     property bool showCommandInspector: false
+    property bool showSkillInspector: false
+
+    // A skill is "valid" when selectedSkill has a real local_path
+    readonly property bool selectedSkillValid:
+        AppController.selectedSkill
+        && AppController.selectedSkill.local_path !== undefined
+        && AppController.selectedSkill.local_path !== ""
 
     // ── Dynamic Collapse Phases (0 = fully expanded) ──────────────
     //   0: All expanded
@@ -583,6 +590,8 @@ Item {
                     }
                     onInspectImageRequested: {
                         lv_root.showImageInspector = true
+                        lv_root.showCommandInspector = false
+                        lv_root.showSkillInspector = false
                     }
                 }
             }
@@ -590,11 +599,28 @@ Item {
     }
 
     // ── Inspector Overlay Layer (replaces SplitView inline inspectors) ──────
+    // Overlay visible is set imperatively from the Connections handler to
+    // bypass QML's visible binding staleness issue in both test and runtime
+    // environments.  The three show flags gate each inspector individually.
     Item {
         id: inspectorOverlay
         anchors.fill: parent
-        visible: lv_inspector.visible || lv_commandInspector.visible || lv_imageInspector.visible
+        visible: false
         z: 10
+
+        // Debouncer for setInspectorWidth — saves width only 150ms after the
+        // user stops dragging, avoiding 60 Python interop calls per second.
+        property int _debouncedWidth: 0
+        Timer {
+            id: _inspectorWidthDebouncer
+            interval: 150
+            repeat: false
+            onTriggered: {
+                if (_debouncedWidth > 0) {
+                    AppController.ui_controller.setInspectorWidth(_debouncedWidth)
+                }
+            }
+        }
 
         // Backdrop — dark overlay in popup mode, invisible in side-panel mode
         Rectangle {
@@ -609,6 +635,7 @@ Item {
                 onClicked: {
                     lv_root.showCommandInspector = false
                     lv_root.showImageInspector = false
+                    lv_root.showSkillInspector = false
                     AppController.ui_controller.selectSkill(-1)
                 }
             }
@@ -624,13 +651,13 @@ Item {
         readonly property int _panelX: parent.width - _panelW
         readonly property int _panelW: {
             var p = AppController.ui_controller.inspectorWidth
-            // Use the active inspector's targetWidth as reference
-            var tw = lv_root.showImageInspector
-                ? lv_imageInspector.targetWidth
-                : lv_root.showCommandInspector
-                    ? lv_commandInspector.targetWidth
-                    : lv_inspector.targetWidth
-            return p > 0 ? Math.max(p, tw) : tw
+            // Decoupled from inspector targetWidth to avoid chicken-and-egg:
+            // targetWidth reads parent.width (the overlay) which is sized by _panelW.
+            var baseMin = lv_root.showImageInspector ? 440
+                        : lv_root.showCommandInspector ? 400
+                        : 400
+            var computed = Math.max(baseMin, lv_root.width * 0.5)
+            return p > 0 ? Math.max(p, computed) : computed
         }
 
         // ── CommandInspector ──────────────────────────────────────
@@ -638,7 +665,7 @@ Item {
             id: lv_commandInspector
             skill: AppController.selectedSkill
             editDialog: lv_commandDialog
-            visible: targetWidth > 0 && lv_root.showCommandInspector
+            overlayVisible: lv_root.selectedSkillValid && lv_root.showCommandInspector
             x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
             y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
             width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
@@ -646,7 +673,8 @@ Item {
 
             onWidthChanged: {
                 if (visible && width > 0 && !lv_root._usePopupMode) {
-                    AppController.ui_controller.setInspectorWidth(width)
+                    inspectorOverlay._debouncedWidth = width
+                    _inspectorWidthDebouncer.restart()
                 }
             }
             onClosed: {
@@ -664,7 +692,7 @@ Item {
         SkillInspector {
             id: lv_inspector
             skill: AppController.selectedSkill
-            visible: targetWidth > 0 && !lv_root.showImageInspector && !lv_root.showCommandInspector
+            overlayVisible: lv_root.selectedSkillValid && lv_root.showSkillInspector
             x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
             y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
             width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
@@ -672,17 +700,20 @@ Item {
 
             onWidthChanged: {
                 if (visible && width > 0 && !lv_root._usePopupMode) {
-                    AppController.ui_controller.setInspectorWidth(width)
+                    inspectorOverlay._debouncedWidth = width
+                    _inspectorWidthDebouncer.restart()
                 }
             }
-            onClosed: AppController.ui_controller.selectSkill(-1)
+            onClosed: {
+                lv_root.showSkillInspector = false
+                AppController.ui_controller.selectSkill(-1)
+            }
         }
 
         // ── ImageInspector ────────────────────────────────────────
         ImageInspector {
             id: lv_imageInspector
             skill: AppController.selectedSkill
-            visible: targetWidth > 0 && lv_root.showImageInspector
             x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
             y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
             width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
@@ -690,7 +721,8 @@ Item {
 
             onWidthChanged: {
                 if (visible && width > 0 && !lv_root._usePopupMode) {
-                    AppController.ui_controller.setInspectorWidth(width)
+                    inspectorOverlay._debouncedWidth = width
+                    _inspectorWidthDebouncer.restart()
                 }
             }
             onClosed: {
@@ -705,16 +737,25 @@ Item {
         target: AppController
         function onSelectedSkillChanged() {
             var skill = AppController.selectedSkill
-            if (skill && skill.is_command) {
-                lv_root.showCommandInspector = true
-                lv_root.showImageInspector = false
-            } else if (skill && skill.is_screenshot) {
-                lv_root.showCommandInspector = false
-                lv_root.showImageInspector = true
-            } else {
-                lv_root.showCommandInspector = false
-                lv_root.showImageInspector = false
-            }
+            var isCommand = !!(skill && skill.is_command)
+            var isScreenshot = !!(skill && skill.is_screenshot)
+            var sv = lv_root.selectedSkillValid
+            var showSkill = !isCommand && !isScreenshot && sv
+            lv_root.showCommandInspector = isCommand
+            lv_root.showImageInspector = isScreenshot
+            lv_root.showSkillInspector = showSkill
+            // Set visible imperatively on overlay + each inspector to bypass
+            // QML's binding staleness bug for the `visible` property.
+            inspectorOverlay.visible = isCommand || isScreenshot || showSkill
+            lv_commandInspector.visible = isCommand
+            lv_imageInspector.visible = isScreenshot
+            lv_inspector.visible = showSkill
+            console.log("INSPECTOR_DEBUG: selectedSkill path=" + (skill && skill.local_path ? skill.local_path : "NONE")
+                + " isCmd=" + isCommand + " isScr=" + isScreenshot
+                + " sv=" + sv + " showSk=" + showSkill
+                + " overlay.vis=" + inspectorOverlay.visible
+                + " insp.vis=" + lv_inspector.visible
+                + " overlVis=" + lv_inspector.overlayVisible)
         }
     }
 

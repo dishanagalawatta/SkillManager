@@ -10,6 +10,10 @@ Rectangle {
     property var skill: _sel
     property bool isQuickCopy: false
     property bool isCollapsed: false
+    // Controlled externally (e.g. from LibraryView overlay) to gate visibility.
+    // Also gates internal ColumnLayout content. The overlay directly sets
+    // `visible` on this root to bypass QML's visible binding staleness issue.
+    property bool overlayVisible: true
 
     readonly property int targetWidth: {
         if (!root._sel || root._sel.local_path === undefined) return 0;
@@ -93,7 +97,7 @@ Rectangle {
         ColumnLayout {
             anchors.fill: parent
             spacing: 16
-            visible: !root.isCollapsed && root._sel.local_path !== undefined
+            visible: root.overlayVisible && !root.isCollapsed && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
             
             Behavior on opacity { NumberAnimation { duration: 200 } }

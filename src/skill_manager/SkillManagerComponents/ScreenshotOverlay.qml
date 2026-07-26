@@ -9,27 +9,32 @@ Window {
     visibility: Window.Hidden
     color: "transparent"
 
-    onClosing: {
-        try {
-            AppController.screenshot_controller.cancelCapture()
-        } catch (e) {
-            console.error("Failed to cancel capture:", e)
-        }
-    }
-
     property real startX: 0
     property real startY: 0
     property rect selectionRect: Qt.rect(0, 0, 0, 0)
     property bool isSelecting: false
     property bool isRedacting: false
-    property string mode: "selecting" // "selecting" or "redacting"
+    property string mode: "selecting"
     property var redactionRects: []
+    property bool savingInProgress: false
 
-    // Background freeze-frame
+    onClosing: {
+        if (!savingInProgress) {
+            try {
+                AppController.screenshot_controller.cancelCapture()
+            } catch (e) {
+                console.error("Failed to cancel capture:", e)
+            }
+        }
+    }
+
+    // Background freeze-frame (hidden on Wayland deferred — transparent window shows desktop)
     Image {
         id: bg
         anchors.fill: parent
-        source: "image://screenshot/current?v=" + AppController.screenshot_controller.screenshotVersion
+        source: AppController.screenshot_controller.screenshotValid
+                ? "image://screenshot/current?v=" + AppController.screenshot_controller.screenshotVersion
+                : ""
         cache: false
     }
 
@@ -236,7 +241,9 @@ Window {
     }
 
     function finalize() {
-        // Prepare redactions relative to the crop area
+        savingInProgress = true
+
+        var savedRect = Qt.rect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height)
         var relativeRedactions = []
         for (var i=0; i < redactionRects.length; i++) {
             var r = redactionRects[i]
@@ -250,11 +257,12 @@ Window {
             }
         }
 
-        AppController.screenshot_controller.saveScreenshot(
-            Qt.rect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height),
-            relativeRedactions
-        )
         overlay.close()
+        // Defer save to next event cycle so overlay is fully hidden before capture
+        Qt.callLater(function() {
+            AppController.screenshot_controller.saveScreenshot(savedRect, relativeRedactions)
+            savingInProgress = false
+        })
     }
 
     Shortcut {
@@ -290,7 +298,14 @@ Window {
             overlay.isRedacting = false
             overlay.selectionRect = Qt.rect(0,0,0,0)
             overlay.redactionRects = []
-            overlay.visibility = Window.FullScreen
+            // Avoid Window.FullScreen: on Wayland it creates an opaque full-screen
+            // surface that ignores transparency (shows black). Use a manually-sized
+            // window so the compositor treats it as a regular transparent surface.
+            overlay.showNormal()
+            overlay.x = 0
+            overlay.y = 0
+            overlay.width = Screen.width
+            overlay.height = Screen.height
             overlay.raise()
             overlay.requestActivate()
         }
