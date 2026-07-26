@@ -74,7 +74,7 @@ def _redirect_qml_log():
     """Redirect stderr (QML console.log goes here) to a log file."""
     log_path = DATA_DIR / "qml_console.log"
     try:
-        fh = open(log_path, "w", encoding="utf-8")
+        fh = open(log_path, "w", encoding="utf-8")  # noqa: SIM115 — must keep fh open for sys.stderr replacement
         sys.stderr = fh
     except OSError:
         pass  # best-effort

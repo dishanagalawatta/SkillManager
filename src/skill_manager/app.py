@@ -29,7 +29,7 @@ from PySide6.QtCore import (  # noqa: E402
     Signal,
     Slot,
 )
-from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtGui import QGuiApplication, QIcon, QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine, QQmlPropertyMap, qmlRegisterSingletonInstance
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -1567,9 +1567,14 @@ class AppController(QObject):
             self.ui._save_timer.stop()
             self.ui.saveUiState()
 
-        # Release the single-instance mutex so another instance can acquire it
+        # Release the single-instance mutex / lock so another instance can start
         global _app_mutex
         _app_mutex = None
+        global _SINGLE_INSTANCE_LOCK_PATH
+        if _SINGLE_INSTANCE_LOCK_PATH and os.path.exists(_SINGLE_INSTANCE_LOCK_PATH):
+            with contextlib.suppress(OSError):
+                os.remove(_SINGLE_INSTANCE_LOCK_PATH)
+            _SINGLE_INSTANCE_LOCK_PATH = None
 
         logger.debug("[SHUTDOWN] on_quit complete")
         dump_diagnostics("on_quit complete")
@@ -1721,15 +1726,83 @@ def _watchdog_exit(ret: int, timeout: float = 5.0) -> threading.Thread:
 
 
 def _bring_existing_window_to_front() -> None:
-    """Finds the existing SkillManager window and brings it to the front."""
-    if sys.platform != "win32":
-        return
-    import ctypes
+    """Finds the existing SkillManager window and brings it to the front.
 
-    hwnd = ctypes.windll.user32.FindWindowW(None, "Skill Manager")
-    if hwnd:
-        ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        ctypes.windll.user32.SetForegroundWindow(hwnd)
+    Uses Win32 API on Windows, ``xdotool`` / ``wmctrl`` on Linux.
+    Best-effort: silently no-ops when tools are unavailable.
+    """
+    if sys.platform == "win32":
+        import ctypes
+
+        hwnd = ctypes.windll.user32.FindWindowW(None, "Skill Manager")
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        return
+
+    if sys.platform == "linux":
+        import shutil
+        import subprocess
+
+        xdotool = shutil.which("xdotool")
+        if xdotool:
+            try:
+                subprocess.run(
+                    [xdotool, "search", "--name", "Skill Manager", "windowactivate"],
+                    capture_output=True,
+                    timeout=5,
+                )
+                return
+            except Exception:  # noqa: BLE001
+                pass
+
+        wmctrl = shutil.which("wmctrl")
+        if wmctrl:
+            with contextlib.suppress(Exception):
+                subprocess.run(
+                    [wmctrl, "-a", "Skill Manager"],
+                    capture_output=True,
+                    timeout=5,
+                )
+
+
+_SINGLE_INSTANCE_LOCK_PATH: str | None = None
+
+
+def _acquire_linux_lock() -> str | None:
+    """Create a PID-based single-instance lock.
+
+    Writes the current PID to a lock file.  If the file already exists
+    and the PID inside it is still alive, returns ``None`` (another
+    instance is running).  If the PID is stale, replaces it.
+
+    Returns the lock file path on success, ``None`` on failure.
+    """
+    global _SINGLE_INSTANCE_LOCK_PATH
+    from skill_manager.core.config import DATA_DIR
+
+    lock_path = os.path.join(str(DATA_DIR), "app.lock")
+    try:
+        # Try reading existing lock
+        if os.path.exists(lock_path):
+            with open(lock_path) as f:
+                old_pid_str = f.read().strip()
+            if old_pid_str:
+                try:
+                    old_pid = int(old_pid_str)
+                    # Check if process is alive
+                    os.kill(old_pid, 0)  # signal 0 = existence check
+                    return None  # Another instance is running
+                except (OSError, ValueError):
+                    pass  # Stale lock — fall through to replace
+            os.remove(lock_path)
+
+        with open(lock_path, "w") as f:
+            f.write(str(os.getpid()))
+        _SINGLE_INSTANCE_LOCK_PATH = lock_path
+        return lock_path
+    except OSError:
+        return None
 
 
 def _run_mcp_mode() -> None:  # pragma: no cover
@@ -1745,8 +1818,10 @@ def _run_mcp_mode() -> None:  # pragma: no cover
 
     # Dedicated mutex — distinct from the GUI's SkillManagerAppMutex so a GUI
     # instance and an MCP instance can run side by side.
-    global _app_mutex
-    _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerMcpMutex")
+    # Windows-only; skipped on Linux (no Inno Setup installer to coordinate with).
+    if sys.platform == "win32":
+        global _app_mutex
+        _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerMcpMutex")
 
     # Force a headless platform when no display is present so construction
     # works in CI / SSH / service contexts. Set BEFORE QGuiApplication exists.
@@ -1800,40 +1875,54 @@ def main():  # pragma: no cover
         default_integrations=False,
     )
 
-    # Acquire mutex so Inno Setup installer can cleanly close the app
+    # Acquire mutex so Inno Setup installer can cleanly close the app.
+    # Windows-only: guarded by sys.platform so Linux startup doesn't crash.
     global _app_mutex
-    _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
-    ERROR_ALREADY_EXISTS = 183
-
-    # Check if we should enforce single-instance
     single_instance_requested = (
         os.environ.get("SKILL_MANAGER_SINGLE_INSTANCE") == "1" or "--single-instance" in sys.argv
     )
 
-    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS and single_instance_requested:
-        _bring_existing_window_to_front()
-        sys.exit(0)
+    if sys.platform == "win32":
+        _app_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SkillManagerAppMutex")
+        ERROR_ALREADY_EXISTS = 183
 
-    # Use a standard AppUserModelID format
-    myappid = "Antigravity.SkillManager.App.1.0"
-    if not getattr(sys, "frozen", False):
-        # Development mode: Append .dev to distinguish from release builds.
-        # Do NOT append a timestamp, as it breaks Windows taskbar icon grouping.
-        myappid += ".dev"
+        if (
+            ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+            and single_instance_requested
+        ):
+            _bring_existing_window_to_front()
+            sys.exit(0)
+    elif single_instance_requested and sys.platform == "linux":
+        _app_mutex = _acquire_linux_lock()
+        if _app_mutex is None:
+            _bring_existing_window_to_front()
+            sys.exit(0)
 
-    try:
-        res = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        logger.info(
-            f"Windows: Pre-init SetCurrentProcessExplicitAppUserModelID('{myappid}') returned {res}"
-        )
-    except Exception as e:
-        logger.error(f"Failed to set AppUserModelID: {e}")
+        # Use a standard AppUserModelID format
+        myappid = "Antigravity.SkillManager.App.1.0"
+        if not getattr(sys, "frozen", False):
+            # Development mode: Append .dev to distinguish from release builds.
+            # Do NOT append a timestamp, as it breaks Windows taskbar icon grouping.
+            myappid += ".dev"
+
+        try:
+            res = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+            logger.info(
+                f"Windows: Pre-init SetCurrentProcessExplicitAppUserModelID('{myappid}') returned {res}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to set AppUserModelID: {e}")
 
     # Safety net: drop any stale Qt QML disk cache before loading QML.
     # Runs even when QML_DISABLE_DISK_CACHE=1 is honored (defense in depth).
     invalidate_qml_disk_cache_if_stale(skill_manager.__version__)
 
     QQuickStyle.setStyle("Basic")
+    # Enable per-pixel alpha for all windows (required for transparent overlay
+    # on Wayland where Window.FullScreen disables compositor transparency).
+    fmt = QSurfaceFormat()
+    fmt.setAlphaBufferSize(8)
+    QSurfaceFormat.setDefaultFormat(fmt)
     app = QGuiApplication(sys.argv)
 
     # Set application name and version for better shell integration
@@ -1842,37 +1931,49 @@ def main():  # pragma: no cover
     app.setOrganizationName("Antigravity")
     app.setOrganizationDomain("antigravity.io")
 
-    # Robust icon loading
-    icon_ext = "ico"
-    icon_candidates = [
-        resolve_resource_path(f"assets/brand/logo.{icon_ext}"),
-        os.path.join(os.path.dirname(__file__), "assets", "brand", f"logo.{icon_ext}"),
-        os.path.join(os.path.abspath("."), "assets", "brand", f"logo.{icon_ext}"),
-        # Fallbacks to png just in case
-        resolve_resource_path("assets/brand/logo.png"),
-        os.path.join(os.path.dirname(__file__), "assets", "brand", "logo.png"),
-        os.path.join(os.path.abspath("."), "assets", "brand", "logo.png"),
-    ]
-
+    # Robust icon loading — use PNG on Linux (Wayland/GNOME docks need PNG)
     app_icon = QIcon()
     loaded_icon = False
     loaded_icon_path = ""
-    for icon_path in icon_candidates:
-        if os.path.exists(icon_path):
-            app_icon = QIcon(icon_path)
-            if not app_icon.isNull():
-                app.setWindowIcon(app_icon)
-                logger.info(f"Successfully loaded and set application icon from: {icon_path}")
+    if sys.platform == "linux":
+        icon_64 = resolve_resource_path("assets/brand/logo-64.png")
+        icon_128 = resolve_resource_path("assets/brand/logo-128.png")
+        icon_png = resolve_resource_path("assets/brand/logo.png")
+        for candidate in (icon_64, icon_128, icon_png):
+            if os.path.exists(candidate):
                 loaded_icon = True
-                loaded_icon_path = icon_path
-                break
-            logger.warning(f"QIcon failed to load existing file: {icon_path}")
-        else:
-            logger.debug(f"Icon candidate not found: {icon_path}")
+                app_icon.addFile(candidate)
+        if loaded_icon:
+            app.setWindowIcon(app_icon)
+            logger.info(f"Set application icon from multi-size PNGs: {icon_64}, {icon_128}")
+        # Wayland/GNOME derives dock icon from .desktop file matched via
+        # setDesktopFileName, not from setWindowIcon.
+        app.setDesktopFileName("skill-manager")
+    else:
+        icon_candidates = [
+            resolve_resource_path("assets/brand/logo.ico"),
+            os.path.join(os.path.dirname(__file__), "assets", "brand", "logo.ico"),
+            os.path.join(os.path.abspath("."), "assets", "brand", "logo.ico"),
+            resolve_resource_path("assets/brand/logo.png"),
+            os.path.join(os.path.dirname(__file__), "assets", "brand", "logo.png"),
+            os.path.join(os.path.abspath("."), "assets", "brand", "logo.png"),
+        ]
+        loaded_icon_path = ""
+        for icon_path in icon_candidates:
+            if os.path.exists(icon_path):
+                app_icon = QIcon(icon_path)
+                if not app_icon.isNull():
+                    app.setWindowIcon(app_icon)
+                    logger.info(f"Successfully loaded and set application icon from: {icon_path}")
+                    loaded_icon = True
+                    loaded_icon_path = icon_path
+                    break
+                logger.warning(f"QIcon failed to load existing file: {icon_path}")
+            else:
+                logger.debug(f"Icon candidate not found: {icon_path}")
 
     if not loaded_icon:
         logger.error("CRITICAL: All icon candidates failed to load.")
-        # Check if PNG is even supported
         from PySide6.QtGui import QImageReader
 
         formats = [f.data().decode() for f in QImageReader.supportedImageFormats()]  # type: ignore[attr-defined]
@@ -1988,9 +2089,7 @@ def main():  # pragma: no cover
                         hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4
                     )
 
-                # Force native Windows taskbar icon via Win32 API.
-                # LoadImageW with LR_LOADFROMFILE supports both ICO and PNG on Windows 10+.
-                if loaded_icon_path:
+                if sys.platform == "win32" and loaded_icon_path:
                     WM_SETICON = 0x0080
                     ICON_SMALL = 0
                     ICON_BIG = 1
