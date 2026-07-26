@@ -17,7 +17,6 @@ dependencies = [
     "httpx",
     "markdown-it-py",
     "pyyaml",
-    "pywinstyles",
     "pathspec",
     "platformdirs",
     "posthog>=7.14.2",
@@ -40,10 +39,14 @@ dependencies = [
     "joblib>=1.5.3",
     "psutil",
     "mcp>=1.2.0",
+    "pyautogui>=0.9.54",
 ]
 
 
 [project.optional-dependencies]
+win32 = [
+    "pywinstyles",
+]
 test = [
     "pytest",
     "pytest-qt",
@@ -56,10 +59,8 @@ dev = [
     "pillow",
 ]
 
-[project.gui-scripts]
-skill-manager = "skill_manager.__main__:main"
-
 [project.scripts]
+skill-manager = "skill_manager.__main__:main"
 skill-manager-build = "skill_manager._build:main"
 
 

@@ -295,6 +295,14 @@ class UpdateController(BaseController):
             self.app._set_status(f"Added skill package: {final_record.name}")
             capture_event("skill_package_added", {"source_type": final_record.source_type})
 
+            # 6. Trigger initial install in background so skill files are
+            #    actually downloaded/relocated into the resolved package
+            #    storage path.  Without this the package metadata shows
+            #    "Up to Date" (current_version == latest_version) but no
+            #    skill folders exist on disk yet.
+            new_index = len(self.app._update_packages) - 1
+            QTimer.singleShot(500, lambda idx=new_index: self.runPackageUpdate(idx))
+
             return json.dumps({"ok": True, "error": None, "name": final_record.name})
         except Exception as e:
             logger.error("Failed to add skill package: %s", e)

@@ -629,10 +629,19 @@ class OpsController(BaseController):
         QTimer.singleShot(delay, self._send_paste_to_focused_window)
 
     def _send_paste_to_focused_window(self):
-        """Helper that calls the Win32 paste function."""
-        from skill_manager.utils.win32 import send_paste_to_focused_window
+        """Helper that sends Ctrl+V to the focused window.
 
-        if not send_paste_to_focused_window():
+        Dispatches to the platform-appropriate implementation:
+        Win32 keybd_event on Windows, wl-clipboard/ydotool on Linux.
+        """
+        import sys as _sys
+
+        if _sys.platform == "win32":
+            from skill_manager.utils.win32 import send_paste_to_focused_window as _paste
+        else:
+            from skill_manager.utils.linux import send_paste_to_focused_window as _paste
+
+        if not _paste():
             self.app._set_status("Copied, but could not paste automatically")
 
     @Slot(str, str, list, str, result=str)
