@@ -1049,10 +1049,10 @@ class SkillModel(QAbstractListModel):
         updated_paths = {s_dict.get("local_path", "") for s_dict in new_skills}
         skills_dict = {s.local_path: s for s in self._all_skills}
 
-        # Recompute project_label from the NORMALIZED project_path to
-        # prevent stale labels.  The normalization through get_skills_dir
-        # ensures the label matches what getProjectLabel (dropdown) uses.
-        from skill_manager.core.copier import get_skills_dir
+        # Recompute project_label from project_path to ensure the label
+        # matches what getProjectLabel (dropdown) produces for the same path.
+        # The project_path is the raw root path (not .agents/skills), matching
+        # how getProjectLabel receives it from app._projects.
         from skill_manager.core.diagnostics import (
             CATEGORY_PROJECT_LABEL_MISMATCH,
             get_diagnostic_logger,
@@ -1065,8 +1065,7 @@ class SkillModel(QAbstractListModel):
         for s_dict in new_skills:
             skill = Skill.from_dict_fast(s_dict)
             if skill.project_path:
-                normalized_path = str(get_skills_dir(skill.project_path))
-                new_label = canonical_label(normalized_path, project_aliases=project_aliases)
+                new_label = canonical_label(skill.project_path, project_aliases=project_aliases)
                 incoming = s_dict.get("project_label", "")
                 if incoming and incoming != new_label:
                     diag.log_event(
@@ -1079,7 +1078,6 @@ class SkillModel(QAbstractListModel):
                             "incoming_label": incoming,
                             "recomputed_label": new_label,
                             "raw_project_path": skill.project_path,
-                            "normalized_project_path": normalized_path,
                         },
                     )
                 skill.project_label = new_label

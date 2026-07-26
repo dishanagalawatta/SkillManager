@@ -1,8 +1,9 @@
-"""Tests for addOrUpdateSkills project_path normalization.
+"""Tests for addOrUpdateSkills project_label consistency.
 
-Verifies that skills loaded from cache with stale root-path project_path
-get their project_label recomputed from the NORMALIZED path via get_skills_dir,
-so the label matches what getProjectLabel (dropdown) produces.
+Verifies that addOrUpdateSkills computes project_label from the raw
+project_path (root path) so it matches what getProjectLabel (dropdown)
+produces for the same root path, ensuring skills are not filtered out
+by the project filter.
 """
 
 from unittest.mock import MagicMock
@@ -32,53 +33,35 @@ def _make_model():
     return SkillModel(config=config)
 
 
-def test_root_path_normalized_to_skills_dir(tmp_path):
-    """Skill with root-path project_path gets label matching normalized path."""
+def test_root_path_label_matches_dropdown(tmp_path):
+    """addOrUpdateSkills computes same label as getProjectLabel for root path."""
     model = _make_model()
 
     project_root = tmp_path / "my-project"
     skills_dir = project_root / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
 
-    # Feed a skill with root-path project_path and a stale label
+    # Feed a skill with root-path project_path (production scenario)
     skill_dict = {
         "name": "TestSkill",
         "local_path": str(project_root / ".agents" / "skills" / "TestSkill"),
-        "project_path": str(project_root),  # root path, not normalized
-        "project_label": "stale-label",
+        "project_path": str(project_root),  # root path
+        "project_label": "",
     }
 
     model.addOrUpdateSkills([skill_dict])
 
     assert len(model._all_skills) == 1
     skill = model._all_skills[0]
-    # The label should match what getProjectLabel produces for the normalized path
-    expected = project_label(str(skills_dir))
-    assert skill.project_label == expected, f"Expected {expected!r}, got {skill.project_label!r}"
+    # The label should match what getProjectLabel produces for the root path
+    expected = project_label(str(project_root))
+    assert skill.project_label == expected, (
+        f"Expected {expected!r} (root-path label), got {skill.project_label!r}"
+    )
 
 
-def test_normalized_path_unchanged(tmp_path):
-    """Skill with already-normalized project_path is unchanged."""
-    model = _make_model()
-
-    project_root = tmp_path / "my-project"
-    skills_dir = project_root / ".agents" / "skills"
-    skills_dir.mkdir(parents=True)
-
-    correct_label = project_label(str(skills_dir))
-    skill_dict = {
-        "name": "TestSkill",
-        "local_path": str(skills_dir / "TestSkill"),
-        "project_path": str(skills_dir),
-        "project_label": correct_label,
-    }
-
-    model.addOrUpdateSkills([skill_dict])
-    assert model._all_skills[0].project_label == correct_label
-
-
-def test_skills_dir_label_matches_dropdown(tmp_path):
-    """The label from addOrUpdateSkills matches getProjectLabel for the normalized path."""
+def test_label_matches_dropdown_for_root_path(tmp_path):
+    """Label from addOrUpdateSkills matches getProjectLabel(root_path)."""
     from skill_manager.controllers.config_controller import ConfigController
 
     project_root = tmp_path / "my-project"
@@ -96,16 +79,35 @@ def test_skills_dir_label_matches_dropdown(tmp_path):
     model.addOrUpdateSkills([skill_dict])
     model_label = model._all_skills[0].project_label
 
-    # The dropdown uses normalized paths from _projects, so getProjectLabel
-    # receives the normalized .agents/skills path, not the root path.
+    # getProjectLabel is called with root paths from app._projects in production
     mock_app = MagicMock()
     mock_app._project_aliases = {}
     ctrl = ConfigController(mock_app)
-    dropdown_label = ctrl.getProjectLabel(str(skills_dir))
+    dropdown_label = ctrl.getProjectLabel(str(project_root))
 
     assert model_label == dropdown_label, (
         f"Model label {model_label!r} != dropdown label {dropdown_label!r}"
     )
+
+
+def test_skills_dir_path_label_computed_directly(tmp_path):
+    """Skill with skills-dir project_path gets label from that path directly."""
+    model = _make_model()
+
+    project_root = tmp_path / "my-project"
+    skills_dir = project_root / ".agents" / "skills"
+    skills_dir.mkdir(parents=True)
+
+    expected_label = project_label(str(skills_dir))
+    skill_dict = {
+        "name": "TestSkill",
+        "local_path": str(skills_dir / "TestSkill"),
+        "project_path": str(skills_dir),
+        "project_label": expected_label,
+    }
+
+    model.addOrUpdateSkills([skill_dict])
+    assert model._all_skills[0].project_label == expected_label
 
 
 def test_mismatch_warning_emitted(tmp_path):
