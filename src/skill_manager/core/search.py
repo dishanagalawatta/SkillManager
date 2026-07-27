@@ -144,6 +144,10 @@ class SearchEngine:
                 return 100.0 if query in index_data["name"] else 50.0
             return 0.0
 
+        # Perf: Fast-path exact match before expensive fuzzy call
+        if query == index_data["name"]:
+            return 100.0
+
         # Prevent completely irrelevant skills from surfacing due to random letter overlaps
         # by ensuring at least one query token matches a document token reasonably well.
         if query_tokens is None:
