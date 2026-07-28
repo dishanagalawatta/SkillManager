@@ -125,6 +125,7 @@ Rectangle {
         property color hoverColor: Theme.glassHover
         property color textColor: Theme.label
         property real btnSize: 28
+        property real iconSize: 18
         property string tooltipText: ""
         property string iconSource: ""
         
@@ -150,10 +151,10 @@ Rectangle {
                 id: iconImg
                 visible: btn.iconSource !== ""
                 source: btn.iconSource
-                width: 12
-                height: 12
-                sourceSize.width: 12
-                sourceSize.height: 12
+                width: btn.iconSize
+                height: btn.iconSize
+                sourceSize.width: btn.iconSize
+                sourceSize.height: btn.iconSize
                 fillMode: Image.PreserveAspectFit
                 anchors.centerIn: parent
                 smooth: true
