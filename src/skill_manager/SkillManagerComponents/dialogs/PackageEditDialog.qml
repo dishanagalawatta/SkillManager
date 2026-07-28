@@ -532,9 +532,9 @@ Dialog {
                                 id: verificationStatus
                                 text: ""
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.sizeMetadata
                                 font.weight: Font.Medium
-                                color: text.includes("✓") ? "#4dff88" : (text.includes("✗") ? "#ff4d4d" : Theme.accent)
+                                color: text.includes("✓") ? Theme.success : (text.includes("✗") ? Theme.danger : Theme.accent)
                                 visible: text !== ""
                             }
                         }
@@ -635,9 +635,9 @@ Dialog {
                 Text {
                     text: root.saveError
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.sizeMetadata
                     font.weight: Font.Medium
-                    color: "#ff4d4d"
+                    color: Theme.danger
                     visible: root.saveError !== ""
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
