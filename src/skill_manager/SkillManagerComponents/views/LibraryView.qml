@@ -9,10 +9,6 @@ Item {
     id: lv_root
     objectName: "LibraryView"
 
-    property bool showImageInspector: false
-    property bool showCommandInspector: false
-    property bool showSkillInspector: false
-
     // A skill is "valid" when selectedSkill has a real local_path
     readonly property bool selectedSkillValid:
         AppController.selectedSkill
@@ -105,6 +101,21 @@ Item {
         return 8
     }
 
+    // Full layout chain debug — logs every sizing layer from window down to content
+    function dumpLayoutChain() {
+        var win = window || (lv_root && lv_root.parent && lv_root.parent.parent && lv_root.parent.parent.parent ? lv_root.parent.parent.parent.parent : null)
+        console.log("LAYOUT_CHAIN winW=" + (win ? win.width : -1)
+            + " libW=" + lv_root.width
+            + " overlayW=" + (lv_inspectorOverlay ? lv_inspectorOverlay.width : -1)
+            + " panelW=" + (lv_inspectorOverlay ? lv_inspectorOverlay._panelW : -1)
+            + " popupMode=" + lv_root._usePopupMode
+            + " phase=" + lv_root._libPhase
+            + " loaderW=" + (lv_root.parent ? lv_root.parent.width : -1))
+    }
+
+    onWidthChanged: {
+        if (lv_root.width > 0) dumpLayoutChain()
+    }
     function focusSearch() {
         // Handled globally in TopBar now
     }
@@ -129,6 +140,7 @@ Item {
             lv_listView.model = m
             lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
         }
+        Qt.callLater(dumpLayoutChain)
     }
 
     Connections {
@@ -278,7 +290,7 @@ Item {
                             if (allProjects.length === 0 && AppController.currentProject) {
                                 allProjects.push(AppController.currentProject)
                             }
-                            lv_cmdDeleteDialog.openBulkSkill(AppController.libraryModel.selectedCount, allProjects, selectedPaths, AppController.libraryModel.getSelectedNames())
+                            lv_inspectorOverlay.cmdDeleteDialog.openBulkSkill(AppController.libraryModel.selectedCount, allProjects, selectedPaths, AppController.libraryModel.getSelectedNames())
                         }
                     }
 
@@ -581,191 +593,33 @@ Item {
                         if (isCommand) {
                             var holders = AppController.commandProjectsForPath(path) || []
                             if (holders.length === 0) holders = [AppController.currentProject || ""]
-                            lv_cmdDeleteDialog.openForCommand(name, holders)
+                            lv_inspectorOverlay.cmdDeleteDialog.openForCommand(name, holders)
                         } else {
                             var holders = AppController.skillProjectsForPath(path) || []
                             if (holders.length === 0) holders = [AppController.currentProject || ""]
-                            lv_cmdDeleteDialog.openForSkill(name, holders, path)
+                            lv_inspectorOverlay.cmdDeleteDialog.openForSkill(name, holders, path)
                         }
                     }
                     onInspectImageRequested: {
-                        lv_root.showImageInspector = true
-                        lv_root.showCommandInspector = false
-                        lv_root.showSkillInspector = false
+                        lv_inspectorOverlay.forceImageInspector()
                     }
                 }
             }
 
     }
 
-    // ── Inspector Overlay Layer (replaces SplitView inline inspectors) ──────
-    // Overlay visible is set imperatively from the Connections handler to
-    // bypass QML's visible binding staleness issue in both test and runtime
-    // environments.  The three show flags gate each inspector individually.
-    Item {
-        id: inspectorOverlay
+    // ── Shared Inspector Overlay ─────────────────────────────────
+    SkillInspectorOverlay {
+        id: lv_inspectorOverlay
         anchors.fill: parent
-        visible: false
+        usePopupMode: lv_root._usePopupMode
         z: 10
-
-        // Debouncer for setInspectorWidth — saves width only 150ms after the
-        // user stops dragging, avoiding 60 Python interop calls per second.
-        property int _debouncedWidth: 0
-        Timer {
-            id: _inspectorWidthDebouncer
-            interval: 150
-            repeat: false
-            onTriggered: {
-                if (_debouncedWidth > 0) {
-                    AppController.ui_controller.setInspectorWidth(_debouncedWidth)
-                }
-            }
-        }
-
-        // Backdrop — dark overlay in popup mode, invisible in side-panel mode
-        Rectangle {
-            anchors.fill: parent
-            color: Qt.rgba(0, 0, 0, 0.45)
-            visible: lv_root._usePopupMode
-            opacity: lv_root._usePopupMode ? 1.0 : 0.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    lv_root.showCommandInspector = false
-                    lv_root.showImageInspector = false
-                    lv_root.showSkillInspector = false
-                    AppController.ui_controller.selectSkill(-1)
-                }
-            }
-        }
-
-        // Shared calculator for popup geometry
-        readonly property int _popupW: Math.min(parent.width * 0.92, 560)
-        readonly property int _popupH: Math.min(parent.height * 0.88, 700)
-        readonly property int _popupX: Math.round((parent.width - _popupW) / 2)
-        readonly property int _popupY: Math.round((parent.height - _popupH) / 2)
-
-        // Side-panel (wide mode) — positioned at right edge, full height
-        readonly property int _panelX: parent.width - _panelW
-        readonly property int _panelW: {
-            var p = AppController.ui_controller.inspectorWidth
-            // Decoupled from inspector targetWidth to avoid chicken-and-egg:
-            // targetWidth reads parent.width (the overlay) which is sized by _panelW.
-            var baseMin = lv_root.showImageInspector ? 440
-                        : lv_root.showCommandInspector ? 400
-                        : 400
-            var computed = Math.max(baseMin, lv_root.width * 0.5)
-            return p > 0 ? Math.max(p, computed) : computed
-        }
-
-        // ── CommandInspector ──────────────────────────────────────
-        CommandInspector {
-            id: lv_commandInspector
-            skill: AppController.selectedSkill
-            editDialog: lv_commandDialog
-            overlayVisible: lv_root.selectedSkillValid && lv_root.showCommandInspector
-            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
-            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
-            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
-            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
-
-            onWidthChanged: {
-                if (visible && width > 0 && !lv_root._usePopupMode) {
-                    inspectorOverlay._debouncedWidth = width
-                    _inspectorWidthDebouncer.restart()
-                }
-            }
-            onClosed: {
-                lv_root.showCommandInspector = false
-                AppController.ui_controller.selectSkill(-1)
-            }
-            onDeleteRequested: (name, path, isCommand) => {
-                var holders = AppController.commandProjectsForPath(path) || []
-                if (holders.length === 0) holders = [AppController.currentProject || ""]
-                lv_cmdDeleteDialog.openForCommand(name, holders)
-            }
-        }
-
-        // ── SkillInspector ────────────────────────────────────────
-        SkillInspector {
-            id: lv_inspector
-            skill: AppController.selectedSkill
-            overlayVisible: lv_root.selectedSkillValid && lv_root.showSkillInspector
-            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
-            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
-            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
-            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
-
-            onWidthChanged: {
-                if (visible && width > 0 && !lv_root._usePopupMode) {
-                    inspectorOverlay._debouncedWidth = width
-                    _inspectorWidthDebouncer.restart()
-                }
-            }
-            onClosed: {
-                lv_root.showSkillInspector = false
-                AppController.ui_controller.selectSkill(-1)
-            }
-        }
-
-        // ── ImageInspector ────────────────────────────────────────
-        ImageInspector {
-            id: lv_imageInspector
-            skill: AppController.selectedSkill
-            x: lv_root._usePopupMode ? inspectorOverlay._popupX : inspectorOverlay._panelX
-            y: lv_root._usePopupMode ? inspectorOverlay._popupY : 0
-            width:  lv_root._usePopupMode ? inspectorOverlay._popupW : inspectorOverlay._panelW
-            height: lv_root._usePopupMode ? inspectorOverlay._popupH : parent.height
-
-            onWidthChanged: {
-                if (visible && width > 0 && !lv_root._usePopupMode) {
-                    inspectorOverlay._debouncedWidth = width
-                    _inspectorWidthDebouncer.restart()
-                }
-            }
-            onClosed: {
-                lv_root.showImageInspector = false
-                AppController.ui_controller.selectSkill(-1)
-            }
-        }
     }
 
-    // Toggle between SkillInspector, CommandInspector, and ImageInspector based on skill type
-    Connections {
-        target: AppController
-        function onSelectedSkillChanged() {
-            var skill = AppController.selectedSkill
-            var isCommand = !!(skill && skill.is_command)
-            var isScreenshot = !!(skill && skill.is_screenshot)
-            var sv = lv_root.selectedSkillValid
-            var showSkill = !isCommand && !isScreenshot && sv
-            lv_root.showCommandInspector = isCommand
-            lv_root.showImageInspector = isScreenshot
-            lv_root.showSkillInspector = showSkill
-            // Set visible imperatively on overlay + each inspector to bypass
-            // QML's binding staleness bug for the `visible` property.
-            inspectorOverlay.visible = isCommand || isScreenshot || showSkill
-            lv_commandInspector.visible = isCommand
-            lv_imageInspector.visible = isScreenshot
-            lv_inspector.visible = showSkill
-            console.log("INSPECTOR_DEBUG: selectedSkill path=" + (skill && skill.local_path ? skill.local_path : "NONE")
-                + " isCmd=" + isCommand + " isScr=" + isScreenshot
-                + " sv=" + sv + " showSk=" + showSkill
-                + " overlay.vis=" + inspectorOverlay.visible
-                + " insp.vis=" + lv_inspector.visible
-                + " overlVis=" + lv_inspector.overlayVisible)
-        }
-    }
-
-    CommandCreateDialog {
-        id: lv_commandDialog
-    }
-
-    CommandDeleteDialog {
-        id: lv_cmdDeleteDialog
-    }
+    // Property aliases for test compatibility (forward to overlay).
+    readonly property alias showSkillInspector:    lv_inspectorOverlay.showSkillInspector
+    readonly property alias showCommandInspector:  lv_inspectorOverlay.showCommandInspector
+    readonly property alias showImageInspector:    lv_inspectorOverlay.showImageInspector
 
     ArchiveConfirmDialog {
         id: lv_archiveConfirmDialog

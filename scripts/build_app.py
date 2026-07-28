@@ -284,7 +284,10 @@ def main() -> None:
                 file=sys.stderr,
             )
             for pkg in critical_missing:
-                print(f"  - {pkg}: required at runtime but not found in Analysis-00.toc", file=sys.stderr)
+                print(
+                    f"  - {pkg}: required at runtime but not found in Analysis-00.toc",
+                    file=sys.stderr,
+                )
             print(
                 "\nThis usually means collect_all() failed to find the package.",
                 file=sys.stderr,

@@ -1030,6 +1030,22 @@ class SkillModel(QAbstractListModel):
         """
         return [s.local_path for s in self._all_skills if s.local_path]
 
+    def find_by_path(self, local_path: str) -> Skill | None:
+        """Find a skill by its local_path.
+
+        Searches the filtered (visible) skills first, then falls back to the
+        full master list. Returns the Skill object or None if no match is found.
+        """
+        for skill in self._filtered_skills:
+            if skill.local_path == local_path:
+                return skill
+
+        for skill in self._all_skills:
+            if skill.local_path == local_path:
+                return skill
+
+        return None
+
     @Slot(str)
     def refresh_emoji_for_path(self, local_path: str) -> None:
         """Emit ``dataChanged`` for the ``EmojiRole`` of the row matching ``local_path``.

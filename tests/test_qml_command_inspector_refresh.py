@@ -1,10 +1,8 @@
 """QML binding test for CommandInspector refresh.
 
-Verifies that the ``selectedSkillChanged`` signal triggers re-binding
-of ``skill: AppController.selectedSkill`` by checking that the
-``_selected_skill`` property is updated when the signal fires.
+Verifies that after a model mutation the ``_selected_skill`` QQmlPropertyMap
+is updated in-place (no new QMap object, no ``selectedSkillChanged`` signal).
 
-This is a lightweight Python-level test of the signal→binding pipeline.
 Full QML rendering tests are deferred — the integration tests in
 ``test_ops_controller.py`` and ``test_app_controller.py`` already
 validate end-to-end that ``discover_single`` works for command files.
@@ -15,7 +13,7 @@ from unittest.mock import patch
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
-def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller, temp_dir):
+def test_selected_skill_updated_in_place(mock_patch_cache, app_controller, temp_dir):
     """After updateCustomCommandFull, _selected_skill should reflect new data."""
     project_path = temp_dir / "project"
     project_path.mkdir()
@@ -80,12 +78,10 @@ def test_selected_skill_changed_updates_binding(mock_patch_cache, app_controller
 
     QApplication.processEvents()
 
-    # Signal should fire
-    assert emissions, "selectedSkillChanged was not emitted"
-
+    # Data is updated in-place (no selectedSkillChanged emission)
     # _selected_skill should now have the new body
-    assert app_controller._selected_skill.value("body_content") == "new body", (
-        f"body_content should be 'new body', got {app_controller._selected_skill.value('body_content')}"
+    assert app_controller.selectedSkill.body_content == "new body", (
+        f"body_content should be 'new body', got {app_controller.selectedSkill.body_content}"
     )
 
 
@@ -194,13 +190,13 @@ def test_library_view_routes_command_delete():
     assert "onDeleteRequested: (name, path, isCommand)" in content, (
         "LibraryView must accept isCommand in onDeleteRequested handler"
     )
-    assert "lv_cmdDeleteDialog.openForCommand" in content, (
+    assert "lv_inspectorOverlay.cmdDeleteDialog.openForCommand" in content, (
         "LibraryView must route command deletes to openForCommand"
     )
-    assert "lv_cmdDeleteDialog.openForSkill" in content, (
+    assert "lv_inspectorOverlay.cmdDeleteDialog.openForSkill" in content, (
         "LibraryView must route skill deletes to openForSkill"
     )
-    assert "lv_cmdDeleteDialog.openBulkSkill" in content, (
+    assert "lv_inspectorOverlay.cmdDeleteDialog.openBulkSkill" in content, (
         "LibraryView must route bulk deletes to openBulkSkill"
     )
     assert "DeleteConfirmDialog" not in content, (
@@ -224,10 +220,10 @@ def test_quick_copy_view_routes_command_delete():
     assert "onDeleteRequested: (name, path, isCommand)" in content, (
         "QuickCopyView must accept isCommand in onDeleteRequested handler"
     )
-    assert "qcv_cmdDeleteDialog.openForCommand" in content, (
+    assert "qcv_inspectorOverlay.cmdDeleteDialog.openForCommand" in content, (
         "QuickCopyView must route command deletes to openForCommand"
     )
-    assert "qcv_cmdDeleteDialog.openForSkill" in content, (
+    assert "qcv_inspectorOverlay.cmdDeleteDialog.openForSkill" in content, (
         "QuickCopyView must route skill deletes to openForSkill"
     )
     # QuickCopyView uses onDeleteRequested which routes to openForCommand /

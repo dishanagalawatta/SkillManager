@@ -6,7 +6,7 @@ import App 1.0
 Rectangle {
     id: root
     
-    readonly property var _sel: AppController.selectedSkill || ({})
+    readonly property var _sel: AppController.selectedSkill
     property var skill: _sel
     property bool isQuickCopy: false
     property bool isCollapsed: false
@@ -72,13 +72,18 @@ Rectangle {
             
             // Skip the name header if it matches root._sel.name (case insensitive, allowing for markdown headers)
             let headerMatch = trimmed.replace(/^#+\s+/, '').trim().toLowerCase();
-            if (headerMatch === (root._sel.name || "").toLowerCase()) continue;
+            let selName = root._sel ? (root._sel.name || "").toLowerCase() : "";
+            if (selName && headerMatch === selName) continue;
             
             result.push(line);
         }
         
         // 3. Join and trim leading/trailing whitespace/newlines
-        return result.join('\n').trim();
+        let finalCleaned = result.join('\n').trim();
+        if (!finalCleaned) {
+            return cleaned.trim() || content.trim();
+        }
+        return finalCleaned;
     }
 
     signal closed()
@@ -97,7 +102,7 @@ Rectangle {
         ColumnLayout {
             anchors.fill: parent
             spacing: 16
-            visible: root.overlayVisible && !root.isCollapsed && root._sel.local_path !== undefined
+            visible: root.overlayVisible && !root.isCollapsed && root._sel && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
             
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -108,7 +113,7 @@ Rectangle {
                 spacing: 8
                 TextEdit {
                     id: skillNameEdit
-                    text: root._sel.name || "No Selection"
+                    text: root._sel ? (root._sel.name || "No Selection") : "No Selection"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -129,38 +134,6 @@ Rectangle {
                     }
                 }
 
-                TextField {
-                    id: argField
-                    ContextMenu.menu: null
-                    objectName: "argField"
-                    visible: root.isQuickCopy && root._sel.local_path !== undefined
-                    Layout.preferredWidth: 150
-                    Layout.alignment: Qt.AlignVCenter
-                    placeholderText: "Optional argument..."
-                    Accessible.role: Accessible.EditableText
-                    Accessible.name: "Argument"
-                    font.family: Theme.fontFamily
-                    color: Theme.label
-                    placeholderTextColor: Theme.secondaryLabel
-                    background: Rectangle {
-                        radius: Theme.radiusField
-                        color: Theme.glassPill
-                        border.color: Theme.glassBorder
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.RightButton
-                        onClicked: (mouse) => {
-                            inspectorContextMenu.targetControl = argField
-                            inspectorContextMenu.popup()
-                        }
-                    }
-                    SleekToolTip {
-                        text: "Argument (e.g. ultra)"
-                        visible: argField.hovered || argField.activeFocus
-                    }
-                }
                 IconButton {
                     id: starButton
                     iconSource: (root._sel && root._sel.is_starred) 
@@ -190,10 +163,48 @@ Rectangle {
                 }
             }
 
+            // QuickCopy Argument Input Row
+            RowLayout {
+                Layout.fillWidth: true
+                visible: root.isQuickCopy && root._sel && root._sel.local_path !== undefined
+                spacing: 8
+
+                TextField {
+                    id: argField
+                    ContextMenu.menu: null
+                    objectName: "argField"
+                    Layout.fillWidth: true
+                    placeholderText: "Optional argument (e.g. ultra)..."
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: "Argument"
+                    font.family: Theme.fontFamily
+                    color: Theme.label
+                    placeholderTextColor: Theme.secondaryLabel
+                    background: Rectangle {
+                        radius: Theme.radiusField
+                        color: Theme.glassPill
+                        border.color: Theme.glassBorder
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+                        onClicked: (mouse) => {
+                            inspectorContextMenu.targetControl = argField
+                            inspectorContextMenu.popup()
+                        }
+                    }
+                    SleekToolTip {
+                        text: "Argument (e.g. ultra)"
+                        visible: argField.hovered || argField.activeFocus
+                    }
+                }
+            }
+
             // Description
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root._sel.description !== ""
+                visible: root._sel && root._sel.description !== ""
                 spacing: 4
                 
                 Text {
@@ -207,15 +218,22 @@ Rectangle {
                 
                 TextEdit {
                     id: descriptionEdit
-                    text: root._sel.description || ""
+                    text: (root._sel && root._sel.description) || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
                     color: Theme.label
                     wrapMode: TextEdit.Wrap
                     Layout.fillWidth: true
+                    Layout.preferredHeight: contentHeight + topPadding + bottomPadding
                     readOnly: true
                     selectByMouse: true
                     cursorVisible: false
+
+                    onWidthChanged: {
+                        if (width > 0) {
+                            console.log("DESC_EDIT width=" + width + " contentW=" + contentWidth + " implicitH=" + implicitHeight + " contentH=" + contentHeight)
+                        }
+                    }
 
                     MouseArea {
                         anchors.fill: parent
@@ -233,10 +251,10 @@ Rectangle {
                 id: metaFlow
                 Layout.fillWidth: true
                 spacing: 8
-                visible: root._sel.local_path !== undefined && !root._sel.is_screenshot
+                visible: root._sel && root._sel.local_path !== undefined && !root._sel.is_screenshot
 
                 Repeater {
-                    model: root._sel.local_path ? [
+                    model: (root._sel && root._sel.local_path) ? [
                         { label: "Location", value: root._sel.project_label || "Unknown" },
                         { label: "Type", value: root._sel.category || "Unknown" },
                         { label: "Risk", value: root._sel.risk || "Unknown" },
@@ -347,7 +365,7 @@ Rectangle {
             // Screenshot Preview
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root._sel.is_screenshot === true
+                visible: root._sel && root._sel.is_screenshot === true
                 spacing: 8
                 
                 Text {
@@ -371,7 +389,7 @@ Rectangle {
                         anchors.margins: 4
                         fillMode: Image.PreserveAspectFit
                         source: {
-                            if (!root._sel.is_screenshot || !root._sel.local_path) return "";
+                            if (!root._sel || !root._sel.is_screenshot || !root._sel.local_path) return "";
                             let p = root._sel.local_path.replace(/\\/g, "/");
                             if (p.startsWith("/")) return "file://" + p;
                             return "file:///" + p;
@@ -382,7 +400,9 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => AppController.ui_controller.openPath(root._sel.local_path)
+                        onClicked: (mouse) => {
+                            if (root._sel && root._sel.local_path) AppController.ui_controller.openPath(root._sel.local_path)
+                        }
                     }
                 }
             }
@@ -390,7 +410,10 @@ Rectangle {
             // Skill Details / Raw Content Section
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root._sel.local_path !== undefined && !root._sel.is_screenshot
+                Layout.fillHeight: true
+                Layout.minimumHeight: 150
+                visible: root._sel && root._sel.local_path !== undefined
+                    && !root._sel.is_screenshot
                 spacing: 8
                 
                 Rectangle {
@@ -413,14 +436,14 @@ Rectangle {
                         TextArea {
                             id: rawContentArea
                             ContextMenu.menu: null
-                            width: rawContentScroll.width - rawContentScroll.leftPadding - rawContentScroll.rightPadding
+                            width: rawContentScroll.availableWidth
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Skill Details"
-                            text: cleanBodyContent((root._sel && root._sel.body_content) || "")
+                            text: cleanBodyContent((root._sel && (root._sel.body_content || root._sel.raw_content)) || "")
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
-                            color: (root._sel && root._sel.raw_content) ? Theme.label : Theme.secondaryLabel
-                            wrapMode: TextEdit.Wrap
+                            color: Theme.label
+                            wrapMode: TextEdit.WrapAnywhere
                             readOnly: true
                             selectByMouse: true
                             cursorVisible: false
@@ -446,7 +469,7 @@ Rectangle {
             // Flexible spacer for screenshot mode to prevent vertical stretching
             Item {
                 Layout.fillHeight: true
-                visible: root._sel.is_screenshot === true
+                visible: root._sel && root._sel.is_screenshot === true
             }
         }
     }

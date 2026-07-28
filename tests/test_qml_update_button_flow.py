@@ -184,6 +184,7 @@ class TestUpdateFlows:
             "package_id": "pkg_new1",
         }
         with (
+            patch("skill_manager.controllers.update_controller.QTimer"),
             patch("skill_manager.controllers.update_controller.UpdatePackageRecord") as mock_rec,
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
@@ -545,6 +546,7 @@ class TestPackageConfigFieldPreservation:
             "clone_path": "/tmp/clone",
         }
         with (
+            patch("skill_manager.controllers.update_controller.QTimer"),
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
                 side_effect=lambda d, **kw: {
@@ -601,6 +603,7 @@ class TestPackageConfigFieldPreservation:
             "latest_version_command": "npm show version",
         }
         with (
+            patch("skill_manager.controllers.update_controller.QTimer"),
             patch(
                 "skill_manager.core.skill_packages.check_skill_package_versions",
                 side_effect=lambda d, **kw: {

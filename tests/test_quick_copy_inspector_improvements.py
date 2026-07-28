@@ -95,25 +95,32 @@ def _check_width_save_handler(inspector_type: str, view_content: str) -> None:
         "_qc_debouncedWidth = width",  # QuickCopyView debounce
     ]
     assert any(m in view_content for m in markers), (
-        f"{inspector_type} missing width save handler (direct or debounced) in view"
+        f"{inspector_type} missing width save handler (direct or debounced)"
     )
 
 
-def test_library_view_inspectors_persist_width() -> None:
-    """Verify that all three inspectors in LibraryView use overlay-based width from inspectorWidth and save on change."""
+def test_library_view_inspectors_width_is_proportional() -> None:
+    """Verify that all three inspectors in LibraryView use proportional overlay-based width (not clamped by inspectorWidth)."""
     view_path: Path = QML_DIR / "views" / "LibraryView.qml"
+    overlay_path: Path = QML_DIR / "SkillInspectorOverlay.qml"
     content: str = view_path.read_text(encoding="utf-8")
-    assert "AppController.ui_controller.inspectorWidth" in content
+    overlay_content: str = overlay_path.read_text(encoding="utf-8")
+    # Width uses proportional formula, not inspectorWidth clamp
+    assert "_panelW" in content
+    assert "width * 0.5" in overlay_content
+    # inspectorWidth is still saved for session persistence (in the overlay)
+    assert "setInspectorWidth" in overlay_content
     for insp in ("CommandInspector", "SkillInspector", "ImageInspector"):
-        _check_width_save_handler(insp, content)
+        _check_width_save_handler(insp, overlay_content)
 
 
-def test_quick_copy_view_inspectors_persist_width() -> None:
-    """Verify that all three inspectors in QuickCopyView use overlay-based width (inspectorWidth via _qcPanelW) and save on change."""
-    view_path: Path = QML_DIR / "views" / "QuickCopyView.qml"
-    content: str = view_path.read_text(encoding="utf-8")
-    # In overlay mode, _qcPanelW references inspectorWidth centrally
-    assert "AppController.ui_controller.inspectorWidth" in content
-    assert "_qcPanelW" in content
-    for insp in ("CommandInspector", "SkillInspector", "ImageInspector"):
-        _check_width_save_handler(insp, content)
+def test_quick_copy_view_inspectors_width_is_proportional() -> None:
+    """Verify that all three inspectors in QuickCopyView use proportional overlay-based width (not clamped by inspectorWidth)."""
+    overlay_path: Path = QML_DIR / "SkillInspectorOverlay.qml"
+    overlay_content: str = overlay_path.read_text(encoding="utf-8")
+    # Width computations moved to shared SkillInspectorOverlay
+    assert "width * 0.5" in overlay_content
+    # inspectorWidth is still saved for session persistence (in the overlay)
+    assert "setInspectorWidth" in overlay_content
+    # Width save handler is now in the overlay
+    assert "_debouncedWidth" in overlay_content

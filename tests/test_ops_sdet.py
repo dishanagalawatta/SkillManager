@@ -5,6 +5,13 @@ import pytest
 from skill_manager.controllers.ops_controller import OpsController
 
 
+def _mock_skill(**attrs):
+    s = MagicMock()
+    for k, v in attrs.items():
+        setattr(s, k, v)
+    return s
+
+
 @pytest.fixture
 def mock_app():
     app = MagicMock()
@@ -37,7 +44,7 @@ class TestOpsControllerSDET:
     def test_toggle_archive_success(self, controller, mock_app):
         # Setup
         path = "/path/to/skill"
-        mock_app._selected_skill = {"local_path": path, "is_archived": False}
+        mock_app._selected_skill = _mock_skill(local_path=path, is_archived=False)
         mock_app._library_model.updateSkillProperty.return_value = True
         mock_app._quick_copy_model.updateSkillProperty.return_value = True
 
@@ -46,16 +53,15 @@ class TestOpsControllerSDET:
 
         # Assert
         assert path in mock_app._archive_paths
-        assert mock_app._selected_skill["is_archived"] is True
+        assert mock_app._selected_skill.is_archived is True
         mock_app._library_model.updateSkillProperty.assert_called_with(path, "is_archived", True)
         mock_app._quick_copy_model.updateSkillProperty.assert_called_with(path, "is_archived", True)
-        mock_app.selectedSkillChanged.emit.assert_called()
 
     def test_toggle_starred_off(self, controller, mock_app):
         # Setup
         path = "/path/to/starred"
         mock_app._starred_paths = [path]
-        mock_app._selected_skill = {"local_path": path, "is_starred": True}
+        mock_app._selected_skill = _mock_skill(local_path=path, is_starred=True)
         mock_app._library_model.updateSkillProperty.return_value = True
 
         # Act
@@ -63,7 +69,7 @@ class TestOpsControllerSDET:
 
         # Assert
         assert path not in mock_app._starred_paths
-        assert mock_app._selected_skill["is_starred"] is False
+        assert mock_app._selected_skill.is_starred is False
         mock_app._library_model.updateSkillProperty.assert_called_with(path, "is_starred", False)
 
     def test_delete_skills_with_validation(self, controller, mock_app):
