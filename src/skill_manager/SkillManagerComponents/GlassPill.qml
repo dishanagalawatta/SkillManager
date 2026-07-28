@@ -16,7 +16,7 @@ Rectangle {
     border.width: 1
     border.color: Theme.glassOuterBorder
 
-    layer.enabled: true
+    layer.enabled: !AppController.isTesting
     layer.effect: MultiEffect {
         shadowEnabled: true
         shadowBlur: 2.0

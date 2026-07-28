@@ -42,8 +42,8 @@ Window {
             }
         })
     }
-    minimumWidth: 350
-    minimumHeight: 650
+    minimumWidth: 400
+    minimumHeight: 520
 
     Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }
     visible: false
@@ -277,14 +277,14 @@ Window {
 
     Rectangle {
         anchors.fill: parent
-        color: "transparent"
+        color: Theme.appBackground
         radius: window.visibility === Window.Maximized ? 0 : Theme.radiusCard
         clip: true
         border.width: window.visibility === Window.Maximized ? 0 : 1
         border.color: Theme.glassBorder
         
         // Ensure child components are clipped to the radius
-        layer.enabled: true
+        layer.enabled: window.visibility !== Window.Maximized && !AppController.isTesting
         
         Loader {
             active: !AppController.isTesting
@@ -328,6 +328,7 @@ Window {
 
                 Loader {
                     id: viewLoader
+                    objectName: "viewLoader"
                     anchors.fill: parent
                     anchors.margins: 16
                     source: "views/" + window.currentView.replace(" ", "") + "View.qml"
@@ -340,8 +341,8 @@ Window {
             objectName: "topStatusPill"
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.margins: 24
-            implicitWidth: statusTextRow.implicitWidth + 32
+            anchors.margins: 16
+            width: Math.min(window.width - 32, statusTextRow.implicitWidth + 32)
             height: 34
             radius: Theme.radiusPill
             color: Theme.alpha(Theme.glassPill, 0.95)
@@ -356,8 +357,8 @@ Window {
             RowLayout {
                 id: statusTextRow
                 anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
                 spacing: 8
 
                 Rectangle {
@@ -366,6 +367,7 @@ Window {
                     radius: 4
                     color: AppController.isLoading ? Theme.selectedRowBorder : Theme.secondaryLabel
                     opacity: AppController.isLoading ? 1 : 0.75
+                    Layout.alignment: Qt.AlignVCenter
                 }
 
                 Text {
@@ -377,6 +379,8 @@ Window {
                     color: Theme.label
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideMiddle
+                    Layout.fillWidth: true
                 }
             }
 
