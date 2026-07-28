@@ -556,3 +556,30 @@ def test_dropdowns_use_implicit_height_for_popup():
         assert "implicitHeight: Math.min(dropdownList.implicitHeight" in content, (
             f"{name} Popup must derive its implicitHeight from dropdownList.implicitHeight, not contentHeight, to prevent jumping."
         )
+
+
+def test_main_window_minimum_dimensions_contract():
+    """Verify that Main.qml sets minimumWidth to 400, minimumHeight to 520, and bounds statusToast width."""
+    main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+    assert "minimumWidth: 400" in main_qml, "Main.qml must enforce minimumWidth: 400"
+    assert "minimumHeight: 520" in main_qml, "Main.qml must enforce minimumHeight: 520"
+    assert "width: Math.min(window.width - 32, statusTextRow.implicitWidth + 32)" in main_qml, (
+        "statusToast must cap width to window boundaries"
+    )
+    assert "elide: Text.ElideMiddle" in main_qml, "statusText must elide long notification paths"
+
+
+def test_updates_view_responsive_layout_contract():
+    """Verify that UpdatesView.qml dynamically switches SplitView orientation and uses responsive height/button/text properties."""
+    updates_qml = (QML_DIR / "views" / "UpdatesView.qml").read_text(encoding="utf-8")
+    assert "orientation: updatesRoot.width < 520 ? Qt.Vertical : Qt.Horizontal" in updates_qml, (
+        "UpdatesView.qml must switch SplitView orientation dynamically for narrow widths"
+    )
+    assert "SplitView.preferredHeight: parent.height * 0.45" in updates_qml, (
+        "Packages manager pane must set preferredHeight for vertical layout mode"
+    )
+    assert "SplitView.preferredHeight: parent.height * 0.55" in updates_qml, (
+        "Projects manager pane must set preferredHeight for vertical layout mode"
+    )
+    assert "iconOnlyMode: uv_packagesHeader.width < 340" in updates_qml
+    assert "iconOnlyMode: uv_projectsHeader.width < 320" in updates_qml

@@ -20,7 +20,7 @@ Item {
         default property alias controlContent: controlContainer.data
         
         Layout.fillWidth: true
-        spacing: 16
+        spacing: sr.width < 450 ? 8 : 16
         
         ColumnLayout {
             Layout.fillWidth: true
@@ -220,7 +220,7 @@ Item {
                                 SettingsRow {
                                     titleText: "Scroll Speed"
                                     descriptionText: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
-                                    Slider {
+                                    GlassSlider {
                                         width: 150
                                         from: 0.5
                                         to: 5.0

@@ -12,22 +12,25 @@ Button {
     property string tooltipText: ""
     property string accessibleName: labelText
     property int buttonHeight: 36
-    property int sidePadding: labelText !== "" ? 16 : 0
+    property bool iconOnlyMode: false
+    readonly property bool effectiveIconOnly: iconOnlyMode && (iconSource !== "" || iconText !== "")
+    property int sidePadding: (labelText !== "" && !effectiveIconOnly) ? 16 : 0
 
     Layout.preferredHeight: buttonHeight
     implicitHeight: buttonHeight
-    implicitWidth: Math.max(buttonHeight, contentRow.implicitWidth + sidePadding * 2)
+    implicitWidth: effectiveIconOnly ? buttonHeight : Math.max(buttonHeight, contentRow.implicitWidth + sidePadding * 2)
     padding: 0
     flat: true
 
     contentItem: Item {
         implicitWidth: contentRow.implicitWidth
         implicitHeight: control.buttonHeight
+        clip: true
 
         RowLayout {
             id: contentRow
             anchors.centerIn: parent
-            spacing: (control.iconText !== "" || control.iconSource !== "") && control.labelText !== "" ? 7 : 0
+            spacing: (control.iconText !== "" || control.iconSource !== "") && control.labelText !== "" ? 6 : 0
 
             Item {
                 visible: control.iconText !== "" || control.iconSource !== ""
@@ -79,7 +82,7 @@ Button {
 
             Text {
                 text: control.labelText
-                visible: control.labelText !== ""
+                visible: !control.effectiveIconOnly && control.labelText !== ""
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
                 font.weight: control.role === "primary" || control.role === "danger" ? Font.Bold : Font.DemiBold

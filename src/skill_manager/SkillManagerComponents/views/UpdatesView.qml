@@ -120,19 +120,19 @@ Item {
                         width: 1
                         height: 12
                         color: Theme.separator
+                        visible: updatesRoot.width >= 420
                     }
                     Text {
                         text: AppController.isLoading ? "Checking..." : (AppController.statsOutdated + " updates")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.sizeCaption
                         color: AppController.isLoading ? Theme.accent : Theme.secondaryLabel
+                        visible: updatesRoot.width >= 420
                     }
                 }
 
                 RowLayout {
                     spacing: 8
-
-
 
                     ActionButton {
                         objectName: "scanUpdatesBtn"
@@ -159,16 +159,22 @@ Item {
         SplitView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            orientation: Qt.Horizontal
+            orientation: updatesRoot.width < 520 ? Qt.Vertical : Qt.Horizontal
             handle: Rectangle {
                 implicitWidth: 4
+                implicitHeight: 4
                 color: "transparent"
             }
 
             // Left Pane: Packages Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.45
+                SplitView.preferredHeight: parent.height * 0.45
                 SplitView.minimumWidth: 100
+                SplitView.minimumHeight: 140
+                SplitView.fillWidth: true
+                SplitView.fillHeight: true
+                Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 16
 
@@ -183,20 +189,24 @@ Item {
                         
                         RowLayout {
                             id: uv_packagesHeader
+                            Layout.fillWidth: true
                             Text {
                                 text: "Skill Packages"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.sizeSectionTitle
                                 font.weight: Font.Bold
                                 color: Theme.label
+                                elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
                             RowLayout {
-                                spacing: 8
+                                spacing: 6
                                 ActionButton {
                                     labelText: "Add Package"
                                     iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
+                                    iconOnlyMode: uv_packagesHeader.width < 340
                                     role: "secondary"
+                                    tooltipText: "Add Package"
                                     onClicked: (mouse) => {
                                         uv_packageEditDialog.editIndex = -1
                                         uv_packageEditDialog.open()
@@ -205,7 +215,9 @@ Item {
                                 ActionButton {
                                     labelText: "Folder"
                                     iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
+                                    iconOnlyMode: uv_packagesHeader.width < 340
                                     role: "secondary"
+                                    tooltipText: "Add Folder"
                                     onClicked: (mouse) => {
                                         uv_folderPicker.mode = "package"
                                         uv_folderPicker.open()
@@ -316,11 +328,12 @@ Item {
                                                 modelData.latest_version === modelData.current_version
                                             )
                                             labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
+                                            iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
                                             role: modelData.update_error ? "destructive" : (isLatest ? "secondary" : "primary")
                                             buttonHeight: 26
-                                            Layout.preferredWidth: 100
-                                            Layout.minimumWidth: 100
-                                            Layout.maximumWidth: 100
+                                            iconOnlyMode: uv_packagesList.width < 320
+                                            Layout.preferredWidth: implicitWidth
+                                            Layout.minimumWidth: implicitWidth
                                             enabled: !isLatest && !modelData.is_updating
                                             tooltipText: {
                                                 if (modelData.update_error) return "Update failed: " + modelData.update_error
@@ -403,7 +416,12 @@ Item {
             // Right Pane: Projects Manager
             ColumnLayout {
                 SplitView.preferredWidth: parent.width * 0.55
+                SplitView.preferredHeight: parent.height * 0.55
                 SplitView.minimumWidth: 100
+                SplitView.minimumHeight: 140
+                SplitView.fillWidth: true
+                SplitView.fillHeight: true
+                Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 16
 
@@ -417,18 +435,23 @@ Item {
                         anchors.margins: 16
                         
                         RowLayout {
+                            id: uv_projectsHeader
+                            Layout.fillWidth: true
                             Text {
                                 text: "Projects (Skill Folders)"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.sizeSectionTitle
                                 font.weight: Font.Bold
                                 color: Theme.label
+                                elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
                             ActionButton {
                                 labelText: "Add Project"
                                 iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
+                                iconOnlyMode: uv_projectsHeader.width < 320
                                 role: "secondary"
+                                tooltipText: "Add Project"
                                 onClicked: (mouse) => {
                                     uv_folderPicker.mode = "project"
                                     uv_folderPicker.open()
@@ -489,6 +512,8 @@ Item {
                                         spacing: 2
                                         Layout.fillWidth: true
                                         RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
                                             Text {
                                                 text: modelData.name
                                                 font.family: Theme.fontFamily
@@ -496,6 +521,7 @@ Item {
                                                 font.weight: Font.Bold
                                                 color: Theme.label
                                                 elide: Text.ElideRight
+                                                Layout.fillWidth: true
                                             }
                                             Text {
                                                 text: "(" + modelData.skill_count + " skills)"
