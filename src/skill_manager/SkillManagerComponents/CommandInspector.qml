@@ -196,24 +196,63 @@ Rectangle {
                 }
             }
 
+            // Metadata Section
+            InspectorMetadataRow {
+                id: metaFlow
+                selectedSkill: root._sel
+                contextMenu: inspectorContextMenu
+            }
+
             // Skill Dependencies Section
             ColumnLayout {
+                id: depSection
                 Layout.fillWidth: true
                 spacing: 4
                 visible: root.dependencyList.length > 0
+                property bool isExpanded: true
 
-                Text {
-                    text: "Skill Dependencies"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.weight: Font.Bold
-                    color: Theme.secondaryLabel
-                    opacity: 0.8
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: depHeaderRow.implicitHeight
+
+                    RowLayout {
+                        id: depHeaderRow
+                        anchors.fill: parent
+                        spacing: 4
+
+                        Text {
+                            text: "Skill Dependencies"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Theme.secondaryLabel
+                            opacity: 0.8
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        IconButton {
+                            buttonSize: 18
+                            iconSize: 12
+                            role: "ghost"
+                            tooltipText: depSection.isExpanded ? "Collapse Skill Dependencies" : "Expand Skill Dependencies"
+                            iconSource: depSection.isExpanded ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: depSection.isExpanded = !depSection.isExpanded
+                    }
                 }
 
                 Flow {
                     Layout.fillWidth: true
                     spacing: 6
+                    visible: depSection.isExpanded
 
                     Repeater {
                         model: root.dependencyList

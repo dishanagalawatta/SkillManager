@@ -247,87 +247,62 @@ Rectangle {
             }
 
             // Metadata Section
-            Flow {
+            InspectorMetadataRow {
                 id: metaFlow
-                Layout.fillWidth: true
-                spacing: 8
-                visible: root._sel && root._sel.local_path !== undefined && !root._sel.is_screenshot
-
-                Repeater {
-                    model: (root._sel && root._sel.local_path) ? [
-                        { label: "Location", value: root._sel.project_label || "Unknown" },
-                        { label: "Type", value: root._sel.category || "Unknown" },
-                        { label: "Risk", value: root._sel.risk || "Unknown" },
-                        { label: "Source", value: root._sel.source || "Unknown" },
-                        { label: "Date", value: root._sel.date || "Unknown" }
-                    ] : []
-                    
-                    Rectangle {
-                        height: 26
-                        width: rowLayout.implicitWidth + 16
-                        radius: Theme.radiusSmall
-                        color: Theme.glassPill
-                        border.color: Theme.glassBorder
-                        border.width: 1
-                        visible: modelData.value && modelData.value.toLowerCase() !== "unknown"
-                        
-                        Row {
-                            id: rowLayout
-                            anchors.centerIn: parent
-                            spacing: 4
-                            
-                            Text {
-                                text: modelData.label + ":"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.sizeMetadata
-                                font.weight: Font.DemiBold
-                                color: Theme.secondaryLabel
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            
-                            TextEdit {
-                                id: metaValEdit
-                                text: modelData.value
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.sizeMetadata
-                                color: Theme.label
-                                readOnly: true
-                                selectByMouse: true
-                                cursorVisible: false
-                                anchors.verticalCenter: parent.verticalCenter
-                                
-                                MouseArea {
-                                    anchors.fill: parent
-                                    acceptedButtons: Qt.RightButton
-                                    onClicked: (mouse) => {
-                                        inspectorContextMenu.targetControl = metaValEdit
-                                        inspectorContextMenu.popup()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                selectedSkill: root._sel
+                contextMenu: inspectorContextMenu
             }
 
             // Documentation / Commands (Moved up for better visibility)
             ColumnLayout {
+                id: docSection
                 Layout.fillWidth: true
                 visible: (root._sel && root._sel.commands && !root._sel.is_screenshot) ? root._sel.commands.length > 0 : false
                 spacing: 4
-                
-                Text {
-                    text: "Documentation"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.weight: Font.Bold
-                    color: Theme.secondaryLabel
-                    opacity: 0.8
+                property bool isExpanded: true
+
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: docHeaderRow.implicitHeight
+
+                    RowLayout {
+                        id: docHeaderRow
+                        anchors.fill: parent
+                        spacing: 4
+
+                        Text {
+                            text: "Documentation"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Theme.secondaryLabel
+                            opacity: 0.8
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        IconButton {
+                            buttonSize: 18
+                            iconSize: 12
+                            role: "ghost"
+                            tooltipText: docSection.isExpanded ? "Collapse Documentation" : "Expand Documentation"
+                            iconSource: docSection.isExpanded ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: docSection.isExpanded = !docSection.isExpanded
+                    }
                 }
 
                 Flow {
                     Layout.fillWidth: true
                     spacing: 6
+                    visible: docSection.isExpanded
                     Repeater {
                         model: root._sel.commands || []
                         delegate: Rectangle {

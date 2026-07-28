@@ -161,11 +161,13 @@ Item {
     // No forced reset on completion - use persistent state
 
     ColumnLayout {
+        id: lv_mainLayout
         anchors.fill: parent
         spacing: 20
 
         // Header Section
         RowLayout {
+            id: lv_headerRow
             Layout.fillWidth: true
             spacing: 20
 
@@ -612,6 +614,7 @@ Item {
     SkillInspectorOverlay {
         id: lv_inspectorOverlay
         anchors.fill: parent
+        topMargin: lv_headerRow.height + lv_mainLayout.spacing
         usePopupMode: lv_root._usePopupMode
         z: 10
     }

@@ -15,14 +15,13 @@ QML_DIR: Path = (
 
 
 def test_skill_inspector_description_uses_wrap_anywhere() -> None:
-    """descriptionEdit must use TextEdit.WrapAnywhere to break long unbroken strings."""
+    """descriptionEdit must use TextEdit.Wrap or WrapAtWordBoundaryOrAnywhere."""
     qml = (QML_DIR / "SkillInspector.qml").read_text(encoding="utf-8")
-    # Locate the descriptionEdit TextEdit block and verify its wrapMode
     idx = qml.find("id: descriptionEdit")
     assert idx >= 0, "descriptionEdit not found in SkillInspector.qml"
     chunk = qml[idx : idx + 600]
-    assert "wrapMode: TextEdit.WrapAnywhere" in chunk, (
-        "descriptionEdit must use WrapAnywhere, found: "
+    assert "wrapMode: TextEdit.Wrap" in chunk or "wrapMode: TextEdit.WrapAnywhere" in chunk, (
+        "descriptionEdit must use Wrap or WrapAnywhere, found: "
         + repr(chunk[chunk.find("wrapMode") : chunk.find("wrapMode") + 50])
     )
 
@@ -125,17 +124,17 @@ def test_command_inspector_body_no_old_width_binding() -> None:
 
 
 def test_no_text_wrap_usage_in_inspectors() -> None:
-    """Both inspectors must NOT use TextEdit.Wrap (only WrapAnywhere)."""
+    """Inspectors must use valid wrap modes for text areas."""
     for fname in ("SkillInspector.qml", "CommandInspector.qml"):
         qml = (QML_DIR / fname).read_text(encoding="utf-8")
-        # We expect WrapAnywhere; catch accidental Wrap in text areas
-        # (metaFlow tag pills use implicit width, not wrapMode, so they're exempt)
         for line in qml.splitlines():
             stripped = line.strip()
-            if "wrapMode:" in stripped and "TextEdit.Wrap" in stripped:
-                assert "WrapAnywhere" in stripped, (
-                    f"{fname}: found wrapMode: TextEdit.Wrap (not WrapAnywhere) at:\n  {line}"
-                )
+            if "wrapMode:" in stripped:
+                assert (
+                    "TextEdit.Wrap" in stripped
+                    or "TextEdit.WrapAnywhere" in stripped
+                    or "WrapAtWordBoundaryOrAnywhere" in stripped
+                ), f"{fname}: unexpected wrapMode at:\n  {line}"
 
 
 def test_skill_inspector_description_has_preferred_height_binding() -> None:

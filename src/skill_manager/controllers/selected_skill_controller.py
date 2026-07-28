@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import os
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Property, QModelIndex, QObject, QPersistentModelIndex, Signal
@@ -31,29 +30,9 @@ if TYPE_CHECKING:
     from skill_manager.app import AppController
     from skill_manager.core.models.qt_model import SkillModel
 
+from skill_manager.core.parsing.skill import parse_skill_md, resolve_skill_file_path
+
 logger = logging.getLogger(__name__)
-
-
-def resolve_skill_file_path(path: str) -> str | None:
-    """Resolve a local path (file or directory) to an actual readable markdown file path."""
-    if not path:
-        return None
-    if os.path.isfile(path):
-        return path
-    if os.path.isdir(path):
-        for candidate_name in ("SKILL.md", "skill.md", "README.md"):
-            cand = os.path.join(path, candidate_name)
-            if os.path.isfile(cand):
-                return cand
-        try:
-            for entry in os.listdir(path):
-                if entry.endswith(".md"):
-                    cand = os.path.join(path, entry)
-                    if os.path.isfile(cand):
-                        return cand
-        except Exception:
-            pass
-    return None
 
 
 class SelectedSkillController(QObject):
@@ -104,6 +83,8 @@ class SelectedSkillController(QObject):
         self._date: str = ""
         self._project_label: str = ""
         self._raw_content: str = ""
+        self._path: str = ""
+        self._parsed_skill_cache: dict[str, dict[str, Any]] = {}
 
         # ── Subscribe to incremental data changes on both models ──
         lib: SkillModel = app._library_model
@@ -271,18 +252,24 @@ class SelectedSkillController(QObject):
         path = skill_dict.get("local_path", "")
         file_path = resolve_skill_file_path(path)
         if file_path and not skill_dict.get("body_content") and not skill_dict.get("raw_content"):
-            try:
-                from skill_manager.core.parsing.skill import parse_skill_md
+            if file_path in self._parsed_skill_cache:
+                parsed = self._parsed_skill_cache[file_path]
+            else:
+                try:
+                    parsed = parse_skill_md(file_path)
+                    if len(self._parsed_skill_cache) > 200:
+                        self._parsed_skill_cache.clear()
+                    self._parsed_skill_cache[file_path] = parsed
+                except Exception as exc:
+                    logger.warning("Failed to auto-read skill file for %s: %s", file_path, exc)
+                    parsed = {}
 
-                parsed = parse_skill_md(file_path)
-                if parsed.get("body_content") or parsed.get("raw_content"):
-                    skill_dict = dict(skill_dict)
-                    if parsed.get("body_content"):
-                        skill_dict["body_content"] = parsed["body_content"]
-                    if parsed.get("raw_content"):
-                        skill_dict["raw_content"] = parsed["raw_content"]
-            except Exception as exc:
-                logger.warning("Failed to auto-read skill file for %s: %s", file_path, exc)
+            if parsed.get("body_content") or parsed.get("raw_content"):
+                skill_dict = dict(skill_dict)
+                if parsed.get("body_content"):
+                    skill_dict["body_content"] = parsed["body_content"]
+                if parsed.get("raw_content"):
+                    skill_dict["raw_content"] = parsed["raw_content"]
 
         self._path = path
         self._update_from_dict(skill_dict)

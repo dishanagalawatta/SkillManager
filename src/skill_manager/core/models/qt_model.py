@@ -146,6 +146,11 @@ class SkillModel(QAbstractListModel):
         self._incubation_timer.setInterval(5000)  # 5s safety window
         self._incubation_timer.timeout.connect(self._force_end_incubation)
 
+        self._filter_debounce_timer = QTimer(self)
+        self._filter_debounce_timer.setSingleShot(True)
+        self._filter_debounce_timer.setInterval(50)  # 50ms search debounce
+        self._filter_debounce_timer.timeout.connect(self._apply_filter)
+
         if self._config:
             self.state.collapsed_categories = set(self._config.get("collapsed_categories", []))
             self.state.show_archived = self._config.get("show_archived", False)
@@ -278,8 +283,11 @@ class SkillModel(QAbstractListModel):
     def filterText(self, value):
         if self.state.filter_text != value:
             self.state.filter_text = value
-            self._apply_filter()
             self.filterChanged.emit()
+            if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+                self._apply_filter()
+            else:
+                self._filter_debounce_timer.start()
 
     @Property(bool, notify=showArchivedChanged)
     def showArchived(self):  # type: ignore[reportRedeclaration]

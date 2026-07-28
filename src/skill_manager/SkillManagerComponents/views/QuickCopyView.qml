@@ -228,11 +228,13 @@ Item {
     // No forced reset on completion - use persistent state
 
     ColumnLayout {
+        id: qcv_mainLayout
         anchors.fill: parent
         spacing: 20
 
         // Header Section
         RowLayout {
+            id: qcv_headerRow
             Layout.fillWidth: true
             spacing: 20
 
@@ -928,6 +930,7 @@ Item {
     SkillInspectorOverlay {
         id: qcv_inspectorOverlay
         anchors.fill: parent
+        topMargin: qcv_headerRow.height + qcv_mainLayout.spacing
         isQuickCopy: true
         z: 10
     }
