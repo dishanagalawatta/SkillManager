@@ -46,3 +46,6 @@ MissingSkillsDialog 1.0 dialogs/MissingSkillsDialog.qml
 CommandInspectorPanel 1.0 CommandInspectorPanel.qml
 ImageInspectorPanel 1.0 ImageInspectorPanel.qml
 SkillInspectorOverlay 1.0 SkillInspectorOverlay.qml
+InspectorMetadataRow 1.0 InspectorMetadataRow.qml
+InspectorActionBar 1.0 InspectorActionBar.qml
+InspectorEmptyState 1.0 InspectorEmptyState.qml

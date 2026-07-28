@@ -62,7 +62,12 @@ class GlobalHotkeyManager(QObject):
 
             self._pynput_available = True
         except (ImportError, OSError) as e:
-            logger.warning("pynput unavailable: %s. Global hotkeys will not function.", e)
+            import os
+
+            if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+                logger.debug("pynput unavailable in test mode: %s", e)
+            else:
+                logger.warning("pynput unavailable: %s. Global hotkeys will not function.", e)
             self._pynput_available = False
         return self._pynput_available
 

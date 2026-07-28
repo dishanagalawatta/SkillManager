@@ -43,6 +43,7 @@ class OpsController(BaseController):
     """Controller for skill-related operations."""
 
     minimizeAppRequested = Signal()
+    errorOccurred = Signal(str, str)  # (title, message)
     commandSkillsCarryPrompt = Signal(str, str, str)
     commandPendingRemovals = Signal(str, list)
 

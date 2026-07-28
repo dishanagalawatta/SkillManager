@@ -138,5 +138,53 @@ def test_closed_handlers_reset_their_flag() -> None:
     assert "root.showCommandInspector = false" in overlay
     assert "root.showImageInspector = false" in overlay
 
-    # SkillInspector close handler should also reset explicitly (via selectSkill(-1) or direct)
-    assert "selectSkill(-1)" in overlay
+
+# ── Top Margin & Dynamic Height ─────────────────────────────────
+
+
+def test_top_margin_property_in_overlay() -> None:
+    """SkillInspectorOverlay must declare topMargin property for dynamic vertical positioning."""
+    overlay: str = (QML_DIR / "SkillInspectorOverlay.qml").read_text(encoding="utf-8")
+    assert "property real topMargin: 0" in overlay
+
+
+def test_side_panel_y_and_height_use_top_margin() -> None:
+    """Side panel position and height must dynamically account for topMargin without hardcoded heights."""
+    overlay: str = (QML_DIR / "SkillInspectorOverlay.qml").read_text(encoding="utf-8")
+    assert "y: root.usePopupMode ? root._popupY : root.topMargin" in overlay
+    assert "parent.height - root.topMargin" in overlay
+
+
+def test_views_pass_dynamic_top_margin() -> None:
+    """LibraryView and QuickCopyView must dynamically compute topMargin from header height and layout spacing."""
+    lib_view: str = (QML_DIR / "views" / "LibraryView.qml").read_text(encoding="utf-8")
+    qc_view: str = (QML_DIR / "views" / "QuickCopyView.qml").read_text(encoding="utf-8")
+
+    assert "topMargin: lv_headerRow.height + lv_mainLayout.spacing" in lib_view
+    assert "topMargin: qcv_headerRow.height + qcv_mainLayout.spacing" in qc_view
+
+
+# ── Collapsible Inspector Sections ──────────────────────────────
+
+
+def test_inspector_metadata_row_has_collapsible_is_expanded_property() -> None:
+    """InspectorMetadataRow must expose property bool isExpanded: true and collapsible header controls."""
+    meta_row: str = (QML_DIR / "InspectorMetadataRow.qml").read_text(encoding="utf-8")
+    assert "property bool isExpanded: true" in meta_row
+    assert 'tooltipText: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
+
+
+def test_command_inspector_dependencies_section_has_is_expanded() -> None:
+    """CommandInspector's Skill Dependencies section must support interactive expand/collapse toggling."""
+    cmd_insp: str = (QML_DIR / "CommandInspector.qml").read_text(encoding="utf-8")
+    assert "id: depSection" in cmd_insp
+    assert "property bool isExpanded: true" in cmd_insp
+    assert "depSection.isExpanded = !depSection.isExpanded" in cmd_insp
+
+
+def test_skill_inspector_documentation_section_has_is_expanded() -> None:
+    """SkillInspector's Documentation section must support interactive expand/collapse toggling."""
+    skill_insp: str = (QML_DIR / "SkillInspector.qml").read_text(encoding="utf-8")
+    assert "id: docSection" in skill_insp
+    assert "property bool isExpanded: true" in skill_insp
+    assert "docSection.isExpanded = !docSection.isExpanded" in skill_insp

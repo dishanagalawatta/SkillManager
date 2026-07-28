@@ -29,6 +29,8 @@ Item {
     // ── Public Properties ────────────────────────────────────────
     property bool isQuickCopy: false
     property bool usePopupMode: false
+    // Vertical top margin (dynamic offset from top of view so side-panels do not cover the header ribbon)
+    property real topMargin: 0
     // Calculate internally so bindings update reliably even in
     // QQmlComponent test environments (cross-module bindings can stall).
     readonly property bool selectedSkillValid:
@@ -119,9 +121,9 @@ Item {
     Rectangle {
         id: resizeHandle
         x: root._panelX - width
-        y: 0
+        y: root.usePopupMode ? 0 : root.topMargin
         width: 6
-        height: parent ? parent.height : root.height
+        height: root.usePopupMode ? (parent ? parent.height : root.height) : (parent ? parent.height - root.topMargin : root.height - root.topMargin)
         z: 11
         visible: !root.usePopupMode && root._anyInspectorVisible
 
@@ -176,9 +178,9 @@ Item {
         overlayVisible: root.selectedSkillValid && root.showCommandInspector
         visible: root.selectedSkillValid && root.showCommandInspector
         x: root.usePopupMode ? root._popupX : root._panelX
-        y: root.usePopupMode ? root._popupY : 0
+        y: root.usePopupMode ? root._popupY : root.topMargin
         width:  root.usePopupMode ? root._popupW : root._panelW
-        height: root.usePopupMode ? root._popupH : (parent ? parent.height : root.height)
+        height: root.usePopupMode ? root._popupH : (parent ? parent.height - root.topMargin : root.height - root.topMargin)
 
         onWidthChange: {
             if (visible && width > 0 && !root.usePopupMode) {
@@ -201,9 +203,9 @@ Item {
         overlayVisible: root.selectedSkillValid && root.showSkillInspector
         visible: root.selectedSkillValid && root.showSkillInspector
         x: root.usePopupMode ? root._popupX : root._panelX
-        y: root.usePopupMode ? root._popupY : 0
+        y: root.usePopupMode ? root._popupY : root.topMargin
         width:  root.usePopupMode ? root._popupW : root._panelW
-        height: root.usePopupMode ? root._popupH : (parent ? parent.height : root.height)
+        height: root.usePopupMode ? root._popupH : (parent ? parent.height - root.topMargin : root.height - root.topMargin)
 
         onWidthChanged: {
             if (visible && width > 0 && !root.usePopupMode) {
@@ -225,9 +227,9 @@ Item {
         overlayVisible: root.selectedSkillValid && root.showImageInspector
         visible: root.selectedSkillValid && root.showImageInspector
         x: root.usePopupMode ? root._popupX : root._panelX
-        y: root.usePopupMode ? root._popupY : 0
+        y: root.usePopupMode ? root._popupY : root.topMargin
         width:  root.usePopupMode ? root._popupW : root._panelW
-        height: root.usePopupMode ? root._popupH : (parent ? parent.height : root.height)
+        height: root.usePopupMode ? root._popupH : (parent ? parent.height - root.topMargin : root.height - root.topMargin)
 
         onWidthChange: {
             if (visible && width > 0 && !root.usePopupMode) {

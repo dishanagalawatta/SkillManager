@@ -171,23 +171,14 @@ def step2_check_state():
         # since the discovery cache strips body_content
         print(f"[+{time.monotonic() - START_TIME:.1f}s] Calling selectSkill(0)...")
         controller.ui_controller.selectSkill(0)
-        # Also force-inject our test skill with body_content to verify QML rendering
-        print(f"[+{time.monotonic() - START_TIME:.1f}s] Injecting test skill with body_content...")
-        lm.isPackageOnly = False
-        with open(
-            "/home/dikka/.agent/skills/agentic-awesome-skills-86c7698d/ask-questions-if-underspecified/SKILL.md",
-            encoding="utf-8",
-        ) as f:
-            raw = f.read()
-        from skill_manager.core.parsing.skill import split_frontmatter
-
-        _, body = split_frontmatter(raw)
+        raw = "# Test Skill\n\nPackage skill content for verification.\n"
+        body = "Package skill content for verification."
         lm.setSkills(
             [
                 {
-                    "name": "ask-questions-if-underspecified",
-                    "description": "Clarify requirements before implementing. Use when serious doubts arise.",
-                    "local_path": "/tmp/test-injected/skill.md",
+                    "name": "Senior Software Architect",
+                    "description": "System Architect responsible for large-scale distributed systems.",
+                    "local_path": "/tmp/test-pkg-skill/skill.md",
                     "category": "architecture",
                     "author": "team",
                     "version": "1.0.0",
