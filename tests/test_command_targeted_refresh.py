@@ -356,7 +356,7 @@ def test_refresh_finds_renamed_file_in_all_skills(mock_app, ops_controller):
     new_path = "C:/Projects/New/projA/.agents/commands/Cmd.md"
     skill = _FakeSkill(local_path=new_path, project_path="C:/Projects/New/projA")
 
-    # Set up selected skill with the OLD path
+    # Set up selected skill with the OLD path (as a dict — legacy fallback)
     mock_app._selected_skill = {
         "local_path": "C:/Projects/Old/projB/.agents/commands/Cmd.md",
         "name": "Cmd",
@@ -373,10 +373,7 @@ def test_refresh_finds_renamed_file_in_all_skills(mock_app, ops_controller):
         rename_path=new_path,
     )
 
-    # Selection should be updated to the new skill (even though filtered)
-    mock_app.set_selected_skill.assert_called_once()
-    call_arg = mock_app.set_selected_skill.call_args[0][0]
-    assert call_arg["local_path"] == new_path
+    assert mock_app._selected_skill["local_path"] == new_path
 
 
 def test_refresh_returns_when_not_in_view(mock_app, ops_controller):

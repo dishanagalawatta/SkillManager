@@ -7,7 +7,7 @@ import App 1.0
 Rectangle {
     id: root
 
-    readonly property var _sel: AppController.selectedSkill || ({})
+    readonly property var _sel: AppController.selectedSkill
     property var skill: _sel
     property bool isCollapsed: false
 

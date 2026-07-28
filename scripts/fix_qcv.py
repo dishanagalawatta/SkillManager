@@ -1,11 +1,13 @@
-import re
-
-with open("src/skill_manager/SkillManagerComponents/views/QuickCopyView.qml", "r", encoding="utf-8") as f:
+with open(
+    "src/skill_manager/SkillManagerComponents/views/QuickCopyView.qml", encoding="utf-8"
+) as f:
     content = f.read()
 
 # 1. Extract qcv_selectionControls contents (we'll rewrite them anyway so we can just delete)
 # We know it starts at `RowLayout {\n                        id: qcv_selectionControls`
-start_idx = content.find("                    RowLayout {\n                        id: qcv_selectionControls")
+start_idx = content.find(
+    "                    RowLayout {\n                        id: qcv_selectionControls"
+)
 
 # It goes until just before `// Edit Collection Mode`
 end_idx = content.find("                    // Edit Collection Mode", start_idx)
@@ -18,7 +20,7 @@ if start_idx != -1 and end_idx != -1:
 filter_idx = content.find("                    // Filter Group")
 brace_idx = content.rfind("                    }", 0, filter_idx)
 if brace_idx != -1:
-    content = content[:brace_idx] + content[brace_idx + 22:] # remove `                    }\n`
+    content = content[:brace_idx] + content[brace_idx + 22 :]  # remove `                    }\n`
 
 # 3. Insert the new buttons into `Filter Group`
 # We'll insert them right after `spacing: 12` inside `Filter Group`
@@ -156,7 +158,9 @@ new_buttons = """
 
 content = content.replace(insert_target, insert_target + new_buttons)
 
-with open("src/skill_manager/SkillManagerComponents/views/QuickCopyView.qml", "w", encoding="utf-8") as f:
+with open(
+    "src/skill_manager/SkillManagerComponents/views/QuickCopyView.qml", "w", encoding="utf-8"
+) as f:
     f.write(content)
 
 print("Modifications done.")

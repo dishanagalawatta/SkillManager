@@ -72,6 +72,7 @@ class UIController(BaseController):
         normalized = self._normalizeViewName(value)
         if self.state.current_view != normalized:
             self.state.current_view = normalized
+            self.app.set_selected_skill({})
             self.saveUiState()
             self.currentViewChanged.emit()
             self.app.skillModelChanged.emit()

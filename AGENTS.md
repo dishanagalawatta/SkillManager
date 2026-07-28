@@ -20,6 +20,33 @@
 2. **QML lifecycle**: Clear `cacheBuffer` before setting `model = null` to prevent incubation destruction exceptions.
 3. **Threading**: Never block the PySide6 event loop. Heavy work runs on `joblib.Parallel` or `BackgroundTaskRunner`.
 4. **Telemetry**: Never log or commit API tokens. `.env` is gitignored.
+5. **Git revert**: Any `git checkout --`, `git revert`, `git reset` (hard/mixed), or any other command that discards or reverts changes must be approved by the user first. Tag the user for confirmation before executing.
+6. **UI Validation (REAL APP ONLY — ZERO TOLERANCE)**: After EVERY change involving layout, positioning, visibility, or text rendering in QML (including debugging/fixing text clipping), you MUST visually verify using `look_at` on a screenshot of the REAL running app (`uv run skill-manager`).
+
+   **EXPLICITLY FORBIDDEN (automatic violation)**
+   - ❌ Writing inline QML (`qml = '''...'''`) in Python test scripts
+   - ❌ Creating temporary `.qml` files under `/tmp/` or anywhere outside `src/skill_manager/SkillManagerComponents/`
+   - ❌ Instantiating `QQmlApplicationEngine` in test scripts with ad-hoc QML content
+   - ❌ Using `grabWindow()` or any capture method on anything other than the real `Main.qml` loaded through the real `AppController`
+   - ❌ Running UI/rendering tests through pytest (these are for logic/contract testing only)
+   - ❌ Referencing old/stale screenshot captures from previous verification runs
+
+   The ONLY valid verification procedure is:
+   (a) Start the real app via `uv run skill-manager`
+   (b) Identify ALL views/panels affected by the change (Library, QuickCopy, etc.) — verify EACH ONE, not just the first one you think of
+   (c) For each affected view:
+       - Navigate to that view
+       - Select a skill that exercises the changed code path
+       - Wait for QML to settle (at least 3s after selectSkill)
+       - Verify QML debug logs (INSPECTOR_DEBUG, LAYOUT_CHAIN) confirm the expected state
+   (d) Capture a screenshot using `PySide6.QtGui.QWindow.grabWindow()` from a helper script that shares the same process as the real AppController — do NOT use IPC `CommandChannel` capture (grabs wrong region in headless/multiscreen environments)
+   (e) Clean all captures from `data/mcp/captures/` BEFORE each run so no stale screenshot is accidentally re-analyzed
+   (f) Pass the NEW screenshot to `look_at` for analysis
+   (g) CONFIRM the active view in the screenshot matches the expected view (Library vs QuickCopy vs Settings) — if the view is wrong, fix the verification script and retake
+   
+   **CRITICAL: Visual Evidence Overrides Properties**: A `look_at` analysis showing clipped/truncated/overflowing text takes ABSOLUTE PRIORITY over any QML property values (`contentHeight`, `contentWidth`, `implicitHeight`, etc.) or debug logging. If the screenshot shows clipping, the fix is INCOMPLETE — do not rationalize away visual evidence with property values. Investigate ALL visual issues `look_at` reports, not just the one you were checking.
+
+   **Enforcement**: Any violation of this rule triggers IMMEDIATE REVERSION of all unverified QML changes and restart from last known-good state. Do NOT mark any UI/rendering work complete without real-app visual validation evidence.
 
 ## Conventions
 
@@ -109,4 +136,4 @@
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contribution guidelines
 - [`ADR_INDEX.md`](ADR_INDEX.md) — architecture decisions
 
-- **UI Validation**: MUST use `multimodal-looker` subagent (via `look_at` MCP tool) to validate visually after every UI change involving layout, positioning, or visibility. Never rely solely on static mathematical validation. Capture a full-desktop screenshot via PowerShell (`Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $bitmap.Save(...)`) then pass to `look_at` for analysis. Do NOT mark UI work complete without MCP visual validation evidence.
+- **UI Validation**: See Mandatory Rule #6 — applies to every QML layout/positioning/rendering change.

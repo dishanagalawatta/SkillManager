@@ -12,6 +12,7 @@ GlassSearchInput 1.0 GlassSearchInput.qml
 SkillItem 1.0 SkillItem.qml
 SkillInspector 1.0 SkillInspector.qml
 CommandInspector 1.0 CommandInspector.qml
+ImageInspector 1.0 ImageInspector.qml
 FilterPill 1.0 FilterPill.qml
 GlassMenu 1.0 GlassMenu.qml
 GlassMenuItem 1.0 GlassMenuItem.qml
@@ -42,3 +43,6 @@ GlassCheckBox 1.0 GlassCheckBox.qml
 ScreenshotOverlay 1.0 ScreenshotOverlay.qml
 CommandCarrySkillsDialog 1.0 dialogs/CommandCarrySkillsDialog.qml
 MissingSkillsDialog 1.0 dialogs/MissingSkillsDialog.qml
+CommandInspectorPanel 1.0 CommandInspectorPanel.qml
+ImageInspectorPanel 1.0 ImageInspectorPanel.qml
+SkillInspectorOverlay 1.0 SkillInspectorOverlay.qml

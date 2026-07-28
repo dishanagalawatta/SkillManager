@@ -1,11 +1,11 @@
 import difflib
 
-with open("orig.txt", "r", encoding="utf-8") as f:
+with open("orig.txt", encoding="utf-8") as f:
     orig = f.readlines()
-    
-with open("curr.txt", "r", encoding="utf-8") as f:
+
+with open("curr.txt", encoding="utf-8") as f:
     curr = f.readlines()
-    
+
 diff = difflib.ndiff(orig, curr)
 count = 0
 for line in diff:

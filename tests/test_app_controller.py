@@ -242,9 +242,9 @@ def test_controller_selection_and_clipboard_paths(controller):
     controller.skillModel.setSkills([{"name": "S1", "local_path": "/p1", "is_package": True}])
 
     controller.selectSkill(0)
-    assert controller.selectedSkill.value("name") == "S1"
+    assert controller.selectedSkill.name == "S1"
     controller.selectSkill(-1)
-    assert controller.selectedSkill.value("name") is None
+    assert controller.selectedSkill.name == ""
 
     controller._clipboard = MagicMock()
     controller.copyTextToClipboard("hello")
@@ -794,10 +794,9 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     _write_command_file(cmd_file, "Cmd", "old body")
 
     _load_command_into_model(controller, cmd_file, "Cmd", "old body")
-    controller.set_selected_skill({"local_path": str(cmd_file), "name": "Cmd"})
-
-    emissions = []
-    controller.selectedSkillChanged.connect(lambda: emissions.append(True))
+    controller.set_selected_skill(
+        {"local_path": str(cmd_file), "name": "Cmd", "body_content": "old body"}
+    )
 
     proj_label = compute_project_label(project_path)
     controller.updateCustomCommandFull(
@@ -808,10 +807,15 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
 
     QApplication.processEvents()
 
-    assert emissions, (
-        "selectedSkillChanged was not emitted — "
-        "discover_single likely returned None for the command file"
+    # With in-place refresh, selectedSkillChanged is NOT emitted for data
+    # refreshes.  Instead, the QMap's entries are updated directly and
+    # valueChanged signals fire per key.  Verify the data was updated.
+    sel = controller.selectedSkill
+    assert sel is not None, "selectedSkill should still be set"
+    assert sel.body_content == "new body", (
+        f"body_content should be 'new body', got {sel.body_content!r}"
     )
+    assert sel.name == "Cmd"
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")

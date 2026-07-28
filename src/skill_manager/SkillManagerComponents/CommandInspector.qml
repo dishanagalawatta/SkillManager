@@ -6,7 +6,7 @@ import App 1.0
 Rectangle {
     id: root
 
-    readonly property var _sel: AppController.selectedSkill || ({})
+    readonly property var _sel: AppController.selectedSkill
     property var skill: _sel
     property bool isCollapsed: false
     // Controlled externally (e.g. from LibraryView overlay) to gate visibility.
@@ -70,19 +70,19 @@ Rectangle {
     }
 
     Connections {
-        target: root._sel
-        function onValueChanged(key, value) {
-            if (key === "local_path" || key === "is_command") {
-                if (value !== root._prevLocalPath) {
-                    root._prevLocalPath = (key === "local_path" ? (value || "") : root._prevLocalPath)
-                    root._refreshDependencies()
-                }
-            } else if (key === "body_content") {
-                if (bodyArea) {
-                    bodyArea._lastHighlightedText = ""
-                }
-                _applyHighlights(-1)
+        target: AppController.selectedSkill
+        function onLocalPathChanged() {
+            root._prevLocalPath = AppController.selectedSkill.local_path
+            root._refreshDependencies()
+        }
+        function onIsCommandChanged() {
+            root._refreshDependencies()
+        }
+        function onBodyContentChanged() {
+            if (bodyArea) {
+                bodyArea._lastHighlightedText = ""
             }
+            _applyHighlights(-1)
         }
     }
 
@@ -94,7 +94,7 @@ Rectangle {
     }
 
     function _applyHighlights(focusedIndex) {
-        if (typeof AppController === "undefined" || !AppController) return
+        if (typeof AppController === "undefined" || !AppController || !AppController.ops_controller) return
         if (root.referenceRanges && root.referenceRanges.length > 0) {
             AppController.ops_controller.applySkillHighlights(
                 bodyArea,
@@ -126,7 +126,7 @@ Rectangle {
             x: 12
             y: 12
             spacing: 16
-            visible: root.overlayVisible && !root.isCollapsed && root._sel.local_path !== undefined
+            visible: root.overlayVisible && !root.isCollapsed && root._sel && root._sel.local_path !== undefined
             opacity: visible ? 1.0 : 0.0
 
             Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -139,7 +139,7 @@ Rectangle {
                 TextField {
                     id: nameField
                     ContextMenu.menu: null
-                    text: root._sel.name || ""
+                    text: (root._sel && root._sel.name) || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle
                     font.weight: Font.Bold
@@ -181,7 +181,7 @@ Rectangle {
                     role: "destructive"
                     flat: true
                     onClicked: (mouse) => {
-                        root.deleteRequested(root._sel.name || "", root._sel.local_path || "", true)
+                        root.deleteRequested((root._sel && root._sel.name) || "", (root._sel && root._sel.local_path) || "", true)
                     }
                     visible: root._sel && root._sel.local_path !== undefined
                     tooltipText: "Delete command"
@@ -221,15 +221,28 @@ Rectangle {
                         Rectangle {
                             id: depPill
                             height: 22
-                            width: depRow.implicitWidth + 12
+                            // Cap width so long dependency names don't overflow
+                            width: Math.min(depRow.implicitWidth + 12, (parent ? parent.width : 400) - 8)
                             radius: Theme.radiusSmall
                             color: Theme.glassHover
                             border.color: Theme.glassBorder
                             border.width: 1
+                            clip: true
 
-                            Row {
+                            onWidthChanged: {
+                                if (width > 0 && parent && parent.width > 0)
+                                    console.log("DEP_PILL name=" + modelData.name
+                                        + " pillW=" + width + " flowW=" + parent.width
+                                        + " iw=" + depRow.implicitWidth)
+                            }
+
+                            RowLayout {
                                 id: depRow
-                                anchors.centerIn: parent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
                                 spacing: 4
 
                                 Text {
@@ -237,7 +250,8 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     color: Theme.label
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
                                 }
 
                                 Text {
@@ -245,7 +259,6 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 9
                                     color: Theme.secondaryLabel
-                                    anchors.verticalCenter: parent.verticalCenter
                                     visible: modelData.occurrences > 1
                                 }
                             }
@@ -288,6 +301,7 @@ Rectangle {
                     clip: true
 
                     SmoothScrollView {
+                        id: bodyScroll
                         anchors.fill: parent
                         anchors.margins: 2
                         clip: true
@@ -297,7 +311,9 @@ Rectangle {
                             id: bodyArea
                             ContextMenu.menu: null
                             objectName: "commandBodyTextArea"
-                            width: parent.width - parent.leftPadding - parent.rightPadding
+                            // Use the ScrollView's availableWidth (viewport minus padding)
+                            // to ensure the content text width matches the visible area.
+                            width: bodyScroll.availableWidth
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Command Details"
                             property string _lastHighlightedText: ""
@@ -311,12 +327,20 @@ Rectangle {
                             font.family: "Consolas", "Monaco", "Courier New", "monospace"
                             font.pixelSize: 12
                             color: Theme.label
-                            wrapMode: TextEdit.Wrap
+                            // WrapAnywhere breaks at any character — required for long
+                            // unbroken strings (URLs, paths, code) that Word-wrap cannot split.
+                            wrapMode: TextEdit.WrapAnywhere
                             selectByMouse: true
                             readOnly: true
                             background: null
                             padding: 12
                             verticalAlignment: TextArea.AlignTop
+
+                            // Debug: log actual rendered dimensions for diagnosing clipping
+                            onWidthChanged: {
+                                if (width > 0)
+                                    console.log("BODY_TXT width=" + width + " iw=" + implicitWidth + " cw=" + contentWidth + " x=" + x + " aw=" + bodyScroll.availableWidth)
+                            }
 
                             MouseArea {
                                 anchors.fill: parent

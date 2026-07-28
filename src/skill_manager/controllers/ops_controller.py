@@ -76,24 +76,11 @@ class OpsController(BaseController):
     ):
         """Generic helper to toggle a boolean property on a skill."""
         skill = self.app._selected_skill
-        if not skill:
+        if not skill or not skill.local_path:
             return
 
-        if hasattr(skill, "value"):
-            path = skill.value("local_path")
-        elif isinstance(skill, dict):
-            path = skill.get("local_path")
-        else:
-            path = getattr(skill, "local_path", None)
-        if not path:
-            return
-
-        if hasattr(skill, "value"):
-            current_val = skill.value(attr_name) or False
-        elif isinstance(skill, dict):
-            current_val = skill.get(attr_name, False)
-        else:
-            current_val = getattr(skill, attr_name, False)
+        path = skill.local_path
+        current_val = getattr(skill, attr_name, False) or False
         new_state = not current_val
 
         # Update global list
@@ -108,15 +95,7 @@ class OpsController(BaseController):
         persist_fn()
         self._updateModelsProperty(path, attr_name, new_state)
 
-        # Update the selected object reference
-        if hasattr(skill, "insert"):
-            skill.insert(attr_name, new_state)
-        elif isinstance(skill, dict):
-            skill[attr_name] = new_state
-        else:
-            setattr(skill, attr_name, new_state)
-
-        self.app.selectedSkillChanged.emit()
+        setattr(skill, attr_name, new_state)
         status_label = attr_name.replace("is_", "") + ("d" if not attr_name.endswith("d") else "")
         action = status_label if new_state else "un" + status_label
         self.app._set_status(f"Skill {action}")
@@ -528,22 +507,19 @@ class OpsController(BaseController):
             self.copySelectedSkillsToClipboard()
             return
         selected = self.app._selected_skill
-        if hasattr(selected, "value") and selected.value("local_path"):
-            # Build a plain dict from the QQmlPropertyMap, converting each
-            # key through str() to avoid PySide6 std::shared_ptr<char>
-            # conversion errors (broken in some Qt/PySide6 versions).
-            keys = list(selected.keys())
-            data = {}
-            for k in keys:
-                sk = str(k)
-                try:
-                    data[sk] = selected.value(sk)
-                except (RuntimeError, TypeError):
-                    continue
-            self.copySkillReference(data)
-            return
         if isinstance(selected, dict) and selected.get("local_path"):
             self.copySkillReference(selected)
+            return
+        if hasattr(selected, "local_path") and selected.local_path:
+            data = {
+                "local_path": selected.local_path,
+                "name": selected.name,
+                "body_content": selected.body_content,
+                "description": selected.description,
+                "is_command": selected.is_command,
+                "is_screenshot": selected.is_screenshot,
+            }
+            self.copySkillReference(data)
             return
         first_skill = self.app.skillModel.get_skill_at(0)
         if first_skill:
@@ -854,19 +830,15 @@ class OpsController(BaseController):
         # ── Instant body refresh: update _selected_skill immediately
         # so the CommandInspector reflects the new content without
         # waiting for the deferred discovery-rescan pipeline.
-        selected = self.app._selected_skill
-        sel_path = None
-        if hasattr(selected, "value"):
-            sel_path = selected.value("local_path")
-        elif isinstance(selected, dict):
-            sel_path = selected.get("local_path")
-        if sel_path == local_path:
-            if hasattr(selected, "insert"):
-                selected.insert("body_content", body)
-                selected.insert("name", name)
-            elif isinstance(selected, dict):
-                selected["body_content"] = body
-                selected["name"] = name
+        sel = self.app._selected_skill
+        path = sel.local_path if hasattr(sel, "local_path") else sel.get("local_path")
+        if path == local_path:
+            if hasattr(sel, "local_path"):
+                sel.body_content = body
+                sel.name = name
+            else:
+                sel["body_content"] = body
+                sel["name"] = name
 
         # ── Targeted rescan: collect unique affected project paths
         from skill_manager.core.commands import find_project_path_by_label
@@ -1227,23 +1199,16 @@ class OpsController(BaseController):
     def _refresh_selected_skill(self, local_path: str, rename_path: str | None = None) -> None:
         """Refresh ``_selected_skill`` after a model mutation.
 
-        If the mutated skill matches the currently selected one, replace
-        the stale snapshot with a fresh dict from the model and emit
-        ``selectedSkillChanged`` so QML re-binds.
-
         For renames, pass ``rename_path`` (the new path) when
         ``local_path`` is the old path that no longer exists in the model.
-
-        Called from ``createCustomCommand``, ``updateCustomCommandFull``,
-        and any other site that calls ``addOrUpdateSkills`` (or
-        ``setSkills``) after a mutation that may change the selected
-        skill's data.
-
-        See ``docs/adr/0011-selection-refresh-invariant.md``.
         """
         diag = get_diagnostic_logger()
         selected = self.app._selected_skill
-        if hasattr(selected, "value"):
+
+        # Resolve the current selected path — handle controller, QMap, or dict.
+        if hasattr(selected, "local_path"):
+            selected_path = selected.local_path
+        elif hasattr(selected, "value"):
             selected_path = selected.value("local_path")
         elif isinstance(selected, dict):
             selected_path = selected.get("local_path")
@@ -1262,17 +1227,19 @@ class OpsController(BaseController):
             )
             return
 
-        # For renames, the old path no longer exists. Try the new path.
         lookup_path = rename_path or local_path
-
-        # Find the row in the active model
         model = self.app.skillModel
 
         for i in range(len(model._filtered_skills)):
             skill = model._filtered_skills[i]
             if skill.local_path == lookup_path:
                 fresh = model.get_skill_at(i)
-                self.app.set_selected_skill(fresh)
+                sel = self.app._selected_skill
+                if hasattr(sel, "setSelection"):
+                    sel.setSelection(fresh)
+                else:
+                    sel.clear()
+                    sel.update(fresh)
                 diag.log_event(
                     "INFO",
                     CATEGORY_SELECTION_REFRESHED,
@@ -1282,7 +1249,6 @@ class OpsController(BaseController):
                 )
                 return
 
-        # Fallback: search _all_skills (skill may be filtered out by search)
         for skill in model._all_skills:
             if skill.local_path == lookup_path:
                 import dataclasses
@@ -1291,7 +1257,12 @@ class OpsController(BaseController):
                     fresh_dict = dataclasses.asdict(skill)
                 else:
                     fresh_dict = dict(vars(skill))
-                self.app.set_selected_skill(fresh_dict)
+                sel = self.app._selected_skill
+                if hasattr(sel, "setSelection"):
+                    sel.setSelection(fresh_dict)
+                else:
+                    sel.clear()
+                    sel.update(fresh_dict)
                 diag.log_event(
                     "INFO",
                     CATEGORY_SELECTION_REFRESHED,

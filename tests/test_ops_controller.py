@@ -33,24 +33,30 @@ def real_ops_controller(temp_dir, mock_config):
 
 
 def test_ops_controller_toggle_archive(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/s", "is_archived": False}
+    _skill = MagicMock()
+    _skill.local_path = "/path/s"
+    _skill.is_archived = False
+    mock_app._selected_skill = _skill
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
         assert "/path/s" in mock_app._archive_paths
-        assert mock_app._selected_skill["is_archived"] is True
-        mock_app.selectedSkillChanged.emit.assert_called()
+        assert mock_app._selected_skill.is_archived is True
+        mock_app.selectedSkillChanged.emit.assert_not_called()
         mock_save.assert_called_with(mock_app._archive_paths)
 
 
 def test_ops_controller_toggle_archive_restore(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/s", "is_archived": True}
+    _skill = MagicMock()
+    _skill.local_path = "/path/s"
+    _skill.is_archived = True
+    mock_app._selected_skill = _skill
     mock_app._archive_paths = ["/path/s"]
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
         assert "/path/s" not in mock_app._archive_paths
-        assert mock_app._selected_skill["is_archived"] is False
+        assert mock_app._selected_skill.is_archived is False
         mock_save.assert_called_with(mock_app._archive_paths)
 
 
@@ -61,34 +67,46 @@ def test_ops_controller_toggle_archive_no_skill(ops_controller, mock_app):
 
 
 def test_ops_controller_toggle_archive_no_path(ops_controller, mock_app):
-    mock_app._selected_skill = {"name": "NoPath"}
+    _skill = MagicMock()
+    _skill.local_path = None
+    _skill.name = "NoPath"
+    mock_app._selected_skill = _skill
     ops_controller.toggleArchive()
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
 
 def test_ops_controller_toggle_starred(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/e", "is_starred": False}
+    _skill = MagicMock()
+    _skill.local_path = "/path/e"
+    _skill.is_starred = False
+    mock_app._selected_skill = _skill
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
         assert "/path/e" in mock_app._starred_paths
-        assert mock_app._selected_skill["is_starred"] is True
+        assert mock_app._selected_skill.is_starred is True
         mock_save.assert_called_with(mock_app._starred_paths)
 
 
 def test_ops_controller_toggle_starred_remove(ops_controller, mock_app):
-    mock_app._selected_skill = {"local_path": "/path/e", "is_starred": True}
+    _skill = MagicMock()
+    _skill.local_path = "/path/e"
+    _skill.is_starred = True
+    mock_app._selected_skill = _skill
     mock_app._starred_paths = ["/path/e"]
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
         assert "/path/e" not in mock_app._starred_paths
-        assert mock_app._selected_skill["is_starred"] is False
+        assert mock_app._selected_skill.is_starred is False
         mock_save.assert_called_with(mock_app._starred_paths)
 
 
 def test_ops_controller_toggle_starred_no_path(ops_controller, mock_app):
-    mock_app._selected_skill = {"name": "NoPath"}
+    _skill = MagicMock()
+    _skill.local_path = None
+    _skill.name = "NoPath"
+    mock_app._selected_skill = _skill
     ops_controller.toggleStarred()
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
@@ -255,28 +273,32 @@ def test_ops_controller_update_models_source(ops_controller, mock_app):
 
 
 def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, mock_app):
-    skill = {"local_path": "/path/s", "is_archived": False}
-    mock_app._selected_skill = skill
-    mock_app._library_model._all_skills = [skill]
-    mock_app._quick_copy_model._all_skills = [{"local_path": "/path/s", "is_archived": False}]
+    _skill = MagicMock()
+    _skill.local_path = "/path/s"
+    _skill.is_archived = False
+    mock_app._selected_skill = _skill
+    mock_app._library_model._all_skills = [_skill]
+    mock_app._quick_copy_model._all_skills = [_skill]
 
     with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
-        assert skill["is_archived"] is True
+        assert _skill.is_archived is True
         mock_save.assert_called_once()
 
 
 def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, mock_app):
-    skill = {"local_path": "/path/e", "is_starred": False}
-    mock_app._selected_skill = skill
-    mock_app._library_model._all_skills = [skill]
-    mock_app._quick_copy_model._all_skills = [{"local_path": "/path/e", "is_starred": False}]
+    _skill = MagicMock()
+    _skill.local_path = "/path/e"
+    _skill.is_starred = False
+    mock_app._selected_skill = _skill
+    mock_app._library_model._all_skills = [_skill]
+    mock_app._quick_copy_model._all_skills = [_skill]
 
     with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
-        assert skill["is_starred"] is True
+        assert _skill.is_starred is True
         mock_save.assert_called_once()
 
 
@@ -891,13 +913,11 @@ class TestRefreshSelectedSkill:
 
         ops_controller._refresh_selected_skill("/cmd/Cmd.md")
 
-        mock_app.set_selected_skill.assert_called_once_with(
-            {
-                "local_path": "/cmd/Cmd.md",
-                "name": "Cmd",
-                "body_content": "new body",
-            }
-        )
+        assert mock_app._selected_skill == {
+            "local_path": "/cmd/Cmd.md",
+            "name": "Cmd",
+            "body_content": "new body",
+        }
 
     def test_rename_refreshes_with_new_path(self, ops_controller, mock_app):
         from skill_manager.core.models.entities import Skill
@@ -913,13 +933,9 @@ class TestRefreshSelectedSkill:
 
         ops_controller._refresh_selected_skill("/cmd/Old.md", rename_path="/cmd/New.md")
 
-        mock_app.set_selected_skill.assert_called_once_with(
-            {
-                "local_path": "/cmd/New.md",
-                "name": "New",
-                "body_content": "updated",
-            }
-        )
+        assert mock_app._selected_skill["local_path"] == "/cmd/New.md"
+        assert mock_app._selected_skill["name"] == "New"
+        assert mock_app._selected_skill["body_content"] == "updated"
 
     def test_not_in_view_when_path_missing_from_model(self, ops_controller, mock_app):
         mock_app._selected_skill = {"local_path": "/cmd/Missing.md"}
@@ -1080,9 +1096,11 @@ def test_update_custom_command_refreshes_selection_real_discovery(
     QApplication.processEvents()
 
     # The command was updated; verify _selected_skill reflects the new body
-    assert emissions, (
-        "selectedSkillChanged was not emitted after updateCustomCommandFull — "
-        "discover_single likely returned None for the command file"
+    # (in-place refresh, not selectedSkillChanged)
+    sel = app.selectedSkill
+    assert sel is not None
+    assert sel.body_content == "new body", (
+        f"body_content should be 'new body', got {sel.body_content!r}"
     )
 
 
@@ -1128,13 +1146,14 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
     assert new_file.exists(), "Renamed command file should exist"
     assert not old_file.exists(), "Old command file should be removed after rename"
 
-    # _selected_skill should now point to the new path
-    assert emissions, (
-        "selectedSkillChanged was not emitted after rename — "
-        "discover_single likely returned None for the command file"
+    # _selected_skill should now point to the new path with updated body
+    sel = app.selectedSkill
+    assert sel is not None
+    assert sel.local_path == str(new_file), (
+        f"_selected_skill should point to renamed file, got {sel.local_path}"
     )
-    assert app._selected_skill.value("local_path") == str(new_file), (
-        f"_selected_skill should point to renamed file, got {app._selected_skill.value('local_path')}"
+    assert sel.body_content == "updated body", (
+        f"body_content should be 'updated body', got {sel.body_content!r}"
     )
 
 

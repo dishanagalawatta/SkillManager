@@ -9,6 +9,7 @@ Usage at the top of any scripts/ entry point::
     from _launcher import ensure_venv
     ensure_venv()
 """
+
 from __future__ import annotations
 
 import os

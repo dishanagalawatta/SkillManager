@@ -82,11 +82,11 @@ def test_update_command_refreshes_selected_skill(mock_patch_cache, app_controlle
 
     QApplication.processEvents()
 
-    assert emissions, "selectedSkillChanged was not emitted"
-    assert app_controller._selected_skill.value("body_content") == "new body", (
-        f"body_content should be 'new body', got {app_controller._selected_skill.value('body_content')}"
+    # Data updated in-place (no selectedSkillChanged emission)
+    assert app_controller.selectedSkill.body_content == "new body", (
+        f"body_content should be 'new body', got {app_controller.selectedSkill.body_content}"
     )
-    assert app_controller._selected_skill.value("name") == "Cmd"
+    assert app_controller.selectedSkill.name == "Cmd"
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
@@ -149,7 +149,7 @@ def test_update_command_refreshes_dependency_list(mock_patch_cache, app_controll
 
     QApplication.processEvents()
 
-    assert app_controller._selected_skill.value("body_content") == "new body with @ref SkillRef"
+    assert app_controller.selectedSkill.body_content == "new body with @ref SkillRef"
 
 
 def test_command_inspector_qml_has_required_bindings():

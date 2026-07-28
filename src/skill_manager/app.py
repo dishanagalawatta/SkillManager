@@ -30,7 +30,7 @@ from PySide6.QtCore import (  # noqa: E402
     Slot,
 )
 from PySide6.QtGui import QGuiApplication, QIcon, QSurfaceFormat
-from PySide6.QtQml import QQmlApplicationEngine, QQmlPropertyMap, qmlRegisterSingletonInstance
+from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 
@@ -78,6 +78,9 @@ from skill_manager.controllers.image_inspector_controller import (  # noqa: E402
 )
 from skill_manager.controllers.ops_controller import OpsController  # noqa: E402
 from skill_manager.controllers.screenshot_controller import ScreenshotController  # noqa: E402
+from skill_manager.controllers.selected_skill_controller import (  # noqa: E402
+    SelectedSkillController,
+)
 from skill_manager.controllers.ui_controller import UIController  # noqa: E402
 from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
 from skill_manager.core.analytics import (  # noqa: E402
@@ -390,8 +393,8 @@ class AppController(QObject):
         self._quick_copy_model = SkillModel(config=self._quick_copy_config)
 
         # 2. Basic Attribute Initialization
-        # create() avoids the deprecated QQmlPropertyMap(parent) ctor (Qt 6.11)
-        self._selected_skill = QQmlPropertyMap.create(self)
+        # Live-bound QObject subscribing to model dataChanged, not a stale QMap.
+        self._selected_skill = SelectedSkillController(self)
         self._is_loading = False
         self._status_message = ""
         # Startup debug-overlay flag: --debug-overlay enables the ribbon debug
@@ -757,20 +760,12 @@ class AppController(QObject):
         return self._selected_skill
 
     def set_selected_skill(self, skill_dict: dict[str, Any]) -> None:
-        """Update the selected skill via QQmlPropertyMap.
-
-        Creates a new QQmlPropertyMap each time so QML's binding system
-        detects the new object and re-evaluates all bindings (including
-        ``text: root.skill.body_content``).
-        """
-        old = self._selected_skill
-        new_map = QQmlPropertyMap.create(self)
-        for key, value in skill_dict.items():
-            new_map.insert(key, value)
-        self._selected_skill = new_map
+        """Populate the selected skill via SelectedSkillController."""
+        if skill_dict:
+            self._selected_skill.setSelection(skill_dict)
+        else:
+            self._selected_skill.clearSelection()
         self.selectedSkillChanged.emit()
-        if old is not None:
-            old.deleteLater()
 
     @Property(bool, notify=isLoadingChanged)
     def isLoading(self):
