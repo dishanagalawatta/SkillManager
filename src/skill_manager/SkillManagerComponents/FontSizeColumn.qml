@@ -66,8 +66,9 @@ Rectangle {
             clip: true
 
             model: {
-                if (!root.family || !root.style) return fontDB.standardSizes
-                return fontDB.getSizes(root.family, root.style)
+                if (typeof fontDB === "undefined" || !fontDB) return []
+                if (!root.family || !root.style) return fontDB.standardSizes || []
+                return fontDB.getSizes(root.family, root.style) || []
             }
 
             currentIndex: {

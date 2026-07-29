@@ -7,7 +7,7 @@ import json
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Slot
+from PySide6.QtCore import QObject, QTimer, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -16,6 +16,11 @@ from skill_manager.core.update_service import UpdateService
 from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_single_shot(msec: int, context, functor):
+    ctx = context if isinstance(context, QObject) else None
+    QTimer.singleShot(msec, ctx, functor)
 
 
 class UpdateController(BaseController):
@@ -92,7 +97,7 @@ class UpdateController(BaseController):
                     self.app._update_packages[idx] = data
                     self.app.updatePackagesChanged.emit()
 
-            QTimer.singleShot(0, self.app, update_item)
+            _safe_single_shot(0, self.app, update_item)
 
         def completion_callback(result, _updated_sources):
             def finalize():
@@ -112,7 +117,7 @@ class UpdateController(BaseController):
                 self.app._syncing_projects = []
                 self.app.projectsChanged.emit()
 
-            QTimer.singleShot(0, self.app, finalize)
+            _safe_single_shot(0, self.app, finalize)
 
         service.run_global_update(
             status_callback=self.app._set_status,
@@ -155,7 +160,7 @@ class UpdateController(BaseController):
                     logger.info("Silent auto-update triggered for outdated skill packages.")
                     self.updateNow()
 
-            QTimer.singleShot(0, self.app, finalize)
+            _safe_single_shot(0, self.app, finalize)
 
         service.scan_for_updates(
             status_callback=self.app._set_status, completion_callback=completion_callback
@@ -493,7 +498,7 @@ class UpdateController(BaseController):
                         )
 
                     def log_callback(msg):
-                        QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
+                        _safe_single_shot(0, self.app, lambda: self.app._set_status(msg))
 
                     inventory = load_package_skill_inventory()
                     previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
@@ -549,7 +554,7 @@ class UpdateController(BaseController):
                     )
                     capture_exception(e)
                     err_msg = f"Update failed for {source.get('name')}: {e}"
-                    QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
+                    _safe_single_shot(0, self.app, lambda: self.app._set_status(err_msg))
                 finally:
 
                     def finalize_ui():
@@ -609,7 +614,7 @@ class UpdateController(BaseController):
 
                         self.config.set("skills", self.app._update_packages)
 
-                    QTimer.singleShot(0, self.app, finalize_ui)
+                    _safe_single_shot(0, self.app, finalize_ui)
 
             self.app.task_runner.run(run)
 
@@ -674,17 +679,17 @@ class UpdateController(BaseController):
                         for skill_dict in discovered_skills:
                             self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
 
-                    QTimer.singleShot(0, self.app, update_ui)
+                    _safe_single_shot(0, self.app, update_ui)
 
                 msg = f"Update complete for {self.app.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
+                _safe_single_shot(0, self.app, lambda: self.app._set_status(msg))
             except Exception as e:
                 err_msg = f"Update failed for {path}: {e}"
-                QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
+                _safe_single_shot(0, self.app, lambda: self.app._set_status(err_msg))
             finally:
                 if path in self.app._syncing_projects:
                     self.app._syncing_projects.remove(path)
-                QTimer.singleShot(0, self.app, self.app.projectsChanged.emit)
+                _safe_single_shot(0, self.app, self.app.projectsChanged.emit)
 
         self.app.task_runner.run(run_sync)
 

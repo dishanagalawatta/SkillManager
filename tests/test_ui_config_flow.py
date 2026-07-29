@@ -19,7 +19,7 @@ class TestUIConfigFlow:
             config_mgr.skillPackageAutoUpdateMode = "silent"
         assert app_controller._config.get("skill_package_auto_update_mode") == "silent"
 
-    def test_add_source_project_ui_flow(self, qml_engine, app_controller, qtbot):
+    def test_add_source_project_ui_flow(self, qml_engine, app_controller, qtbot, tmp_path):
         """Verify adding sources and projects via UI slots."""
         config_mgr = app_controller.config_mgr
 
@@ -33,11 +33,15 @@ class TestUIConfigFlow:
         assert any(expected_source == s for s in app_controller._sources)
 
         # 2. Add Project
-        test_project = "/path/test/project"
+        test_proj_dir = tmp_path / "test_project"
+        skills_dir = test_proj_dir / ".agents" / "skills"
+        skills_dir.mkdir(parents=True)
+        test_project = str(test_proj_dir)
+
         with qtbot.waitSignal(app_controller.projectsChanged, timeout=1000):
             config_mgr.addProject(test_project)
 
-        expected_project = str(Path(test_project).resolve())
+        expected_project = str(skills_dir.resolve())
         assert any(expected_project == p for p in app_controller._projects)
 
     def test_project_alias_ui_update(self, qml_engine, app_controller, qtbot, clean_models):

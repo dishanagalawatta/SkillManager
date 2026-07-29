@@ -33,6 +33,8 @@ with open("/tmp/test-pkg-skill/skill.md", "w") as f:
 os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 os.environ["SKILL_MANAGER_DEV_MODE"] = "1"
 os.environ["SKILL_MANAGER_TESTING"] = "1"
+if "QT_QPA_PLATFORM" not in os.environ:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import sentry_sdk
 

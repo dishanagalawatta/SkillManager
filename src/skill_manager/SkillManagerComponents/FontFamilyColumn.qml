@@ -35,7 +35,8 @@ Rectangle {
             clip: true
 
             model: {
-                var allFamilies = fontDB.families
+                if (typeof fontDB === "undefined" || !fontDB) return []
+                var allFamilies = fontDB.families || []
                 if (root.searchFilter === "") return allFamilies
                 var query = root.searchFilter.toLowerCase()
                 return allFamilies.filter(f => f.toLowerCase().includes(query))
