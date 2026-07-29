@@ -104,10 +104,20 @@ def step1_wait():
 def step2_open_edit_command_dialog():
     print(f"[+{time.monotonic() - START_TIME:.1f}s] Opening Edit Custom Command dialog...")
 
+    proj1 = Path("data/test_xdg_data/proj1").resolve()
+    proj2 = Path("data/test_xdg_data/proj2").resolve()
+    (proj1 / ".agents" / "commands").mkdir(parents=True, exist_ok=True)
+    (proj2 / ".agents" / "commands").mkdir(parents=True, exist_ok=True)
+
+    cmd_file1 = proj1 / ".agents" / "commands" / "Debug.md"
+    cmd_file1.write_text("---\nname: Debug\ncategory: Custom Commands\ntype: command\n---\nBody text")
+
+    controller._projects = [str(proj1), str(proj2)]
+
     test_cmd = {
         "name": "Debug",
         "description": "Senior System Architect & Expert Debugger command.",
-        "local_path": "/tmp/test-command/Debug.md",
+        "local_path": str(cmd_file1),
         "category": "Custom Commands",
         "author": "Antigravity",
         "version": "1.0.0",
@@ -122,7 +132,7 @@ def step2_open_edit_command_dialog():
             "while refactoring the codebase to be clean, professional, and maintainable for the long term."
         ),
         "raw_content": "",
-        "project_label": "skill-manager",
+        "project_label": "proj1",
     }
 
     # Find the dialog in QML root objects or overlay

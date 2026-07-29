@@ -67,10 +67,12 @@ Dialog {
     function openForEdit(skill) {
         editMode = true
         editLocalPath = skill.local_path || ""
-        editProjectLabels = AppController.commandProjectsForPath(skill.local_path || "")
-        if (editProjectLabels.length === 0) {
-            editProjectLabels = AppController.currentProject ? [AppController.currentProject] : []
+        var holders = AppController.commandProjectsForPath(skill.local_path || "")
+        if (!holders || holders.length === 0) {
+            var pl = skill.project_label || (AppController.currentProject ? AppController.currentProject : "")
+            holders = pl ? [pl] : []
         }
+        editProjectLabels = holders
         editCategoryValue = skill.category || ""
         orphanCategory = (skill.category
                           && AppController.categories.indexOf(skill.category) === -1)

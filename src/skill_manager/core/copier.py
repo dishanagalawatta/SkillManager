@@ -394,11 +394,11 @@ def _normalize_project_path(project):
 
 
 def get_installed_skill_folder_names(project_path: str | Path) -> set[str]:
-    """Return the set of folder names already present in *project_path*'s skills dir."""
+    """Return the set of folder names (lowercased) already present in *project_path*'s skills dir."""
     skills_dir = get_skills_dir(project_path)
     if not skills_dir.is_dir():
         return set()
-    return {p.name for p in skills_dir.iterdir() if p.is_dir()}
+    return {p.name.lower() for p in skills_dir.iterdir() if p.is_dir()}
 
 
 def find_missing_skills_for_commands(
@@ -409,28 +409,35 @@ def find_missing_skills_for_commands(
     """Find skills referenced by *commands* that are absent from *project_path*.
 
     Returns the **union** of missing skills across all commands, de-duped
-    by ``local_path``.  Each entry is a full skill dict (ready to feed
+    by ``local_path``. Each entry is a full skill dict (ready to feed
     into :func:`copy_skill_folders_to_projects`).
     """
+    from dataclasses import asdict
+
     installed = get_installed_skill_folder_names(project_path)
     from skill_manager.core.commands import find_referenced_skills_in_command
     from skill_manager.core.skill_references import resolve_referenced_skills
 
     needed: dict[str, dict] = {}
     for cmd in commands:
+        body = cmd.get("body")
         cmd_path = cmd.get("local_path")
-        if cmd_path:
+        if body:
+            referenced = resolve_referenced_skills(body, all_skills)
+        elif cmd_path:
             referenced = find_referenced_skills_in_command(cmd_path, all_skills)
         else:
-            # New command — body is in the dict (not yet on disk).
-            referenced = resolve_referenced_skills(cmd.get("body", ""), all_skills)
+            referenced = []
         for skill in referenced:
             folder = (skill.get("folder_name") or "").lower()
             if not folder or folder in installed:
                 continue
             lp = skill.get("local_path")
             if lp and lp not in needed:
-                needed[lp] = skill
+                skill_dict = (
+                    asdict(skill) if hasattr(skill, "__dataclass_fields__") else dict(skill)
+                )
+                needed[lp] = skill_dict
     return list(needed.values())
 
 

@@ -26,28 +26,17 @@ ytp
 
 ## To Do (Ready for Pickup)
 
-* [ ] Narrow window layout
-* [ ] automatic copy to clipboard when screenshot taken
-* [ ] automatic adding and removing to selected items on screenshot
-* [ ] Priority refresh
-* [ ] Update readme FIle (Revert)
-* [ ] See for winget approval
-* [ ] Posthog implementation review.
+* [ ] Update readme FIle
+* [ ] PostHog implementation review.
+* [ ] Reduce the size of list row(normal mode)
 
 ## In Progress
-
-* [ ] Create a mcp to control app so that agent can access the app
-  * [X] Screenshots for agents
-* [X] Custom command emoji change
-  * [ ] Chnage possitons properly
-* [X] Switch between latest projects
-  * [ ] Change position
 
 ---
 
 # 4. Bug Tracker
 
-* [ ] repace same screenshot when taking new one
+* [ ] remember window position - tried to bug. need further investigations (Not urgent)
 
 ---
 

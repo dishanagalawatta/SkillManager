@@ -2,7 +2,7 @@
 name: New Feature
 category: Custom Commands
 type: command
-date: 2026-07-03
+date: 2026-07-30
 ---
 
 # Role

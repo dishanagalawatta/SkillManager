@@ -737,7 +737,7 @@ class OpsController(BaseController):
         for result in created:
             if result.path:
                 project_path = project_root_for_project(result.path)
-                cmd_dict = {"local_path": str(result.path), "name": result.path.stem}
+                cmd_dict = {"local_path": str(result.path), "body": body, "name": result.path.stem}
                 logger.info(
                     "[CARRY CREATE] Checking missing skills for command: %s in project: %s",
                     result.path,
@@ -746,11 +746,18 @@ class OpsController(BaseController):
                 missing = find_missing_skills_for_commands(
                     [cmd_dict],
                     project_path,
-                    self.app._library_model._all_skills,
+                    self._get_all_known_skills(),
                 )
                 logger.info("[CARRY CREATE] Found missing skills: %s", missing)
                 if missing:
-                    missing_dicts = list(missing)
+                    from dataclasses import asdict
+
+                    missing_dicts = [
+                        asdict(m)
+                        if hasattr(m, "__dataclass_fields__")
+                        else (m.to_dict() if hasattr(m, "to_dict") else dict(m))
+                        for m in missing
+                    ]
                     QTimer.singleShot(
                         0,
                         self,
@@ -787,6 +794,28 @@ class OpsController(BaseController):
                     if lp:
                         snap.add(lp)
         return snap
+
+    def _get_all_known_skills(self) -> list:
+        """Return combined unique skills from library, quick copy, and active models."""
+        skills: list = []
+        seen_paths: set[str] = set()
+        models = [
+            getattr(self.app, "_library_model", None),
+            getattr(self.app, "_quick_copy_model", None),
+            getattr(self.app, "skillModel", None),
+        ]
+        for model in models:
+            if not model:
+                continue
+            all_s = getattr(model, "_all_skills", []) or []
+            for s in all_s:
+                lp = _get_item_attr(s, "local_path")
+                if lp and lp not in seen_paths:
+                    seen_paths.add(lp)
+                    skills.append(s)
+                elif not lp and s not in skills:
+                    skills.append(s)
+        return skills
 
     @Slot(str, str, str, str, list, str)
     def updateCustomCommandFull(
@@ -988,7 +1017,7 @@ class OpsController(BaseController):
             for r in updated:
                 if r.path:
                     proj_root = project_root_for_project(r.path)
-                    cmd_dict = {"local_path": str(r.path), "name": r.path.stem}
+                    cmd_dict = {"local_path": str(r.path), "body": body, "name": r.path.stem}
                     logger.info(
                         "[CARRY UPDATE] Checking missing skills for command: %s in project: %s",
                         r.path,
@@ -997,11 +1026,18 @@ class OpsController(BaseController):
                     missing = find_missing_skills_for_commands(
                         [cmd_dict],
                         proj_root,
-                        self.app._library_model._all_skills,
+                        self._get_all_known_skills(),
                     )
                     logger.info("[CARRY UPDATE] Found missing skills: %s", missing)
                     if missing:
-                        missing_dicts = list(missing)
+                        from dataclasses import asdict
+
+                        missing_dicts = [
+                            asdict(m)
+                            if hasattr(m, "__dataclass_fields__")
+                            else (m.to_dict() if hasattr(m, "to_dict") else dict(m))
+                            for m in missing
+                        ]
                         QTimer.singleShot(
                             0,
                             self,
