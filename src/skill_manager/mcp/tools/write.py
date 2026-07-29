@@ -1,13 +1,12 @@
 """Write-capable MCP tools for the SkillManager MCP server (guarded).
 
-This module registers the *destructive* MCP tools (``sm_delete_skill``,
-``sm_deploy``). They are intentionally gated behind an ``allow_write``
-capability that the server passes in at registration time.
+This module registers mutating MCP tools (``sm_create_skill``, ``sm_update_skill``,
+``sm_delete_skill``, ``sm_deploy``). They are intentionally gated behind an
+``allow_write`` capability passed in at server startup.
 
-Security model (per project constraints):
-* Write tools are ONLY active when the server was started with
-  ``--mcp-allow-write``.
-* AGENTS.md exclusions are enforced: we never operate on paths matching
+Security model:
+* Write tools are ONLY active when started with ``--mcp-allow-write``.
+* AGENTS.md exclusions are enforced: we never mutate paths matching
   ``TODO.md``, ``.agents/commands/`` or ``.agents/skills/``.
 * Every write attempt is recorded via ``capture_event("mcp_write_attempt", ...)``.
 """
@@ -18,7 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 from skill_manager.core.analytics import capture_event
-from skill_manager.mcp.bridge import delete_skill, deploy
+from skill_manager.mcp.bridge import create_skill, delete_skill, deploy, update_skill
 from skill_manager.mcp.models import ToolResult, err, ok
 
 # ---------------------------------------------------------------------------
@@ -43,6 +42,78 @@ def _is_excluded(identifier: str) -> bool:
 # Tool schemas with annotations
 # ---------------------------------------------------------------------------
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+    "sm_create_skill": {
+        "description": "Create a new skill folder with SKILL.md. Gated by write mode; refuses AGENTS.md-excluded paths.",
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name/folder of the skill to create.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "SKILL.md file content (frontmatter + body).",
+                },
+                "source_path": {
+                    "type": "string",
+                    "description": "Target parent source directory; empty = default source.",
+                    "default": "",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional skill summary.",
+                    "default": "",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Optional category.",
+                    "default": "",
+                },
+            },
+            "required": ["name", "content"],
+        },
+    },
+    "sm_update_skill": {
+        "description": "Update content or metadata of an existing skill's SKILL.md. Gated by write mode.",
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "skill_id": {
+                    "type": "string",
+                    "description": "Skill name or local_path to update.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Updated SKILL.md content.",
+                    "default": "",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Updated summary.",
+                    "default": "",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Updated category.",
+                    "default": "",
+                },
+            },
+            "required": ["skill_id"],
+        },
+    },
     "sm_delete_skill": {
         "description": "Delete a skill by name or local_path. Gated by write mode; refuses AGENTS.md-excluded paths (TODO.md, .agents/commands, .agents/skills).",
         "annotations": {
@@ -63,7 +134,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
     },
     "sm_deploy": {
-        "description": "Deploy a skill/package to a target. Gated by write mode; currently not implemented in the app (returns a clear error).",
+        "description": "Deploy a skill/package to a target project directory. Gated by write mode.",
         "annotations": {
             "readOnlyHint": False,
             "destructiveHint": True,
@@ -79,7 +150,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
                 "target": {
                     "type": "string",
-                    "description": "Deployment target (project label or path).",
+                    "description": "Deployment target (project label or project directory path).",
                 },
             },
             "required": ["skill_id", "target"],
@@ -91,6 +162,66 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 # Per-tool handlers (return ToolResult)
 # ---------------------------------------------------------------------------
+def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
+    name: str = str(args.get("name", ""))
+    content: str = str(args.get("content", ""))
+    source_path: str = str(args.get("source_path", ""))
+    description: str = str(args.get("description", ""))
+    category: str = str(args.get("category", ""))
+
+    capture_event(
+        "mcp_write_attempt",
+        {"tool": "sm_create_skill", "allowed": allow_write, "name": name},
+    )
+
+    if not allow_write:
+        return err("sm_create_skill", WRITE_DISABLED_ERROR)
+
+    if _is_excluded(name) or (source_path and _is_excluded(source_path)):
+        return err("sm_create_skill", "refused: target resolves under an AGENTS.md-excluded path.")
+
+    try:
+        result = create_skill(
+            name=name,
+            content=content,
+            source_path=source_path,
+            description=description,
+            category=category,
+        )
+        return ok("sm_create_skill", result)
+    except Exception as exc:  # noqa: BLE001
+        return err("sm_create_skill", str(exc))
+
+
+def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
+    skill_id: str = str(args.get("skill_id", ""))
+    content: str = str(args.get("content", ""))
+    description: str = str(args.get("description", ""))
+    category: str = str(args.get("category", ""))
+
+    capture_event(
+        "mcp_write_attempt",
+        {"tool": "sm_update_skill", "allowed": allow_write, "skill_id": skill_id},
+    )
+
+    if not allow_write:
+        return err("sm_update_skill", WRITE_DISABLED_ERROR)
+
+    if _is_excluded(skill_id):
+        return err("sm_update_skill", "refused: target resolves under an AGENTS.md-excluded path.")
+
+    try:
+        result = update_skill(
+            skill_id=skill_id,
+            content=content,
+            description=description,
+            category=category,
+        )
+        return ok("sm_update_skill", result)
+    except Exception as exc:  # noqa: BLE001
+        return err("sm_update_skill", str(exc))
+
+
 def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = args.get("skill_id", "")
 
@@ -109,7 +240,7 @@ def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
 
     try:
         result = delete_skill(skill_id)
-    except (ValueError, NotImplementedError) as exc:
+    except (ValueError, RuntimeError) as exc:
         return err("sm_delete_skill", str(exc))
 
     resolved_path = result.get("resolved_path") if isinstance(result, dict) else None
@@ -138,12 +269,11 @@ def _handle_deploy(args: dict[str, Any], allow_write: bool) -> ToolResult:
 
     try:
         result = deploy(skill_id, target)
-    except NotImplementedError:
-        return err("sm_deploy", "deploy not yet implemented in app")
+        return ok("sm_deploy", result)
     except ValueError as exc:
         return err("sm_deploy", str(exc))
-
-    return ok("sm_deploy", result)
+    except Exception as exc:  # noqa: BLE001
+        return err("sm_deploy", str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +283,8 @@ def _bind_handlers(allow_write: bool) -> dict[str, Callable[[dict[str, Any]], To
     from functools import partial
 
     return {
+        "sm_create_skill": partial(_handle_create_skill, allow_write=allow_write),
+        "sm_update_skill": partial(_handle_update_skill, allow_write=allow_write),
         "sm_delete_skill": partial(_handle_delete_skill, allow_write=allow_write),
         "sm_deploy": partial(_handle_deploy, allow_write=allow_write),
     }

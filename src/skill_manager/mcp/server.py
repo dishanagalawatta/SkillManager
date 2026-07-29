@@ -74,6 +74,10 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
         TOOL_SCHEMAS as SCREENSHOT_SCHEMAS,
         get_handlers as screenshot_handlers,
     )
+    from skill_manager.mcp.tools.skills import (
+        TOOL_SCHEMAS as SKILLS_SCHEMAS,
+        get_handlers as skills_handlers,
+    )
     from skill_manager.mcp.tools.write import (
         TOOL_SCHEMAS as WRITE_SCHEMAS,
         get_handlers as write_handlers,
@@ -85,6 +89,7 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
     for module_schemas, module_handlers in (
         (BUILD_SCHEMAS, build_handlers()),
         (ANALYZE_SCHEMAS, analyze_handlers()),
+        (SKILLS_SCHEMAS, skills_handlers()),
         (MONITOR_SCHEMAS, monitor_handlers()),
         (DEBUG_SCHEMAS, debug_handlers()),
         (SCREENSHOT_SCHEMAS, screenshot_handlers()),

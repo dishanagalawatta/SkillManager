@@ -363,19 +363,139 @@ class DeleteSkillResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# sm_get_skill
+# ---------------------------------------------------------------------------
+class GetSkillRequest(BaseModel):
+    """Retrieve full content and metadata of a single skill."""
+
+    skill_id: str = Field(description="Skill name, folder name, or local_path.")
+
+
+class SkillDetail(BaseModel):
+    """Detailed view of a skill including body content and files."""
+
+    name: str
+    local_path: str
+    category: str = ""
+    description: str = ""
+    content: str = ""
+    project_label: str = ""
+    is_package: bool = False
+    is_command: bool = False
+    is_starred: bool = False
+    is_archived: bool = False
+    client: str = ""
+    risk: str = "Unknown"
+    source: str = "Unknown"
+    files: list[str] = Field(default_factory=list)
+
+
+class GetSkillResponse(BaseModel):
+    """Single skill detail response."""
+
+    found: bool
+    skill: SkillDetail | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_search_skills
+# ---------------------------------------------------------------------------
+class SearchSkillsRequest(BaseModel):
+    """Search skills by query matching name, category, description, or content."""
+
+    query: str = Field(description="Search term or phrase.")
+    category: str = Field(default="", description="Optional category filter.")
+    project_label: str = Field(default="", description="Optional project label filter.")
+    include_commands: bool = Field(default=True, description="Include command-type skills.")
+    limit: int = Field(default=50, ge=1, le=500, description="Max results to return.")
+
+
+class SearchSkillsResponse(BaseModel):
+    """Skill search results."""
+
+    count: int
+    skills: list[SkillSummary]
+
+
+# ---------------------------------------------------------------------------
+# sm_create_skill
+# ---------------------------------------------------------------------------
+class CreateSkillRequest(BaseModel):
+    """Create a new skill with SKILL.md content."""
+
+    name: str = Field(description="Name/folder of the skill.")
+    content: str = Field(description="SKILL.md content (frontmatter + body).")
+    source_path: str = Field(
+        default="", description="Target source path or project directory; empty = default source."
+    )
+    description: str = Field(default="", description="Optional short summary.")
+    category: str = Field(default="", description="Optional category.")
+
+
+class CreateSkillResponse(BaseModel):
+    """Skill creation outcome."""
+
+    created: bool
+    name: str
+    local_path: str
+    message: str = ""
+
+
+# ---------------------------------------------------------------------------
+# sm_update_skill
+# ---------------------------------------------------------------------------
+class UpdateSkillRequest(BaseModel):
+    """Update content or metadata of an existing skill."""
+
+    skill_id: str = Field(description="Skill name or local_path to update.")
+    content: str = Field(default="", description="Updated SKILL.md content.")
+    description: str = Field(default="", description="Updated short summary.")
+    category: str = Field(default="", description="Updated category.")
+
+
+class UpdateSkillResponse(BaseModel):
+    """Skill update outcome."""
+
+    updated: bool
+    skill_id: str
+    local_path: str
+    message: str = ""
+
+
+# ---------------------------------------------------------------------------
+# sm_sync_skills
+# ---------------------------------------------------------------------------
+class SyncSkillsRequest(BaseModel):
+    """Re-scan skill directories and refresh the library model."""
+
+    force_full_scan: bool = Field(default=False, description="Force deep re-scan of all paths.")
+
+
+class SyncSkillsResponse(BaseModel):
+    """Sync outcome."""
+
+    synced: bool
+    count: int
+    message: str = ""
+
+
+# ---------------------------------------------------------------------------
 # sm_deploy
 # ---------------------------------------------------------------------------
 class DeployRequest(BaseModel):
-    """Deploy a skill/package to a target (NOT YET IMPLEMENTED)."""
+    """Deploy a skill or package to a target project directory."""
 
-    skill_id: str = Field(default="", description="Skill to deploy.")
-    target: str = Field(default="", description="Deployment target.")
+    skill_id: str = Field(default="", description="Skill name or local_path to deploy.")
+    target: str = Field(default="", description="Deployment target project label or path.")
 
 
 class DeployResponse(BaseModel):
-    """Deployment outcome (placeholder)."""
+    """Deployment outcome."""
 
     deployed: bool = False
+    skill_id: str = ""
+    target: str = ""
+    details: list[dict[str, Any]] = Field(default_factory=list)
     message: str = ""
 
 
