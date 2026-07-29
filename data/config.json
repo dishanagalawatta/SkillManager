@@ -24,6 +24,8 @@
   "skill_package_auto_update_mode": "prompt",
   "auto_minimize_on_screenshot": false,
   "auto_minimize_on_quick_copy": false,
+  "auto_select_screenshot_in_quick_copy": false,
+  "auto_copy_screenshot_client_format": false,
   "temporary_screenshots": false,
   "diagnostic_logging": false,
   "top_bar_clients": [
@@ -33,10 +35,10 @@
     "Codex"
   ],
   "ui_state": {
-    "window_width": 1300,
-    "window_height": 650,
-    "window_x": 0,
-    "window_y": 0,
+    "window_width": 880,
+    "window_height": 640,
+    "window_x": 180,
+    "window_y": 140,
     "dark_mode": false,
     "current_view": "Library",
     "startup_view": "Library",

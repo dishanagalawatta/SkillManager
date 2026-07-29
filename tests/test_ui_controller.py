@@ -43,6 +43,27 @@ def test_ui_controller_save_state(ui_controller, mock_app):
     assert last_args[1]["compact_list_rows"] is False
 
 
+def test_ui_controller_window_geometry_persistence(ui_controller, mock_app):
+    """Test that window size (including compact dimensions >= 400x520) and position are stored and saved."""
+    ui_controller.windowWidth = 500
+    ui_controller.windowHeight = 550
+    ui_controller.windowX = 250
+    ui_controller.windowY = 300
+    ui_controller.saveUiState()
+
+    assert ui_controller.windowWidth == 500
+    assert ui_controller.windowHeight == 550
+    assert ui_controller.windowX == 250
+    assert ui_controller.windowY == 300
+
+    last_args = mock_app._config.set.call_args[0]
+    assert last_args[0] == "ui_state"
+    assert last_args[1]["window_width"] == 500
+    assert last_args[1]["window_height"] == 550
+    assert last_args[1]["window_x"] == 250
+    assert last_args[1]["window_y"] == 300
+
+
 @patch("PySide6.QtCore.QTimer.start")
 def test_ui_controller_trigger_save(mock_timer_start, ui_controller):
     ui_controller.triggerSave()
@@ -144,17 +165,21 @@ def test_ui_controller_set_inspector_width_slot(ui_controller):
 
 
 def test_ui_controller_window_geometry_properties(ui_controller):
-    # Width (constraint: ge=1050)
+    # Width (constraint: ge=400)
     ui_controller.windowWidth = 1100
     assert ui_controller.windowWidth == 1100
-    ui_controller.windowWidth = 800  # Below constraint
-    assert ui_controller.windowWidth == 1100
+    ui_controller.windowWidth = 800  # Valid compact width
+    assert ui_controller.windowWidth == 800
+    ui_controller.windowWidth = 350  # Below constraint (< 400)
+    assert ui_controller.windowWidth == 800
 
-    # Height (constraint: ge=650)
+    # Height (constraint: ge=520)
     ui_controller.windowHeight = 700
     assert ui_controller.windowHeight == 700
-    ui_controller.windowHeight = 500  # Below constraint
-    assert ui_controller.windowHeight == 700
+    ui_controller.windowHeight = 600  # Valid compact height
+    assert ui_controller.windowHeight == 600
+    ui_controller.windowHeight = 450  # Below constraint (< 520)
+    assert ui_controller.windowHeight == 600
 
     # X and Y
     ui_controller.windowX = 200

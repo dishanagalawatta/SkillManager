@@ -2036,21 +2036,38 @@ def main():  # pragma: no cover
     # Clamp window geometry to visible screen area to prevent off-screen windows.
     # Saved coordinates from a previous multi-monitor setup may be invalid if
     # the monitor was disconnected.
-    screen = app.primaryScreen()
-    if screen:
-        geo = screen.availableGeometry()
-        screen_x, screen_y = geo.x(), geo.y()
-        screen_w, screen_h = geo.width(), geo.height()
-        diag.log_event(
-            "INFO",
-            "window_state",
-            f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h})",
-        )
+    screens = app.screens()
+    if screens:
         for root in engine.rootObjects():
             r: Any = root
             win_x, win_y = r.x(), r.y()
             win_w, win_h = r.width(), r.height()
-            # Clamp so the window is at least partially visible
+
+            # Find matching screen where window titlebar/top area is located
+            target_screen = None
+            for s in screens:
+                s_geo = s.availableGeometry()
+                if (
+                    s_geo.x() <= win_x + win_w - 100
+                    and win_x <= s_geo.x() + s_geo.width() - 100
+                    and s_geo.y() <= win_y + win_h - 100
+                    and win_y <= s_geo.y() + s_geo.height() - 100
+                ):
+                    target_screen = s
+                    break
+
+            if not target_screen:
+                target_screen = app.primaryScreen() or screens[0]
+
+            geo = target_screen.availableGeometry()
+            screen_x, screen_y = geo.x(), geo.y()
+            screen_w, screen_h = geo.width(), geo.height()
+            diag.log_event(
+                "INFO",
+                "window_state",
+                f"Screen geometry: ({screen_x}, {screen_y}, {screen_w}, {screen_h}) for window ({win_x}, {win_y}, {win_w}, {win_h})",
+            )
+            # Clamp so the window is at least partially visible on target screen
             new_x = max(screen_x, min(win_x, screen_x + screen_w - max(win_w, 100)))
             new_y = max(screen_y, min(win_y, screen_y + screen_h - max(win_h, 100)))
             if new_x != win_x or new_y != win_y:
@@ -2061,6 +2078,14 @@ def main():  # pragma: no cover
                 )
                 r.setX(new_x)
                 r.setY(new_y)
+                # Update controller state directly because the QML
+                # _isInitialized guard is still false during startup,
+                # so the signal-based path (onXChanged) is blocked.
+                # Without this the QML position-restore timer would
+                # re-apply the original off-screen position.
+                controller.ui.state.window_x = new_x
+                controller.ui.state.window_y = new_y
+                controller.ui.saveUiState()
 
     # Explicitly set icon on each QML window — QGuiApplication.setWindowIcon()
     # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
