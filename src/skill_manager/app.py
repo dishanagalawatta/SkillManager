@@ -605,6 +605,9 @@ class AppController(QObject):
         if not self._projects:
             return
 
+        if os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1":
+            return
+
         changed = False
         normalized = []
         for project_path in self._projects:

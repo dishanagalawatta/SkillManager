@@ -67,7 +67,12 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for full development guide.
 
 ### MCP Server for Agents
 
-SkillManager ships a native Python MCP server (stdio, via the `mcp` SDK) that lets coding agents introspect the live app — skills, sources, projects, diagnostics, and controller health — without shelling out. Launch it headless with `uv run skill-manager --mcp` for read-only build/analyze/monitor/debug tools, or add `--mcp-allow-write` to also expose the mutating `sm_delete_skill` and `sm_deploy` tools. The server uses its own mutex and bridges in-process to `AppController`, so it never conflicts with a running GUI instance. See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for the full tool reference and a copy-paste `.mcp.json` client config.
+SkillManager ships a native Python MCP server (stdio, via the `mcp` SDK) that lets AI agents search, read, create, update, deploy, delete, and analyze skills without opening a GUI.
+
+- **Read-Only Mode**: `uv run skill-manager --mcp` (`sm_list_skills`, `sm_get_skill`, `sm_search_skills`, `sm_sync_skills`, build, analyze, monitor, debug)
+- **Write Mode**: `uv run skill-manager --mcp --mcp-allow-write` (adds `sm_create_skill`, `sm_update_skill`, `sm_deploy`, `sm_delete_skill`)
+
+See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for full tool reference and client setup guides for **Claude Desktop**, **Cursor**, **VS Code / Continue**, **Antigravity**, **Goose**, **Windsurf**, and **OpenCode**.
 
 ## Building
 

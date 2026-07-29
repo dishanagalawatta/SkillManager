@@ -1,28 +1,24 @@
 ---
 name: skillmanager-mcp
-description: Use this skill when an agent needs to connect to or drive the SkillManager desktop app via its MCP server (uv run skill-manager --mcp). Covers client setup (.mcp.json), the full tool catalogue, write-mode gating, and the response envelope so any coding agent can build, analyze, monitor, debug, or (with --mcp-allow-write) mutate skills safely.
+description: Use this skill when an agent needs to connect to or drive the SkillManager desktop app via its MCP server (uv run skill-manager --mcp). Covers client setup (.mcp.json), full tool catalogue (skills, build, analyze, monitor, debug, write), write-mode gating, and response envelopes for any coding agent.
 risk: medium
 source: project
 ---
 
 # SkillManager MCP Server
 
-SkillManager ships a native Python MCP server (stdio, `mcp` SDK) that lets a coding
-agent introspect and drive the live app — skills, sources, projects, diagnostics,
-controller health, and (write mode) skill deletion — without shelling out or booting a GUI.
+SkillManager ships a native Python MCP server (stdio, `mcp` SDK) that lets AI coding agents search, read, create, update, deploy, delete, and analyze agent skills — without shelling out or opening a GUI.
 
 ## When to Use
 
-- The user wants an agent to build, lint, test, or analyze the SkillManager codebase.
-- The user wants to inspect running app state (health, diagnostics, loaded skills/projects).
-- The user wants to debug the app (dump state, inspect a sub-controller's surface, capture errors).
-- The user asks an agent to delete/deploy a skill and has explicitly enabled write mode.
+- An agent needs to search, read, inspect, or manage skills across projects and source directories.
+- An agent needs to build, lint, test, or analyze the SkillManager codebase.
+- An agent needs to inspect running app state (health, diagnostics, loaded skills/projects).
+- An agent needs to create, update, deploy, or delete skills safely (with write mode enabled).
 
 ## Launch / Connect
 
-The server runs headless (own mutex, never fights a running GUI instance). An agent
-connects by having its MCP client launch the server. Drop this `.mcp.json` at the
-**project root** so `uv` resolves the workspace:
+The server runs headless (own mutex, never collides with a running GUI instance). An agent connects by launching the server executable:
 
 ```json
 {
@@ -39,82 +35,57 @@ connects by having its MCP client launch the server. Drop this `.mcp.json` at th
 }
 ```
 
-- `skillmanager` — read-only tools (build / analyze / monitor / debug).
-- `skillmanager-write` — same plus mutating `sm_delete_skill`, `sm_deploy`.
+- `skillmanager` — Read-only tools (`sm_list_skills`, `sm_get_skill`, `sm_search_skills`, `sm_sync_skills`, build/analyze/monitor/debug).
+- `skillmanager-write` — Same plus mutating tools (`sm_create_skill`, `sm_update_skill`, `sm_delete_skill`, `sm_deploy`).
 
-The agent must run from the project root so `uv` finds the workspace and the
-`skill-manager` command is on PATH.
+## Tools Reference
 
-## Tools
+All tools use the prefix `sm_`. Every response is wrapped in a uniform JSON envelope:
+`{"ok": bool, "tool": str, "data"?: ..., "error"?: str}`.
 
-All tools are prefixed `sm_`. Every response is a JSON envelope:
-`{"ok": bool, "tool": str, "data"?: ..., "error"?: str}`. On unknown tool or
-exception, `ok=false` with a descriptive `error`.
+### Skill Management (Read-Only)
+| Tool | Args | Description |
+|------|------|-------------|
+| `sm_list_skills` | `{include_commands?, project_label?}` | Enumerate all discovered skills in library model. |
+| `sm_get_skill` | `{skill_id}` | Retrieve full skill details (metadata, SKILL.md body, file listing). |
+| `sm_search_skills` | `{query, category?, project_label?, include_commands?, limit?}` | Search skills by keyword in name, category, description, tags, or content. |
+| `sm_sync_skills` | `{force_full_scan?}` | Re-scan skill source directories and target projects into library model. |
+| `sm_list_sources` | `{}` | List configured skill source directories. |
+| `sm_list_projects` | `{}` | List configured target project directories. |
 
-### Build / Dev (read-only)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_lint` | `{path?, fix?}` | Run `uv run ruff check [--fix] <path>`. Returns `passed`, `returncode`, `stdout`, `stderr`. |
-| `sm_run_tests` | `{target?, parallel?}` | Run `pytest [-n auto] [target]`. Returns `passed`, `returncode`, output. |
-| `sm_build` | `{target?}` | Run `uv run skill-manager-build`. Returns `success`, `returncode`, output. |
-| `sm_job_status` | `{job_id}` | Poll an async job buffer. Returns `{status, result, error}`. Unknown id → `ok=false`. |
+### Skill Management (Mutating — `--mcp-allow-write` required)
+| Tool | Args | Description |
+|------|------|-------------|
+| `sm_create_skill` | `{name, content, source_path?, description?, category?}` | Create a new skill directory with SKILL.md. |
+| `sm_update_skill` | `{skill_id, content?, description?, category?}` | Update an existing skill's SKILL.md file or metadata. |
+| `sm_deploy` | `{skill_id, target}` | Deploy a skill to a target project directory (`<target>/.agents/skills/`). |
+| `sm_delete_skill` | `{skill_id}` | Delete a skill folder/file (refuses protected AGENTS.md paths). |
 
-### Analyze (read-only)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_list_skills` | `{include_commands?, project_label?}` | Skills from the library model (name, path, category, client, risk, source, flags). |
-| `sm_list_sources` | `{}` | Configured skill source directories. |
-| `sm_list_projects` | `{}` | Configured target project directories. |
-| `sm_static_analyze` | `{pattern, path?}` | Safe regex grep over the repo (gitignore-aware). Returns `{file, line, text}` matches. Invalid regex → `ok=true` with empty matches (error is swallowed by the bridge). |
+### Build & Dev Tools
+| Tool | Args | Description |
+|------|------|-------------|
+| `sm_lint` | `{path?, fix?}` | Run `uv run ruff check [--fix] <path>`. Returns lint pass status, stdout, stderr. |
+| `sm_run_tests` | `{target?, parallel?}` | Run pytest suite. Returns `job_id` for async polling. |
+| `sm_build` | `{target?}` | Run application builder (`uv run skill-manager-build`). Returns `job_id`. |
+| `sm_job_status` | `{job_id}` | Poll background job status/results (`running`, `done`, `error`). |
 
-### Monitor (read-only)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_get_diagnostics` | `{limit?}` | Recent diagnostic ring-buffer events. |
-| `sm_get_health` | `{}` | Health snapshot: `healthy`, `qt_loop_alive`, `controller_present`, `model_counts`, `recent_errors`. |
-| `sm_tail_events` | `{limit?}` | Newest N diagnostic events. |
+### Analysis & Debugging
+| Tool | Args | Description |
+|------|------|-------------|
+| `sm_static_analyze` | `{pattern, path?}` | Regex grep over codebase (gitignore-aware). |
+| `sm_get_health` | `{}` | Application & bridge health status snapshot. |
+| `sm_get_diagnostics` | `{limit?}` | Read recent diagnostic ring-buffer entries. |
+| `sm_dump_state` | `{}` | Export safe subset of controller & model configuration state. |
+| `sm_screenshot` | `{navigate?, save?}` | Capture live GUI app window screenshot as base64 PNG. |
 
-### Visual (read-only)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_screenshot` | `{navigate?, save?}` | Capture the live GUI window (title "Skill Manager") cross-process as a base64 PNG. Optional `navigate` (`QuickCopy`\|`Library`\|`Updates`\|`Settings`) switches the running GUI to that section first via a file-based IPC channel. `save=true` also writes the PNG to `.agents/screenshots/` and returns `save_path`. GUI not running → `ok=false`. |
+## Safety & Exclusion Rules
 
-### Debug (read-only)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_dump_state` | `{}` | Safe subset of `AppController` state (sources, projects, config keys, model counts). |
-| `sm_inspect_controller` | `{name}` | Introspect a sub-controller's public methods + signals. Unknown name → `found=false`. |
-| `sm_capture_errors` | `{limit?}` | Only error-level diagnostic events. |
-
-### Write (gated by `--mcp-allow-write`)
-| Tool | Args | Does |
-|------|------|------|
-| `sm_delete_skill` | `{skill_id}` | Resolve `skill_id` (name or local_path) then delegate to `OpsController.deleteSkill`. Refuses to guess an unknown path. |
-| `sm_deploy` | `{skill_id, target}` | **Not implemented** in the app yet — returns `ok=false` ("deploy not yet implemented"). Do not assume it works. |
-
-## Hard Rules (follow these)
-
-1. **Write tools require the `-write` server.** If connected to `skillmanager`
-   (read-only), `sm_delete_skill`/`sm_deploy` return
-   `{"ok": false, "error": "write mode disabled … restart with --mcp-allow-write"}`.
-   Do not retry against the read-only server — request write mode instead.
-2. **AGENTS.md exclusions are enforced even in write mode.** `sm_delete_skill`
-   refuses `TODO.md`, `.agents/skills/…`, and `.agents/commands/…` with
-   `ok=false` ("refused: skill_id resolves under an AGENTS.md-excluded path.").
-   Never attempt to bypass; these are protected paths.
-3. **`sm_delete_skill` never guesses.** Pass a real skill name or `local_path`
-   from `sm_list_skills`. An unresolvable id returns `ok=false` — do not fabricate paths.
-4. **`sm_deploy` is a no-op stub.** It raises `NotImplementedError`; the tool
-   reports it as `ok=false`. Treat deployment as unsupported until the app gains a deploy API.
-5. **Async work uses jobs.** Long ops return a `job_id`; poll with `sm_job_status`.
-   A job buffer entry is `{status: "running"|"done"|"error", result, error}`.
-6. **Headless, not a GUI.** The MCP server does not open windows. Use it for
-   automation/CI, not for visual interaction.
+1. **Write tools require `--mcp-allow-write`.** Without this flag, mutating tools return `{"ok": false, "error": "write mode disabled..."}`.
+2. **AGENTS.md Exclusions.** Mutating tools strictly refuse paths containing `TODO.md`, `.agents/skills`, or `.agents/commands`.
+3. **No Unsafe Fallbacks.** Unresolvable skill IDs return `ok=false` with descriptive error messages instead of corrupting paths.
 
 ## Quick Reference
 
-- Connect read-only: `uv run skill-manager --mcp`
-- Connect with writes: `uv run skill-manager --mcp --mcp-allow-write`
-- All responses are JSON envelopes with `ok`/`tool`/`data`/`error`.
-- Unknown tool or bad args → `ok=false`; read `error` and adjust.
-- Full design + tool reference: `docs/MCP_SERVER.md` (in the SkillManager repo).
+- Read-only: `uv run skill-manager --mcp`
+- Write mode: `uv run skill-manager --mcp --mcp-allow-write`
+- Full documentation & setup guides: `docs/MCP_SERVER.md`

@@ -139,11 +139,35 @@ All tools return structured JSON, names prefixed `sm_`.
 | Full lifecycle tools | Analyze/monitor-only | Matches explicit user ask |
 | Write tools gated `--mcp-allow-write` | Always-open, read-only | Respects AGENTS.md exclusions by default |
 
-## Client Setup (.mcp.json)
+## Client Setup & Installation Guides
 
-Drop a `.mcp.json` at the project root so opencode / Claude Code can launch the
-server. The agent **must run from the project root** so `uv` resolves the
-workspace and the `skill-manager` command is on PATH.
+The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to SkillManager MCP, use one of the client configuration snippets below depending on your agent platform.
+
+### 1. Claude Desktop (`claude_desktop_config.json`)
+
+**Location:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "skillmanager": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/skill-manager", "run", "skill-manager", "--mcp"]
+    },
+    "skillmanager-write": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/skill-manager", "run", "skill-manager", "--mcp", "--mcp-allow-write"]
+    }
+  }
+}
+```
+
+### 2. Cursor (`.cursor/mcp.json`)
+
+**Location:** `.cursor/mcp.json` at your project root or global settings (`Settings > Features > MCP`).
 
 ```json
 {
@@ -160,11 +184,72 @@ workspace and the `skill-manager` command is on PATH.
 }
 ```
 
-- `skillmanager` — all read-only tools (build / analyze / monitor / debug / screenshot / gui).
-- `skillmanager-write` — same plus mutating tools `sm_delete_skill`, `sm_deploy`.
-  Only add this entry when the agent is trusted to modify skills/deployments.
+### 3. VS Code / Continue (`.mcp.json`)
 
-For **opencode**, the server can be configured in `opencode.jsonc` instead:
+**Location:** Project root `.mcp.json` or `.vscode/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "skillmanager": {
+      "command": "uv",
+      "args": ["run", "skill-manager", "--mcp"]
+    }
+  }
+}
+```
+
+### 4. Antigravity / Gemini (`.mcp.json` or `mcp_config.json`)
+
+**Location:** Project root `.mcp.json` or `~/.gemini/mcp_config.json`.
+
+```json
+{
+  "mcpServers": {
+    "skillmanager": {
+      "command": "uv",
+      "args": ["run", "skill-manager", "--mcp"]
+    },
+    "skillmanager-write": {
+      "command": "uv",
+      "args": ["run", "skill-manager", "--mcp", "--mcp-allow-write"]
+    }
+  }
+}
+```
+
+### 5. Goose CLI (`~/.config/goose/config.yaml`)
+
+**Location:** `~/.config/goose/config.yaml`
+
+```yaml
+mcpServers:
+  skillmanager:
+    command: uv
+    args:
+      - run
+      - skill-manager
+      - --mcp
+```
+
+### 6. Windsurf (`.codeium/windsurf/mcp_config.json`)
+
+**Location:** `~/.codeium/windsurf/mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "skillmanager": {
+      "command": "uv",
+      "args": ["run", "skill-manager", "--mcp"]
+    }
+  }
+}
+```
+
+### 7. OpenCode (`opencode.jsonc`)
+
+**Location:** Project root `opencode.jsonc`
 
 ```jsonc
 {
@@ -179,32 +264,39 @@ For **opencode**, the server can be configured in `opencode.jsonc` instead:
 }
 ```
 
-### Tool reference
+---
 
-| Tool | What it does | Gated? |
-|------|--------------|--------|
+### Comprehensive Tool Reference
+
+| Tool | Description | Gated? |
+|------|-------------|--------|
+| `sm_list_skills` | List skills in library model | No |
+| `sm_get_skill` | Retrieve full details of a single skill (metadata, SKILL.md body, files) | No |
+| `sm_search_skills` | Search skills by keyword matching name, category, tags, or content | No |
+| `sm_sync_skills` | Re-scan skill source directories into library model | No |
+| `sm_list_sources` | List configured skill source directories | No |
+| `sm_list_projects` | List configured target project directories | No |
+| `sm_create_skill` | Create a new skill directory with SKILL.md | Yes (`--mcp-allow-write`) |
+| `sm_update_skill` | Update content or metadata of an existing skill's SKILL.md | Yes (`--mcp-allow-write`) |
+| `sm_deploy` | Deploy a skill/package to a target project (`<target>/.agents/skills/`) | Yes (`--mcp-allow-write`) |
+| `sm_delete_skill` | Delete a skill (refuses AGENTS.md-excluded paths) | Yes (`--mcp-allow-write`) |
 | `sm_lint` | Run `ruff check src tests`, return structured error list | No |
-| `sm_run_tests` | Run `pytest` (subset/full), return pass/fail/coverage | No |
-| `sm_build` | Run `skill-manager-build` (PyInstaller), return artifact path | No |
-| `sm_job_status` | Poll status of an async build/test job by id | No |
-| `sm_list_skills` | List skills from `AppController._library_model` | No |
-| `sm_list_sources` | List configured skill sources | No |
-| `sm_list_projects` | List configured deploy target projects | No |
-| `sm_static_analyze` | Safe in-repo symbol/pattern search (respects `.gitignore`) | No |
-| `sm_get_diagnostics` | Return diagnostic logger buffer | No |
-| `sm_get_health` | Report Qt loop / controller / model health | No |
-| `sm_tail_events` | Return last N telemetry / `capture_event` entries | No |
-| `sm_profile` | Run discovery pipeline with per-stage timing; report bottleneck | No |
-| `sm_dump_state` | Serialize `AppController` key state to JSON | No |
-| `sm_inspect_controller` | List a controller's public methods/signals | No |
-| `sm_capture_errors` | Return in-memory / Sentry error buffer | No |
-| `sm_screenshot` | Capture the live GUI window as base64 PNG; optional `navigate`/`save` | No |
-| `sm_mouse_move` | Move the system cursor to (x, y) screen coordinates | No |
-| `sm_mouse_click` | Click left/right/middle mouse button, optional (x, y), double-click | No |
-| `sm_type_text` | Type text into the currently focused window | No |
-| `sm_get_window_info` | Return live GUI window geometry + HWND | No |
-| `sm_delete_skill` | Delete a skill (delegates to `OpsController`) | Yes (`--mcp-allow-write`) |
-| `sm_deploy` | Deploy a skill to a target project | Yes (`--mcp-allow-write`) |
+| `sm_run_tests` | Run `pytest` suite in background job | No |
+| `sm_build` | Run `skill-manager-build` in background job | No |
+| `sm_job_status` | Poll background test/build job status | No |
+| `sm_static_analyze` | Safe regex grep over repository (respecting `.gitignore`) | No |
+| `sm_get_health` | App & bridge health snapshot | No |
+| `sm_get_diagnostics` | Read diagnostic logger ring-buffer events | No |
+| `sm_tail_events` | Tail recent telemetry / `capture_event` entries | No |
+| `sm_profile` | Run discovery pipeline profiling | No |
+| `sm_dump_state` | Export safe subset of controller state | No |
+| `sm_inspect_controller` | Introspect sub-controller methods/signals | No |
+| `sm_capture_errors` | Return error diagnostic buffer | No |
+| `sm_screenshot` | Capture live GUI window screenshot as base64 PNG | No |
+| `sm_mouse_move` | Move system cursor (Windows) | No |
+| `sm_mouse_click` | Send mouse click (Windows) | No |
+| `sm_type_text` | Type text into focused window (Windows) | No |
+| `sm_get_window_info` | Return live GUI window geometry | No |
 
 ### `sm_screenshot` — GUI capture & navigation
 

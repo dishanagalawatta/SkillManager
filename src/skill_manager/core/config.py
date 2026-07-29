@@ -56,7 +56,11 @@ def get_app_data_dir() -> Path:
     else:
         app_dir = Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
 
-    app_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        app_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        app_dir = Path.cwd() / "data"
+        app_dir.mkdir(parents=True, exist_ok=True)
     return app_dir
 
 

@@ -453,12 +453,12 @@ def test_write_delete_skill_bridge_value_error(monkeypatch: pytest.MonkeyPatch) 
     assert "missing" in result.error
 
 
-def test_write_deploy_allowed_but_not_implemented(monkeypatch: pytest.MonkeyPatch) -> None:
-    """sm_deploy is allowed but the bridge raises NotImplementedError -> clear error."""
+def test_write_deploy_allowed_and_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sm_deploy is allowed but the bridge raises ValueError -> clear error."""
     monkeypatch.setattr(
         write_mod,
         "deploy",
-        lambda skill_id, target: (_ for _ in ()).throw(NotImplementedError()),
+        lambda skill_id, target: (_ for _ in ()).throw(ValueError("unknown skill")),
     )
 
     handlers = write_mod._bind_handlers(allow_write=True)
@@ -466,7 +466,7 @@ def test_write_deploy_allowed_but_not_implemented(monkeypatch: pytest.MonkeyPatc
 
     assert result.ok is False
     assert result.error is not None
-    assert "deploy not yet implemented" in result.error
+    assert "unknown skill" in result.error
 
 
 def test_write_deploy_excluded_skill_id() -> None:
@@ -489,5 +489,10 @@ def test_write_is_excluded_helper() -> None:
 
 
 def test_write_tool_schemas_present() -> None:
-    """Both write tools are declared in TOOL_SCHEMAS."""
-    assert set(write_mod.TOOL_SCHEMAS) == {"sm_delete_skill", "sm_deploy"}
+    """All write tools are declared in TOOL_SCHEMAS."""
+    assert set(write_mod.TOOL_SCHEMAS) == {
+        "sm_create_skill",
+        "sm_update_skill",
+        "sm_delete_skill",
+        "sm_deploy",
+    }

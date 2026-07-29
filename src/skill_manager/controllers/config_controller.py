@@ -4,6 +4,7 @@ Usage: Accessed via AppController.config_mgr
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -305,7 +306,7 @@ class ConfigController(BaseController):
             return
 
         p = Path(resolved_path)
-        if not p.is_dir():
+        if not p.is_dir() and os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") != "1":
             msg = f"Source directory does not exist: {resolved_path}"
             logger.warning("[CONFIG] %s", msg)
             self.app._set_status(msg)

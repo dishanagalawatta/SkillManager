@@ -45,10 +45,11 @@ def test_every_tool_module_exports_schemas_and_handlers() -> None:
         gui,
         monitor,
         screenshot,
+        skills,
         write,
     )
 
-    for mod in (analyze, build, debug, gui, monitor, screenshot, write):
+    for mod in (analyze, build, debug, gui, monitor, screenshot, skills, write):
         assert hasattr(mod, "TOOL_SCHEMAS"), f"{mod.__name__} missing TOOL_SCHEMAS"
         assert hasattr(mod, "get_handlers"), f"{mod.__name__} missing get_handlers()"
         assert isinstance(mod.TOOL_SCHEMAS, dict), f"{mod.__name__}.TOOL_SCHEMAS must be a dict"
@@ -63,7 +64,7 @@ def test_every_tool_module_exports_schemas_and_handlers() -> None:
 
 def test_expected_tool_names_declared() -> None:
     """Each module exposes its expected tool names in TOOL_SCHEMAS."""
-    from skill_manager.mcp.tools import analyze, build, write
+    from skill_manager.mcp.tools import analyze, build, skills, write
 
     assert set(build.TOOL_SCHEMAS) == {
         "sm_lint",
@@ -77,7 +78,17 @@ def test_expected_tool_names_declared() -> None:
         "sm_list_projects",
         "sm_static_analyze",
     }
-    assert set(write.TOOL_SCHEMAS) == {"sm_delete_skill", "sm_deploy"}
+    assert set(skills.TOOL_SCHEMAS) == {
+        "sm_get_skill",
+        "sm_search_skills",
+        "sm_sync_skills",
+    }
+    assert set(write.TOOL_SCHEMAS) == {
+        "sm_create_skill",
+        "sm_update_skill",
+        "sm_delete_skill",
+        "sm_deploy",
+    }
 
 
 @pytest.mark.parametrize("allow_write", [False, True])
