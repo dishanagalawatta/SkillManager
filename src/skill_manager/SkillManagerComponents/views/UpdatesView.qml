@@ -592,9 +592,9 @@ Item {
         id: uv_inspector
         property var skillData: null
         
-        width: 400
-        height: parent.height
-        x: parent.width - width
+        width: Math.min(400, parent ? parent.width : 400)
+        height: parent ? parent.height : 600
+        x: parent ? Math.max(0, parent.width - width) : 0
         y: 0
         modal: true
         focus: true

@@ -14,9 +14,10 @@ import App 1.0
 Dialog {
     id: root
 
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: 520
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(520, Overlay.overlay ? Overlay.overlay.width - 32 : 520)
+    height: Math.min(600, Overlay.overlay ? Overlay.overlay.height - 32 : 600)
     modal: true
     padding: 0
 

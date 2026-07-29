@@ -20,10 +20,10 @@ Dialog {
     property int dragTargetIndex: -1
     property bool dropAbove: true
 
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: 420
-    height: Math.min(500, contentColumn.implicitHeight, parent ? parent.height - 40 : 500)
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(420, Overlay.overlay ? Overlay.overlay.width - 32 : 420)
+    height: Math.min(500, contentColumn.implicitHeight, Overlay.overlay ? Overlay.overlay.height - 40 : 500)
     modal: true
     padding: 0
 

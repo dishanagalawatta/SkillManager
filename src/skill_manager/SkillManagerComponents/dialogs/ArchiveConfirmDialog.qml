@@ -30,9 +30,9 @@ Dialog {
         currentCallback = null
     }
     
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: 440
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(440, Overlay.overlay ? Overlay.overlay.width - 32 : 440)
     modal: true
     padding: 0
     
