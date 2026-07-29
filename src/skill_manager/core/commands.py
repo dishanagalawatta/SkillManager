@@ -217,16 +217,27 @@ def find_command_holder_projects(
 ) -> list[str]:
     """Return the list of project labels whose .agents/commands/ contains ``command_name``.
 
-    ``command_name`` is the stem (no extension). Each project is checked
-    for ``<root>/.agents/commands/<safe_name>.md``.
+    ``command_name`` can be a stem, filename, or local path. Each project is checked
+    case-insensitively for the matching command file.
     """
-    safe_name = build_command_filename(command_name)
+    stem = Path(command_name).stem
+    safe_name = build_command_filename(stem).lower()
     holders: list[str] = []
     for pp in project_paths:
         project_path = Path(pp)
         commands_dir = project_root_for_project(project_path) / ".agents" / "commands"
-        if (commands_dir / safe_name).exists():
-            holders.append(project_label(project_path, project_aliases=project_aliases))
+        if not commands_dir.is_dir():
+            continue
+        for cmd_file in commands_dir.iterdir():
+            if (
+                cmd_file.is_file()
+                and cmd_file.suffix.lower() == ".md"
+                and (cmd_file.name.lower() == safe_name or cmd_file.stem.lower() == stem.lower())
+            ):
+                label = project_label(project_path, project_aliases=project_aliases)
+                if label not in holders:
+                    holders.append(label)
+                break
     return holders
 
 
@@ -360,13 +371,11 @@ def update_custom_command_file_multi(
         )
     )
 
-    # Phase 2: fan-out to add_set (skip keep_set labels)
+    # Phase 2: fan-out to all target project labels (add_set and keep_set, except canonical_label)
     if canonical.ok and canonical.path and canonical.path.is_file():
         new_content = canonical.path.read_text(encoding="utf-8")
-        for label in add_set:
-            # Skip the canonical label — already handled above
-            if label == canonical_label:
-                continue
+        target_labels = sorted((set(keep_set) | set(add_set)) - {canonical_label})
+        for label in target_labels:
             target = find_project_path_by_label(
                 label, project_paths, project_aliases=project_aliases
             )
@@ -389,7 +398,9 @@ def update_custom_command_file_multi(
                                 True,
                                 f"Already up to date: {target_file.name}",
                                 target_file,
-                                set_membership="fanout_skip",
+                                set_membership="fanout_skip"
+                                if label in add_set
+                                else "canonical_keep",
                             )
                         )
                         continue
@@ -399,7 +410,7 @@ def update_custom_command_file_multi(
                         True,
                         f"Updated command: {target_file.name}",
                         target_file,
-                        set_membership="fanout_add",
+                        set_membership="fanout_add" if label in add_set else "canonical_update",
                     )
                 )
             except Exception as exc:

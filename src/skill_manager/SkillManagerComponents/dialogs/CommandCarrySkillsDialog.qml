@@ -16,8 +16,12 @@ Dialog {
 
     parent: Overlay.overlay
     anchors.centerIn: Overlay.overlay
-    width: Math.min(520, Overlay.overlay ? Overlay.overlay.width - 32 : 520)
-    height: Math.min(600, Overlay.overlay ? Overlay.overlay.height - 32 : 600)
+    readonly property real idealListHeight: root.missingSkills.length * 44 + 16
+    readonly property real maxListHeight: Overlay.overlay ? Math.max(120, Overlay.overlay.height - 240) : 340
+    readonly property real listHeight: Math.max(100, Math.min(idealListHeight, maxListHeight))
+
+    width: Math.min(540, Overlay.overlay ? Math.max(380, Overlay.overlay.width - 32) : 540)
+    height: Math.min(60 + 76 + 48 + 36 + listHeight, Overlay.overlay ? Math.max(280, Overlay.overlay.height - 32) : 560)
     modal: true
     padding: 0
 
@@ -58,13 +62,13 @@ Dialog {
         open()
     }
 
-    contentItem: ColumnLayout {
-        spacing: 0
+    header: Item {
+        width: root.width
+        height: 60
+        implicitHeight: 60
 
-        // Header
         Rectangle {
-            Layout.fillWidth: true
-            height: 60
+            anchors.fill: parent
             color: "transparent"
 
             RowLayout {
@@ -116,77 +120,82 @@ Dialog {
                 color: Theme.separator
             }
         }
+    }
 
-        // Body
-        ColumnLayout {
+    contentItem: ColumnLayout {
+        spacing: 16
+
+        Text {
+            text: "This command references " + root.missingSkills.length + " skill(s) not installed in the target project:"
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.sizeBody
+            color: Theme.secondaryLabel
+            wrapMode: Text.Wrap
             Layout.fillWidth: true
-            Layout.margins: 24
-            spacing: 16
+            Layout.topMargin: 20
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+        }
 
-            Text {
-                text: "This command references " + root.missingSkills.length + " skill(s) not installed in the target project:"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeBody
-                color: Theme.secondaryLabel
-                wrapMode: Text.Wrap
-                Layout.fillWidth: true
-            }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.preferredHeight: root.listHeight
+            Layout.minimumHeight: 100
+            Layout.leftMargin: 24
+            Layout.rightMargin: 24
+            Layout.bottomMargin: 16
+            radius: Theme.radiusField
+            color: Theme.glassHover
+            border.color: Theme.glassBorder
+            border.width: 1
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(root.missingSkills.length * 40 + 16, 240)
-                radius: Theme.radiusField
-                color: Theme.glassHover
-                border.color: Theme.glassBorder
-                border.width: 1
+            SmoothScrollView {
+                anchors.fill: parent
+                anchors.margins: 8
+                clip: true
 
-                SmoothScrollView {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    clip: true
+                Column {
+                    spacing: 0
+                    width: parent.width
 
-                    Column {
-                        spacing: 0
-                        width: parent.width
+                    Repeater {
+                        model: root.missingSkills
 
-                        Repeater {
-                            model: root.missingSkills
+                        delegate: RowLayout {
+                            width: parent ? parent.width : 200
+                            height: 40
+                            spacing: 12
 
-                            delegate: RowLayout {
-                                width: parent ? parent.width : 200
-                                height: 40
-                                spacing: 12
-
-                                GlassCheckBox {
-                                    id: skillCheck
-                                    Layout.leftMargin: 8
-                                    checkState: (root._checked[modelData.folder_name || modelData.name] !== false) ? Qt.Checked : Qt.Unchecked
-                                    onToggled: {
-                                        var c = JSON.parse(JSON.stringify(root._checked))
-                                        var key = modelData.folder_name || modelData.name
-                                        c[key] = (skillCheck.checkState === Qt.Checked)
-                                        root._checked = c
-                                    }
+                            GlassCheckBox {
+                                id: skillCheck
+                                Layout.leftMargin: 8
+                                checkState: (root._checked[modelData.folder_name || modelData.name] !== false) ? Qt.Checked : Qt.Unchecked
+                                onToggled: {
+                                    var c = JSON.parse(JSON.stringify(root._checked))
+                                    var key = modelData.folder_name || modelData.name
+                                    c[key] = (skillCheck.checkState === Qt.Checked)
+                                    root._checked = c
                                 }
+                            }
 
-                                Column {
-                                    Layout.fillWidth: true
-                                    spacing: 2
+                            Column {
+                                Layout.fillWidth: true
+                                spacing: 2
 
-                                    Text {
-                                        text: modelData.name || modelData.folder_name || "Unknown"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeBody
-                                        font.weight: Font.Medium
-                                        color: Theme.label
-                                    }
-                                    Text {
-                                        text: modelData.folder_name || ""
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeMetadata
-                                        color: Theme.secondaryLabel
-                                        visible: modelData.folder_name && modelData.folder_name !== modelData.name
-                                    }
+                                Text {
+                                    text: modelData.name || modelData.folder_name || "Unknown"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.sizeBody
+                                    font.weight: Font.Medium
+                                    color: Theme.label
+                                }
+                                Text {
+                                    text: modelData.folder_name || ""
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.sizeMetadata
+                                    color: Theme.secondaryLabel
+                                    visible: modelData.folder_name && modelData.folder_name !== modelData.name
                                 }
                             }
                         }
@@ -194,7 +203,6 @@ Dialog {
                 }
             }
         }
-
     }
 
     footer: Item {
