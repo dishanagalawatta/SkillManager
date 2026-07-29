@@ -408,11 +408,9 @@ class AppController(QObject):
 
         default_client = self._config.get("default_client", "Last Selected")
         if default_client == "Last Selected":
-            self._client_format = self._config.get("client_format", "Antigravity")
+            self._client_format = self._get_last_selected_client()
         else:
             self._client_format = default_client
-            # Also sync the currently saved client format to match the default
-            self._config.set("client_format", self._client_format)
 
         self._sources = self._config.get("sources", [])
         self._projects = self._config.get("projects", [])
@@ -529,6 +527,7 @@ class AppController(QObject):
 
         # Reactive client filter: sync model filters when user selects a different client
         self.clientFormatChanged.connect(self._on_client_format_changed)
+        self._on_client_format_changed()
 
         # Initialize shared currentProject from persisted QuickCopy filter or first project
         saved = self._quick_copy_model.projectFilter
@@ -795,11 +794,25 @@ class AppController(QObject):
     def defaultClient(self):
         return self._config.get("default_client", "Last Selected")
 
+    def _get_last_selected_client(self) -> str:
+        return (
+            self._config.get("client_format")
+            or self._config.get("quickcopy.client_format")
+            or self._config.get("library.client_format")
+            or "Antigravity"
+        )
+
     @Slot(str)
     def setDefaultClient(self, f):
         if self.defaultClient != f:
             self._config.set("default_client", f)
             self.defaultClientChanged.emit()
+            target_fmt = self._get_last_selected_client() if f == "Last Selected" else f
+            if self._client_format != target_fmt:
+                self._client_format = target_fmt
+                self.clientFormatChanged.emit()
+                if hasattr(self, "ui") and self.ui:
+                    self.ui.currentViewChanged.emit()
 
     @Property(list, notify=categoriesChanged)
     def categories(self):
