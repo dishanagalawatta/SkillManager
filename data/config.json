@@ -39,7 +39,7 @@
     "window_height": 640,
     "window_x": 180,
     "window_y": 140,
-    "dark_mode": false,
+    "dark_mode": true,
     "current_view": "Library",
     "startup_view": "Library",
     "remember_filters": true,

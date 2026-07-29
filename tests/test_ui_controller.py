@@ -67,7 +67,7 @@ def test_ui_controller_window_geometry_persistence(ui_controller, mock_app):
 @patch("PySide6.QtCore.QTimer.start")
 def test_ui_controller_trigger_save(mock_timer_start, ui_controller):
     ui_controller.triggerSave()
-    mock_timer_start.assert_called_with(2000)
+    mock_timer_start.assert_called_with(1000)
 
 
 def test_ui_controller_get_asset_uri_fallback(ui_controller):

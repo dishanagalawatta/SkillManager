@@ -141,6 +141,54 @@ class TestNoPynputImportAtModuleLoad:
         assert "lazy" in gh.__doc__.lower()
 
 
+class TestEnvironmentDetection:
+    """Verify environment auto-detection and graceful degradation."""
+
+    def test_detect_testing_mode(self):
+        from skill_manager.core.global_hotkey import detect_environment_and_display
+
+        with patch.dict("os.environ", {"SKILL_MANAGER_TESTING": "1"}):
+            env, supported, reason = detect_environment_and_display()
+            assert env == "Testing"
+            assert supported is False
+            assert "test mode" in reason
+
+    def test_detect_offscreen_platform(self):
+        from skill_manager.core.global_hotkey import detect_environment_and_display
+
+        with patch.dict(
+            "os.environ", {"SKILL_MANAGER_TESTING": "0", "QT_QPA_PLATFORM": "offscreen"}
+        ):
+            env, supported, reason = detect_environment_and_display()
+            assert "offscreen" in env.lower()
+            assert supported is False
+            assert "unavailable" in reason
+
+    def test_manager_properties_reflect_environment(self):
+        import skill_manager.core.global_hotkey as gh
+
+        def real_ensure_pynput(inst):
+            env_name, supported, reason = gh.detect_environment_and_display()
+            inst._availability_reason = reason
+            inst._pynput_available = supported
+            return supported
+
+        with (
+            patch.object(GlobalHotkeyManager, "_ensure_pynput", real_ensure_pynput),
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=(
+                    "Headless (offscreen)",
+                    False,
+                    "Global hotkeys unavailable on offscreen platform",
+                ),
+            ),
+        ):
+            manager = GlobalHotkeyManager()
+            assert manager.isAvailable is False
+            assert "offscreen" in manager.statusReason.lower()
+
+
 class TestListenerLifecycle:
     """Unit tests for the new thread-tracking and stop-join behaviour.
 

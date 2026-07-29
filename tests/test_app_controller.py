@@ -221,9 +221,9 @@ def test_controller_update_projects_counts_and_ignores_bad_paths(controller, tem
 def test_controller_window_and_theme_setters_emit(controller):
     controller.ui.triggerSave = MagicMock()
 
-    controller.windowWidth = 900
-    # setter prevents values < 1050
-    assert controller.ui.windowWidth != 900
+    controller.windowWidth = 300
+    # setter prevents values < 400
+    assert controller.ui.windowWidth != 300
 
     controller.windowWidth = 1500
     controller.windowHeight = 800

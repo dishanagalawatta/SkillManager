@@ -255,9 +255,9 @@ class UIController(BaseController):
     @Slot()
     def triggerSave(self):
         """Triggers a debounced save of the UI state."""
-        if not self._save_timer.isActive():
-            self._save_timer.start(2000)
+        self._save_timer.start(1000)
 
+    @Slot()
     def saveUiState(self):
         """Saves current window geometry and UI preferences to config."""
         self.config.set("ui_state", self.state.model_dump())

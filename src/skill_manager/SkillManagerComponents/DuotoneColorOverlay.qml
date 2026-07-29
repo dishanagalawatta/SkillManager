@@ -12,34 +12,11 @@ Item {
     anchors.fill: sourceItem
     visible: sourceItem !== null
 
-    // Layer 1: Secondary Accent Layer (WHITE / Light in Light Mode)
     ColorOverlay {
-        id: bgOverlay
+        id: overlay
         anchors.fill: parent
         source: root.sourceItem
-        color: root.secondaryColor
+        color: root.primaryColor
         visible: root.sourceItem !== null
-    }
-
-    // Layer 2: Primary Stroke Layer (BLACK stroke in Light Mode)
-    ShaderEffect {
-        id: strokeOverlay
-        anchors.fill: parent
-        visible: root.sourceItem !== null
-        property variant source: root.sourceItem
-        property color glyphColor: root.primaryColor
-
-        fragmentShader: "
-            varying highp vec2 qt_TexCoord0;
-            uniform lowp float qt_Opacity;
-            uniform sampler2D source;
-            uniform lowp vec4 glyphColor;
-
-            void main() {
-                lowp vec4 tex = texture2D(source, qt_TexCoord0);
-                lowp float strokeAlpha = smoothstep(0.65, 0.95, tex.a);
-                gl_FragColor = glyphColor * strokeAlpha * qt_Opacity;
-            }
-        "
     }
 }
