@@ -65,14 +65,14 @@ Rectangle {
                     anchors.fill: parent
                     source: AppController.ui_controller.logoSource
                     fillMode: Image.PreserveAspectFit
-                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+                    visible: !(typeof AppController !== "undefined" && AppController && AppController.ui_controller && AppController.ui_controller.isMonochromeLogo(AppController.clientFormat))
                 }
                 
                 ColorOverlay {
                     anchors.fill: sidebarLogoImg
                     source: sidebarLogoImg
-                    color: Theme.label
-                    visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                    color: Theme.iconLabel
+                    visible: (typeof AppController !== "undefined" && AppController && AppController.ui_controller && AppController.ui_controller.isMonochromeLogo(AppController.clientFormat))
                 }
                 
                 MouseArea {

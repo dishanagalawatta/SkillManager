@@ -40,6 +40,8 @@ class ConfigController(BaseController):
     skillPackageAutoUpdateModeChanged = Signal()
     autoMinimizeOnScreenshotChanged = Signal()
     autoMinimizeOnQuickCopyChanged = Signal()
+    autoSelectScreenshotInQuickCopyChanged = Signal()
+    autoCopyScreenshotClientFormatChanged = Signal()
     temporaryScreenshotsChanged = Signal()
     diagnosticLoggingChanged = Signal()
 
@@ -99,6 +101,30 @@ class ConfigController(BaseController):
     def autoMinimizeOnQuickCopy(self, value):
         self._set_config_value(
             "auto_minimize_on_quick_copy", value, self.autoMinimizeOnQuickCopyChanged
+        )
+
+    @Property(bool, notify=autoSelectScreenshotInQuickCopyChanged)
+    def autoSelectScreenshotInQuickCopy(self):  # type: ignore[reportRedeclaration]
+        return self.config.get("auto_select_screenshot_in_quick_copy", False)
+
+    @autoSelectScreenshotInQuickCopy.setter  # type: ignore[func-attr]
+    def autoSelectScreenshotInQuickCopy(self, value):
+        self._set_config_value(
+            "auto_select_screenshot_in_quick_copy",
+            value,
+            self.autoSelectScreenshotInQuickCopyChanged,
+        )
+
+    @Property(bool, notify=autoCopyScreenshotClientFormatChanged)
+    def autoCopyScreenshotClientFormat(self):  # type: ignore[reportRedeclaration]
+        return self.config.get("auto_copy_screenshot_client_format", False)
+
+    @autoCopyScreenshotClientFormat.setter  # type: ignore[func-attr]
+    def autoCopyScreenshotClientFormat(self, value):
+        self._set_config_value(
+            "auto_copy_screenshot_client_format",
+            value,
+            self.autoCopyScreenshotClientFormatChanged,
         )
 
     @Property(bool, notify=temporaryScreenshotsChanged)

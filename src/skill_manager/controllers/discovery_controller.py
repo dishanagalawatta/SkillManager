@@ -617,6 +617,9 @@ class DiscoveryController(BaseController):
         self._previous_skills = {
             p: r for p, r in self._previous_skills.items() if p not in path_set
         }
+        current_sel_path = getattr(self.app._selected_skill, "local_path", "")
+        if current_sel_path and current_sel_path in path_set:
+            self.app.set_selected_skill({})
         logger.info("[DELETE] applied targeted removal of %d paths", len(path_set))
 
     # ------------------------------------------------------------------

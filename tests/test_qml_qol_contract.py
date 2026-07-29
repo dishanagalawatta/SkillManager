@@ -532,7 +532,7 @@ def test_color_overlay_is_a_thin_reexport_of_qt5compat_coloroverlay():
     # Call sites must NOT import Qt5Compat.GraphicalEffects directly — the whole
     # point of the local ColorOverlay.qml is to encapsulate that import.
     for qml_file in QML_DIR.rglob("*.qml"):
-        if qml_file.name == "ColorOverlay.qml":
+        if qml_file.name in ("ColorOverlay.qml", "DuotoneColorOverlay.qml"):
             continue
         text = qml_file.read_text(encoding="utf-8")
         assert "import Qt5Compat.GraphicalEffects" not in text, (

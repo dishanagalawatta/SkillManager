@@ -53,10 +53,10 @@ Button {
                     smooth: true
                 }
 
-                ColorOverlay {
-                    anchors.fill: iconImg
-                    source: iconImg
-                    color: control.active ? Theme.label : Theme.secondaryLabel
+                DuotoneColorOverlay {
+                    sourceItem: iconImg
+                    primaryColor: control.active ? Theme.iconLabel : Theme.iconSecondaryLabel
+                    secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : (control.active ? "#CBD5E1" : "#E2E8F0")
                     visible: control.iconSource !== ""
                 }
             }

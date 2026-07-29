@@ -396,6 +396,22 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
+                                    titleText: "Auto-select Screenshot in Quick Copy"
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.autoSelectScreenshotInQuickCopy : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoSelectScreenshotInQuickCopy = checked
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Copy Screenshot in Client Format"
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.autoCopyScreenshotClientFormat : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoCopyScreenshotClientFormat = checked
+                                    }
+                                }
+                                Separator {}
+                                SettingsRow {
                                     titleText: "Temporary Screenshots"
                                     GlassSwitch {
                                         checked: AppController.config_controller ? AppController.config_controller.temporaryScreenshots : false

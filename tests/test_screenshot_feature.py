@@ -23,6 +23,8 @@ def mock_app():
     app._config = {}
     app.config_controller = MagicMock()
     app.config_controller.autoMinimizeOnScreenshot = False
+    app.config_controller.autoCopyScreenshotClientFormat = False
+    app.config_controller.autoSelectScreenshotInQuickCopy = False
     return app
 
 
@@ -687,3 +689,51 @@ def test_save_screenshot_refreshes_selection(controller, mock_app, tmp_path):
         # The filepath is passed to _refresh_selected_skill
         call_args = mock_app.ops._refresh_selected_skill.call_args
         assert call_args[0][0].endswith(".png") or "Screenshot_" in str(call_args)
+
+
+def test_save_screenshot_auto_copy_client_format(controller, mock_app, tmp_path):
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = project_path
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "Antigravity"
+    mock_app.config_controller.autoCopyScreenshotClientFormat = True
+    mock_app.config_controller.autoSelectScreenshotInQuickCopy = False
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    crop_rect = QRect(10, 10, 50, 50)
+    mock_app.ops = MagicMock()
+
+    with patch("PySide6.QtGui.QGuiApplication.clipboard") as mock_clipboard:
+        controller.saveScreenshot(crop_rect, [])
+
+        mock_clipboard().setText.assert_called_once()
+        copied_text = mock_clipboard().setText.call_args[0][0]
+        assert copied_text.startswith(".agents/screenshots/Screenshot_")
+
+
+def test_save_screenshot_auto_select_quick_copy(controller, mock_app, tmp_path):
+    project_path = str(tmp_path)
+    mock_app.quickCopyModel.projectFilter = project_path
+    mock_app.projects = [project_path]
+    mock_app.clientFormat = "Antigravity"
+    mock_app.config_controller.autoCopyScreenshotClientFormat = False
+    mock_app.config_controller.autoSelectScreenshotInQuickCopy = True
+    mock_app.ui_controller = MagicMock()
+    mock_app._quick_copy_model = MagicMock()
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    crop_rect = QRect(10, 10, 50, 50)
+    mock_app.ops = MagicMock()
+
+    with patch("PySide6.QtGui.QGuiApplication.clipboard"):
+        controller.saveScreenshot(crop_rect, [])
+
+        assert mock_app.ui_controller.currentView == "QuickCopy"
+        mock_app._quick_copy_model.selectByPaths.assert_called_once()
+        mock_app.set_selected_skill.assert_called_once()

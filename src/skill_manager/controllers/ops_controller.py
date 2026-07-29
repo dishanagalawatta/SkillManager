@@ -39,6 +39,15 @@ from skill_manager.core.schemas import SkillRecord
 logger = logging.getLogger(__name__)
 
 
+def _get_item_attr(item: Any, attr: str, default: Any = "") -> Any:
+    """Safely retrieves an attribute from dataclasses, dicts, or objects."""
+    if hasattr(item, attr):
+        return getattr(item, attr)
+    if isinstance(item, dict):
+        return item.get(attr, default)
+    return default
+
+
 class OpsController(BaseController):
     """Controller for skill-related operations."""
 
@@ -161,6 +170,14 @@ class OpsController(BaseController):
         self.app._library_model.removeSkillsByPath(paths_to_delete)
         self.app._quick_copy_model.removeSkillsByPath(paths_to_delete)
 
+        current_sel_path = getattr(self.app._selected_skill, "local_path", "")
+        if current_sel_path and current_sel_path in set(paths_to_delete):
+            logger.info(
+                "[DELETE] currently selected skill %s is being deleted; resetting selectedSkill",
+                current_sel_path,
+            )
+            self.app.set_selected_skill({})
+
         def _background_delete():
             deleted = 0
             failed = 0
@@ -264,12 +281,13 @@ class OpsController(BaseController):
         if not path:
             return
         skill = next(
-            (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+            (s for s in self.app.skillModel._all_skills if _get_item_attr(s, "local_path") == path),
+            None,
         )
         if skill:
             self.deleteSkills([skill])
         else:
-            logger.warning("[DELETE] deleteSkill: path not found in skillModel: %s", path)
+            self.deleteSkillsByPaths([path])
 
     @Slot(list)
     def deleteSkillsByPaths(self, paths: list[str]):
@@ -282,14 +300,30 @@ class OpsController(BaseController):
         records = []
         for model in (self.app._library_model, self.app._quick_copy_model):
             for s in model._all_skills:
-                if s.get("local_path") in path_set:
+                lp = _get_item_attr(s, "local_path")
+                if lp in path_set:
                     records.append(s)
-                    path_set.discard(s.get("local_path"))
+                    path_set.discard(lp)
+
+        for p in list(path_set):
+            file_p = Path(p)
+            if file_p.is_file():
+                records.append(
+                    {
+                        "local_path": str(file_p),
+                        "is_screenshot": file_p.parent.name == "screenshots"
+                        or file_p.suffix in (".png", ".jpg", ".jpeg"),
+                        "is_command": file_p.suffix in (".sh", ".md", ".bash")
+                        and file_p.parent.name == "commands",
+                    }
+                )
+                path_set.discard(p)
+
         if not records:
             logger.warning("[DELETE] no records found for paths: %s", list(paths))
             self.app._set_status("No skills selected for deletion")
             return
-        logger.info("[DELETE] found %d records across both models", len(records))
+        logger.info("[DELETE] found %d records across models/files", len(records))
         self.deleteSkills(records)
 
     @Slot()
@@ -391,7 +425,9 @@ class OpsController(BaseController):
 
         selected_paths = self.app.skillModel.getSelectedPaths()
         selected_skills = [
-            s for s in self.app.skillModel._all_skills if s.get("local_path") in selected_paths
+            s
+            for s in self.app.skillModel._all_skills
+            if _get_item_attr(s, "local_path") in selected_paths
         ]
 
         if not selected_skills:
@@ -494,7 +530,8 @@ class OpsController(BaseController):
     def copySkillToClipboard(self, path: str):
         """Finds skill by path and copies its reference to clipboard."""
         skill = next(
-            (s for s in self.app.skillModel._all_skills if s.get("local_path") == path), None
+            (s for s in self.app.skillModel._all_skills if _get_item_attr(s, "local_path") == path),
+            None,
         )
         if skill:
             self.copySkillReference(skill)  # type: ignore[arg-type]
@@ -1098,7 +1135,7 @@ class OpsController(BaseController):
 
     @Slot(str, list)
     def deleteSkillFromProjects(self, path: str, project_labels: "list[str]"):
-        """Delete a skill folder from the specified projects only."""
+        """Delete a skill folder or file from the specified projects only."""
         if not path or not project_labels:
             return
 
@@ -1113,6 +1150,9 @@ class OpsController(BaseController):
             if not target:
                 continue
             skill_folder = target / ".agents" / "skills" / folder_name
+            screenshot_file = target / ".agents" / "screenshots" / folder_name
+            command_file = target / ".agents" / "commands" / folder_name
+
             if skill_folder.is_dir():
                 items_to_delete.append(
                     {
@@ -1121,6 +1161,28 @@ class OpsController(BaseController):
                         "name": folder_name,
                     }
                 )
+            elif screenshot_file.is_file():
+                items_to_delete.append(
+                    {
+                        "local_path": str(screenshot_file),
+                        "project_path": str(target),
+                        "name": folder_name,
+                        "is_screenshot": True,
+                    }
+                )
+            elif command_file.is_file():
+                items_to_delete.append(
+                    {
+                        "local_path": str(command_file),
+                        "project_path": str(target),
+                        "name": folder_name,
+                        "is_command": True,
+                    }
+                )
+
+        if not items_to_delete and skill_path.exists():
+            self.deleteSkillsByPaths([path])
+            return
 
         if items_to_delete:
             self.deleteSkills(items_to_delete)
