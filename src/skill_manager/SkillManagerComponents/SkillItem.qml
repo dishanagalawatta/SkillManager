@@ -18,6 +18,14 @@ Item {
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
 
+    function formatFileUrl(p) {
+        if (!p) return "";
+        if (p.startsWith("file://")) return p;
+        var clean = p.replace(/\\/g, "/");
+        if (clean.startsWith("/")) return "file://" + clean;
+        return "file:///" + clean;
+    }
+
     // Dynamic height based on visibility of sub-header and item content
     height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 32 : 54))
     visible: height > 0
@@ -185,7 +193,7 @@ Item {
                                 Image {
                                     id: previewImg
                                     anchors.fill: parent
-                                    source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\/g, "/") : ""
+                                    source: (model && model.isScreenshot && model.path) ? root.formatFileUrl(model.path) : ""
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: false
                                     // Setting only width preserves the original aspect ratio for the pixmap
@@ -261,7 +269,7 @@ Item {
                         radius: Theme.radiusSmall
                         color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
                         border.width: model && model.isSelected ? 0 : 1
-                        border.color: Theme.glassBorder
+                        border.color: model && model.isSelected ? "transparent" : (Theme.darkMode ? "#3F3F46" : "#A1A1AA")
                         
                         Text {
                             anchors.centerIn: parent

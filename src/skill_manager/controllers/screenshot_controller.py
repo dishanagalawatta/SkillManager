@@ -416,8 +416,18 @@ class ScreenshotController(QObject):
 
         # -- Clipboard --
         client_format = self.app.clientFormat
-        if client_format == "Gemini CLI":
-            ref = f"@.agents/screenshots/{filename}"
+        auto_copy_client_format = self.app.config_controller.autoCopyScreenshotClientFormat
+        if auto_copy_client_format or client_format == "Gemini CLI":
+            from skill_manager.core.quick_copy import format_project_skill_reference
+
+            temp_skill = {
+                "name": filename,
+                "folder_name": ".agents/screenshots",
+                "local_path": filepath,
+                "project_root": project_path,
+                "is_screenshot": True,
+            }
+            ref = format_project_skill_reference(temp_skill, client_format)
             QGuiApplication.clipboard().setText(ref)
             self.app._set_status(f"Screenshot saved. Path copied: {ref}")
         else:
@@ -450,6 +460,12 @@ class ScreenshotController(QObject):
         if "Screenshots" not in set(self.app._categories):
             self.app._categories = sorted(set(self.app._categories) | {"Screenshots"})
             self.app.categoriesChanged.emit()
+
+        # -- Auto-select in Quick Copy --
+        if self.app.config_controller.autoSelectScreenshotInQuickCopy:
+            self.app.ui_controller.currentView = "QuickCopy"
+            self.app._quick_copy_model.selectByPaths([filepath])
+            self.app.set_selected_skill(skill_data)
 
         return filepath
 

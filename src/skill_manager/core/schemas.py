@@ -147,6 +147,8 @@ class AppConfig(BaseSettings):
     skill_package_auto_update_mode: str = "prompt"
     auto_minimize_on_screenshot: bool = False
     auto_minimize_on_quick_copy: bool = False
+    auto_select_screenshot_in_quick_copy: bool = False
+    auto_copy_screenshot_client_format: bool = False
     temporary_screenshots: bool = False
     diagnostic_logging: bool = False
     top_bar_clients: list[str] = Field(

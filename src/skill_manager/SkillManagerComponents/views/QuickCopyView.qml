@@ -669,21 +669,21 @@ Item {
                                             sourceSize.width: 16
                                             sourceSize.height: 16
                                             fillMode: Image.PreserveAspectFit
-                                            opacity: clientBtn.isSelected ? 1.0 : 0.5
-                                            visible: modelData !== "OpenCode"
+                                            opacity: clientBtn.isSelected ? 1.0 : (Theme.darkMode ? 0.6 : 0.9)
+                                            visible: !AppController.ui_controller.isMonochromeLogo(modelData)
                                         }
                                         ColorOverlay {
                                             anchors.fill: clientImg
                                             source: clientImg
-                                            color: Theme.label
-                                            visible: modelData === "OpenCode"
-                                            opacity: clientBtn.isSelected ? 1.0 : 0.5
+                                            color: Theme.iconLabel
+                                            visible: AppController.ui_controller.isMonochromeLogo(modelData)
+                                            opacity: clientBtn.isSelected ? 1.0 : (Theme.darkMode ? 0.6 : 0.9)
                                         }
                                     }
                                     background: Rectangle {
                                         radius: width / 2
-                                        color: clientBtn.hovered ? Theme.glassHover : "transparent"
-                                        border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : "transparent")
+                                        color: isSelected ? (Theme.darkMode ? Theme.glassActive : "#ECFDF5") : (clientBtn.hovered ? Theme.glassHover : (Theme.darkMode ? "transparent" : "#FFFFFF"))
+                                        border.color: isSelected ? Theme.accent : (clientBtn.hovered ? Theme.glassBorder : (Theme.darkMode ? Theme.glassBorder : "#E2E8F0"))
                                         border.width: 1
                                     }
                                     ToolTip.visible: clientBtn.hovered || clientBtn.visualFocus
@@ -711,13 +711,13 @@ Item {
                                     sourceSize.width: 16
                                     sourceSize.height: 16
                                     fillMode: Image.PreserveAspectFit
-                                    visible: AppController.clientFormat !== "OpenCode"
+                                    visible: !AppController.ui_controller.isMonochromeLogo(AppController.clientFormat)
                                 }
                                 ColorOverlay {
                                     anchors.fill: activeClientImg
                                     source: activeClientImg
-                                    color: Theme.label
-                                    visible: AppController.clientFormat === "OpenCode"
+                                    color: Theme.iconLabel
+                                    visible: AppController.ui_controller.isMonochromeLogo(AppController.clientFormat)
                                 }
                             }
                             GlassMenu {
@@ -727,7 +727,7 @@ Item {
                                     delegate: GlassMenuItem {
                                         text: modelData
                                         iconSource: AppController.ui_controller.getLogoSource(modelData)
-                                        colorizeIcon: modelData === "OpenCode"
+                                        colorizeIcon: AppController.ui_controller.isMonochromeLogo(modelData)
                                         onTriggered: AppController.ui_controller.setClientFormat(modelData)
                                     }
                                 }

@@ -23,6 +23,14 @@ Rectangle {
         return Math.min(800, Math.max(isQuickCopy ? 350 : 400, dynamicWidth));
     }
 
+    function formatFileUrl(p) {
+        if (!p) return "";
+        if (p.startsWith("file://")) return p;
+        var clean = p.replace(/\\/g, "/");
+        if (clean.startsWith("/")) return "file://" + clean;
+        return "file:///" + clean;
+    }
+
     GlassMenu {
         id: inspectorContextMenu
         property var targetControl: null
@@ -328,7 +336,7 @@ Rectangle {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: (mouse) => Qt.openUrlExternally("file:///" + modelData.path)
+                                onClicked: (mouse) => Qt.openUrlExternally(root.formatFileUrl(modelData.path))
                                 Accessible.role: Accessible.Link
                                 Accessible.name: "Open file " + (modelData && modelData.name ? modelData.name : "file")
                             }
@@ -363,12 +371,7 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         fillMode: Image.PreserveAspectFit
-                        source: {
-                            if (!root._sel || !root._sel.is_screenshot || !root._sel.local_path) return "";
-                            let p = root._sel.local_path.replace(/\\/g, "/");
-                            if (p.startsWith("/")) return "file://" + p;
-                            return "file:///" + p;
-                        }
+                        source: (root._sel && root._sel.is_screenshot && root._sel.local_path) ? root.formatFileUrl(root._sel.local_path) : ""
                         asynchronous: true
                     }
                     

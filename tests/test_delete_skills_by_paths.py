@@ -67,3 +67,71 @@ def test_delete_by_paths_no_match(mock_app, ops_controller):
     mock_app._quick_copy_model._all_skills = []
     ops_controller.deleteSkillsByPaths(["/nonexistent/path"])
     mock_app._set_status.assert_called_with("No skills selected for deletion")
+
+
+def test_delete_by_paths_dataclass_skill(mock_app, ops_controller):
+    """deleteSkillsByPaths should handle dataclass Skill objects without AttributeError."""
+    from skill_manager.core.models.entities import Skill
+
+    skill_obj = Skill(name="DataClassSkill", local_path="/path/dataclass_s1")
+    mock_app._library_model._all_skills = [skill_obj]
+    mock_app._quick_copy_model._all_skills = []
+
+    with patch.object(ops_controller, "deleteSkills") as mock_delete:
+        ops_controller.deleteSkillsByPaths(["/path/dataclass_s1"])
+        mock_delete.assert_called_once()
+        assert mock_delete.call_args[0][0] == [skill_obj]
+
+
+def test_delete_by_paths_direct_file_fallback(tmp_path, mock_app, ops_controller):
+    """deleteSkillsByPaths should delete unindexed direct files on disk."""
+    screenshot_file = tmp_path / "screenshots" / "Screenshot_123.png"
+    screenshot_file.parent.mkdir(parents=True, exist_ok=True)
+    screenshot_file.write_text("dummy image data")
+
+    mock_app._library_model._all_skills = []
+    mock_app._quick_copy_model._all_skills = []
+
+    with patch.object(ops_controller, "deleteSkills") as mock_delete:
+        ops_controller.deleteSkillsByPaths([str(screenshot_file)])
+        mock_delete.assert_called_once()
+        records = mock_delete.call_args[0][0]
+        assert len(records) == 1
+        assert records[0]["local_path"] == str(screenshot_file)
+        assert records[0]["is_screenshot"] is True
+
+
+def test_delete_skill_from_projects_screenshot(tmp_path, mock_app, ops_controller):
+    """deleteSkillFromProjects should handle screenshot files under .agents/screenshots/."""
+    from skill_manager.core.commands import project_label
+
+    proj_dir = tmp_path / "my_project"
+    scr_dir = proj_dir / ".agents" / "screenshots"
+    scr_dir.mkdir(parents=True, exist_ok=True)
+    screenshot_file = scr_dir / "Screenshot_456.png"
+    screenshot_file.write_text("image content")
+
+    mock_app._projects = [str(proj_dir)]
+    label = project_label(proj_dir)
+
+    with patch.object(ops_controller, "deleteSkills") as mock_delete:
+        ops_controller.deleteSkillFromProjects(str(screenshot_file), [label])
+        mock_delete.assert_called_once()
+        records = mock_delete.call_args[0][0]
+        assert len(records) == 1
+        assert records[0]["local_path"] == str(screenshot_file)
+        assert records[0]["is_screenshot"] is True
+
+
+def test_delete_resets_selected_skill_and_closes_inspector(mock_app, ops_controller):
+    """When the currently selected item is deleted, set_selected_skill({}) must be called to close inspector."""
+    from unittest.mock import MagicMock
+
+    skill = {"name": "S_Opened", "local_path": "/path/opened_s1", "is_command": False}
+    mock_app._library_model._all_skills = [skill]
+    mock_app._quick_copy_model._all_skills = []
+    mock_app._selected_skill = MagicMock(local_path="/path/opened_s1")
+
+    ops_controller.deleteSkills([skill])
+
+    mock_app.set_selected_skill.assert_called_with({})

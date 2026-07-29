@@ -47,14 +47,14 @@ Rectangle {
                 source: (typeof AppController !== "undefined" && AppController) ? AppController.logoSource : ""
                 fillMode: Image.PreserveAspectFit
                 opacity: 0.9
-                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? false : true
+                visible: !(typeof AppController !== "undefined" && AppController && AppController.ui_controller && AppController.ui_controller.isMonochromeLogo(AppController.clientFormat))
             }
 
             ColorOverlay {
                 anchors.fill: titleLogoImg
                 source: titleLogoImg
-                color: Theme.label
-                visible: (typeof AppController !== "undefined" && AppController && AppController.clientFormat === "OpenCode") ? true : false
+                color: Theme.iconLabel
+                visible: (typeof AppController !== "undefined" && AppController && AppController.ui_controller && AppController.ui_controller.isMonochromeLogo(AppController.clientFormat))
                 opacity: 0.9
             }
         }
@@ -123,7 +123,7 @@ Rectangle {
     component TitleBarButton: AbstractButton {
         id: btn
         property color hoverColor: Theme.glassHover
-        property color textColor: Theme.label
+        property color textColor: Theme.iconLabel
         property real btnSize: 28
         property real iconSize: 18
         property string tooltipText: ""
@@ -160,10 +160,10 @@ Rectangle {
                 smooth: true
             }
 
-            ColorOverlay {
-                anchors.fill: iconImg
-                source: iconImg
-                color: btn.textColor
+            DuotoneColorOverlay {
+                sourceItem: iconImg
+                primaryColor: btn.textColor
+                secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : "#E2E8F0"
                 visible: btn.iconSource !== ""
             }
         }

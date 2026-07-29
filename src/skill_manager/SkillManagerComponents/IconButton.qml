@@ -58,16 +58,16 @@ Button {
             smooth: true
         }
 
-        ColorOverlay {
-            anchors.fill: iconImg
-            source: iconImg
-            color: {
+        DuotoneColorOverlay {
+            sourceItem: iconImg
+            primaryColor: {
                 if (control.customIconColor.a > 0) return control.customIconColor
                 if (!control.enabled) return Theme.secondaryLabel
                 if (control.role === "primary") return "white"
                 if (control.role === "destructive") return Theme.danger
-                return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
+                return control.hovered || control.down ? Theme.iconLabel : Theme.iconSecondaryLabel
             }
+            secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : (control.hovered ? "#CBD5E1" : "#E2E8F0")
             visible: control.iconSource !== ""
         }
     }

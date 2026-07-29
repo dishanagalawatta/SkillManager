@@ -31,6 +31,8 @@ class ConfigController(QObject):
     skillPackageAutoUpdateModeChanged: ClassVar[SignalInstance]
     autoMinimizeOnScreenshotChanged: ClassVar[SignalInstance]
     autoMinimizeOnQuickCopyChanged: ClassVar[SignalInstance]
+    autoSelectScreenshotInQuickCopyChanged: ClassVar[SignalInstance]
+    autoCopyScreenshotClientFormatChanged: ClassVar[SignalInstance]
     temporaryScreenshotsChanged: ClassVar[SignalInstance]
     diagnosticLoggingChanged: ClassVar[SignalInstance]
 
@@ -39,6 +41,8 @@ class ConfigController(QObject):
     skillPackageAutoUpdateMode: str
     autoMinimizeOnScreenshot: bool
     autoMinimizeOnQuickCopy: bool
+    autoSelectScreenshotInQuickCopy: bool
+    autoCopyScreenshotClientFormat: bool
     temporaryScreenshots: bool
     diagnosticLogging: bool
     isRecordingShortcut: bool

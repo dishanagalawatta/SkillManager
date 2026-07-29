@@ -249,3 +249,14 @@ def test_ui_controller_reset_state_complex(ui_controller, mock_app):
     assert ui_controller.windowWidth == 1300
     assert ui_controller.darkMode is False
     assert ui_controller.currentView == "Library"
+
+
+def test_ui_controller_is_monochrome_logo(ui_controller):
+    assert ui_controller.isMonochromeLogo("OpenCode") is True
+    assert ui_controller.isMonochromeLogo("opencode") is True
+    assert ui_controller.isMonochromeLogo("Plain Text") is True
+    assert ui_controller.isMonochromeLogo("plaintext") is True
+    assert ui_controller.isMonochromeLogo("Antigravity") is False
+    assert ui_controller.isMonochromeLogo("Gemini CLI") is False
+    assert ui_controller.isMonochromeLogo("Codex") is False
+    assert ui_controller.isMonochromeLogo(None) is False

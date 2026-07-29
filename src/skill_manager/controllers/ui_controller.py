@@ -221,6 +221,12 @@ class UIController(BaseController):
     def getLogoSource(self, fmt):
         return self.getAssetUri(logo_asset_for_client(fmt))
 
+    @Slot(str, result=bool)
+    def isMonochromeLogo(self, fmt: str) -> bool:
+        """Returns True if the client format uses a single-color (monochrome) logo requiring Theme.label colorization."""
+        fmt_lower = str(fmt or "").lower().strip()
+        return fmt_lower in ("opencode", "plain text", "plaintext", "plain")
+
     @Slot(str)
     def setClientFormat(self, f):
         if self.app._client_format != f:
