@@ -372,8 +372,8 @@ class ScreenshotParams(BaseModel):
 
 class UIStateRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    window_width: int = Field(default=1300, ge=1050)
-    window_height: int = Field(default=650, ge=650)
+    window_width: int = Field(default=1300, ge=400)
+    window_height: int = Field(default=650, ge=520)
     window_x: int = 100
     window_y: int = 100
     dark_mode: bool = False

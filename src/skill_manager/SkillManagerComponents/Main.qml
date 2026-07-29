@@ -5,29 +5,53 @@ import App 1.0
 
 Window {
     id: window
+    property bool _isInitialized: false
+    property bool isClosing: false
+
+    // Timer to re-apply saved position after window manager settles.
+    // On X11/Wayland, WMs override client-requested position during the
+    // initial show.  We wait for that to complete, then force the saved
+    // position and enable tracking.
+    Timer {
+        id: _positionRestoreTimer
+        interval: 200
+        repeat: false
+        onTriggered: {
+            window.x = AppController.ui_controller.windowX
+            window.y = AppController.ui_controller.windowY
+            window._isInitialized = true
+            AppController.logDiagnostic("INFO", "window_state",
+                "Position restored and tracking enabled: (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height)
+        }
+    }
+
     Component.onCompleted: {
         // Set initial geometry from saved state
-        x = AppController.ui_controller.windowX
-        y = AppController.ui_controller.windowY
         width = AppController.ui_controller.windowWidth
         height = AppController.ui_controller.windowHeight
-        // Ensure window is visible and raised on startup
+        x = AppController.ui_controller.windowX
+        y = AppController.ui_controller.windowY
+        // Show window — WM may override x/y during this call
         window.visible = true
         window.showNormal()
         window.raise()
         window.requestActivate()
+        // Schedule position re-application after WM settles
+        _positionRestoreTimer.start()
         AppController.logDiagnostic("INFO", "window_state",
             "Component.onCompleted: window shown at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height + ", visibility=" + window.visibility)
     }
 
-    onWidthChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowWidth = width
-    onHeightChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
-    onXChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
-    onYChanged: if (window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
-    property bool isClosing: false
+    onWidthChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowWidth = width
+    onHeightChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
+    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
+    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
 
     onClosing: (close) => {
         isClosing = true
+        if (typeof AppController !== "undefined" && AppController && AppController.ui_controller) {
+            AppController.ui_controller.saveUiState()
+        }
         // Clean up the active view to ensure models are detached BEFORE context tear down
         if (viewLoader && viewLoader.item && typeof viewLoader.item.cleanup === "function") {
             viewLoader.item.cleanup()
