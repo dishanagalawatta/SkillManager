@@ -10,12 +10,12 @@ from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
 from PySide6.QtDBus import QDBus, QDBusConnection, QDBusInterface
 from PySide6.QtGui import QGuiApplication, QPixmap
 
+from skill_manager.core import quick_copy
 from skill_manager.core.image_processing import ImageProcessor
 from skill_manager.core.persistence import (
     load_temp_screenshots_registry,
     save_temp_screenshots_registry,
 )
-from skill_manager.core.quick_copy import project_label, project_root_for_project
 from skill_manager.core.schemas import ScreenshotParams
 
 logger = logging.getLogger(__name__)
@@ -358,13 +358,11 @@ class ScreenshotController(QObject):
 
         # First pass: match by label or path
         for p in self.app.projects:
-            if (
-                project_label(p, aliases, p) == project_label_or_path
-                or str(p) == project_label_or_path
-            ):
-                candidate = str(project_root_for_project(Path(p)))
+            lbl = quick_copy.project_label(p, aliases, p)
+            if lbl == project_label_or_path or str(p) == project_label_or_path:
+                candidate = str(quick_copy.project_root_for_project(Path(p)))
                 if Path(candidate).is_dir():
-                    return candidate, str(p), project_label(p, aliases, p)
+                    return candidate, str(p), lbl
                 logger.warning(
                     "Matched project root does not exist: %s (from %s)",
                     candidate,
@@ -373,9 +371,9 @@ class ScreenshotController(QObject):
 
         # Second pass: first project with an existing root directory
         for p in self.app.projects:
-            candidate = str(project_root_for_project(Path(p)))
+            candidate = str(quick_copy.project_root_for_project(Path(p)))
             if Path(candidate).is_dir():
-                return candidate, str(p), project_label(p, aliases, p)
+                return candidate, str(p), quick_copy.project_label(p, aliases, p)
 
         cwd = os.getcwd()
         logger.warning("No project matched, falling back to CWD: %s/.agents/screenshots/", cwd)

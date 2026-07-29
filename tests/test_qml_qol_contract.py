@@ -50,7 +50,7 @@ def test_screenshot_hover_tooltip_exists_in_skill_item():
     )
     assert "delay: 450" in skill_item
     assert (
-        'source: (model && model.isScreenshot && model.path) ? "file:///" + model.path.replace(/\\\\/g, "/") : ""'
+        'source: (model && model.isScreenshot && model.path) ? root.formatFileUrl(model.path) : ""'
         in skill_item
     )
     assert "fillMode: Image.PreserveAspectFit" in skill_item

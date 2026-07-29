@@ -290,25 +290,31 @@ class ConfigController(BaseController):
             self.isRecordingShortcutChanged.emit()
 
     def normalize_path(self, raw_url: str) -> str:
-        """Helper to convert file URLs or raw strings to absolute local paths."""
-        if not raw_url:
-            return ""
-        path_str = (
-            raw_url.replace("file:///", "").replace("/", "\\")
-            if raw_url.startswith("file://")
-            else raw_url
-        )
-        try:
-            # Expand ~ and make absolute
-            return str(Path(path_str).expanduser().resolve())
-        except Exception:
-            return path_str
+        """Helper to convert file URLs or raw strings to canonical absolute local paths."""
+        from skill_manager.core.copier import url_to_local_path
+
+        return url_to_local_path(raw_url)
 
     @Slot(str)
     def addSource(self, url: str):
-        """Adds a local skill source directory."""
+        """Adds a local skill source directory with path validation."""
+        if not url or not str(url).strip():
+            return
         resolved_path = self.normalize_path(url)
         if not resolved_path:
+            return
+
+        p = Path(resolved_path)
+        if not p.is_dir():
+            msg = f"Source directory does not exist: {resolved_path}"
+            logger.warning("[CONFIG] %s", msg)
+            self.app._set_status(msg)
+            get_diagnostic_logger().log_event(
+                "WARNING",
+                "source_add_invalid_path",
+                msg,
+                data={"raw_input": url, "resolved_path": resolved_path},
+            )
             return
 
         try:
@@ -340,35 +346,51 @@ class ConfigController(BaseController):
 
     @Slot(str)
     def addProject(self, url: str):
-        """Adds a project directory."""
+        """Adds a project directory with robust validation and normalization."""
         if not url or not str(url).strip():
             return
 
         from skill_manager.core.copier import normalize_project_skills_path
 
-        # First try specialized normalization for .agents/skills
-        path_str = (
-            url.replace("file:///", "").replace("/", "\\") if url.startswith("file://") else url
-        )
-        resolved_path, error = normalize_project_skills_path(path_str)
-        if error:
-            # Fallback to standard absolute path
-            resolved_path = self.normalize_path(url)
+        clean_path = self.normalize_path(url)
+        resolved_path_obj, error = normalize_project_skills_path(clean_path)
+        resolved_str = str(resolved_path_obj) if resolved_path_obj else clean_path
 
-        if resolved_path and resolved_path not in self.app._projects:
-            self.app._projects.append(resolved_path)
+        p = Path(resolved_str)
+        # Validate that the target path or its parent project root exists on disk
+        if not p.exists():
+            root_exists = False
+            if p.name == "skills" and p.parent.name == ".agents":
+                root_exists = p.parent.parent.is_dir()
+            elif p.parent.is_dir():
+                root_exists = True
+
+            if not root_exists and not p.is_dir():
+                msg = f"Project directory does not exist: {resolved_str}"
+                logger.warning("[CONFIG] %s", msg)
+                self.app._set_status(msg)
+                get_diagnostic_logger().log_event(
+                    "WARNING",
+                    "project_add_invalid_path",
+                    msg,
+                    data={"raw_input": url, "resolved_path": resolved_str, "error": error},
+                )
+                return
+
+        if resolved_str and resolved_str not in self.app._projects:
+            self.app._projects.append(resolved_str)
             self.config.set("projects", self.app._projects)
             self._emit_projects_changed()
-            self.app._set_status(f"Added project: {resolved_path}")
+            self.app._set_status(f"Added project: {resolved_str}")
             capture_event("project_target_added", {"target_count": len(self.app._projects)})
 
             get_diagnostic_logger().log_event(
                 "INFO",
                 "project_added",
-                f"Project added: {resolved_path}",
+                f"Project added: {resolved_str}",
                 data={
                     "raw_input": url,
-                    "normalized": resolved_path,
+                    "normalized": resolved_str,
                     "error": error,
                 },
             )

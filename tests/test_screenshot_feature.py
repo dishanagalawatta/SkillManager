@@ -11,7 +11,7 @@ from skill_manager.core.quick_copy import discover_single_project
 
 
 @pytest.fixture
-def mock_app():
+def mock_app(tmp_path):
     app = MagicMock()
     app.screenshot_provider = MagicMock()
     app.skillModel = MagicMock()
@@ -19,7 +19,9 @@ def mock_app():
     app._library_model = MagicMock()
     app._quick_copy_model = MagicMock()
     app._categories = []
-    app.projects = ["/mock/project"]
+    fake_proj = tmp_path / "mock_project"
+    fake_proj.mkdir(parents=True, exist_ok=True)
+    app.projects = [str(fake_proj)]
     app._config = {}
     app.config_controller = MagicMock()
     app.config_controller.autoMinimizeOnScreenshot = False

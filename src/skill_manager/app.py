@@ -591,14 +591,16 @@ class AppController(QObject):
             )
 
     def _normalize_project_paths_on_startup(self):
-        """Rewrite stored project paths to their canonical .agents/skills form.
+        """Rewrite stored project paths to their canonical .agents/skills form and auto-repair malformed paths.
 
-        If a project was stored as a root path (e.g. ``C:\\path\\myproj``)
-        instead of ``C:\\path\\myproj\\.agents\\skills``, the stored path is
-        updated in-place and persisted so that ``project_label`` and
-        ``getProjectLabel`` always agree.
+        If a project path contains duplicated prefix artifacts or points to a non-existent path
+        where an inner path segment exists, auto-repairs it so that the user's config stays healthy.
         """
-        from skill_manager.core.copier import get_skills_dir
+        from skill_manager.core.copier import (
+            get_skills_dir,
+            repair_malformed_path,
+            url_to_local_path,
+        )
 
         if not self._projects:
             return
@@ -607,8 +609,33 @@ class AppController(QObject):
         normalized = []
         for project_path in self._projects:
             try:
-                canonical = get_skills_dir(project_path)
+                # 1. Clean up file:// or raw formatting
+                clean_path = url_to_local_path(project_path)
+                repaired = repair_malformed_path(clean_path)
+                if repaired != clean_path:
+                    logger.info(
+                        "Boot self-healing: repaired malformed path %r -> %r",
+                        project_path,
+                        repaired,
+                    )
+                    clean_path = repaired
+                    changed = True
+
+                canonical = get_skills_dir(clean_path)
                 canonical_str = str(canonical)
+
+                # Check if the target project path or any ancestor exists on disk
+                cand_p = Path(canonical_str)
+                if not cand_p.exists() and not any(
+                    p.is_dir() for p in cand_p.parents if len(p.parts) > 1
+                ):
+                    logger.warning(
+                        "Boot self-healing: removing non-existent stale project path %r",
+                        project_path,
+                    )
+                    changed = True
+                    continue
+
                 if canonical_str != project_path:
                     logger.info("Boot normalization: %r -> %r", project_path, canonical_str)
                     normalized.append(canonical_str)
@@ -670,6 +697,10 @@ class AppController(QObject):
     @Property(QObject, constant=True)
     def image_inspector_controller(self):
         return self.image_inspector
+
+    @Property(QObject, constant=True)
+    def global_hotkey_controller(self):
+        return self.global_hotkey
 
     @Property(str, notify=currentProjectChanged)
     def currentProject(self):  # type: ignore[reportRedeclaration]
@@ -2089,21 +2120,26 @@ def main():  # pragma: no cover
 
     # Explicitly set icon on each QML window — QGuiApplication.setWindowIcon()
     # doesn't reliably propagate to QML Window elements with FramelessWindowHint.
-    if not app_icon.isNull():
-        for i, root in enumerate(engine.rootObjects()):
-            # ``engine.rootObjects()`` returns ``list[QObject]`` per the stub,
-            # but QML roots are actually ``QWindow``/``QQuickWindow`` which
-            # expose ``setIcon``/``show``/``winId``. Cast through ``Any`` so
-            # pyright agrees with the runtime.
-            root_any: Any = root
+    for i, root in enumerate(engine.rootObjects()):
+        root_any: Any = root
+        if not app_icon.isNull():
             root_any.setIcon(app_icon)
-            if hasattr(root, "show"):
-                root_any.show()
-                diag.log_event(
-                    "INFO",
-                    "window_state",
-                    f"Called root.show() on root {i} (visible={getattr(root, 'isVisible', lambda: 'unknown')()})",
-                )
+        if hasattr(root, "show"):
+            # Set position explicitly on native QWindow handle before/during show
+            root_any.setX(controller.ui.windowX)
+            root_any.setY(controller.ui.windowY)
+            root_any.setWidth(controller.ui.windowWidth)
+            root_any.setHeight(controller.ui.windowHeight)
+            root_any.show()
+            if hasattr(root, "raise_"):
+                root_any.raise_()
+            if hasattr(root, "requestActivate"):
+                root_any.requestActivate()
+            diag.log_event(
+                "INFO",
+                "window_state",
+                f"Called root.show() on root {i} at ({root_any.x()}, {root_any.y()}) size={root_any.width()}x{root_any.height()}",
+            )
 
     def apply_native_styles():
         diag.log_event(

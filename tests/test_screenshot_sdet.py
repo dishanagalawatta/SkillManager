@@ -10,11 +10,13 @@ from skill_manager.core.schemas import Redaction
 
 
 @pytest.fixture
-def mock_app():
+def mock_app(tmp_path):
     app = MagicMock()
     app.config_controller = MagicMock()
     app.quickCopyModel = MagicMock()
-    app.projects = ["/fake/project"]
+    fake_project = tmp_path / "fake_project"
+    fake_project.mkdir(parents=True, exist_ok=True)
+    app.projects = [str(fake_project)]
     app.config_controller.project_aliases = {}
     app._categories = []
 

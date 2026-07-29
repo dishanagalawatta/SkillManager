@@ -21,12 +21,12 @@ def config_controller(mock_app):
     return ConfigController(mock_app)
 
 
-def test_config_controller_add_source(config_controller, mock_app):
-    config_controller.addSource("/path/to/source")
-    # abspath will normalize path based on platform, so we normalize for the test
-    import os
+def test_config_controller_add_source(config_controller, mock_app, tmp_path):
+    source_dir = tmp_path / "my_source"
+    source_dir.mkdir()
+    config_controller.addSource(str(source_dir))
 
-    expected = os.path.abspath("/path/to/source")
+    expected = str(source_dir.resolve())
     assert expected in mock_app._sources
     mock_app._config.set.assert_called_with("sources", mock_app._sources)
     mock_app.sourcesChanged.emit.assert_called_once()
@@ -39,10 +39,24 @@ def test_config_controller_remove_source(config_controller, mock_app):
     mock_app.sourcesChanged.emit.assert_called_once()
 
 
-def test_config_controller_add_project(config_controller, mock_app):
-    config_controller.addProject("file:///C:/project")
-    assert any(r"C:\project" in p for p in mock_app._projects)
+def test_config_controller_add_project(config_controller, mock_app, tmp_path):
+    proj_dir = tmp_path / "my_project"
+    proj_dir.mkdir()
+    file_url = f"file://{proj_dir.as_posix()}"
+    config_controller.addProject(file_url)
+    assert any(str(proj_dir.name) in p for p in mock_app._projects)
     mock_app.projectsChanged.emit.assert_called_once()
+
+
+def test_url_to_local_path_formatting():
+    from skill_manager.core.copier import url_to_local_path
+
+    # Posix absolute file URL
+    posix_url = "file:///home/dikka/Documents/Project"
+    assert url_to_local_path(posix_url).replace("\\", "/") == "/home/dikka/Documents/Project"
+
+    # Non-existent path rejection check
+    assert url_to_local_path("") == ""
 
 
 def test_config_controller_get_project_label(config_controller, mock_app):
@@ -247,9 +261,11 @@ def test_config_controller_remove_source_by_index(config_controller, mock_app):
     assert len(mock_app._sources) == 1
 
 
-def test_config_controller_add_source_exception(config_controller, mock_app):
+def test_config_controller_add_source_exception(config_controller, mock_app, tmp_path):
+    source_dir = tmp_path / "valid_dir"
+    source_dir.mkdir()
     with patch.object(config_controller.config, "set", side_effect=OSError("Access denied")):
-        config_controller.addSource("/bad/path")
+        config_controller.addSource(str(source_dir))
         mock_app._set_status.assert_called_with("Failed to add source: Access denied")
 
 

@@ -11,7 +11,7 @@ size_kb = len(b64) / 1024 if b64 else 0
 print(f"Capture: {w}x{h} data={b64 is not None} size={size_kb:.1f}KB", flush=True)
 
 if b64:
-    path = r".agents\screenshots\test_fix.png"
+    path = os.path.join(".agents", "screenshots", "test_fix.png")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         f.write(base64.b64decode(b64))

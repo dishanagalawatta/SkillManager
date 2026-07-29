@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 logger = logging.getLogger(__name__)
 
@@ -254,12 +257,70 @@ def _normalize_skill_package(skill):
     return source_path, folder_name, ""
 
 
+def repair_malformed_path(raw_path: str) -> str:
+    """Repair paths that have had current working directory or leading path prepended to an absolute path."""
+    if not raw_path:
+        return ""
+    p_str = str(raw_path)
+    if Path(p_str).exists():
+        return p_str
+
+    # Search for nested absolute path roots (e.g. /home/, /tmp/, /Users/, /private/)
+    patterns = ["/home/", "/tmp/", "/Users/", "/private/"]
+    for pat in patterns:
+        pos = p_str.find(pat, 1)
+        if pos != -1:
+            candidate = p_str[pos:]
+            cand_p = Path(candidate)
+            if cand_p.exists() or any(
+                parent.is_dir() for parent in cand_p.parents if len(parent.parts) > 1
+            ):
+                return candidate
+
+    # Windows drive letter pattern e.g. /cwd/C:/... or C:\cwd\D:\...
+    m = re.search(r"[a-zA-Z]:[/\\]", p_str[1:])
+    if m:
+        candidate = p_str[m.start() + 1 :]
+        cand_p = Path(candidate)
+        if cand_p.exists() or any(
+            parent.is_dir() for parent in cand_p.parents if len(parent.parts) > 1
+        ):
+            return candidate
+
+    return p_str
+
+
+def url_to_local_path(raw_input: str) -> str:
+    """Convert file URLs (file://...) or raw path strings to clean absolute local paths.
+
+    Handles Linux/macOS file:///home/... and Windows file:///C:/... correctly
+    without stripping leading root slashes.
+    """
+    if not raw_input or not str(raw_input).strip():
+        return ""
+    cleaned = str(raw_input).strip()
+    if cleaned.startswith("file://"):
+        parsed = urlparse(cleaned)
+        path_str = url2pathname(unquote(parsed.path))
+    else:
+        path_str = cleaned
+
+    path_str = repair_malformed_path(path_str)
+
+    try:
+        p = Path(path_str).expanduser()
+        return str(p.resolve())
+    except Exception:
+        return path_str
+
+
 def _normalize_project_path(project):
     raw_path = str(project or "").strip()
     if not raw_path:
         return Path("."), "Project path is empty."
 
-    project_path = Path(os.path.expanduser(raw_path)).resolve()
+    clean_str = url_to_local_path(raw_path)
+    project_path = Path(clean_str)
 
     if project_path.exists() and not project_path.is_dir():
         error_msg = f"Project directory is not a folder: {project_path}"

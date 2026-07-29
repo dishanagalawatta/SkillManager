@@ -57,3 +57,25 @@ def test_no_loky_intercept_in_entrypoint():
     app_content = (src_dir / "app.py").read_text(encoding="utf-8")
     assert "loky_main" not in app_content, "app.py must not contain loky intercept"
     assert "joblib.externals.loky" not in app_content, "app.py must not import loky"
+
+
+def test_boot_normalization_self_healing(tmp_path):
+    from unittest.mock import MagicMock
+
+    from skill_manager.app import AppController
+
+    real_dir = tmp_path / "valid_project"
+    real_dir.mkdir()
+    skills_dir = real_dir / ".agents" / "skills"
+    skills_dir.mkdir(parents=True)
+
+    malformed_path = f"/some/cwd{real_dir.as_posix()}/.agents/skills"
+
+    controller = MagicMock(spec=AppController)
+    controller._projects = [malformed_path]
+    controller._config = MagicMock()
+
+    AppController._normalize_project_paths_on_startup(controller)
+
+    assert controller._projects[0] == str(skills_dir.resolve())
+    controller._config.set.assert_called_with("projects", controller._projects)
