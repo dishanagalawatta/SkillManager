@@ -19,9 +19,9 @@ Dialog {
     property string projectPath: ""
     property string currentName: ""
     
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: 400
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(400, Overlay.overlay ? Overlay.overlay.width - 32 : 400)
     modal: true
     padding: 0
     

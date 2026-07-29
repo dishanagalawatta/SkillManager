@@ -158,6 +158,7 @@ ComboBox {
             boundsBehavior: Flickable.StopAtBounds
             highlightRangeMode: ListView.NoHighlightRange
             highlightFollowsCurrentItem: false
+            ScrollBar.vertical: AppScrollBar { }
 
             onContentYChanged: {
                 appController.logDiagnosticEvent("DEBUG", "status_message", "GlassCollectionDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")

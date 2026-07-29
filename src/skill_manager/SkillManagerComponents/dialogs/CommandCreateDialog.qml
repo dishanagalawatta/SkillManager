@@ -15,9 +15,10 @@ import App 1.0
 Dialog {
     id: root
 
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: 750
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(750, Overlay.overlay ? Overlay.overlay.width - 32 : 750)
+    height: Math.min(680, Overlay.overlay ? Overlay.overlay.height - 32 : 680)
     modal: true
     padding: 0
 
@@ -143,6 +144,7 @@ Dialog {
         // Content
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.fillHeight: true
             Layout.margins: 24
             spacing: 20
 
@@ -306,7 +308,9 @@ Dialog {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 350
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 150
+                    Layout.preferredHeight: 300
                     radius: Theme.radiusField
                     color: Theme.glassHover
                     border.color: cmdBodyInput.activeFocus ? Theme.accent : Theme.glassBorder

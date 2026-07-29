@@ -19,10 +19,10 @@ Dialog {
     property bool isEdit: editIndex !== -1
     property string saveError: ""
     
-    x: Math.round((parent.width - width) / 2)
-    y: Math.round(Math.max(10, (parent.height - height) / 2))
-    width: 750
-    height: Math.min(parent.height - 20, 850)
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
+    width: Math.min(750, Overlay.overlay ? Overlay.overlay.width - 32 : 750)
+    height: Math.min(850, Overlay.overlay ? Overlay.overlay.height - 32 : 850)
     modal: true
     padding: 0
     
@@ -158,9 +158,6 @@ Dialog {
             Layout.fillHeight: true
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
-
-            ColumnLayout {
-            }
 
             Pane {
                 id: formPane

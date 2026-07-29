@@ -27,8 +27,8 @@ Dialog {
         font.weight: Font.DemiBold
     }
     
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
+    parent: Overlay.overlay
+    anchors.centerIn: Overlay.overlay
     width: {
         var maxNameW = 0
         for (var i = 0; i < projectCheckItems.length; i++) {
@@ -36,7 +36,8 @@ Dialog {
             maxNameW = Math.max(maxNameW, _nameMetrics.advanceWidth)
         }
         var contentW = maxNameW + 340
-        return Math.max(600, Math.min(parent.width - 80, contentW))
+        var availableW = Overlay.overlay ? Overlay.overlay.width : 800
+        return Math.max(320, Math.min(availableW - 40, contentW))
     }
     height: {
         var listH = 16
@@ -44,7 +45,8 @@ Dialog {
             listH += projectCheckItems[i].detailsExpanded ? 300 : 76
         }
         var total = 224 + listH
-        return Math.max(400, Math.min(parent.height - 80, total))
+        var availableH = Overlay.overlay ? Overlay.overlay.height : 600
+        return Math.max(300, Math.min(availableH - 40, total))
     }
     modal: true
     padding: 0
@@ -200,6 +202,8 @@ Dialog {
             // Project list with missing skills
             Rectangle {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 150
                 Layout.preferredHeight: {
                     var h = 16
                     for (var i = 0; i < root.projectCheckItems.length; i++) {

@@ -19,10 +19,10 @@ Popup {
 
     // --- Dialog Properties ---
     modal: true
-    width: 480
-    height: 520
+    width: Math.min(480, Overlay.overlay ? Overlay.overlay.width - 32 : 480)
+    height: Math.min(520, Overlay.overlay ? Overlay.overlay.height - 32 : 520)
     parent: Overlay.overlay
-    anchors.centerIn: parent
+    anchors.centerIn: Overlay.overlay
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     // --- Background ---
