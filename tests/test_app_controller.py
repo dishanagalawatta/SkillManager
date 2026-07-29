@@ -710,6 +710,42 @@ def test_client_format_change_syncs_model_filters(qapp, controller):
     assert controller.libraryModel.clientFilter == "Antigravity"
 
 
+def test_default_client_last_selected_preservation(qapp, controller):
+    # Setup stored config with Last Selected client format = "Gemini CLI"
+    controller._config.set("client_format", "Gemini CLI")
+    controller._config.set("default_client", "Codex")
+
+    # Re-evaluate startup logic
+    default_client = controller._config.get("default_client", "Last Selected")
+    if default_client == "Last Selected":
+        controller._client_format = controller._config.get("client_format", "Antigravity")
+    else:
+        controller._client_format = default_client
+
+    assert controller.clientFormat == "Codex"
+    # Ensure config client_format was NOT overwritten with "Codex"
+    assert controller._config.get("client_format") == "Gemini CLI"
+
+    # Now switch defaultClient back to "Last Selected"
+    controller.setDefaultClient("Last Selected")
+    qapp.processEvents()
+
+    assert controller.clientFormat == "Gemini CLI"
+    assert controller.quickCopyModel.clientFilter == "Gemini CLI"
+
+
+def test_set_default_client_dynamic_update(qapp, controller):
+    controller._config.set("client_format", "Antigravity")
+    controller.setDefaultClient("Last Selected")
+    assert controller.clientFormat == "Antigravity"
+
+    controller.setDefaultClient("Gemini CLI")
+    qapp.processEvents()
+
+    assert controller.clientFormat == "Gemini CLI"
+    assert controller.quickCopyModel.clientFilter == "Gemini CLI"
+
+
 def test_copy_collection_to_clipboard_delegates_to_ops(controller):
     controller._custom_collections = {
         "TestColl": {

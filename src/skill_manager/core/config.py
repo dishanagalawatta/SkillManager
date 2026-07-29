@@ -409,7 +409,6 @@ _SCOPED_FILTER_KEYS = (
     "category_filter",
     "collection_filter",
     "project_filter",
-    "client_format",
     "show_commands",
     "show_starred",
     "is_package_only",
