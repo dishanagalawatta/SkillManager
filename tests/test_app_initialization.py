@@ -59,10 +59,12 @@ def test_no_loky_intercept_in_entrypoint():
     assert "joblib.externals.loky" not in app_content, "app.py must not import loky"
 
 
-def test_boot_normalization_self_healing(tmp_path):
+def test_boot_normalization_self_healing(tmp_path, monkeypatch):
     from unittest.mock import MagicMock
 
     from skill_manager.app import AppController
+
+    monkeypatch.delenv("SKILL_MANAGER_SKIP_INITIAL_LOAD", raising=False)
 
     real_dir = tmp_path / "valid_project"
     real_dir.mkdir()

@@ -144,9 +144,12 @@ Rectangle {
 
                 IconButton {
                     id: starButton
-                    iconSource: (root._sel && root._sel.is_starred) 
-                        ? AppController.ui_controller.getAssetUri("ui/star-filled.svg") 
-                        : AppController.ui_controller.getAssetUri("ui/star-outline.svg")
+                    iconSource: {
+                        if (!AppController || !AppController.ui_controller) return ""
+                        return (root._sel && root._sel.is_starred)
+                            ? AppController.ui_controller.getAssetUri("ui/star-filled.svg")
+                            : AppController.ui_controller.getAssetUri("ui/star-outline.svg")
+                    }
                     customIconColor: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
                     iconSize: 22
                     flat: true
@@ -312,7 +315,7 @@ Rectangle {
                     spacing: 6
                     visible: docSection.isExpanded
                     Repeater {
-                        model: root._sel.commands || []
+                        model: (root._sel && root._sel.commands) ? root._sel.commands : []
                         delegate: Rectangle {
                             height: 16
                             width: tagText.implicitWidth + 10

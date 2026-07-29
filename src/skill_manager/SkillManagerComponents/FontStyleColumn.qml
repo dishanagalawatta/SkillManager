@@ -35,8 +35,8 @@ Rectangle {
             clip: true
 
             model: {
-                if (!root.family) return []
-                return fontDB.getStyles(root.family)
+                if (!root.family || typeof fontDB === "undefined" || !fontDB) return []
+                return fontDB.getStyles(root.family) || []
             }
 
             currentIndex: {

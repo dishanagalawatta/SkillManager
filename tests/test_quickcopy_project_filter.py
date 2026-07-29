@@ -111,9 +111,11 @@ def _make_config(projects, aliases=None):
     return cfg
 
 
-def test_boot_normalize_project_paths(tmp_path):
+def test_boot_normalize_project_paths(tmp_path, monkeypatch):
     """Stored root paths are rewritten to .agents/skills on startup."""
     from skill_manager.app import AppController
+
+    monkeypatch.delenv("SKILL_MANAGER_SKIP_INITIAL_LOAD", raising=False)
 
     project_root = tmp_path / "my-project"
     skills_dir = project_root / ".agents" / "skills"
@@ -135,6 +137,7 @@ def test_boot_normalize_project_paths(tmp_path):
 
     try:
         ctrl = AppController(skip_initial_load=True, config=config)
+        ctrl._normalize_project_paths_on_startup()
     finally:
         for p in patches:
             p.stop()

@@ -36,8 +36,8 @@ Rectangle {
             text: root.previewText
             font.family: root.family
             font.pixelSize: root.size
-            font.bold: fontDB.isBold(root.family, root.style)
-            font.italic: fontDB.isItalic(root.family, root.style)
+            font.bold: (typeof fontDB !== "undefined" && fontDB) ? fontDB.isBold(root.family, root.style) : false
+            font.italic: (typeof fontDB !== "undefined" && fontDB) ? fontDB.isItalic(root.family, root.style) : false
             color: root.previewColor
             wrapMode: Text.WordWrap
             verticalAlignment: Text.AlignVCenter

@@ -131,10 +131,10 @@ ComboBox {
             ScrollBar.vertical: AppScrollBar { }
 
             onContentYChanged: {
-                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")
+                if (typeof AppController !== "undefined" && AppController) AppController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")
             }
             onContentHeightChanged: {
-                appController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentHeight changed: " + contentHeight)
+                if (typeof AppController !== "undefined" && AppController) AppController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentHeight changed: " + contentHeight)
             }
             
             Keys.onPressed: (event) => {
