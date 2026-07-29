@@ -14,6 +14,7 @@
 | [ADR-0019](docs/adr/ADR-0019-multiprocessing-joblib.md) | Multiprocessing with Joblib | Accepted | 2026-05-28 | @DIKKA |
 | [ADR-0020](docs/adr/ADR-0020-command-skill-pills.md) | Command Inspector Skill-Dependency Pills | Accepted | 2026-06-14 | @DIKKA |
 | [ADR-0021](docs/adr/ADR-0021-frozen-joblib-threads.md) | Frozen-build joblib backend override | Accepted | 2026-07-01 | @DIKKA |
+| [ADR-0022](docs/adr/ADR-0022-workspace-cleanup-standardization.md) | Workspace Cleanup & Gitignore Standardization | Accepted | 2026-07-29 | @DIKKA |
 
 ## Template
 
@@ -25,3 +26,42 @@ See [`docs/adr/0000-template.md`](docs/adr/0000-template.md) for the ADR format.
 - **Accepted** — Decision made and implemented
 - **Superseded** — Replaced by a newer ADR
 - **Deprecated** — No longer relevant
+
+## Process
+
+**When to write an ADR:**
+- A significant architectural change is being made (new subsystem, pattern change, dependency swap)
+- A decision affects multiple files or teams and its rationale should be preserved
+- You are choosing between two or more non-trivial technical alternatives
+
+**When NOT to write an ADR:**
+- Routine bug fixes or minor patches
+- Internal refactoring with no external interface change
+- Adding a single utility function
+
+**How to create one:**
+
+```bash
+# 1. Copy the template
+cp docs/adr/0000-template.md docs/adr/ADR-XXXX-short-title.md
+
+# 2. Fill in all sections (Context, Decision, Consequences)
+# 3. Set status to "Proposed" until reviewed
+# 4. Add entry to this index table
+# 5. Reference in related DESIGN.md or ARCHITECTURE.md if applicable
+```
+
+**Key rules** (from `/architecture-decision-records` skill):
+- Keep ADRs to 1–2 pages max
+- Never modify an accepted ADR — supersede it with a new one
+- Be honest about cons and trade-offs
+
+## Navigation
+
+| Related Document | Purpose |
+|-----------------|----------|
+| [`DESIGN.md`](DESIGN.md) | System design and architectural patterns |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Full architecture with diagrams |
+| [`docs/adr/0000-template.md`](docs/adr/0000-template.md) | ADR authoring template |
+| [`conductor/workflow.md`](conductor/workflow.md) | Feature track lifecycle |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution guidelines |

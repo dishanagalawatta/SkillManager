@@ -31,6 +31,18 @@
 - **Roles**: Use `role: "primary-outline"` instead of solid filled `role: "primary"` for secondary or auxiliary actions to reduce visual weight.
 - **Toggles**: Use `IconButton` with dynamic `iconSource` (e.g., swapping between `bold-duotone` and `broken`) instead of `GlassToggleButton`.
 - **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
+- **Icon naming**: All icons use the `solar:` URI scheme (e.g., `solar:copy-bold-duotone`, `solar:trash-bin-2-broken`). Use `bold-duotone` for primary actions, `broken` for secondary/inactive state.
+
+**`IconButton` pattern:**
+
+```qml
+IconButton {
+    iconSource: isActive ? "solar:bookmark-bold-duotone" : "solar:bookmark-broken"
+    role: "primary-outline"
+    onClicked: controller.toggleBookmark(skillId)
+    ToolTip.text: isActive ? "Remove bookmark" : "Bookmark skill"
+    ToolTip.visible: hovered
+}
 
 ## Architectural Patterns
 
@@ -161,6 +173,52 @@ User clicks "Copy"
         └─▶ Emit skillsCopied signal
 ```
 
+### 10. MCP Server Architecture
+
+The `src/skill_manager/mcp/` subsystem exposes all core app capabilities to AI agents via the [MCP protocol](https://modelcontextprotocol.io/) (stdio, JSON-RPC 2.0).
+
+```
+src/skill_manager/mcp/
+├── bridge.py          ← IPC bridge: routes MCP ↔ AppController
+├── models.py          ← pydantic request/response schemas
+├── server.py          ← MCP server entry point (stdio)
+└── tools/
+    ├── read_tools.py    ← sm_list_skills, sm_get_skill, sm_search_skills, sm_sync_skills
+    ├── analyze.py       ← sm_analyze_skill, sm_monitor_discovery
+    ├── build.py         ← sm_build_app
+    ├── debug.py         ← sm_debug_skill, sm_get_diagnostics
+    ├── write_tools.py   ← sm_create_skill, sm_update_skill, sm_deploy, sm_delete_skill
+    └── screenshot.py    ← sm_screenshot, sm_navigate
+```
+
+**Access modes:**
+
+```bash
+# Read-only (safe for untrusted agents)
+uv run skill-manager --mcp
+
+# Write-enabled (requires explicit opt-in)
+uv run skill-manager --mcp --mcp-allow-write
+```
+
+See [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) for the full tool reference.
+
+### 11. Error Handling Strategy
+
+```
+Error occurs
+  ├── Sentry.capture_exception()     ← telemetry (if opt-in + prod)
+  ├── logger.error(...)              ← structured log (always)
+  ├── UI: toast / dialog             ← user-visible feedback
+  └── Graceful degradation           ← app stays responsive
+```
+
+**Principles:**
+- All exceptions in background threads are caught at the boundary and converted to signals
+- `BackgroundTaskRunner` propagates failures via `taskFailed(str)` signal; QML binds to it for toasts
+- Telemetry (`Sentry`) is always opt-in and disabled in `SKILL_MANAGER_TESTING=1` mode
+- No exception propagates to the PySide6 event loop unhandled
+
 ## ADR Cross-references
 
 | ADR | Decision | Impact |
@@ -174,3 +232,5 @@ User clicks "Copy"
 | ADR-0018 | Workspace standardization | File organization rules |
 | ADR-0019 | Joblib multiprocessing | CPU-bound work offloaded |
 | ADR-0020 | Command skill pills | Skill dependency UI |
+| ADR-0021 | Frozen-build joblib override | `threading` backend in PyInstaller builds |
+| ADR-0022 | Workspace cleanup standardization | Gitignore hardening + conductor archival batch |

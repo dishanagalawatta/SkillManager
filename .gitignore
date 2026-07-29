@@ -53,8 +53,17 @@ tuf_repo/
 
 # ─── Agent / Local Tooling ──────────────────────────────────────
 # Per ADR-0016: .opencode/ is local agent config, never committed.
+# Per ADR-0022: all local agent/IDE index dirs are excluded.
 .opencode/
 .omo/
+.jules/
+.codegraph/
+.icons_temp/
+.playwright-mcp/
+
+# ─── Build / Runtime Diagnostic Artifacts ────────────────────────
+# Large runtime diagnostic logs (also covered by *.log wildcard above)
+shutdown_diag.log
 
 # ─── Secrets (never commit) ─────────────────────────────────────
 # .env contains live API tokens (PostHog, Sentry, etc.)

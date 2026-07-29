@@ -124,8 +124,59 @@ When all tasks are done and the branch is merged:
 - Archive folders: `YYYY-MM-DD` (e.g., `2026-06-30`)
 - Metadata status: lowercase (`active`, `completed`)
 
+## Canonical Metadata Schema
+
+All `metadata.json` files must use these exact field names (inconsistencies
+found in older tracks have been documented here for normalization):
+
+```json
+{
+  "slug":        "<track-name>",       // REQUIRED. Kebab-case identifier
+  "title":       "Human-readable title", // REQUIRED. ≤ 60 chars
+  "status":      "active",             // REQUIRED. One of: active | completed
+  "owner":       "@username",          // REQUIRED
+  "created":     "YYYY-MM-DD",         // REQUIRED. ISO 8601 date
+  "completed":   "YYYY-MM-DD",         // Set when status → completed
+  "description": "What this implements", // REQUIRED. 1–2 sentences
+  "related_adrs": ["ADR-00XX"],        // Optional. List of related ADR IDs
+  "notes":       "Free-form text"      // Optional. Work-in-progress notes
+}
+```
+
+> **Deprecated fields** (found in legacy tracks, do not use in new tracks):
+> `id` (use `slug`), `type` (not part of schema), `current_phase`, `current_task`,
+> `phases`, `tasks`, `commits` (use git log instead), `branch`, `updated`.
+
+## Stale Track Policy
+
+A track is considered **stale** when it has had no commits, plan updates,
+or metadata changes in **30 or more days** and its status is still `active`.
+
+**Monthly review checklist** (first Monday of each month):
+
+1. Run: `find conductor/tracks -name 'metadata.json' -mtime +30`
+2. For each stale track, check if the associated branch still exists:
+   ```bash
+   git branch --list "track/<slug>"
+   ```
+3. If the branch is merged or deleted → update status to `completed` and archive
+4. If work is genuinely paused → add a `notes` field with reason and target date
+5. If track is abandoned → discuss with owner before archiving as `completed`
+
+## Agent Integration
+
+When AI agents interact with conductor tracks, they must follow these rules:
+
+- **Reading**: Always read `metadata.json` and `plan.md` before starting work
+- **Updating plan.md**: Use `[ ]` → `[/]` (in progress) → `[x]` (done) notation
+- **Updating metadata.json**: Update `status` when all tasks are complete
+- **Archiving**: Use `/conductor-manage` skill — never manually `mv` without updating the index
+- **Creating new tracks**: Follow the Metadata Schema above exactly; avoid deprecated fields
+- **Halting**: If a plan step fails, halt and report — do not skip steps silently
+
 ## Cross-references
 
 - [`docs/HOUSEKEEPING.md`](../docs/HOUSEKEEPING.md) — cleanup rules
 - [`docs/adr/ADR-0015-conductor-archival.md`](../docs/adr/ADR-0015-conductor-archival.md) — archival policy
+- [`docs/adr/ADR-0022-workspace-cleanup-standardization.md`](../docs/adr/ADR-0022-workspace-cleanup-standardization.md) — gitignore and archival batch
 - [`AGENTS.md`](../AGENTS.md) — agent workflow rules
