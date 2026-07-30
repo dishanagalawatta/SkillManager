@@ -165,6 +165,13 @@ class SearchEngine:
                         max_token_match = 100
                         break
 
+                # Fast path: exact token match if no substring match was found
+                if max_token_match == 0:
+                    for qt in query_tokens:
+                        if qt in all_doc_tokens:
+                            max_token_match = 100
+                            break
+
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
                     for qt in query_tokens:
