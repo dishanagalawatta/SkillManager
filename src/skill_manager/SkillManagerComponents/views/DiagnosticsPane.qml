@@ -108,7 +108,7 @@ Item {
                         height: 6
                         radius: 3
                         color: root.healthStatus === "red" ? Theme.danger
-                             : root.healthStatus === "yellow" ? "#F59E0B"
+                             : root.healthStatus === "yellow" ? Theme.warning
                              : "#22C55E"
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -121,7 +121,7 @@ Item {
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
                         color: root.healthStatus === "red" ? Theme.danger
-                             : root.healthStatus === "yellow" ? "#F59E0B"
+                             : root.healthStatus === "yellow" ? Theme.warning
                              : "#22C55E"
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -381,9 +381,9 @@ Item {
                                             font.pixelSize: 11
                                             font.weight: Font.DemiBold
                                             color: modelData.level === "ERROR" ? Theme.danger
-                                                 : modelData.level === "WARNING" ? "#F59E0B"
+                                                 : modelData.level === "WARNING" ? Theme.warning
                                                  : modelData.level === "DEBUG" ? Theme.secondaryLabel
-                                                 : "#3B82F6"
+                                                 : Theme.info
                                             Layout.preferredWidth: 70
                                         }
                                         Text {
