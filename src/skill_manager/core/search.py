@@ -138,6 +138,10 @@ class SearchEngine:
         """
         Calculate a weighted relevance score for a skill.
         """
+        # Perf: Fast-path exact match before expensive fuzzy calls
+        if query == index_data["name"]:
+            return 100.0
+
         # If no rapidfuzz, fallback to simple substring check
         if fuzz is None:
             if query in index_data["full_text"]:
@@ -155,39 +159,41 @@ class SearchEngine:
             if all_doc_tokens:
                 max_token_match = 0
 
-                # Fast path: check all query tokens for exact substring matches first
+                # Fast path: exact token match (C-optimized list membership)
                 for qt in query_tokens:
-                    if qt in index_data["full_text"]:
+                    if qt in all_doc_tokens:
                         max_token_match = 100
                         break
+
+                # Fast path: evaluate substring matches if no exact token match was found
+                if max_token_match == 0:
+                    for qt in query_tokens:
+                        if qt in index_data["full_text"]:
+                            max_token_match = 100
+                            break
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
                     for qt in query_tokens:
-                        if qt in all_doc_tokens:
-                            max_token_match = 100
+                        if process is not None:
+                            # Perf: C-optimized best match instead of nested Python iteration
+                            match = process.extractOne(
+                                qt,
+                                all_doc_tokens,
+                                scorer=fuzz.ratio,
+                                score_cutoff=max_token_match,
+                            )
+                            if match:
+                                max_token_match = match[1]
+                        else:
+                            for dt in all_doc_tokens:
+                                score = fuzz.ratio(qt, dt)
+                                if score > max_token_match:
+                                    max_token_match = score
+                                if max_token_match > 70:
+                                    break
+                        if max_token_match > 70:
                             break
-                    if max_token_match == 0:
-                        for qt in query_tokens:
-                            if process is not None:
-                                # Perf: C-optimized best match instead of nested Python iteration
-                                match = process.extractOne(
-                                    qt,
-                                    all_doc_tokens,
-                                    scorer=fuzz.ratio,
-                                    score_cutoff=max_token_match,
-                                )
-                                if match:
-                                    max_token_match = match[1]
-                            else:
-                                for dt in all_doc_tokens:
-                                    score = fuzz.ratio(qt, dt)
-                                    if score > max_token_match:
-                                        max_token_match = score
-                                    if max_token_match > 70:
-                                        break
-                            if max_token_match > 70:
-                                break
 
                 # If no query token has a decent match with any document token, it's irrelevant
                 if max_token_match < 65:
