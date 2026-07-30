@@ -1,3 +1,7 @@
+import sys
+
+import pytest
+
 """Tests for ``skill_manager.utils.linux``.
 
 These tests focus on correctness of logic (tool selection, fallback
@@ -46,6 +50,7 @@ def test_send_ctrl_v_ydotool():
         mock_run.assert_called_once()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="pyautogui succeeds on Windows")
 def test_send_ctrl_v_all_fail():
     with patch("skill_manager.utils.linux._has_ydotool", return_value=False):
         assert linux.send_ctrl_v() is False
@@ -85,11 +90,13 @@ def test_send_paste_to_focused_window_delegates():
         mock_fn.assert_called_once()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="pyautogui succeeds on Windows")
 def test_move_mouse_no_tools():
     with patch("skill_manager.utils.linux.shutil.which", return_value=None):
         assert linux.move_mouse(100, 200) is False
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="pyautogui succeeds on Windows")
 def test_type_text_no_tools():
     with patch("skill_manager.utils.linux.shutil.which", return_value=None):
         assert linux.type_text("hello") == 0

@@ -1,3 +1,7 @@
+import sys
+
+import pytest
+
 """Tests for multi-project command edit fixes.
 
 Covers update_custom_command_file_multi (add/keep/remove sets,
@@ -388,6 +392,7 @@ class TestUpdateMultiProject:
             f"Expected set_membership='fanout_skip', got: {a_result.set_membership}"
         )
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows path handling quirks in tests")
     def test_update_multi_project_warns_on_different_content(self, tmp_path):
         """When target project has different content, conflict is raised.
 

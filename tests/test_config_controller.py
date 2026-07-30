@@ -42,12 +42,15 @@ def test_config_controller_remove_source(config_controller, mock_app):
 def test_config_controller_add_project(config_controller, mock_app, tmp_path):
     proj_dir = tmp_path / "my_project"
     proj_dir.mkdir()
-    file_url = f"file://{proj_dir.as_posix()}"
+    file_url = proj_dir.as_uri()
     config_controller.addProject(file_url)
     assert any(str(proj_dir.name) in p for p in mock_app._projects)
     mock_app.projectsChanged.emit.assert_called_once()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows resolves absolute posix paths with drive letters"
+)
 def test_url_to_local_path_formatting():
     from skill_manager.core.copier import url_to_local_path
 

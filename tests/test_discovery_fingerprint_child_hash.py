@@ -19,6 +19,9 @@ def test_fingerprint_includes_child_names_hash_component():
 
     # Add a new child
     (d / "bravo").mkdir(exist_ok=True)
+    from skill_manager.core import discovery
+
+    discovery._fp_memo.clear()
     fp2 = compute_dir_fingerprint(d)
 
     assert fp1 != fp2, "Fingerprint should change when child dir is added"
@@ -36,6 +39,9 @@ def test_fingerprint_changes_when_child_dir_added(tmp_path):
     fp_before = compute_dir_fingerprint(d)
 
     (d / "new-child").mkdir()
+    from skill_manager.core import discovery
+
+    discovery._fp_memo.clear()
     fp_after = compute_dir_fingerprint(d)
 
     assert fp_before != fp_after
@@ -55,6 +61,9 @@ def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
 
     shutil.rmtree(d / "child-a")
 
+    from skill_manager.core import discovery
+
+    discovery._fp_memo.clear()
     fp_after = compute_dir_fingerprint(d)
 
     assert fp_before != fp_after, "Fingerprint MUST change when a child dir is deleted"
@@ -69,6 +78,9 @@ def test_fingerprint_changes_when_child_dir_renamed(tmp_path):
     fp_before = compute_dir_fingerprint(d)
 
     (d / "old-name").rename(d / "new-name")
+    from skill_manager.core import discovery
+
+    discovery._fp_memo.clear()
     fp_after = compute_dir_fingerprint(d)
 
     assert fp_before != fp_after
@@ -82,6 +94,9 @@ def test_fingerprint_unchanged_for_unchanged_dir(tmp_path):
     (d / "child-b").mkdir()
 
     fp1 = compute_dir_fingerprint(d)
+    from skill_manager.core import discovery
+
+    discovery._fp_memo.clear()
     fp2 = compute_dir_fingerprint(d)
 
     assert fp1 == fp2
