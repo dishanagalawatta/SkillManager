@@ -6,6 +6,7 @@ Handles saving and loading of archive, starred, and skill cache.
 import contextlib
 import logging
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -155,13 +156,19 @@ def save_package_skill_inventory(data: dict[str, Any]) -> bool:
     return _atomic_write_json(PACKAGE_SKILL_INVENTORY_FILE, data)
 
 
+@lru_cache(maxsize=128)
+def _cached_get_skills_dir(pp: str) -> str:
+    from skill_manager.core.copier import get_skills_dir
+
+    return str(get_skills_dir(pp))
+
+
 def _normalize_skill_project_path(skill: dict[str, Any]) -> dict[str, Any]:
     """Normalize a skill's project_path through get_skills_dir for consistency."""
     pp = skill.get("project_path")
     if pp:
-        from skill_manager.core.copier import get_skills_dir
-
-        skill["project_path"] = str(get_skills_dir(pp))
+        # Perf: Many skills share a few project paths; cache the resolution to avoid repeated disk I/O
+        skill["project_path"] = _cached_get_skills_dir(str(pp))
     return skill
 
 
