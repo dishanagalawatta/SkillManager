@@ -116,7 +116,9 @@ def _portal_capture(output_path: str | None = None) -> str | None:
     Returns the path to the saved PNG, or ``None`` on failure.
     """
     if output_path is None:
-        output_path = tempfile.mktemp(suffix=".png")
+        # SECURITY: Use mkstemp instead of mktemp to prevent TOCTOU race conditions
+        fd, output_path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
 
     # Pre-authorise via PermissionStore (persistent — benefits the
     # subprocess even though it has a different PID).
@@ -169,7 +171,9 @@ def _gnome_screenshot_capture(output_path: str | None = None) -> str | None:
     Returns the path or ``None`` on failure.
     """
     if output_path is None:
-        output_path = tempfile.mktemp(suffix=".png")
+        # SECURITY: Use mkstemp instead of mktemp to prevent TOCTOU race conditions
+        fd, output_path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
 
     try:
         proc = subprocess.run(
