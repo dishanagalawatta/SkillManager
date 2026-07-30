@@ -124,6 +124,5 @@ Button {
         text: control.tooltipText
     }
     Accessible.role: Accessible.Button
-    Accessible.name: text
-    Accessible.description: tooltipText
+    Accessible.name: tooltipText !== "" ? tooltipText : text
 }
