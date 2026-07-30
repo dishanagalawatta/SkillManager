@@ -31,3 +31,7 @@
 
 **Learning:** When creating reusable QML components with `Accessible.name` derived from a property (like `text` or `tooltipText`), explicitly setting `Accessible.description` to the exact same value causes screen readers to double-announce the action.
 **Action:** Always verify that `Accessible.description` provides additional context. If it merely mirrors `Accessible.name`, omit it entirely to ensure a clean, single announcement.
+
+## 2026-07-26 - SkillInspector collapse handle keyboard accessibility
+**Learning:** In QML, when refactoring a `MouseArea` to make a previously mouse-only UI element (like a collapse handle) keyboard accessible, the `Accessible` roles and names must be moved to the element that can actually receive active focus (e.g., the parent `Rectangle`). Additionally, a visual focus indicator (`border.color`) should be bound to `activeFocus`.
+**Action:** Always move `Accessible.*` properties to the focusable parent `Item`/`Rectangle` when replacing `MouseArea` click behavior with keyboard shortcuts, and ensure tooltips combine `hovered` and `activeFocus` for visibility.
