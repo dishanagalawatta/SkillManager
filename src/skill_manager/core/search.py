@@ -159,18 +159,11 @@ class SearchEngine:
             if all_doc_tokens:
                 max_token_match = 0
 
-                # Fast path: exact token match (C-optimized list membership)
+                # Fast path: evaluate substring matches (C-optimized str.__contains__)
                 for qt in query_tokens:
-                    if qt in all_doc_tokens:
+                    if qt in index_data["full_text"]:
                         max_token_match = 100
                         break
-
-                # Fast path: evaluate substring matches if no exact token match was found
-                if max_token_match == 0:
-                    for qt in query_tokens:
-                        if qt in index_data["full_text"]:
-                            max_token_match = 100
-                            break
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
