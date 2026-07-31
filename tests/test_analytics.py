@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 from unittest.mock import MagicMock, patch
@@ -5,6 +6,44 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.core import analytics
+
+# ---------------------------------------------------------------------------
+# Module-state hygiene (xdist determinism)
+# ---------------------------------------------------------------------------
+# The MCP profiling tools (skill_manager.mcp.tools.monitor._handle_profile)
+# permanently replace analytics.capture_event / capture_exception / capture
+# with no-op lambdas to suppress telemetry while profiling — and never
+# restore them.  Under pytest-xdist a worker that previously ran such a tool
+# (e.g. test_mcp_tools.py) would hand this file a module whose capture
+# functions are inert lambdas, making every ``assert_called_once_with`` fail
+# with "Called 0 times".  Snapshot the canonical module state at import time
+# (collection, before any test executes) and restore it around every test so
+# this file is deterministic regardless of what ran earlier in the worker.
+_ORIGINAL_ANALYTICS_STATE = {
+    "capture_event": analytics.capture_event,
+    "capture_exception": analytics.capture_exception,
+    "_posthog": analytics._posthog,
+    "_device_id": analytics._device_id,
+}
+# monitor.py also creates a stray ``capture`` attribute via setattr; it is
+# not part of the analytics API and must be removed when present.
+_STRAY_ANALYTICS_NAMES = ("capture",)
+
+
+def _restore_analytics_module_state() -> None:
+    for _name, _value in _ORIGINAL_ANALYTICS_STATE.items():
+        setattr(analytics, _name, _value)
+    for _name in _STRAY_ANALYTICS_NAMES:
+        with contextlib.suppress(AttributeError):
+            delattr(analytics, _name)
+
+
+@pytest.fixture(autouse=True)
+def restore_analytics_module_state():
+    """Restore analytics module singletons before and after every test."""
+    _restore_analytics_module_state()
+    yield
+    _restore_analytics_module_state()
 
 
 @pytest.fixture

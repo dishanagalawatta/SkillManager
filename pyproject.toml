@@ -42,7 +42,6 @@ dependencies = [
     "pyautogui>=0.9.54",
 ]
 
-
 [project.optional-dependencies]
 win32 = [
     "pywinstyles",
@@ -63,26 +62,12 @@ dev = [
 skill-manager = "skill_manager.__main__:main"
 skill-manager-build = "skill_manager._build:main"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["skill_manager*"]
 
 [tool.setuptools.package-data]
 skill_manager = ["assets/brand/*", "assets/ui/*", "assets/clients/*"]
-
 
 [tool.coverage.run]
 source = ["skill_manager"]
@@ -92,15 +77,6 @@ omit = ["src/skill_manager/__main__.py"]
 fail_under = 80
 show_missing = true
 skip_covered = false
-
-
-
-
-
-
-
-
-
 
 [dependency-groups]
 dev = [
@@ -117,7 +93,6 @@ dev = [
     "python-semantic-release>=10.5.3",
 ]
 
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -129,7 +104,6 @@ markers = [
 filterwarnings = [
     "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
 ]
-
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
