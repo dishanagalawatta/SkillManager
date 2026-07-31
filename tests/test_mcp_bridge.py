@@ -1,9 +1,11 @@
 """Lightweight tests for the MCP bridge functions that need no Qt/AppController.
 
 These exercise the parts of ``skill_manager.mcp.bridge`` that are safe to run
-headless: the async job buffer (``run_async_job`` / ``get_job``) and the
-filesystem grep (``static_analyze``). They never call ``get_app_controller()``,
-so no Qt application is constructed.
+headless: the async job buffer (``run_async_job`` / ``get_job``), the
+filesystem grep (``static_analyze``), and the input-injection guard on the
+cross-process GUI tools (``send_mouse_move`` / ``send_mouse_click`` /
+``send_type_text``). They never call ``get_app_controller()``, so no Qt
+application is constructed.
 """
 
 from __future__ import annotations
@@ -13,7 +15,9 @@ from typing import Any
 
 import pytest
 
+import skill_manager.utils.linux as linux_utils
 from skill_manager.mcp import bridge
+from skill_manager.utils import input_guard
 
 
 def test_run_async_job_returns_id_and_buffers() -> None:
@@ -100,3 +104,72 @@ def test_static_analyze_missing_path(tmp_path: Any, monkeypatch: pytest.MonkeyPa
     matches = bridge.static_analyze(pattern="x", path="no-such-dir-xyz")
 
     assert matches == []
+
+
+def _clear_injection_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate a real desktop session so the guard can reach its target check."""
+    """Simulate a real desktop session so the guard can reach its target check."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("QT_QPA_PLATFORM", raising=False)
+
+
+def test_input_tools_refuse_under_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under pytest (PYTEST_CURRENT_TEST set) every input tool refuses."""
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "tests/test_mcp_bridge.py::f")
+
+    for result in (
+        bridge.send_mouse_move(10, 10),
+        bridge.send_mouse_click(10, 10),
+        bridge.send_type_text("hello"),
+    ):
+        assert result["ok"] is False
+        assert "pytest" in (result["error"] or "")
+
+
+def test_input_tools_refuse_offscreen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With QT_QPA_PLATFORM=offscreen every input tool refuses."""
+    _clear_injection_env(monkeypatch)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+
+    for result in (
+        bridge.send_mouse_move(10, 10),
+        bridge.send_mouse_click(10, 10),
+        bridge.send_type_text("hello"),
+    ):
+        assert result["ok"] is False
+        assert "offscreen" in (result["error"] or "")
+
+
+def test_input_tools_refuse_without_gui_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No SkillManager window present => injection refused (never blind)."""
+    _clear_injection_env(monkeypatch)
+    monkeypatch.setattr(input_guard, "gui_window_present", lambda: False)
+
+    for result in (
+        bridge.send_mouse_move(10, 10),
+        bridge.send_mouse_click(10, 10),
+        bridge.send_type_text("hello"),
+    ):
+        assert result["ok"] is False
+        assert "window" in (result["error"] or "")
+
+
+def test_input_tools_run_when_gui_window_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With a live GUI window present, tools delegate to the platform backends."""
+    _clear_injection_env(monkeypatch)
+    monkeypatch.setattr(input_guard, "gui_window_present", lambda: True)
+    monkeypatch.setattr(linux_utils, "move_mouse", lambda x, y: True)
+    monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
+    monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
+
+    move = bridge.send_mouse_move(10, 10)
+    click = bridge.send_mouse_click(10, 10)
+    typed = bridge.send_type_text("hello")
+
+    assert move["ok"] is True
+    assert click["ok"] is True
+    assert typed == {"ok": True, "chars": 5}

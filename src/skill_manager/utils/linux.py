@@ -22,6 +22,8 @@ import os
 import shutil
 import subprocess
 
+from skill_manager.utils.input_guard import injection_allowed
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -130,7 +132,7 @@ def get_clipboard() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Keyboard injection
+# Keyboard/mouse injection (guarded)
 # ---------------------------------------------------------------------------
 
 _KEY_CTRL = 29  # ydotool KEY_LEFTCTRL
@@ -143,6 +145,8 @@ def send_ctrl_v() -> bool:
     Tries ``ydotool`` first (Wayland uinput), then falls back gracefully.
     Returns ``True`` on success.
     """
+    if not injection_allowed():
+        return False
     if _has_ydotool():
         try:
             subprocess.run(
@@ -302,6 +306,8 @@ def get_window_geometry(_window_id: int) -> dict | None:
 
 def move_mouse(x: int, y: int) -> bool:
     """Move cursor to (``x``, ``y``).  Returns ``True`` on success."""
+    if not injection_allowed():
+        return False
     # ydotool (Wayland uinput)
     ydotool = shutil.which("ydotool")
     if ydotool:
@@ -333,6 +339,8 @@ def click_mouse(
     button: str = "left",
 ) -> bool:
     """Click at (``x``, ``y``) if provided.  Returns ``True`` on success."""
+    if not injection_allowed():
+        return False
     if x is not None and y is not None and not move_mouse(x, y):
         return False
 
@@ -368,6 +376,8 @@ def click_mouse(
 
 def type_text(text: str) -> int:
     """Type *text* into the focused window.  Returns chars typed (0 on failure)."""
+    if not injection_allowed():
+        return 0
     # ydotool type
     ydotool = shutil.which("ydotool")
     if ydotool:

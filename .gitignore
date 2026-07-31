@@ -61,6 +61,9 @@ tuf_repo/
 .icons_temp/
 .playwright-mcp/
 
+# MCP screenshot captures (regenerable; must never be committed)
+.agents/screenshots/
+
 # ─── Build / Runtime Diagnostic Artifacts ────────────────────────
 # Large runtime diagnostic logs (also covered by *.log wildcard above)
 shutdown_diag.log

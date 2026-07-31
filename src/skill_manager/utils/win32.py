@@ -1,7 +1,10 @@
 import contextlib
 import ctypes
 import logging
+import os
 from ctypes import wintypes
+
+from skill_manager.utils.input_guard import injection_allowed
 
 pywinstyles = None
 with contextlib.suppress(ImportError):
@@ -99,6 +102,8 @@ def send_paste_to_focused_window() -> bool:
 
     Returns True on success, False on failure (non-Windows or permission error).
     """
+    if not injection_allowed():
+        return False
     try:
         user32 = ctypes.windll.user32
         VK_CONTROL = 0x11

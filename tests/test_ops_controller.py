@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -871,7 +872,10 @@ def test_copy_collection_to_clipboard_auto_minimize(mock_timer, ops_controller, 
         mock_timer.assert_called_once_with(120, ops_controller._send_paste_to_focused_window)
 
 
-@patch("skill_manager.utils.win32.send_paste_to_focused_window", return_value=False)
+_PASTE_MODULE = "win32" if sys.platform == "win32" else "linux"
+
+
+@patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
 def test_send_paste_to_focused_window_failure_sets_status(mock_paste, ops_controller, mock_app):
     ops_controller._send_paste_to_focused_window()
     mock_app._set_status.assert_called_with("Copied, but could not paste automatically")

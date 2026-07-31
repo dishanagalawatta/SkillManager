@@ -72,24 +72,49 @@ class TestBackgroundTaskRunnerShutdown:
         assert len(runner._threads) == 0
 
 
+class TestDumpDiagnostics:
+    """dump_diagnostics must be env-gated and write to DATA_DIR, not CWD."""
+
+    def test_noop_without_diag_env(self, tmp_path, monkeypatch):
+        """Without SKILL_MANAGER_DIAG=1 the function must not create a log."""
+        from skill_manager.utils.shutdown import dump_diagnostics
+
+        monkeypatch.delenv("SKILL_MANAGER_DIAG", raising=False)
+        with patch("skill_manager.utils.shutdown.DIAG_FILE", tmp_path / "shutdown_diag.log"):
+            dump_diagnostics("no-gate test")
+        assert not (tmp_path / "shutdown_diag.log").exists()
+
+    def test_writes_log_when_env_set(self, tmp_path, monkeypatch):
+        """With SKILL_MANAGER_DIAG=1 the function must append a diagnostic entry."""
+        from skill_manager.utils.shutdown import dump_diagnostics
+
+        monkeypatch.setenv("SKILL_MANAGER_DIAG", "1")
+        diag_file = tmp_path / "shutdown_diag.log"
+        with patch("skill_manager.utils.shutdown.DIAG_FILE", diag_file):
+            dump_diagnostics("gated test")
+        content = diag_file.read_text(encoding="utf-8")
+        assert "gated test" in content
+        assert "THREAD LIST" in content
+
+
 class TestWatchdogExit:
     """The watchdog exit function must force-kill after timeout."""
 
     def test_watchdog_exit_fires_os_exit(self):
-        """_watchdog_exit calls os._exit after the timeout."""
-        from skill_manager.app import _watchdog_exit
+        """watchdog_exit calls os._exit after the timeout."""
+        from skill_manager.utils.shutdown import watchdog_exit
 
-        with patch("skill_manager.app.os._exit") as mock_exit:
-            t = _watchdog_exit(42, timeout=0.1)
+        with patch("skill_manager.utils.shutdown.os._exit") as mock_exit:
+            t = watchdog_exit(42, timeout=0.1)
             t.join(timeout=1.0)
             mock_exit.assert_called_once_with(42)
 
     def test_watchdog_exit_uses_daemon_thread(self):
         """The watchdog thread must be a daemon so it doesn't block exit."""
-        from skill_manager.app import _watchdog_exit
+        from skill_manager.utils.shutdown import watchdog_exit
 
-        with patch("skill_manager.app.os._exit"):
-            t = _watchdog_exit(0, timeout=0.1)
+        with patch("skill_manager.utils.shutdown.os._exit"):
+            t = watchdog_exit(0, timeout=0.1)
             assert t.daemon is True
             t.join(timeout=1.0)
 
@@ -180,9 +205,9 @@ class TestMainExitStrategy:
         """Watchdog must still use os._exit as the failsafe."""
         import inspect
 
-        from skill_manager.app import _watchdog_exit
+        from skill_manager.utils.shutdown import watchdog_exit
 
-        source = inspect.getsource(_watchdog_exit)
+        source = inspect.getsource(watchdog_exit)
         assert "os._exit(" in source, "watchdog should use os._exit as failsafe"
 
     def test_cleanup_posthog_is_daemon_thread(self):

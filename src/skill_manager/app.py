@@ -22,6 +22,8 @@ import sentry_sdk
 from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
 from PySide6.QtCore import (  # noqa: E402
     Property,
+    QCoreApplication,
+    QEvent,
     QFileSystemWatcher,
     QObject,
     Qt,
@@ -111,6 +113,7 @@ from skill_manager.core.resources import (  # noqa: E402
     resource_path as resolve_resource_path,
 )
 from skill_manager.core.schemas import UpdatePackageRecord  # noqa: E402
+from skill_manager.utils.shutdown import dump_diagnostics, watchdog_exit  # noqa: E402
 from skill_manager.utils.task_runner import BackgroundTaskRunner  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -184,6 +187,27 @@ class CommandChannel(QObject):
         except Exception as exc:  # noqa: BLE001 — degrade, never crash
             logger.warning("CommandChannel disabled (headless/CI?): %s", exc)
             self._commands_dir = None
+
+    def stop(self) -> None:
+        """Release watcher and timer. Idempotent; safe to call multiple times.
+
+        Required so controllers created in tests/MCP bridges do not leak
+        inotify instances on the host.
+        """
+        watcher = getattr(self, "_watcher", None)
+        if watcher is not None:
+            with contextlib.suppress(TypeError):
+                watcher.directoryChanged.disconnect(self._poll_commands)
+            watcher.deleteLater()
+            self._watcher = None
+        timer = getattr(self, "_timer", None)
+        if timer is not None:
+            timer.stop()
+            timer.deleteLater()
+            self._timer = None
+        # Flush deferred deletes now so the inotify fd is released even when
+        # no event loop runs afterwards (e.g. pytest workers, probe scripts).
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
     def _poll_commands(self) -> None:
         """Check for new command files and process every pending one.
@@ -1597,6 +1621,17 @@ class AppController(QObject):
         if hasattr(self, "global_hotkey"):
             self.global_hotkey.stop()
 
+        # Release CommandChannel watcher/timer — QFileSystemWatcher holds an
+        # inotify instance; without this every controller leaks one (system-wide
+        # "inotify instance limit reached" when many are created, e.g. in tests).
+        if hasattr(self, "command_channel") and self.command_channel is not None:
+            self.command_channel.stop()
+
+        # Stop periodic timers (watcher debounce + known-paths poll).
+        for timer in ("_watcher_debounce_timer", "_poll_timer"):
+            if hasattr(self, timer):
+                getattr(self, timer).stop()
+
         if hasattr(self, "_watcher"):
             self._watcher.stop()
         if hasattr(self, "_scheduler") and self._scheduler.running:
@@ -1658,113 +1693,6 @@ class AppController(QObject):
 
         logger.debug("[SHUTDOWN] cleanup complete")
         dump_diagnostics("cleanup complete")
-
-
-_diag_lock = threading.Lock()
-
-
-def dump_diagnostics(reason: str) -> None:
-    """Write comprehensive stack traces, threads, and child processes to shutdown_diag.log and stderr.
-
-    This runs during shutdown steps or from the watchdog thread to identify hangs.
-    """
-    try:
-        import sys
-        import time
-        import traceback
-        from pathlib import Path
-
-        import psutil
-
-        # Query child processes info
-        child_info = []
-        try:
-            parent = psutil.Process(os.getpid())
-            for child in parent.children(recursive=True):
-                with contextlib.suppress(Exception):
-                    child_info.append(f"{child.name()}({child.pid})[{child.status()}]")
-        except Exception as e:
-            child_info.append(f"error:{e}")
-
-        children_str = ",".join(child_info) if child_info else "none"
-
-        # Print a clear diagnostic message directly to the terminal
-        console_msg = f"[SHUTDOWN_DIAG] {reason} (PID: {os.getpid()}, Threads: {threading.active_count()}, Children: {children_str})\n"
-        with contextlib.suppress(Exception):
-            os.write(2, console_msg.encode())
-
-        diag_file = Path("shutdown_diag.log")
-        with _diag_lock, diag_file.open("a", encoding="utf-8") as f:
-            f.write(f"\n================ DIAGNOSTICS: {reason} ================\n")
-            f.write(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"PID: {os.getpid()}\n")
-            f.write(f"Active Threads count: {threading.active_count()}\n")
-
-            # Log children in detail
-            f.write(f"\n--- CHILD PROCESSES ({len(child_info)}) ---\n")
-            try:
-                parent = psutil.Process(os.getpid())
-                for child in parent.children(recursive=True):
-                    try:
-                        f.write(
-                            f"PID: {child.pid}, Name: {child.name()}, Status: {child.status()}, Created: {child.create_time()}\n"
-                        )
-                    except Exception as e:
-                        f.write(f"PID: {child.pid} error: {e}\n")
-            except Exception as e:
-                f.write(f"Failed to get children: {e}\n")
-
-            f.write("\n--- THREAD LIST ---\n")
-            for t in threading.enumerate():
-                daemon_str = "daemon" if t.daemon else "non-daemon"
-                f.write(f"Thread: {t.name} (ID: {t.ident}, {daemon_str}, alive: {t.is_alive()})\n")
-
-            f.write("\n--- STACK TRACES ---\n")
-            for thread_id, frame in sys._current_frames().items():
-                t = next((x for x in threading.enumerate() if x.ident == thread_id), None)
-                t_name = t.name if t else "Unknown"
-                f.write(f"\nStack for thread {t_name} (ID {thread_id}):\n")
-                traceback.print_stack(frame, file=f)
-
-            f.write("\n=======================================================\n")
-    except Exception as e:
-        with contextlib.suppress(Exception):
-            os.write(2, f"Failed to dump diagnostics: {e}\n".encode())
-
-
-def _watchdog_exit(ret: int, timeout: float = 5.0) -> threading.Thread:
-    """Force-kill the process after *timeout* seconds if shutdown hangs.
-
-    Spawns a daemon thread that periodically dumps diagnostics to a log file
-    and calls ``os._exit()`` after the timeout.
-    """
-
-    def _force_exit():
-        # Log diagnostics every 1 second until the timeout is reached
-        start_time = time.time()
-        tick = 1
-        while True:
-            remaining = timeout - (time.time() - start_time)
-            if remaining <= 0:
-                break
-            time.sleep(min(1.0, remaining))
-            if timeout - (time.time() - start_time) > 0:
-                dump_diagnostics(f"Watchdog tick {tick}s")
-                tick += 1
-
-        # Final diagnostics dump right before force-exit
-        dump_diagnostics("Watchdog final timeout reached")
-
-        with contextlib.suppress(Exception):
-            os.write(
-                2,
-                f"\n[SHUTDOWN] Watchdog timeout: calling os._exit({ret})\n".encode(),
-            )
-        os._exit(ret)
-
-    t = threading.Thread(target=_force_exit, daemon=True)
-    t.start()
-    return t
 
 
 def _bring_existing_window_to_front() -> None:
@@ -2229,7 +2157,7 @@ def main():  # pragma: no cover
 
     # Arm the watchdog — if shutdown takes >5s, force-exit
     dump_diagnostics("app.exec finished")
-    _watchdog_exit(ret, timeout=5.0)
+    watchdog_exit(ret, timeout=5.0)
 
     # Drain pending Qt events so QML releases GPU resources cleanly.
     app.processEvents()

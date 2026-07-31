@@ -87,6 +87,7 @@ cp .env.example .env
 |----------|---------|----------|
 | `SKILL_MANAGER_LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 | `SKILL_MANAGER_HOTKEY` | `ctrl+shift+s` | Global hotkey to summon the UI |
+| `SKILL_MANAGER_DIAG` | — | Set `1` to enable shutdown diagnostics logging (debug only) |
 | `QT_QPA_PLATFORM` | native | Set `offscreen` for headless/CI |
 | `POSTHOG_PROJECT_TOKEN` | — | PostHog analytics token (opt-in) |
 | `SENTRY_DSN` | — | Sentry error tracking DSN (opt-in) |
