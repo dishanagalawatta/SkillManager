@@ -169,6 +169,13 @@ class SearchEngine:
                         max_token_match = 100
                         break
 
+                # If no exact match found, we still need to evaluate substring match for partial/prefix matching
+                if max_token_match == 0:
+                    for qt in query_tokens:
+                        if qt in index_data["full_text"]:
+                            max_token_match = 100
+                            break
+
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
                 if max_token_match == 0:
                     for qt in query_tokens:
