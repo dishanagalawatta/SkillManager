@@ -37,6 +37,7 @@ from typing import Any
 
 from skill_manager.core.analytics import capture_event
 from skill_manager.core.diagnostics import get_diagnostic_logger
+from skill_manager.utils import input_guard
 
 logger = logging.getLogger(__name__)
 
@@ -1519,6 +1520,9 @@ def send_mouse_move(x: int, y: int) -> dict[str, Any]:
     on failure.
     """
     _log_call("send_mouse_move")
+    refused = input_guard.injection_refused_reason()
+    if refused is not None:
+        return {"ok": False, "error": refused}
     if sys.platform == "win32":
         try:
             result = ctypes.windll.user32.SetCursorPos(x, y)  # type: ignore[attr-defined]
@@ -1550,6 +1554,9 @@ def send_mouse_click(
     on failure.
     """
     _log_call("send_mouse_click")
+    refused = input_guard.injection_refused_reason()
+    if refused is not None:
+        return {"ok": False, "error": refused}
     if sys.platform == "win32":
         try:
             user32 = ctypes.windll.user32  # type: ignore[attr-defined]
@@ -1589,6 +1596,9 @@ def send_type_text(text: str) -> dict[str, Any]:
     ``{"ok": False, "error": ...}`` on failure.
     """
     _log_call("send_type_text")
+    refused = input_guard.injection_refused_reason()
+    if refused is not None:
+        return {"ok": False, "error": refused}
     if sys.platform == "win32":
         return _send_type_text_win32(text)
     # Linux: try ydotool / pyautogui

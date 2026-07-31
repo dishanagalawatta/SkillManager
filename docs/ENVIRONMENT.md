@@ -25,6 +25,7 @@ changes. `.env` overrides process environment.
 | `SKILL_MANAGER_SKIP_INITIAL_LOAD` | test only | unset | Skip initial skill load. |
 | `SKILL_MANAGER_DATA_DIR` | optional | platformdirs | Override user data dir. |
 | `SKILL_MANAGER_LOG_LEVEL` | optional | `INFO` | QML console bridge log level. |
+| `SKILL_MANAGER_DIAG` | debug only | unset | Set to `1` to enable shutdown diagnostics (`<data>/shutdown_diag.log`). Leave unset in production. |
 
 ## Telemetry
 

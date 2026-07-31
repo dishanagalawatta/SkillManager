@@ -48,6 +48,11 @@
 
    **Enforcement**: Any violation of this rule triggers IMMEDIATE REVERSION of all unverified QML changes and restart from last known-good state. Do NOT mark any UI/rendering work complete without real-app visual validation evidence.
 
+7. **Input Injection Safety (ZERO TOLERANCE)**: Real mouse/keyboard injection (`ydotool` uinput, `pyautogui`, Win32 `keybd_event`/`SendInput`) sends input to the user's live desktop. It MUST NEVER run from tests, CI, or headless processes, and MCP input tools MUST NEVER inject into a window that is not the live SkillManager GUI.
+   - **Single source of truth**: ALL injection safety decisions MUST route through `src/skill_manager/utils/input_guard.py` — `injection_allowed()` (env guard: pytest/offscreen) and `injection_refused_reason()` (adds GUI-window presence check). Never add a new injection path or guard check anywhere else.
+   - **Patch target**: Tests that exercise injection code MUST patch `skill_manager.utils.input_guard.*` (or the module-level name imported by the caller, e.g. `utils.linux.injection_allowed`). NEVER patch a platform module by guesswork — the original incident happened because a test patched `win32.send_paste_to_focused_window` while the code dispatched to `utils.linux` on non-Windows, so the real `ydotool key 29+47` (Ctrl+V) executed against the live desktop.
+   - **No bypass**: Never delete/override `PYTEST_CURRENT_TEST` or `QT_QPA_PLATFORM=offscreen` to force real injection in a test, and never assert a real `subprocess`/`keybd_event` call fired during a pytest run (regression guard: `tests/test_linux_utils.py::test_send_ctrl_v_blocked_under_pytest`).
+
 ## Conventions
 
 ### Code Style

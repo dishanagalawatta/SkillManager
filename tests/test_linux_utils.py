@@ -39,6 +39,7 @@ def test_get_clipboard_wl_paste_success():
 
 def test_send_ctrl_v_ydotool():
     with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux._has_ydotool", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
@@ -47,8 +48,23 @@ def test_send_ctrl_v_ydotool():
 
 
 def test_send_ctrl_v_all_fail():
-    with patch("skill_manager.utils.linux._has_ydotool", return_value=False):
+    with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
+        patch("skill_manager.utils.linux._has_ydotool", return_value=False),
+    ):
         assert linux.send_ctrl_v() is False
+
+
+def test_send_ctrl_v_blocked_under_pytest():
+    """Injection guard: real keystrokes must never reach the live desktop
+    when running under pytest (regression: ydotool was invoked for real).
+    """
+    with (
+        patch("skill_manager.utils.linux._has_ydotool", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        assert linux.send_ctrl_v() is False
+        mock_run.assert_not_called()
 
 
 def test_find_window_by_title_xdotool():
@@ -86,13 +102,32 @@ def test_send_paste_to_focused_window_delegates():
 
 
 def test_move_mouse_no_tools():
-    with patch("skill_manager.utils.linux.shutil.which", return_value=None):
+    with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
+        patch("skill_manager.utils.linux.shutil.which", return_value=None),
+    ):
         assert linux.move_mouse(100, 200) is False
 
 
 def test_type_text_no_tools():
-    with patch("skill_manager.utils.linux.shutil.which", return_value=None):
+    with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
+        patch("skill_manager.utils.linux.shutil.which", return_value=None),
+    ):
         assert linux.type_text("hello") == 0
+
+
+def test_input_injection_blocked_offscreen():
+    """Injection guard: offscreen/headless runs must not inject input."""
+    with (
+        patch("skill_manager.utils.linux.os.environ.get", return_value="offscreen"),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        assert linux.move_mouse(100, 200) is False
+        assert linux.click_mouse(100, 200) is False
+        assert linux.type_text("hello") == 0
+        assert linux.send_ctrl_v() is False
+        mock_run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
