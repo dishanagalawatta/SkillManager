@@ -7,3 +7,7 @@
 ## 2025-02-14 - Cache path calculations in quick_copy.py
 **Learning:** During the file discovery process and quick copying operations, `project_root_for_project` and `skill_base_relative` are called heavily on the same paths, which adds redundant path resolution overhead. Applying `@lru_cache` significantly reduces this overhead.
 **Action:** Use `@lru_cache` on repetitive path resolution functions like `project_root_for_project` and `skill_base_relative` to memoize the results for hot paths.
+
+## 2026-07-30 - Search engine scoring order fast-paths
+**Learning:** Reordering the exact token match (`qt in all_doc_tokens`) and the substring match (`qt in index_data["full_text"]`) in `core/search.py` is a measured performance regression. `all_doc_tokens` is a small deduplicated list (fast pointer comparisons), while `full_text` is a long concatenated string (slower substring scan). Checking the list first is measurably faster than the substring scan.
+**Action:** Do not attempt to optimize the `max_token_match` fast-paths by reordering them or prioritizing `str.__contains__` over the `all_doc_tokens` list in this specific hot loop. The current order is optimal.
