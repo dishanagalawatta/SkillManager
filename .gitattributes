@@ -3,3 +3,38 @@
 
 # Enforce LF line endings for Markdown files to prevent conflicts
 *.md text eol=lf
+
+# Source & docs — LF (POSIX)
+*.py text eol=lf
+*.pyi text eol=lf
+*.qml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.qrc text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.env.example text eol=lf
+
+# Windows packaging artifacts — CRLF
+*.ps1 text eol=crlf
+*.iss text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.exe binary
+*.dll binary
+*.pyd binary
+*.whl binary
+*.so binary
+*.dylib binary
+

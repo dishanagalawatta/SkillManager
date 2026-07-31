@@ -8,11 +8,18 @@ from skill_manager.app import AppController
 @pytest.fixture
 def discovery_controller(session_mock_config, session_temp_dir):
     """Provides an AppController specifically for discovery testing."""
-    # Clear the discovery cache before each test to ensure isolation
+    # Clear the discovery cache before each test to ensure isolation.
+    # The app's own cache-rebuild path (app.py _clear_and_rebuild) deletes
+    # the JSON index AND clears the granular diskcache; the fixture must do
+    # the same or a stale index written by an earlier test in this worker
+    # can paint unrelated skills into the model.
+    from skill_manager.core.config import SKILL_LIBRARY_CACHE_FILE
     from skill_manager.core.discovery import get_discovery_cache
 
     with get_discovery_cache() as cache:
         cache.clear()
+    if os.path.exists(SKILL_LIBRARY_CACHE_FILE):
+        os.remove(SKILL_LIBRARY_CACHE_FILE)
 
     controller = AppController(skip_initial_load=True, config=session_mock_config)
     yield controller
@@ -40,7 +47,20 @@ def test_discovery_ui_integration(qtbot, qapp, discovery_controller, temp_dir):
     # 3. Trigger discovery
     discovery_controller.refreshSkills("", False)
 
-    qtbot.waitUntil(lambda: discovery_controller.libraryModel.rowCount() > 0, timeout=5000)
+    # Wait for the SPECIFIC skill instead of rowCount() > 0: the refresh is
+    # asynchronous, so a stale/unrelated row can satisfy a generic count
+    # wait while the target skill is still being discovered.
+    def test_automation_visible():
+        for i in range(discovery_controller.libraryModel.rowCount()):
+            name = discovery_controller.libraryModel.data(
+                discovery_controller.libraryModel.index(i, 0),
+                discovery_controller.libraryModel.NameRole,
+            )
+            if "Test Automation" in name:
+                return True
+        return False
+
+    qtbot.waitUntil(test_automation_visible, timeout=15000)
 
     # 4. Verify UI Models are updated
     library_model = discovery_controller.libraryModel
@@ -74,15 +94,15 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
 
     assert discovery_controller.libraryModel.rowCount() > 0
 
-    # Wait to ensure mtime change
+    skill_md.write_text("---\nname: Version 2\n---\nBody", encoding="utf-8")
+    # Force mtimes strictly greater than the first scan recorded so the
+    # fingerprint-based incremental scan detects the change deterministically
+    # — no wall-clock sleep that can flake under xdist load.
     import time
 
-    time.sleep(1.1)
-
-    skill_md.write_text("---\nname: Version 2\n---\nBody", encoding="utf-8")
-    # Touch the skill folder and the SKILL.md file
-    os.utime(skill_md, None)
-    os.utime(skill_folder, None)
+    new_mtime = time.time() + 30
+    os.utime(skill_md, (new_mtime, new_mtime))
+    os.utime(skill_folder, (new_mtime, new_mtime))
 
     # Trigger refresh again — track generation to know when it completes
     _ = discovery_controller.discovery._refresh_generation

@@ -1,67 +1,120 @@
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from skill_manager.core.config import (
     DEFAULT_SHORTCUTS,
     ConfigManager,
     resolve_data_file,
 )
-from skill_manager.core.updater import update_projects
+from skill_manager.core.copier import copy_skill_folders_to_projects
 
 
-def test_update_projects_invalid_paths(caplog):
-    # Test skipping non-existent paths
-    update_projects(["missing_proj"], ["missing_src"])
-    assert "Project path 'missing_proj' is not a directory" in caplog.text
-    assert "Source path 'missing_src' is not a directory" in caplog.text
-    assert "No valid project directories provided." in caplog.text
+def test_copy_skill_folders_invalid_paths(tmp_path, caplog):
+    result = copy_skill_folders_to_projects(
+        [{"name": "ghost", "local_path": str(tmp_path / "missing-skill")}],
+        [str(tmp_path / "proj")],
+    )
+    assert result["copied"] == 0
+    assert result["failed"] == 0
+    assert result["skipped"] == 1
+    assert "Skill folder does not exist" in result["details"][0]["message"]
+
+    valid_src = tmp_path / "valid-skill"
+    valid_src.mkdir()
+    (valid_src / "SKILL.md").write_text("# skill")
+    missing_parent = tmp_path / "no_such_parent" / "proj" / "skills"
+    result = copy_skill_folders_to_projects(
+        [{"name": "valid", "local_path": str(valid_src)}],
+        [str(missing_parent)],
+    )
+    assert result["skipped"] == 1
+    assert "Project parent folder does not exist" in result["details"][0]["message"]
+    assert "parent_missing" in caplog.text
 
 
-def test_update_projects_empty_sources(caplog):
-    update_projects([], ["missing_src"])
-    assert "No valid project directories provided." in caplog.text
+def test_copy_skill_folders_empty_inputs(tmp_path):
+    assert copy_skill_folders_to_projects([], []) == {
+        "copied": 0,
+        "merged": 0,
+        "skipped": 0,
+        "failed": 0,
+        "details": [],
+    }
 
-    fresh_proj = MagicMock(spec=Path)
-    fresh_proj.is_dir.return_value = True
-    with (
-        patch("skill_manager.core.updater.Path", return_value=fresh_proj),
-        patch("skill_manager.core.updater.Path.resolve", return_value=fresh_proj),
-    ):
-        update_projects(["/valid_proj"], [])
-        assert "No valid source directories provided." in caplog.text
+    result = copy_skill_folders_to_projects([{"name": "x"}], [str(tmp_path / "proj")])
+    assert result["skipped"] == 1
+    assert "no local folder path" in result["details"][0]["message"]
 
-
-def test_update_projects_with_progress_callback(tmp_path):
-    proj = tmp_path / "proj"
-    proj.mkdir()
-    (proj / "item").mkdir()
-    src = tmp_path / "src"
-    src.mkdir()
-    (src / "item").mkdir()
-
-    calls = []
-
-    def callback(current, total, msg):
-        calls.append((current, total, msg))
-
-    result = update_projects([str(proj)], [str(src)], progress_callback=callback)
-    assert result == (1, 0)
-    assert len(calls) >= 2
+    valid_src = tmp_path / "valid-skill"
+    valid_src.mkdir()
+    (valid_src / "SKILL.md").write_text("# skill")
+    result = copy_skill_folders_to_projects([{"name": "valid", "local_path": str(valid_src)}], [])
+    assert result["copied"] == 0
+    assert result["skipped"] == 0
+    assert result["details"] == []
 
 
-def test_update_projects_error_handling(tmp_path, caplog):
-    proj = tmp_path / "proj"
-    proj.mkdir()
-    (proj / "item").mkdir()
-    src = tmp_path / "src"
-    src.mkdir()
-    (src / "item").mkdir()
+def test_copy_skill_folders_multi_source(tmp_path):
+    source_1 = tmp_path / "source1"
+    source_1.mkdir()
+    (source_1 / "SKILL.md").write_text("source 1 content")
+    (source_1 / "assets").mkdir()
+    (source_1 / "assets" / "icon.svg").write_text("icon 1")
 
-    # Trigger exception in copytree
+    source_2 = tmp_path / "source2"
+    source_2.mkdir()
+    (source_2 / "SKILL.md").write_text("source 2 content")
+
+    skills_dir = tmp_path / "proj" / "skills"
+    (skills_dir / "skill-a").mkdir(parents=True)
+    (skills_dir / "skill-a" / "SKILL.md").write_text("old content")
+    (skills_dir / "unknown-skill").mkdir()
+
+    result = copy_skill_folders_to_projects(
+        [
+            {"name": "skill-a", "folder_name": "skill-a", "local_path": str(source_1)},
+            {"name": "skill-b", "folder_name": "skill-b", "local_path": str(source_2)},
+        ],
+        [str(skills_dir)],
+    )
+
+    assert result["merged"] == 1
+    assert result["copied"] == 1
+    assert result["failed"] == 0
+    assert result["skipped"] == 0
+    assert (skills_dir / "skill-a" / "SKILL.md").read_text() == "source 1 content"
+    assert (skills_dir / "skill-a" / "assets" / "icon.svg").read_text() == "icon 1"
+    assert (skills_dir / "skill-b" / "SKILL.md").read_text() == "source 2 content"
+    assert not (skills_dir / "unknown-skill" / "SKILL.md").exists()
+
+    # Copier has no first-wins priority: for the same target folder the
+    # LAST source wins (updater.py's priority semantics are not preserved).
+    copy_skill_folders_to_projects(
+        [
+            {"name": "skill-a", "folder_name": "skill-a", "local_path": str(source_1)},
+            {"name": "skill-a", "folder_name": "skill-a", "local_path": str(source_2)},
+        ],
+        [str(skills_dir)],
+    )
+    assert (skills_dir / "skill-a" / "SKILL.md").read_text() == "source 2 content"
+
+
+def test_copy_skill_folders_error_handling(tmp_path):
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "SKILL.md").write_text("# skill")
+    skills_dir = tmp_path / "proj" / "skills"
+    skills_dir.mkdir(parents=True)
+
+    # Trigger exception in copytree → counted as failed, no crash
     with patch("shutil.copytree", side_effect=RuntimeError("Copy failed")):
-        update_projects([str(proj)], [str(src)])
+        result = copy_skill_folders_to_projects(
+            [{"name": "skill-a", "folder_name": "skill-a", "local_path": str(source)}],
+            [str(skills_dir)],
+        )
 
-    assert "Error updating 'item': Copy failed" in caplog.text
+    assert result["failed"] == 1
+    assert result["details"][0]["status"] == "failed"
+    assert result["details"][0]["message"] == "Copy failed"
 
 
 def test_resolve_data_file_copy_error(tmp_path):
