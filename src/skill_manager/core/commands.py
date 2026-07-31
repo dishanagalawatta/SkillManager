@@ -303,9 +303,8 @@ def update_custom_command_file_multi(
     if not project_labels:
         return [CommandUpdateResult(False, "No projects selected")]
 
-    stem = Path(local_path).stem
     current_holders = find_command_holder_projects(
-        stem, project_paths, project_aliases=project_aliases
+        name, project_paths, project_aliases=project_aliases
     )
     add_set = sorted(set(project_labels) - set(current_holders))
     keep_set = sorted(set(current_holders) & set(project_labels))
@@ -371,10 +370,12 @@ def update_custom_command_file_multi(
         )
     )
 
-    # Phase 2: fan-out to all target project labels (add_set and keep_set, except canonical_label)
+    # Phase 2: fan-out to all new target project labels (add_set only, except canonical_label).
+    # Projects that already hold the command (keep_set) keep their existing files and are
+    # NOT overwritten — this preserves per-project content that may have diverged.
     if canonical.ok and canonical.path and canonical.path.is_file():
         new_content = canonical.path.read_text(encoding="utf-8")
-        target_labels = sorted((set(keep_set) | set(add_set)) - {canonical_label})
+        target_labels = sorted(set(add_set) - {canonical_label})
         for label in target_labels:
             target = find_project_path_by_label(
                 label, project_paths, project_aliases=project_aliases

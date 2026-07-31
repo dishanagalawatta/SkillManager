@@ -940,6 +940,10 @@ Item {
     readonly property alias showCommandInspector:  qcv_inspectorOverlay.showCommandInspector
     readonly property alias showImageInspector:    qcv_inspectorOverlay.showImageInspector
 
+    CommandCreateDialog {
+        id: qcv_commandDialog
+    }
+
     MissingSkillsDialog {
         id: qcv_missingSkillsDialog
     }

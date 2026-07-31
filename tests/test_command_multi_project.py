@@ -374,7 +374,8 @@ class TestUpdateMultiProject:
             project_aliases=aliases,
         )
 
-        # projA should get "Already up to date" (identical content, skip write)
+        # projA should get "Already up to date" from the canonical result (Phase 1)
+        # since projA already has CmdNew.md with identical content.
         ok_results = [r for r in results if r.ok]
         a_result = next(
             (r for r in ok_results if r.path and str(proj_a) in str(r.path)),
@@ -384,8 +385,8 @@ class TestUpdateMultiProject:
         assert "Already up to date" in a_result.message, (
             f"Expected 'Already up to date' for projA, got: {a_result.message}"
         )
-        assert a_result.set_membership == "fanout_skip", (
-            f"Expected set_membership='fanout_skip', got: {a_result.set_membership}"
+        assert a_result.set_membership == "canonical", (
+            f"Expected set_membership='canonical', got: {a_result.set_membership}"
         )
 
     def test_update_multi_project_warns_on_different_content(self, tmp_path):
