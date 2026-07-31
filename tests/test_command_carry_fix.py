@@ -178,7 +178,12 @@ def test_ops_controller_update_command_carry_prompt_emitted(tmp_path: Path, qtbo
 
 
 def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path, qtbot):
-    """Test editing a command held in projA and projB updates projB and prompts carry if projB lacks skills."""
+    """Test editing a command to add a new project prompts carry if the new project lacks skills.
+
+    The command is initially held only in projA. Updating with project_labels=[A, B]
+    adds projB as an ``add_set`` project, which triggers the fan-out write and carry check
+    for projB. projB lacks the skill that projA has, so the carry prompt is emitted for projB.
+    """
     from skill_manager.controllers.ops_controller import OpsController
 
     app_mock = MagicMock()
@@ -218,11 +223,11 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
     label_a = project_label(proj_a)
     label_b = project_label(proj_b)
 
-    # Create command in both projects projA and projB
+    # Create command in projA only (not in projB)
     cmd_path_a = ops.createCustomCommand(
         name="shared-cmd",
         body="Initial shared body",
-        project_labels=[label_a, label_b],
+        project_labels=[label_a],
         category="General",
     )
 
@@ -235,7 +240,8 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
         )
     )
 
-    # Now edit command, adding reference to /multi-helper across projA and projB
+    # Now edit command, adding reference to /multi-helper, targeting BOTH projects.
+    # projB is in add_set (doesn't hold the command yet) → fan-out writes to projB → carry check runs.
     ops.updateCustomCommandFull(
         local_path=cmd_path_a,
         name="shared-cmd",
@@ -246,12 +252,12 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
 
     qtbot.wait(100)
 
-    # Verify projB's command file was updated
+    # Verify projB's command file was created by the add_set fan-out
     cmd_file_b = proj_b / ".agents" / "commands" / "shared-cmd.md"
     assert cmd_file_b.exists()
     assert "/multi-helper" in cmd_file_b.read_text()
 
-    # Verify carry prompt was emitted specifically for projB (since projA already has the skill installed)
+    # Verify carry prompt was emitted for projB (which lacks the skill)
     assert len(received_signals) >= 1
     proj_b_signals = [s for s in received_signals if s[1] == str(proj_b)]
     assert len(proj_b_signals) == 1

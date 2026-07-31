@@ -285,6 +285,51 @@ def test_take_screenshot_emits_minimize_requested_when_enabled(controller, mock_
     mock_app.screenshot_provider.set_pixmap.assert_not_called()
 
 
+def test_auto_minimize_full_flow_captures_after_minimize(controller, mock_app):
+    """Full auto-minimize flow: takeScreenshot emits minimize, then
+    captureScreen (called by QML timer) performs the actual capture."""
+    mock_app.config_controller = MagicMock()
+    mock_app.config_controller.autoMinimizeOnScreenshot = True
+
+    minimize_requested = False
+
+    def on_minimize():
+        nonlocal minimize_requested
+        minimize_requested = True
+
+    controller.minimizeRequested.connect(on_minimize)
+
+    # Step 1: takeScreenshot — only emits minimize, does NOT capture
+    with patch("PySide6.QtGui.QGuiApplication.primaryScreen") as mock_screen:
+        controller.takeScreenshot()
+
+    assert minimize_requested, "minimizeRequested must be emitted"
+    mock_app.screenshot_provider.set_pixmap.assert_not_called()
+    assert controller.current_full_pixmap is None
+
+    # Step 2: captureScreen — called by the QML timer after window is hidden
+    overlay_shown = False
+
+    def on_show():
+        nonlocal overlay_shown
+        overlay_shown = True
+
+    controller.showOverlay.connect(on_show)
+
+    with patch("PySide6.QtGui.QGuiApplication.primaryScreen") as mock_screen:
+        screen = MagicMock()
+        mock_screen.return_value = screen
+        pixmap = QPixmap(10, 10)
+        screen.grabWindow.return_value = pixmap
+
+        controller.captureScreen()
+
+    assert overlay_shown, "Overlay must be shown after deferred capture"
+    mock_app.screenshot_provider.set_pixmap.assert_called_with(pixmap)
+    assert controller.current_full_pixmap is not None
+    assert not controller.current_full_pixmap.isNull()
+
+
 def test_take_screenshot_no_minimize_when_disabled(controller, mock_app):
     mock_app.config_controller = MagicMock()
     mock_app.config_controller.autoMinimizeOnScreenshot = False

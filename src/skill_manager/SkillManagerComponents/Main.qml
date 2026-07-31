@@ -142,8 +142,14 @@ Window {
     function hideWindowInstantly() {
         _isHidingForScreenshot = true
         window.opacity = 0
-        window.x = -32000
-        window.y = -32000
+        // Intentionally do NOT move the window off-screen.
+        // The ScreenshotOverlay is a child Window declared inside this Window,
+        // so its x/y coordinate space is relative to our position.
+        // Moving to (-32000, -32000) would place the overlay off-screen too,
+        // preventing it from displaying correctly after capture.
+        // Opacity=0 alone is sufficient: on all modern compositing desktops
+        // the compositor excludes fully-transparent windows from grabWindow(0),
+        // and on non-compositing X11 grabWindow(0) captures only the root window.
     }
 
     function restoreWindowState() {
@@ -249,9 +255,16 @@ Window {
 
     Timer {
         id: screenshotDelayTimer
-        interval: 10
+        interval: 150
         onTriggered: {
             AppController.screenshot_controller.captureScreen()
+            // Restore opacity after capture so the window is visible underneath
+            // the overlay.  Keep pendingScreenshot=true so that onCaptureFinished
+            // / onCaptureCancelled still raise+activate the window when the
+            // overlay closes (the user expects the app to come to front).
+            if (window.pendingScreenshot) {
+                window.restoreWindowState()
+            }
         }
     }
 

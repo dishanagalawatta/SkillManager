@@ -1,7 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import ".."
+import ".."          // Theme, glass components
+import "../dialogs"  // CommandCreateDialog, etc.
 import App 1.0
 import ".."
 
@@ -626,6 +627,10 @@ Item {
 
     ArchiveConfirmDialog {
         id: lv_archiveConfirmDialog
+    }
+
+    CommandCreateDialog {
+        id: lv_commandDialog
     }
 
     CommandCarrySkillsDialog {
