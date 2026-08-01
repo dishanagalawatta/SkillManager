@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 from PySide6.QtCore import QObject, Qt, SignalInstance
 from PySide6.QtQml import QQmlPropertyMap
 
+from skill_manager.controllers.app_proxies import AppControllerProxyMixin
 from skill_manager.controllers.app_update_controller import AppUpdateController
 from skill_manager.controllers.config_controller import ConfigController
 from skill_manager.controllers.discovery_controller import DiscoveryController
@@ -32,7 +33,7 @@ from skill_manager.core.global_hotkey import GlobalHotkeyManager
 from skill_manager.core.image_provider import ScreenshotImageProvider
 from skill_manager.core.models import SkillModel
 
-class AppController(QObject):
+class AppController(AppControllerProxyMixin, QObject):
     # Core State Signals
     skillModelChanged: ClassVar[SignalInstance]
     selectedSkillChanged: ClassVar[SignalInstance]
