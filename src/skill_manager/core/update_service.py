@@ -59,6 +59,50 @@ def _log_update(level: str, event: str, **fields: Any) -> None:
         logger.info(msg, *args)
 
 
+def update_single_package(
+    source: dict[str, Any],
+    previous_inventory: dict[str, Any],
+    status_callback: Callable[[str], None],
+) -> dict[str, Any]:
+    """Run the package-update pipeline for a single source dict.
+
+    Shared by ``UpdateService.run_global_update_sync`` and
+    ``UpdateController.runPackageUpdate``. Promotes grouped storage, runs the
+    package update, rescans the package inventory, and persists the refreshed
+    inventory (skipped with a status warning when the scan is unsafe).
+
+    Returns the updated source dict with ``managed_folders``,
+    ``removed_folders``, ``updated_folders`` and ``removals_verified`` set.
+    """
+    if source.get("storage_mode") == "grouped":
+        promote_result = promote_package_storage(source, previous_inventory)
+        if promote_result.get("skipped"):
+            raise RuntimeError(f"Could not promote package storage for {source.get('name')}")
+
+    updated_source = {**source, **run_skill_package_update(source, status_callback)}
+    current_inventory = scan_package_inventory(updated_source)
+    inventory_diff = diff_package_inventory(previous_inventory, current_inventory)
+    removals_verified = inventory_removals_verified(previous_inventory, current_inventory)
+
+    inventory = load_package_skill_inventory()
+    if current_inventory.get("scan_ok"):
+        inventory[updated_source["package_id"]] = current_inventory
+    elif previous_inventory:
+        status_callback(
+            "Skipped package inventory save for "
+            f"{updated_source.get('name')}: {current_inventory.get('scan_error')}"
+        )
+    save_package_skill_inventory(inventory)
+
+    updated_source["managed_folders"] = sorted(current_inventory.get("skills", {}).keys())
+    updated_source["removed_folders"] = inventory_diff["removed"] if removals_verified else []
+    updated_source["updated_folders"] = sorted(
+        set(inventory_diff["added"]) | set(inventory_diff["updated"])
+    )
+    updated_source["removals_verified"] = removals_verified
+    return updated_source
+
+
 class UpdateService:
     """Service for handling background skill updates and project syncing."""
 
@@ -173,39 +217,11 @@ class UpdateService:
                             source["local_path"] = potential_path
 
                     previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
-                    if source.get("storage_mode") == "grouped":
-                        promote_result = promote_package_storage(source, previous_inventory)
-                        if promote_result.get("skipped"):
-                            raise RuntimeError(
-                                f"Could not promote package storage for {source.get('name')}"
-                            )
-
-                    updated_source = {**source, **run_skill_package_update(source, status_callback)}
+                    updated_source = update_single_package(
+                        source, previous_inventory, status_callback
+                    )
                     updated_source["is_updating"] = False
                     updated_source["just_finished"] = True
-
-                    current_inventory = scan_package_inventory(updated_source)
-                    inventory_diff = diff_package_inventory(previous_inventory, current_inventory)
-                    removals_verified = inventory_removals_verified(
-                        previous_inventory, current_inventory
-                    )
-                    if current_inventory.get("scan_ok"):
-                        inventory[updated_source["package_id"]] = current_inventory
-                    elif previous_inventory:
-                        status_callback(
-                            "Skipped package inventory save for "
-                            f"{updated_source.get('name')}: {current_inventory.get('scan_error')}"
-                        )
-                    updated_source["managed_folders"] = sorted(
-                        current_inventory.get("skills", {}).keys()
-                    )
-                    updated_source["removed_folders"] = (
-                        inventory_diff["removed"] if removals_verified else []
-                    )
-                    updated_source["updated_folders"] = sorted(
-                        set(inventory_diff["added"]) | set(inventory_diff["updated"])
-                    )
-                    updated_source["removals_verified"] = removals_verified
 
                     # Track which folders were actually updated/relocated
                     folders_changed = updated_source.get("updated_folders") or []
@@ -214,6 +230,9 @@ class UpdateService:
                         for folder_name in folders_changed:
                             package_id_by_folder[folder_name] = updated_source.get("package_id")
 
+                    removed_suspected = set((previous_inventory or {}).get("skills", {})) - set(
+                        updated_source.get("managed_folders", [])
+                    )
                     if updated_source.get("removed_folders"):
                         for folder_name in updated_source["removed_folders"]:
                             removed_by_package.append(
@@ -223,7 +242,7 @@ class UpdateService:
                                     "removal_verified": True,
                                 }
                             )
-                    elif inventory_diff["removed"] and not removals_verified:
+                    elif removed_suspected and not updated_source.get("removals_verified"):
                         status_callback(
                             "Skipped project deletion for "
                             f"{updated_source.get('name')}: package inventory scan was unsafe"
@@ -247,8 +266,6 @@ class UpdateService:
                     )
                     source["is_updating"] = False
                     source_progress_callback(index, source)
-
-            save_package_skill_inventory(inventory)
 
             # Phase 2/2: Syncing to projects
             status_callback("Phase 2/2: Updating project folders...")

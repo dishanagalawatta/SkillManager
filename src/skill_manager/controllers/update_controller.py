@@ -460,18 +460,9 @@ class UpdateController(BaseController):
                 from datetime import datetime
                 from pathlib import Path
 
-                from skill_manager.core.persistence import (
-                    load_package_skill_inventory,
-                    save_package_skill_inventory,
-                )
-                from skill_manager.core.skill_packages import (
-                    diff_package_inventory,
-                    inventory_removals_verified,
-                    package_project_path_conflicts,
-                    promote_package_storage,
-                    run_skill_package_update,
-                    scan_package_inventory,
-                )
+                from skill_manager.core.persistence import load_package_skill_inventory
+                from skill_manager.core.skill_packages import package_project_path_conflicts
+                from skill_manager.core.update_service import update_single_package
 
                 try:
                     pkg_path = (
@@ -502,32 +493,7 @@ class UpdateController(BaseController):
 
                     inventory = load_package_skill_inventory()
                     previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
-                    if source.get("storage_mode") == "grouped":
-                        promote_result = promote_package_storage(source, previous_inventory)
-                        if promote_result.get("skipped"):
-                            raise RuntimeError(
-                                f"Could not promote package storage for {source.get('name')}"
-                            )
-
-                    updated_source = {**source, **run_skill_package_update(source, log_callback)}
-                    current_inventory = scan_package_inventory(updated_source)
-                    inventory_diff = diff_package_inventory(previous_inventory, current_inventory)
-                    removals_verified = inventory_removals_verified(
-                        previous_inventory, current_inventory
-                    )
-                    if current_inventory.get("scan_ok"):
-                        inventory[updated_source["package_id"]] = current_inventory
-                    updated_source["managed_folders"] = sorted(
-                        current_inventory.get("skills", {}).keys()
-                    )
-                    updated_source["removed_folders"] = (
-                        inventory_diff["removed"] if removals_verified else []
-                    )
-                    updated_source["updated_folders"] = sorted(
-                        set(inventory_diff["added"]) | set(inventory_diff["updated"])
-                    )
-                    updated_source["removals_verified"] = removals_verified
-                    save_package_skill_inventory(inventory)
+                    updated_source = update_single_package(source, previous_inventory, log_callback)
                     source.update(updated_source)
                     source["update_error"] = ""
                     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")

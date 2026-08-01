@@ -102,40 +102,37 @@ def normalize_project_skills_path(project):
     return str(path), error
 
 
-def get_skills_dir(project_path: str | Path) -> Path:
-    """Return the skills directory for a project, regardless of input shape.
+def auto_detect_skills_dir(project_root: str | Path) -> Path:
+    """Return the `.agents/skills` directory for a project root.
+
+    Single source of truth for `.agents/skills` auto-detection, shared by
+    ``get_skills_dir``, ``_normalize_project_path`` and
+    ``resolve_resilient_path``.
 
     Handles all normalization cases:
-    - Path already at <root>/.agents/skills → return as-is
     - Path already at <root>/skills → return as-is
+    - Path already at <root>/.agents → return <path>/skills
     - Path at project root → return <root>/.agents/skills (existing or intended)
-    - Path at .agents → return <path>/skills
-
-    This is the single source of truth for resolving skills directory from a stored
-    project path. Use this instead of hardcoding ``Path(project_path) / ".agents" / "skills"``.
     """
-    path = Path(project_path).resolve()
+    path = Path(project_root).resolve()
     name_lower = path.name.lower()
 
-    # Already at skills level
     if name_lower == "skills":
         return path
 
-    # Already at .agents level
     if name_lower == ".agents":
         return path / "skills"
 
-    # Already at .agents/skills level
-    if name_lower == "skills" and path.parent.name.lower() == ".agents":
-        return path
+    return (path / ".agents" / "skills").resolve()
 
-    # Project root — check for .agents/skills
-    potential = path / ".agents" / "skills"
-    if potential.exists() and potential.is_dir():
-        return potential
 
-    # Project root — .agents/skills doesn't exist yet, return intended path
-    return potential
+def get_skills_dir(project_path: str | Path) -> Path:
+    """Return the skills directory for a project, regardless of input shape.
+
+    Thin wrapper over ``auto_detect_skills_dir``; keeps the well-known helper
+    name for callers that only need the canonical skills directory.
+    """
+    return auto_detect_skills_dir(project_path)
 
 
 def get_commands_dir(project_path: str | Path) -> Path:
@@ -337,7 +334,6 @@ def _normalize_project_path(project):
     if project_path.name.lower() not in ("skills", ".agents"):
         potential = project_path / ".agents" / "skills"
         if potential.exists() and potential.is_dir():
-            project_path = potential.resolve()
             found = True
 
         logger.info(
@@ -351,9 +347,8 @@ def _normalize_project_path(project):
             project_path.exists(),
         )
 
-        if not found:
-            # Assume it's a project root, use the standard .agents/skills
-            project_path = (project_path / ".agents" / "skills").resolve()
+        # Assume it's a project root, use the standard .agents/skills
+        project_path = auto_detect_skills_dir(project_path)
     else:
         logger.info(
             "project_path_normalized: raw=%s name=%s (already skills/agents) "
