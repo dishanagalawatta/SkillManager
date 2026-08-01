@@ -155,6 +155,17 @@ All tools return structured JSON, names prefixed `sm_`.
 
 The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to SkillManager MCP, use one of the client configuration snippets below depending on your agent platform.
 
+### Why a launcher script?
+
+Every config below points the client at `scripts/mcp_launcher.sh` (POSIX) or `scripts/mcp_launcher.bat` (Windows) instead of running `uv` directly. GUI-launched clients (Claude Desktop, Cursor, IDEs, ...) spawn the configured `command` with a **minimal environment** that never sources your shell rc files, so `uv` — which the standalone installer places in `~/.local/bin` (`%USERPROFILE%\.local\bin` on Windows) — is **not on their PATH**, producing `Executable not found in $PATH: "uv"`.
+
+The launcher removes that PATH dependency:
+
+1. It runs the project's own venv Python directly: `.venv/bin/python -m skill_manager.__main__` (Windows: `.venv\Scripts\python.exe`).
+2. Only if the venv is missing does it fall back to `uv`, searching PATH first, then `~/.local/bin`.
+
+Replace `/path/to/skill-manager` below with the absolute path of your clone. On Windows, point `command` at `C:\path\to\skill-manager\scripts\mcp_launcher.bat` instead.
+
 ### 1. Claude Desktop (`claude_desktop_config.json`)
 
 **Location:**
@@ -166,12 +177,12 @@ The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to Ski
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/skill-manager", "run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     },
     "skillmanager-write": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/skill-manager", "run", "skill-manager", "--mcp", "--mcp-allow-write"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp", "--mcp-allow-write"]
     }
   }
 }
@@ -185,12 +196,12 @@ The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to Ski
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     },
     "skillmanager-write": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp", "--mcp-allow-write"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp", "--mcp-allow-write"]
     }
   }
 }
@@ -204,8 +215,8 @@ The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to Ski
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     }
   }
 }
@@ -219,12 +230,12 @@ The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to Ski
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     },
     "skillmanager-write": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp", "--mcp-allow-write"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp", "--mcp-allow-write"]
     }
   }
 }
@@ -237,10 +248,8 @@ The SkillManager MCP server runs via stdio. To connect an AI agent or IDE to Ski
 ```yaml
 mcpServers:
   skillmanager:
-    command: uv
+    command: /path/to/skill-manager/scripts/mcp_launcher.sh
     args:
-      - run
-      - skill-manager
       - --mcp
 ```
 
@@ -252,8 +261,8 @@ mcpServers:
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     }
   }
 }
@@ -268,7 +277,7 @@ mcpServers:
   "mcp": {
     "skillmanager": {
       "type": "local",
-      "command": ["uv", "run", "skill-manager", "--mcp"],
+      "command": ["bash", "/path/to/skill-manager/scripts/mcp_launcher.sh", "--mcp"],
       "enabled": true,
       "description": "SkillManager MCP server"
     }

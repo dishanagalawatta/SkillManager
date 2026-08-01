@@ -18,18 +18,18 @@ SkillManager ships a native Python MCP server (stdio, `mcp` SDK) that lets AI co
 
 ## Launch / Connect
 
-The server runs headless (own mutex, never collides with a running GUI instance). An agent connects by launching the server executable:
+The server runs headless (own mutex, never collides with a running GUI instance). An agent connects by launching the server executable. Point the client at the repo launcher script (it invokes the project venv directly, so `uv` does not need to be on the client's PATH):
 
 ```json
 {
   "mcpServers": {
     "skillmanager": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp"]
     },
     "skillmanager-write": {
-      "command": "uv",
-      "args": ["run", "skill-manager", "--mcp", "--mcp-allow-write"]
+      "command": "/path/to/skill-manager/scripts/mcp_launcher.sh",
+      "args": ["--mcp", "--mcp-allow-write"]
     }
   }
 }
