@@ -13,6 +13,9 @@ from unittest.mock import MagicMock
 from PIL import Image
 
 import skill_manager.mcp.bridge as bridge
+import skill_manager.mcp.bridge._capture as bridge_capture
+import skill_manager.mcp.bridge._ipc as bridge_ipc
+import skill_manager.mcp.bridge._win32 as bridge_win32
 import skill_manager.mcp.tools.screenshot as tools_screenshot
 from skill_manager.mcp.models import ToolResult
 
@@ -24,12 +27,12 @@ def test_capture_app_window_success(monkeypatch):
     img = Image.new("RGB", (100, 50), "red")
     # IPC path: mock send_capture_command to fail fast (no live GUI in test).
     monkeypatch.setattr(
-        bridge, "send_capture_command", lambda **kw: {"ok": False, "error": "no GUI"}
+        bridge_capture, "send_capture_command", lambda **kw: {"ok": False, "error": "no GUI"}
     )
     # Win32 fallback path: mock window + capture.
-    monkeypatch.setattr(bridge, "_find_skill_manager_window", lambda: 123)
-    monkeypatch.setattr(bridge, "_get_window_rect", lambda _h: (0, 0, 100, 50))
-    monkeypatch.setattr(bridge, "_capture_window_to_image", lambda *a, **kw: img)
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: 123)
+    monkeypatch.setattr(bridge_capture, "_get_window_rect", lambda _h: (0, 0, 100, 50))
+    monkeypatch.setattr(bridge_capture, "_capture_window_to_image", lambda *a, **kw: img)
     # Force Windows path for this test (Win32 fallback).
     monkeypatch.setattr("sys.platform", "win32")
 
@@ -43,7 +46,7 @@ def test_capture_app_window_success(monkeypatch):
 
 
 def test_capture_app_window_no_window(monkeypatch):
-    monkeypatch.setattr(bridge, "_find_skill_manager_window", lambda: None)
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: None)
     monkeypatch.setattr("sys.platform", "win32")
 
     b64, width, height = bridge.capture_app_window()
@@ -54,8 +57,8 @@ def test_capture_app_window_no_window(monkeypatch):
 
 
 def test_capture_app_window_no_matching_title(monkeypatch):
-    monkeypatch.setattr(bridge, "_enum_top_level_windows", lambda: [1, 2, 3])
-    monkeypatch.setattr(bridge, "_get_window_title", lambda _h: "Notepad")
+    monkeypatch.setattr(bridge_win32, "_enum_top_level_windows", lambda: [1, 2, 3])
+    monkeypatch.setattr(bridge_win32, "_get_window_title", lambda _h: "Notepad")
     monkeypatch.setattr("sys.platform", "win32")
 
     b64, width, height = bridge.capture_app_window()
@@ -75,9 +78,9 @@ class _FakeUUID:
 def test_send_navigation_command_writes_file_and_parses_ack(tmp_path, monkeypatch):
     commands_dir = tmp_path / "commands"
     acks_dir = tmp_path / "acks"
-    monkeypatch.setattr(bridge, "MCP_COMMANDS_DIR", commands_dir)
-    monkeypatch.setattr(bridge, "MCP_ACKS_DIR", acks_dir)
-    monkeypatch.setattr(bridge.uuid, "uuid4", lambda: _FakeUUID())
+    monkeypatch.setattr(bridge_ipc, "MCP_COMMANDS_DIR", commands_dir)
+    monkeypatch.setattr(bridge_ipc, "MCP_ACKS_DIR", acks_dir)
+    monkeypatch.setattr(bridge_ipc.uuid, "uuid4", lambda: _FakeUUID())
     acks_dir.mkdir(parents=True, exist_ok=True)
     (acks_dir / f"{_FakeUUID.hex}.json").write_text(
         json.dumps({"ok": True, "view": "Library"}), encoding="utf-8"
@@ -101,9 +104,9 @@ def test_send_navigation_command_writes_file_and_parses_ack(tmp_path, monkeypatc
 def test_send_navigation_command_timeout_returns_ok_false(tmp_path, monkeypatch):
     commands_dir = tmp_path / "commands"
     acks_dir = tmp_path / "acks"
-    monkeypatch.setattr(bridge, "MCP_COMMANDS_DIR", commands_dir)
-    monkeypatch.setattr(bridge, "MCP_ACKS_DIR", acks_dir)
-    monkeypatch.setattr(bridge.uuid, "uuid4", lambda: _FakeUUID())
+    monkeypatch.setattr(bridge_ipc, "MCP_COMMANDS_DIR", commands_dir)
+    monkeypatch.setattr(bridge_ipc, "MCP_ACKS_DIR", acks_dir)
+    monkeypatch.setattr(bridge_ipc.uuid, "uuid4", lambda: _FakeUUID())
 
     # wait=True makes it poll for an ack that never arrives.
     result = bridge.send_navigation_command("Library", wait=True, timeout=0.05)
