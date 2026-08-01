@@ -180,10 +180,14 @@ See [`DESIGN.md`](DESIGN.md) for detailed design patterns and [`docs/ARCHITECTUR
 SkillManager/
 ├── src/skill_manager/          # Application source
 │   ├── core/                   # Business logic, models, parsing
+│   │   └── models/             # SkillModel facade + mixins (roles, selection, pipeline, ...)
 │   ├── controllers/            # PySide6 controller layer
+│   │   ├── ops/                # OpsController mixins (copy, delete, toggles, commands, ...)
+│   │   └── config/             # ConfigController mixins (settings, sources, projects, ...)
+│   ├── mcp/                    # MCP server (bridge/ package + tools/)
 │   ├── utils/                  # Threading, platform utils
 │   └── SkillManagerComponents/ # QML UI components
-├── tests/                      # Test suite (pytest)
+├── tests/                      # Test suite (pytest: controllers/, core/, qml/, ui/)
 ├── scripts/                    # Dev scripts, diagnostics
 ├── packaging/                  # Build & installer configs
 ├── environments/               # Tier-specific env examples
