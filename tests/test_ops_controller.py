@@ -10,7 +10,7 @@ from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 @pytest.fixture
 def ops_controller(mock_app):
-    with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as mock_timer:
         mock_timer.side_effect = lambda msec, receiver, functor=None: (
             functor() if functor is not None else receiver()
         )
@@ -38,7 +38,7 @@ def test_ops_controller_toggle_archive(ops_controller, mock_app):
     _skill.local_path = "/path/s"
     _skill.is_archived = False
     mock_app._selected_skill = _skill
-    with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
         assert "/path/s" in mock_app._archive_paths
@@ -53,7 +53,7 @@ def test_ops_controller_toggle_archive_restore(ops_controller, mock_app):
     _skill.is_archived = True
     mock_app._selected_skill = _skill
     mock_app._archive_paths = ["/path/s"]
-    with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
         assert "/path/s" not in mock_app._archive_paths
@@ -81,7 +81,7 @@ def test_ops_controller_toggle_starred(ops_controller, mock_app):
     _skill.local_path = "/path/e"
     _skill.is_starred = False
     mock_app._selected_skill = _skill
-    with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
         assert "/path/e" in mock_app._starred_paths
@@ -95,7 +95,7 @@ def test_ops_controller_toggle_starred_remove(ops_controller, mock_app):
     _skill.is_starred = True
     mock_app._selected_skill = _skill
     mock_app._starred_paths = ["/path/e"]
-    with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
         assert "/path/e" not in mock_app._starred_paths
@@ -112,21 +112,21 @@ def test_ops_controller_toggle_starred_no_path(ops_controller, mock_app):
     mock_app.selectedSkillChanged.emit.assert_not_called()
 
 
-@patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops.delete.delete_project_skill_folders")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_delete_commands(mock_timer, mock_del, ops_controller, mock_app, tmp_path):
     cmd_file = tmp_path / "test.md"
     cmd_file.write_text("content")
 
     items = [{"name": "Cmd", "local_path": str(cmd_file), "is_command": True}]
-    with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
+    with patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_patch:
         ops_controller.deleteSkills(items)
         assert not cmd_file.exists()
         mock_patch.assert_called_with([str(cmd_file)])
 
 
-@patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops.delete.delete_project_skill_folders")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock_app):
     mock_del.return_value = {
         "deleted": 1,
@@ -135,7 +135,7 @@ def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock
     }
 
     items = [{"name": "S1", "local_path": "/p1", "is_command": False}]
-    with patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch:
+    with patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_patch:
         ops_controller.deleteSkills(items)
         mock_del.assert_called_once()
         mock_patch.assert_called_with(["/p1"])
@@ -147,8 +147,8 @@ def test_ops_controller_delete_screenshots(ops_controller, tmp_path):
 
     items = [{"name": "Screenshot", "local_path": str(screenshot), "is_screenshot": True}]
     with (
-        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_patch,
-        patch("skill_manager.controllers.ops_controller.QTimer.singleShot"),
+        patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_patch,
+        patch("skill_manager.controllers.ops._helpers.QTimer.singleShot"),
     ):
         ops_controller.deleteSkills(items)
         assert not screenshot.exists()
@@ -163,10 +163,10 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
 
     with (
         patch(
-            "skill_manager.controllers.ops_controller.load_temp_registry",
+            "skill_manager.controllers.ops.delete.load_temp_registry",
             return_value=[str(temp_dir), str(temp_file)],
         ),
-        patch("skill_manager.controllers.ops_controller.save_temp_registry") as mock_save,
+        patch("skill_manager.controllers.ops.delete.save_temp_registry") as mock_save,
     ):
         ops_controller.cleanup_temp_copies()
 
@@ -182,13 +182,11 @@ def test_ops_controller_cleanup_temp_screenshots(ops_controller, tmp_path):
 
     with (
         patch(
-            "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
             return_value=[cache_entry_path],
         ),
-        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_cache_remove,
-        patch(
-            "skill_manager.controllers.ops_controller.save_temp_screenshots_registry"
-        ) as mock_save,
+        patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
+        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
     ):
         ops_controller.cleanup_temp_screenshots()
 
@@ -199,7 +197,7 @@ def test_ops_controller_cleanup_temp_screenshots(ops_controller, tmp_path):
 
 def test_ops_controller_cleanup_temp_screenshots_empty(ops_controller):
     with patch(
-        "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+        "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
         return_value=[],
     ):
         ops_controller.cleanup_temp_screenshots()
@@ -212,13 +210,11 @@ def test_ops_controller_cleanup_temp_screenshots_crash_recovery(ops_controller, 
 
     with (
         patch(
-            "skill_manager.controllers.ops_controller.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
             return_value=[cache_entry_path],
         ),
-        patch("skill_manager.controllers.ops_controller.patch_cache_remove") as mock_cache_remove,
-        patch(
-            "skill_manager.controllers.ops_controller.save_temp_screenshots_registry"
-        ) as mock_save,
+        patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
+        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
     ):
         ops_controller.cleanup_temp_screenshots()
 
@@ -227,7 +223,7 @@ def test_ops_controller_cleanup_temp_screenshots_crash_recovery(ops_controller, 
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_copy_selected(mock_timer, mock_copy, ops_controller, mock_app):
     mock_copy.return_value = {"copied": 1, "merged": 0, "details": []}
 
@@ -241,7 +237,7 @@ def test_ops_controller_copy_selected(mock_timer, mock_copy, ops_controller, moc
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_copy_selected_temporary(mock_timer, mock_copy, ops_controller, mock_app):
     mock_copy.return_value = {
         "copied": 1,
@@ -253,8 +249,8 @@ def test_ops_controller_copy_selected_temporary(mock_timer, mock_copy, ops_contr
     mock_app.skillModel._all_skills = [{"local_path": "/p1", "name": "S1"}]
 
     with (
-        patch("skill_manager.controllers.ops_controller.load_temp_registry", return_value=[]),
-        patch("skill_manager.controllers.ops_controller.save_temp_registry") as mock_save,
+        patch("skill_manager.controllers.ops.copy.load_temp_registry", return_value=[]),
+        patch("skill_manager.controllers.ops.copy.save_temp_registry") as mock_save,
     ):
         ops_controller.copySelectedSkillsToProject("/project", is_temporary=True)
 
@@ -281,7 +277,7 @@ def test_ops_controller_toggle_archive_updates_all_skills_list(ops_controller, m
     mock_app._library_model._all_skills = [_skill]
     mock_app._quick_copy_model._all_skills = [_skill]
 
-    with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_archive") as mock_save:
         ops_controller.toggleArchive()
 
         assert _skill.is_archived is True
@@ -296,7 +292,7 @@ def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, m
     mock_app._library_model._all_skills = [_skill]
     mock_app._quick_copy_model._all_skills = [_skill]
 
-    with patch("skill_manager.controllers.ops_controller.save_starred") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_starred") as mock_save:
         ops_controller.toggleStarred()
 
         assert _skill.is_starred is True
@@ -304,7 +300,7 @@ def test_ops_controller_toggle_starred_updates_all_skills_list(ops_controller, m
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
     mock_timer, mock_copy, ops_controller, mock_app
 ):
@@ -344,7 +340,7 @@ def test_ops_controller_copy_selected_targeted_discovery_and_dynamic_update(
             "skill_manager.core.discovery.DiscoveryService.discover_single",
             return_value=mock_skill_data,
         ) as mock_discover,
-        patch("skill_manager.controllers.ops_controller.patch_cache_add") as mock_patch_cache,
+        patch("skill_manager.controllers.ops.copy.patch_cache_add") as mock_patch_cache,
     ):
         ops_controller.copySelectedSkillsToProject("/project")
 
@@ -377,7 +373,7 @@ def test_ops_controller_copy_selected_no_selection(ops_controller, mock_app):
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_copy_selected_exception(mock_timer, mock_copy, ops_controller, mock_app):
     # Execute singleShot callbacks immediately
     mock_timer.side_effect = lambda ms, obj, cb: cb()
@@ -391,8 +387,8 @@ def test_ops_controller_copy_selected_exception(mock_timer, mock_copy, ops_contr
     mock_app._set_status.assert_called_with("Copy failed: Disk full")
 
 
-@patch("skill_manager.controllers.ops_controller.delete_project_skill_folders")
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops.delete.delete_project_skill_folders")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_ops_controller_delete_skills_partial_failure(
     mock_timer, mock_del, ops_controller, mock_app
 ):
@@ -428,7 +424,7 @@ def test_ops_controller_archive_selected_skills(ops_controller, mock_app):
     mock_app._library_model._all_skills = []
     mock_app._quick_copy_model._all_skills = []
 
-    with patch("skill_manager.controllers.ops_controller.save_archive") as mock_save:
+    with patch("skill_manager.controllers.ops.toggles.save_archive") as mock_save:
         ops_controller.archiveSelectedSkills()
 
         assert "/p2" in mock_app._archive_paths
@@ -785,7 +781,7 @@ def test_update_custom_command_full_emits_conflict_signal(
     mock_app._set_status.assert_not_called()
 
 
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_copy_collection_to_clipboard(mock_timer, ops_controller, mock_app):
     skill1 = MagicMock(local_path="/skill/a", name="SkillA")
     skill2 = MagicMock(local_path="/skill/b", name="SkillB")
@@ -813,7 +809,7 @@ def test_copy_collection_to_clipboard(mock_timer, ops_controller, mock_app):
         mock_timer.assert_called_once_with(50, ops_controller._send_paste_to_focused_window)
 
 
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_copy_collection_to_clipboard_no_paths(mock_timer, ops_controller, mock_app):
     mock_app._custom_collections = {"Empty": {"paths": [], "projects": []}}
     ops_controller.copyCollectionToClipboard("Empty")
@@ -821,7 +817,7 @@ def test_copy_collection_to_clipboard_no_paths(mock_timer, ops_controller, mock_
     mock_app._clipboard.setText.assert_not_called()
 
 
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_copy_collection_to_clipboard_missing_skill(mock_timer, ops_controller, mock_app):
     mock_app.skillModel._all_skills = []
     mock_app._custom_collections = {
@@ -841,14 +837,14 @@ def test_copy_collection_to_clipboard_missing_skill(mock_timer, ops_controller, 
         mock_timer.assert_called_once_with(50, ops_controller._send_paste_to_focused_window)
 
 
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_copy_collection_to_clipboard_non_dict_entry(mock_timer, ops_controller, mock_app):
     mock_app._custom_collections = {"Bad": "not a dict"}
     ops_controller.copyCollectionToClipboard("Bad")
     mock_app._clipboard.setText.assert_not_called()
 
 
-@patch("skill_manager.controllers.ops_controller.QTimer.singleShot")
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
 def test_copy_collection_to_clipboard_auto_minimize(mock_timer, ops_controller, mock_app):
     skill = MagicMock(local_path="/skill/a")
     mock_app.skillModel._all_skills = [skill]
@@ -952,7 +948,7 @@ class TestRefreshSelectedSkill:
     def test_diagnostic_events_emitted(self, ops_controller, mock_app):
 
         mock_app._selected_skill = {}
-        with patch("skill_manager.controllers.ops_controller.get_diagnostic_logger") as mock_diag:
+        with patch("skill_manager.controllers.ops.sync.get_diagnostic_logger") as mock_diag:
             ops_controller._refresh_selected_skill("/any/path")
             mock_diag.return_value.log_event.assert_called_with(
                 "INFO", "selection_refreshed", "noop: nothing selected"

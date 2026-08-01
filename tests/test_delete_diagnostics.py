@@ -10,7 +10,7 @@ from skill_manager.controllers.ops_controller import OpsController
 
 @pytest.fixture
 def ops_controller(mock_app):
-    with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as mock_timer:
         mock_timer.side_effect = lambda msec, functor: functor()
         yield OpsController(mock_app)
 
@@ -47,7 +47,7 @@ def test_delete_logs_failed_item(ops_controller, tmp_path, caplog):
 
     with (
         patch(
-            "skill_manager.controllers.ops_controller.Path.unlink",
+            "skill_manager.controllers.ops.delete.Path.unlink",
             side_effect=PermissionError("denied"),
         ),
         caplog.at_level(logging.ERROR),

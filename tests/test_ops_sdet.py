@@ -34,7 +34,7 @@ def mock_app():
 
 @pytest.fixture
 def controller(mock_app):
-    with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as mock_timer:
         # Simulate immediate execution of the functor
         mock_timer.side_effect = lambda msec, functor: functor()
         return OpsController(mock_app)
@@ -85,7 +85,7 @@ class TestOpsControllerSDET:
         items = [valid_item, invalid_item]
 
         with patch(
-            "skill_manager.controllers.ops_controller.delete_project_skill_folders"
+            "skill_manager.controllers.ops.delete.delete_project_skill_folders"
         ) as mock_delete_fs:
             mock_delete_fs.return_value = {
                 "deleted": 1,
@@ -126,7 +126,7 @@ class TestOpsControllerSDET:
         ]
 
         with patch(
-            "skill_manager.controllers.ops_controller.delete_project_skill_folders"
+            "skill_manager.controllers.ops.delete.delete_project_skill_folders"
         ) as mock_delete_fs:
             mock_delete_fs.return_value = {"deleted": 1, "failed": 0, "details": []}
 

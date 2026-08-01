@@ -9,7 +9,7 @@ from skill_manager.controllers.ops_controller import OpsController
 
 @pytest.fixture
 def ops_controller(mock_app):
-    with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as mock_timer:
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as mock_timer:
         mock_timer.side_effect = lambda msec, functor: functor()
         yield OpsController(mock_app)
 
