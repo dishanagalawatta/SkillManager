@@ -17,6 +17,7 @@ import pytest
 
 import skill_manager.utils.linux as linux_utils
 from skill_manager.mcp import bridge
+from skill_manager.mcp.bridge import _static as bridge_static
 from skill_manager.utils import input_guard
 
 
@@ -72,7 +73,7 @@ def test_get_job_unknown_returns_none() -> None:
 
 def test_static_analyze_finds_pattern(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """static_analyze greps a directory tree and returns file/line/text matches."""
-    monkeypatch.setattr(bridge, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
     (tmp_path / "a.py").write_text("x = 1\nSECRET_TOKEN = 'abc'\ny = 2\n", encoding="utf-8")
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "b.py").write_text("print('hello')\nSECRET_TOKEN = 9\n", encoding="utf-8")
@@ -88,7 +89,7 @@ def test_static_analyze_finds_pattern(tmp_path: Any, monkeypatch: pytest.MonkeyP
 
 def test_static_analyze_invalid_pattern(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """An invalid regex yields a structured error entry, not a crash."""
-    monkeypatch.setattr(bridge, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
 
     matches = bridge.static_analyze(pattern="([", path=".")
 
@@ -99,7 +100,7 @@ def test_static_analyze_invalid_pattern(tmp_path: Any, monkeypatch: pytest.Monke
 
 def test_static_analyze_missing_path(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """A non-existent search root yields an empty match list."""
-    monkeypatch.setattr(bridge, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
 
     matches = bridge.static_analyze(pattern="x", path="no-such-dir-xyz")
 
