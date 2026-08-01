@@ -32,7 +32,7 @@ def _make_model_with_skills(*skills: Skill) -> SkillModel:
 
 @pytest.fixture
 def ops_controller(mock_app):
-    with patch("skill_manager.controllers.ops_controller.QTimer.singleShot") as timer:
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as timer:
         timer.side_effect = lambda msec, fn: fn() if fn else None
         yield OpsController(mock_app)
 
@@ -59,11 +59,9 @@ class TestQueuedStatusUpdate:
         ]
 
         with (
-            patch(
-                "skill_manager.controllers.ops_controller.delete_project_skill_folders"
-            ) as del_fn,
-            patch("skill_manager.controllers.ops_controller.patch_cache_remove"),
-            patch("skill_manager.controllers.ops_controller.QMetaObject") as mock_qmo,
+            patch("skill_manager.controllers.ops.delete.delete_project_skill_folders") as del_fn,
+            patch("skill_manager.controllers.ops.delete.patch_cache_remove"),
+            patch("skill_manager.controllers.ops.delete.QMetaObject") as mock_qmo,
         ):
             del_fn.return_value = {
                 "deleted": 1,
@@ -96,12 +94,10 @@ class TestStatusFallback:
         ]
 
         with (
-            patch(
-                "skill_manager.controllers.ops_controller.delete_project_skill_folders"
-            ) as del_fn,
-            patch("skill_manager.controllers.ops_controller.patch_cache_remove"),
-            patch("skill_manager.controllers.ops_controller.QMetaObject") as mock_qmo,
-            patch("skill_manager.controllers.ops_controller.logger") as mock_logger,
+            patch("skill_manager.controllers.ops.delete.delete_project_skill_folders") as del_fn,
+            patch("skill_manager.controllers.ops.delete.patch_cache_remove"),
+            patch("skill_manager.controllers.ops.delete.QMetaObject") as mock_qmo,
+            patch("skill_manager.controllers.ops.delete.logger") as mock_logger,
         ):
             del_fn.return_value = {
                 "deleted": 1,
