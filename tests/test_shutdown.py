@@ -147,59 +147,75 @@ class TestCleanupBounded:
 
 
 class TestMainExitStrategy:
-    """main() must terminate cleanly and drain Qt events."""
+    """_shutdown_sequence (ex main() shutdown tail) must terminate cleanly.
 
-    def test_main_uses_os_kill_or_os_exit(self):
-        """The main shutdown flow must call os.kill or os._exit to bypass loader lock deadlocks."""
+    The shutdown tail moved from ``app.main()`` to ``bootstrap._shutdown_sequence``
+    during the Phase 1 decomposition; these tests pin the ordering invariants on
+    their new home.
+    """
+
+    def test_shutdown_uses_os_kill_or_os_exit(self):
+        """The shutdown flow must call os.kill or os._exit to bypass loader lock deadlocks."""
         import inspect
 
-        from skill_manager.app import main
+        from skill_manager.bootstrap import _shutdown_sequence
 
-        source = inspect.getsource(main)
+        source = inspect.getsource(_shutdown_sequence)
         assert "os.kill(" in source or "os._exit(" in source, (
-            "main() should call os.kill or os._exit"
+            "shutdown sequence should call os.kill or os._exit"
         )
 
-    def test_main_drains_qt_events_before_cleanup(self):
-        """main() must call processEvents() to drain Qt events."""
+    def test_shutdown_drains_qt_events_before_cleanup(self):
+        """_shutdown_sequence must call processEvents() to drain Qt events."""
         import inspect
 
-        from skill_manager.app import main
+        from skill_manager.bootstrap import _shutdown_sequence
 
-        source = inspect.getsource(main)
-        assert "processEvents()" in source, "main() should call processEvents()"
+        source = inspect.getsource(_shutdown_sequence)
+        assert "processEvents()" in source, "shutdown sequence should call processEvents()"
 
-    def test_main_uses_psutil_to_kill_children(self):
-        """main() must use psutil to kill child processes recursively bottom-up."""
+    def test_shutdown_uses_psutil_to_kill_children(self):
+        """_shutdown_sequence must use psutil to kill child processes recursively bottom-up."""
         import inspect
 
-        from skill_manager.app import main
+        from skill_manager.bootstrap import _shutdown_sequence
 
-        source = inspect.getsource(main)
-        assert "psutil" in source, "main() should use psutil"
-        assert "child.kill()" in source, "main() should kill children"
+        source = inspect.getsource(_shutdown_sequence)
+        assert "psutil" in source, "shutdown sequence should use psutil"
+        assert "child.kill()" in source, "shutdown sequence should kill children"
 
-    def test_main_calls_cleanup_before_termination(self):
+    def test_shutdown_calls_cleanup_before_termination(self):
         """cleanup() must be called before final process termination."""
         import inspect
 
-        from skill_manager.app import main
+        from skill_manager.bootstrap import _shutdown_sequence
 
-        source = inspect.getsource(main)
+        source = inspect.getsource(_shutdown_sequence)
         cleanup_pos = source.index("controller.cleanup()")
         term_pos = source.rindex("os.kill(")
         assert cleanup_pos < term_pos, "cleanup() must be called before os.kill()"
 
-    def test_main_drains_events_before_cleanup(self):
+    def test_shutdown_drains_events_before_cleanup(self):
         """processEvents() must be called before cleanup()."""
         import inspect
 
-        from skill_manager.app import main
+        from skill_manager.bootstrap import _shutdown_sequence
 
-        source = inspect.getsource(main)
+        source = inspect.getsource(_shutdown_sequence)
         process_pos = source.index("processEvents()")
         cleanup_pos = source.index("controller.cleanup()")
         assert process_pos < cleanup_pos, "processEvents() must be called before cleanup()"
+
+    def test_shutdown_clears_component_cache_before_cleanup(self):
+        """engine.clearComponentCache() must run before controller.cleanup()."""
+        import inspect
+
+        from skill_manager.bootstrap import _shutdown_sequence
+
+        source = inspect.getsource(_shutdown_sequence)
+        cache_pos = source.index("engine.clearComponentCache()")
+        cleanup_pos = source.index("controller.cleanup()")
+        assert cache_pos < cleanup_pos, "component cache must be cleared before cleanup()"
 
     def test_watchdog_still_uses_os_exit(self):
         """Watchdog must still use os._exit as the failsafe."""

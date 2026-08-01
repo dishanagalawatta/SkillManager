@@ -52,7 +52,7 @@ _disable_qml_disk_cache()
 
 import logging  # noqa: E402
 
-from skill_manager.app import main as app_main  # noqa: E402
+from skill_manager.bootstrap import run_gui as app_main  # noqa: E402
 from skill_manager.core.config import DATA_DIR  # noqa: E402
 from skill_manager.core.resources import force_clear_qml_disk_cache  # noqa: E402
 

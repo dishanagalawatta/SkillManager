@@ -273,11 +273,13 @@ class AppController(QObject):
     def _on_global_hotkey(self, hotkey_id: int) -> None: ...
     def _on_shortcuts_changed(self) -> None: ...
 
-# Module-level constants and entry point
-_app_mutex: Any
+# Module-level constants and entry point.
+# ``_app_mutex`` moved to ``skill_manager.utils.single_instance`` in the
+# Phase 1 decomposition; it is no longer a module attribute of ``app``.
 HAS_PYWINSTYLES: bool
 logger: Any
 
+# Re-export of ``skill_manager.bootstrap.run_gui`` (entry point)
 def main() -> None: ...
 
 # Re-exports used by tests/main

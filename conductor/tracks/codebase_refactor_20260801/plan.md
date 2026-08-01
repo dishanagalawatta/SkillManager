@@ -17,11 +17,17 @@ Philosophy: split + fix issues found. QML surface frozen.
 
 ## Phase 1 — app.py decomposition (2,212 → ~1,000)
 
-- [ ] 9. Extract utils/native_styling.py (pywinstyles, DWMWA, _apply_immersive_dark)
-- [ ] 10. Extract utils/single_instance.py (_bring_existing_window_to_front, _acquire_linux_lock)
-- [ ] 11. Extract controllers/command_channel.py (CommandChannel L136-333)
-- [ ] 12. Extract mcp/launcher.py (_run_mcp_mode) + bootstrap.py (main() split)
-- [ ] 13. Rewrite source-text tests (test_single_instance_guard, test_shutdown, test_app_initialization, test_app_dark_mode_native) + gate + commit
+- [x] 9. Extract utils/native_styling.py (pywinstyles, DWMWA, _apply_immersive_dark)
+- [x] 10. Extract utils/single_instance.py (_bring_existing_window_to_front, _acquire_linux_lock)
+- [x] 11. Extract controllers/command_channel.py (CommandChannel L136-333)
+- [x] 12. Extract mcp/launcher.py (_run_mcp_mode) + bootstrap.py (main() split)
+- [x] 13. Rewrite source-text tests (test_single_instance_guard, test_shutdown, test_app_initialization, test_app_dark_mode_native) + gate + commit
+- [x] 13b. SPIKE (1.6): Extract 64 QML proxy slots into controllers/app_proxies.py
+      (AppControllerProxyMixin, plain-Python mixin; AppController(AppControllerProxyMixin, QObject)).
+      PASSED: PySide6 metaobject discovers inherited plain-mixin slots; QMetaObject.invokeMethod
+      works (clearViewFilters/resetUiState/getCategoryEmoji verified). app.py: 2,212 -> 1,123 lines.
+      Gate: ruff clean, 1721 passed/1 skipped (-n auto + serial), coverage 80.52% >= 80, offscreen
+      smoke exit 124 (no errors). NOT committed (user constraint: no commits; user commits).
 
 ## Phase 2 — mcp/bridge.py package (1,797)
 
