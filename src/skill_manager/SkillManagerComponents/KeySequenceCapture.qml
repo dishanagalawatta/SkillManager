@@ -18,8 +18,8 @@ Rectangle {
     activeFocusOnTab: true
 
     Accessible.role: Accessible.Button
-    Accessible.name: root.active ? "Recording shortcut, click outside to cancel" : (root.sequence || "Click to record shortcut")
-    Accessible.description: "Press Enter or Space to start recording, click outside to cancel"
+    Accessible.name: root.active ? "Recording shortcut. Press Escape to cancel, or Backspace to clear." : (root.sequence || "Click to record shortcut")
+    Accessible.description: "Press Enter or Space to start recording. When recording, press Escape to cancel or Backspace to clear."
 
     focus: active
     onActiveChanged: {
@@ -74,6 +74,20 @@ Rectangle {
             return
         }
 
+        if (event.key === Qt.Key_Escape) {
+            active = false
+            event.accepted = true
+            return
+        }
+
+        if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
+            root.sequence = ""
+            root.sequenceCaptured("")
+            active = false
+            event.accepted = true
+            return
+        }
+
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             active = false
             event.accepted = true
@@ -98,10 +112,6 @@ Rectangle {
         // Handle F-keys
         if (event.key >= Qt.Key_F1 && event.key <= Qt.Key_F12) {
             keyText = "F" + (event.key - Qt.Key_F1 + 1)
-        } else if (event.key === Qt.Key_Escape) {
-            keyText = "Escape"
-        } else if (event.key === Qt.Key_Delete) {
-            keyText = "Delete"
         } else if (event.key === Qt.Key_Home) {
             keyText = "Home"
         } else if (event.key === Qt.Key_End) {
@@ -112,8 +122,6 @@ Rectangle {
             keyText = "PageDown"
         } else if (event.key === Qt.Key_Insert) {
             keyText = "Insert"
-        } else if (event.key === Qt.Key_Backspace) {
-            keyText = "Backspace"
         } else if (event.key === Qt.Key_Tab) {
             keyText = "Tab"
         } else if (event.key === Qt.Key_Space) {
