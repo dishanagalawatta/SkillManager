@@ -45,10 +45,10 @@ a property on `AppController` and is independently testable.
 
 | Property | Type | Module | Purpose |
 |----------|------|--------|---------|
-| `config` | `ConfigController` | `controllers/config_controller.py` | Read / write `ConfigManager` state. |
+| `config` | `ConfigController` | `controllers/config_controller.py` (facade over `controllers/config/` mixins) | Read / write `ConfigManager` state. |
 | `discovery` | `DiscoveryController` | `controllers/discovery_controller.py` | Find skills across configured sources. |
 | `updates` | `UpdateController` | `controllers/update_controller.py` | Schedule and run updates. |
-| `ops` | `OpsController` | `controllers/ops_controller.py` | Delete, archive, restore. |
+| `ops` | `OpsController` | `controllers/ops_controller.py` (facade over `controllers/ops/` mixins) | Delete, archive, restore. |
 | `ui` | `UiController` | `controllers/ui_controller.py` | View selection, modal state. |
 | `screenshot` | `ScreenshotController` | `controllers/screenshot_controller.py` | Capture + annotate. |
 | `image_inspector` | `ImageInspectorController` | `controllers/image_inspector_controller.py` | Image inspection. |

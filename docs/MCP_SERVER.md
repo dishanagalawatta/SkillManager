@@ -42,7 +42,19 @@ but implemented in Python against `AppController` instead of a C++ plugin.
 mcp/
   __init__.py          # registers server with main()
   server.py            # MCPServer factory, stdio transport, tool registry
-  bridge.py            # thin wrappers over AppController + sub-controllers
+  bridge/              # thin wrappers over AppController + sub-controllers
+    __init__.py        # facade: public bridge API (imports preserved)
+    _controller.py     # AppController/ops/update delegation
+    _capture.py        # cross-process GUI capture + nav IPC
+    _devtools.py       # QML debug bridge
+    _input.py          # input-injection helpers (guarded)
+    _ipc.py            # CommandChannel IPC, ack dirs
+    _jobs.py           # background job registry
+    _skills.py         # skill CRUD wrappers
+    _state.py          # state snapshot helpers
+    _static.py         # repo-root constants, ignore rules
+    _telemetry.py      # diagnostics/health aggregation
+    _win32.py          # Windows-specific wrappers
   models.py            # pydantic request/response schemas
   tools/
     build.py           # sm_lint, sm_run_tests, sm_build

@@ -53,9 +53,9 @@ All UI-to-business logic flows through **singleton controllers** registered via 
 | Controller | Module | Purpose |
 |------------|--------|---------|
 | `AppController` | `app.py` | Root controller; sub-controllers exposed as properties |
-| `ConfigController` | `controllers/config_controller.py` | Read/write `ConfigManager` state |
+| `ConfigController` | `controllers/config_controller.py` (facade over `config/` mixins) | Read/write `ConfigManager` state |
 | `DiscoveryController` | `controllers/discovery_controller.py` | Find skills across sources |
-| `OpsController` | `controllers/ops_controller.py` | Copy, delete, archive operations |
+| `OpsController` | `controllers/ops_controller.py` (facade over `ops/` mixins) | Copy, delete, archive operations |
 | `UIController` | `controllers/ui_controller.py` | Sidebar, search, view state |
 | `UpdateController` | `controllers/update_controller.py` | Skill source updates |
 | `AppUpdateController` | `controllers/app_update_controller.py` | App-level update (TUF bundles) |
@@ -179,7 +179,8 @@ The `src/skill_manager/mcp/` subsystem exposes all core app capabilities to AI a
 
 ```
 src/skill_manager/mcp/
-├── bridge.py          ← IPC bridge: routes MCP ↔ AppController
+├── bridge/            ← IPC bridge package: routes MCP ↔ AppController
+│   ├── __init__.py      (facade; submodules: _controller, _capture, _ipc, _skills, ...)
 ├── models.py          ← pydantic request/response schemas
 ├── server.py          ← MCP server entry point (stdio)
 └── tools/

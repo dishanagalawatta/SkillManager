@@ -34,8 +34,8 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | Controller | Module | Purpose |
 |------------|--------|---------|
 | `UIController` | `ui_controller.py` | Application-wide UI state, window geometry, asset URI resolution |
-| `ConfigController` | `config_controller.py` | `ConfigManager` instance, skill sources, projects, shortcuts |
-| `OpsController` | `ops_controller.py` | Copy, delete, archive, restore, starred state, custom commands |
+| `ConfigController` | `config_controller.py` (facade over `config/` mixins) | `ConfigManager` instance, skill sources, projects, shortcuts |
+| `OpsController` | `ops_controller.py` (facade over `ops/` mixins) | Copy, delete, archive, restore, starred state, custom commands |
 | `UpdateController` | `update_controller.py` | Background sync, Git source updates, progress reporting |
 | `DiscoveryController` | `discovery_controller.py` | Filesystem scanning, project discovery, prepared-state pipeline |
 | `ScreenshotController` | `screenshot_controller.py` | Screen capture, region selection, PII redaction |
@@ -59,7 +59,7 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 |------|-------|---------|
 | `entities.py` | `SkillEntity`, `CommandEntity`, etc. | Core data classes (Pydantic models) |
 | `filter_engine.py` | `FilterEngine` | Category, text, client, starred/archived filtering |
-| `qt_model.py` | `SkillModel` | `QAbstractListModel` subclass for QML binding |
+| `qt_model.py` | `SkillModel` | `QAbstractListModel` subclass for QML binding (facade over `roles`, `selection`, `pipeline`, `incubation`, `collapse`, `ingest` mixins) |
 
 `SkillModel` implements optimized filtering and selection, supporting thousands of skills without UI lag.
 
