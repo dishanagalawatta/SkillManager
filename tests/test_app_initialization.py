@@ -1,4 +1,7 @@
+import inspect
 from pathlib import Path
+
+from skill_manager.bootstrap import _set_app_user_model_id
 
 
 def test_app_user_model_id_is_stable():
@@ -6,17 +9,13 @@ def test_app_user_model_id_is_stable():
     Ensure the AppUserModelID does not use a dynamic timestamp which breaks
     Windows taskbar icon grouping.
     """
-    app_py_path = Path(__file__).parent.parent / "src" / "skill_manager" / "app.py"
-    content = app_py_path.read_text(encoding="utf-8")
+    source = inspect.getsource(_set_app_user_model_id)
 
-    # Locate the AppUserModelID setting block specifically
-    start_idx = content.find("myappid = ")
-    end_idx = content.find("SetCurrentProcessExplicitAppUserModelID")
-    assert start_idx != -1 and end_idx != -1
-    block = content[start_idx:end_idx]
-
-    assert 'myappid += ".dev"' in block, "Should append .dev for development builds"
-    assert "time.time()" not in block, "Should NOT append a dynamic timestamp to AppUserModelID"
+    assert 'myappid += ".dev"' in source, "Should append .dev for development builds"
+    assert "time.time()" not in source, "Should NOT append a dynamic timestamp to AppUserModelID"
+    assert "SetCurrentProcessExplicitAppUserModelID" in source, (
+        "Must set the AppUserModelID via the shell32 API"
+    )
 
 
 def test_main_qml_visibility_deferred():
@@ -39,7 +38,8 @@ def test_main_qml_visibility_deferred():
 
 def test_no_loky_intercept_in_entrypoint():
     """
-    Ensure no broken PyInstaller/loky intercept code exists in __main__.py or app.py.
+    Ensure no broken PyInstaller/loky intercept code exists in __main__.py, app.py,
+    or bootstrap.py.
     ADR-0021: loky's frozen-mode fork is broken on Windows (OSError: WinError 6).
     The fix uses joblib_prefer() to select threads in frozen builds, so the
     broken intercept code was removed from both entrypoints.
@@ -54,9 +54,10 @@ def test_no_loky_intercept_in_entrypoint():
         and "joblib_main" not in main_content
     ), "__main__.py must not intercept --multiprocessing-fork for loky"
 
-    app_content = (src_dir / "app.py").read_text(encoding="utf-8")
-    assert "loky_main" not in app_content, "app.py must not contain loky intercept"
-    assert "joblib.externals.loky" not in app_content, "app.py must not import loky"
+    for name in ("app.py", "bootstrap.py"):
+        content = (src_dir / name).read_text(encoding="utf-8")
+        assert "loky_main" not in content, f"{name} must not contain loky intercept"
+        assert "joblib.externals.loky" not in content, f"{name} must not import loky"
 
 
 def test_boot_normalization_self_healing(tmp_path, monkeypatch):

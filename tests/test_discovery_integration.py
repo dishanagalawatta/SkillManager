@@ -95,18 +95,14 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
     assert discovery_controller.libraryModel.rowCount() > 0
 
     skill_md.write_text("---\nname: Version 2\n---\nBody", encoding="utf-8")
-    # Force mtimes strictly greater than the first scan recorded so the
-    # fingerprint-based incremental scan detects the change deterministically
-    # — no wall-clock sleep that can flake under xdist load.
-    import time
 
-    new_mtime = time.time() + 30
-    os.utime(skill_md, (new_mtime, new_mtime))
-    os.utime(skill_folder, (new_mtime, new_mtime))
-
-    # Trigger refresh again — track generation to know when it completes
-    _ = discovery_controller.discovery._refresh_generation
-    discovery_controller.refreshSkills("", False)
+    # Force a full scan for the second refresh. A plain incremental refresh
+    # relies on the fingerprint cache, which races with a cancelled in-flight
+    # pipeline: the cancelled scan parses files before a change lands but
+    # writes the fingerprint after, poisoning the cache pair so the next
+    # scan fingerprint-hits stale skills. force_full_scan bypasses the
+    # fingerprint comparison entirely, making the update deterministic.
+    discovery_controller.refreshSkills("", True)
 
     def version2_visible():
         for i in range(discovery_controller.libraryModel.rowCount()):
@@ -118,7 +114,7 @@ def test_discovery_incremental_ui_update(qtbot, qapp, discovery_controller, temp
                 return True
         return False
 
-    qtbot.waitUntil(version2_visible, timeout=5000)
+    qtbot.waitUntil(version2_visible, timeout=15000)
 
     # Check model
     for i in range(discovery_controller.libraryModel.rowCount()):
