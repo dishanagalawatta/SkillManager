@@ -1,0 +1,33 @@
+{
+  "id": "codebase_refactor_20260801",
+  "title": "Professional codebase cleanup: hygiene, god-file decomposition, test consolidation",
+  "type": "refactor",
+  "status": "completed",
+  "owner": "@dishanagalawatta",
+  "created": "2026-08-01T00:00:00Z",
+  "updated": "2026-08-01T03:19:13Z",
+  "current_phase": 7,
+  "current_task": "38",
+  "phases": {
+    "total": 8,
+    "completed": 8
+  },
+  "tasks": {
+    "total": 38,
+    "completed": 38
+  },
+  "commits": [
+    "be8dce1",
+    "37df392",
+    "ef6edd7",
+    "1ca7ecb",
+    "34799fc",
+    "429f645",
+    "1cdd15b",
+    "395b2b3",
+    "11bbe7a"
+  ],
+  "related_adrs": [],
+  "notes": "Full-sweep refactor per .omo/plans/refactor-codebase.md (Momus-approved 2026-08-01). Phases: 0 hygiene+flaky fixes, 1 app.py split, 2 mcp/bridge.py package, 3 ops_controller.py package, 4 qt_model+config_controller mixins, 5 test consolidation, 6 core module dedup, 7 docs+stub-verify+final gate. User-approved scope: Everything + Split+fix. Commit-per-phase approved. QML surface frozen; .pyi stubs updated in lockstep. FINAL GATE 2026-08-01: ruff clean, serial 1656/1, xdist 1656/1, coverage 80.91%, offscreen smoke exit 0, --mcp-light smoke OK. Track archived.",
+  "design_doc": ".omo/plans/refactor-codebase.md"
+}
