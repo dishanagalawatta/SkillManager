@@ -468,3 +468,94 @@ def test_reset_shortcuts_clears_collection_shortcuts(config_controller, mock_app
     assert mock_app._custom_collections["CollA"]["shortcut_enabled"] is True
     assert mock_app._custom_collections["CollB"]["shortcut"] == ""
     assert mock_app._custom_collections["CollB"]["shortcut_enabled"] is True
+
+
+# ── SDET contract (merged from test_config_sdet.py; duplicates pruned) ──
+
+
+def test_scroll_speed_multiplier_validation(config_controller, mock_app):
+    # Valid value
+    config_controller.scrollSpeedMultiplier = 2.5
+    mock_app._config.set.assert_called_with("scroll_speed_multiplier", 2.5)
+
+    # Below minimum (0.1) -> should still be 0.1 or fallback (Pydantic will coerce)
+    # In our schema, ge=0.1.
+    mock_app._config.reset_mock()
+    config_controller.scrollSpeedMultiplier = 0.05
+    # If Pydantic validation fails in _set_config_value, it logs warning and returns False.
+    # However, our _coerce_float returns 1.0 on ValueError/TypeError.
+    # ge=0.1 is a validation error.
+    mock_app._config.set.assert_not_called()
+
+    # String coercion
+    mock_app._config.reset_mock()
+    config_controller.scrollSpeedMultiplier = "3.14"
+    mock_app._config.set.assert_called_with("scroll_speed_multiplier", 3.14)
+
+
+def test_update_mode_validation(config_controller, mock_app):
+    # Valid
+    config_controller.skillPackageAutoUpdateMode = "silent"
+    mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "silent")
+
+    # Invalid -> fallback to "prompt" via validator
+    mock_app._config.reset_mock()
+    config_controller.skillPackageAutoUpdateMode = "invalid_mode"
+    # Our validator returns "prompt" for unknown strings
+    mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "prompt")
+
+
+def test_add_source_path_normalization(config_controller, mock_app):
+    with patch("pathlib.Path.resolve") as mock_resolve:
+        mock_resolve.return_value = "/absolute/path"
+        config_controller.addSource("file:///relative/path")
+        assert "/absolute/path" in mock_app._sources
+
+
+def test_get_project_label_robustness(config_controller, mock_app):
+    # Test standard folder (root path: canonical label includes "(.)")
+    assert config_controller.getProjectLabel("/home/user/MyProj") == "MyProj (.)"
+
+    # Test .agents/skills folder
+    assert config_controller.getProjectLabel("/home/user/MyProj/.agents/skills") == "MyProj"
+
+    # Test custom alias
+    mock_app._project_aliases = {"/path/a": "CustomName"}
+    assert config_controller.getProjectLabel("/path/a") == "CustomName"
+
+
+def test_set_project_alias_updates_models(config_controller, mock_app):
+    mock_app._library_model = MagicMock()
+    mock_app._quick_copy_model = MagicMock()
+    mock_app._library_model._all_skills = [
+        {"name": "S1", "project_path": "/proj/1", "project_label": "Old"}
+    ]
+
+    config_controller.setProjectAlias("/proj/1", "New")
+
+    assert mock_app._project_aliases["/proj/1"] == "New"
+    assert mock_app._library_model._all_skills[0]["project_label"] == "New"
+    mock_app._library_model._begin_batch.assert_called()
+    mock_app._library_model._end_batch.assert_called()
+
+
+def test_reset_shortcuts(config_controller, mock_app):
+    mock_signal = MagicMock()
+    config_controller.shortcutsChanged.connect(mock_signal)
+
+    config_controller.resetShortcuts()
+    mock_app._config.set.assert_called()
+    # Verify it writes the defaults (DEFAULT_SHORTCUTS) under the
+    # ``shortcuts`` key. ``resetShortcuts`` also writes
+    # ``disabled_shortcuts`` afterwards, so we have to scan the
+    # call list for the ``shortcuts`` write — not just look at the
+    # last call (which would be the ``disabled_shortcuts`` write).
+    shortcut_calls = [
+        call_args
+        for call_args in mock_app._config.set.call_args_list
+        if call_args[0][0] == "shortcuts"
+    ]
+    assert shortcut_calls, "resetShortcuts did not write the 'shortcuts' key"
+    args = shortcut_calls[0]
+    assert "search" in args[0][1]
+    mock_signal.assert_called_once()

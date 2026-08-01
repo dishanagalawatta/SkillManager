@@ -3,11 +3,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtCore import QRect
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QPixmap
 
 from skill_manager.controllers.screenshot_controller import ScreenshotController
+from skill_manager.core.image_processing import ImageProcessor
 from skill_manager.core.image_provider import ScreenshotImageProvider
 from skill_manager.core.quick_copy import discover_single_project
+from skill_manager.core.schemas import Redaction
 
 
 @pytest.fixture
@@ -784,3 +786,99 @@ def test_save_screenshot_auto_select_quick_copy(controller, mock_app, tmp_path):
         assert mock_app.ui_controller.currentView == "QuickCopy"
         mock_app._quick_copy_model.selectByPaths.assert_called_once()
         mock_app.set_selected_skill.assert_called_once()
+
+
+# ── SDET contract (merged from test_screenshot_sdet.py; duplicates pruned) ──
+
+
+class TestImageProcessor:
+    def test_crop_and_redact_success(self):
+        pixmap = QPixmap(100, 100)
+        pixmap.fill(QColor("white"))
+
+        crop_rect = QRect(10, 10, 50, 50)
+        redactions = [Redaction(x=5, y=5, width=10, height=10)]
+
+        result = ImageProcessor.crop_and_redact(pixmap, crop_rect, redactions)
+
+        # Result should match crop size
+        assert result.width() == 50
+        assert result.height() == 50
+
+        # Verify redaction is drawn (black pixel at 5,5)
+        img = result.toImage()
+        color = QColor(img.pixel(5, 5))
+        assert color.name() == "#000000"
+
+    def test_crop_and_redact_null_pixmap(self):
+        pixmap = QPixmap()
+        crop_rect = QRect(0, 0, 10, 10)
+
+        with pytest.raises(ValueError, match="Cannot process a null QPixmap"):
+            ImageProcessor.crop_and_redact(pixmap, crop_rect, [])
+
+    def test_crop_and_redact_empty_crop(self):
+        pixmap = QPixmap(100, 100)
+        crop_rect = QRect(0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="Crop rectangle cannot be empty"):
+            ImageProcessor.crop_and_redact(pixmap, crop_rect, [])
+
+
+def test_save_screenshot_invalid_params(controller, mock_app):
+    crop_rect = QRect(-10, -10, 0, 0)  # Invalid
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    controller.saveScreenshot(crop_rect, [])
+
+    # Should set status to error and not proceed
+    mock_app._set_status.assert_called_with("Failed to save: invalid crop or redaction parameters.")
+
+
+@patch("skill_manager.core.image_processing.ImageProcessor.crop_and_redact")
+def test_save_screenshot_image_processor_fails(mock_process, controller, mock_app):
+    mock_process.side_effect = ValueError("Test error")
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    controller.saveScreenshot(QRect(0, 0, 10, 10), [])
+
+    # Should catch error and return
+    mock_app._set_status.assert_not_called()
+
+
+def test_save_screenshot_success(controller, mock_app, tmp_path):
+    mock_app.projects = [str(tmp_path)]
+    mock_app.clientFormat = "Standard"
+
+    crop_rect = QRect(0, 0, 50, 50)
+    raw_redactions = [{"x": 0, "y": 0, "width": 10, "height": 10}]
+
+    full_pixmap = QPixmap(100, 100)
+    full_pixmap.fill("white")
+    controller.current_full_pixmap = full_pixmap
+
+    with patch("PySide6.QtGui.QGuiApplication.clipboard"):
+        controller.saveScreenshot(crop_rect, raw_redactions)
+
+    # Check files were created
+    screenshots_dir = tmp_path / ".agents" / "screenshots"
+    assert screenshots_dir.exists()
+
+    files = list(screenshots_dir.glob("Screenshot_*.png"))
+    assert len(files) == 1
+
+    # Check model updates
+    mock_app._library_model.addOrUpdateSkills.assert_called_once()
+    args = mock_app._library_model.addOrUpdateSkills.call_args[0][0]
+    assert len(args) == 1
+    assert args[0]["is_screenshot"] is True
+
+    # Check categories update
+    assert "Screenshots" in mock_app._categories
+    mock_app.categoriesChanged.emit.assert_called_once()

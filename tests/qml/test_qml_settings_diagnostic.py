@@ -21,7 +21,10 @@ from PySide6.QtQuick import QQuickItem
 from PySide6.QtWidgets import QApplication
 
 QML_DIR = (
-    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "skill_manager"
+    / "SkillManagerComponents"
 )
 
 

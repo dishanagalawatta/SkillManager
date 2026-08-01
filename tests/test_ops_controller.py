@@ -1400,3 +1400,78 @@ def test_ops_controller_update_custom_command_emits_carry_prompt(
         assert json.loads(cmd_json) == [str(cmd_path)]
         assert Path(proj_str) == tmp_path
         assert json.loads(miss_json) == [{"name": "Skill1"}]
+
+
+# ── SDET contract (merged from test_ops_sdet.py; duplicates pruned) ─────
+
+
+def test_delete_skills_with_validation(ops_controller, mock_app):
+    valid_item = {
+        "name": "Skill 1",
+        "local_path": "/path/1",
+        "project_path": "/proj",
+        "category": "Cat",
+    }
+    invalid_item = {"missing": "fields"}
+
+    items = [valid_item, invalid_item]
+
+    with patch(
+        "skill_manager.controllers.ops.delete.delete_project_skill_folders"
+    ) as mock_delete_fs:
+        mock_delete_fs.return_value = {
+            "deleted": 1,
+            "failed": 0,
+            "details": [{"path": "/path/1", "status": "deleted"}],
+        }
+
+        ops_controller.deleteSkills(items)
+
+        # Should only process valid_item
+        mock_app._library_model.removeSkillsByPath.assert_called_with(["/path/1"])
+        mock_delete_fs.assert_called_once()
+        args = mock_delete_fs.call_args[0][0]
+        assert len(args) == 1
+        assert args[0]["local_path"] == "/path/1"
+
+
+def test_delete_mixed_items(ops_controller, mock_app, tmp_path):
+    skill_path = tmp_path / "skill_dir"
+    cmd_path = tmp_path / "cmd.CLI.md"
+    cmd_path.touch()
+
+    items = [
+        {
+            "name": "Skill",
+            "local_path": str(skill_path),
+            "project_path": str(tmp_path),
+            "is_command": False,
+        },
+        {
+            "name": "Cmd",
+            "local_path": str(cmd_path),
+            "project_path": str(tmp_path),
+            "is_command": True,
+        },
+    ]
+
+    with patch(
+        "skill_manager.controllers.ops.delete.delete_project_skill_folders"
+    ) as mock_delete_fs:
+        mock_delete_fs.return_value = {"deleted": 1, "failed": 0, "details": []}
+
+        ops_controller.deleteSkills(items)
+
+        # Filesystem check for command
+        assert not cmd_path.exists()
+        # FS call check for skill
+        mock_delete_fs.assert_called_once()
+
+
+def test_update_models_property_no_match(ops_controller, mock_app):
+    mock_app._library_model.updateSkillProperty.return_value = False
+    mock_app._quick_copy_model.updateSkillProperty.return_value = False
+
+    ops_controller._updateModelsProperty("/non/existent", "is_starred", True)
+
+    mock_app._library_model.updateSkillProperty.assert_called()

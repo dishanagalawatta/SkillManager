@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 QML_FILE = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parent.parent.parent
     / "src"
     / "skill_manager"
     / "SkillManagerComponents"

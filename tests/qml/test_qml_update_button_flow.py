@@ -491,7 +491,7 @@ class TestQmlConnectionsHandler:
         from pathlib import Path
 
         qml_path = (
-            Path(__file__).resolve().parent.parent
+            Path(__file__).resolve().parent.parent.parent
             / "src"
             / "skill_manager"
             / "SkillManagerComponents"

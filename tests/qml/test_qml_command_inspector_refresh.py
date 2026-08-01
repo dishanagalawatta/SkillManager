@@ -93,7 +93,7 @@ def test_delete_command_routes_to_command_delete_dialog():
     from pathlib import Path
 
     dialog_path = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -122,7 +122,7 @@ def test_legacy_delete_confirm_dialog_removed():
     from pathlib import Path
 
     old_dialog = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -139,7 +139,7 @@ def test_qmldir_registers_command_delete_dialog():
     from pathlib import Path
 
     qmldir = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -159,7 +159,7 @@ def test_skill_item_emits_is_command_in_delete_signal():
     from pathlib import Path
 
     skill_item = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -179,7 +179,7 @@ def test_library_view_routes_command_delete():
     from pathlib import Path
 
     view = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -209,7 +209,7 @@ def test_quick_copy_view_routes_command_delete():
     from pathlib import Path
 
     view = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -239,7 +239,7 @@ def test_command_inspector_uses_shared_dialog():
     from pathlib import Path
 
     inspector = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -260,7 +260,7 @@ def test_command_delete_dialog_uses_new_design_language():
     from pathlib import Path
 
     dialog_path = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -324,7 +324,7 @@ def test_command_removal_dialog_uses_glass_dialog_base():
     from pathlib import Path
 
     dialog = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -361,7 +361,7 @@ def test_command_removal_dialog_registered_in_qmldir():
     from pathlib import Path
 
     qmldir = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -383,7 +383,7 @@ def test_command_removal_dialog_uses_danger_role_button():
     from pathlib import Path
 
     dialog = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -408,7 +408,7 @@ def test_delete_dialogs_do_not_hand_roll_action_button_overrides():
     from pathlib import Path
 
     base = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -479,7 +479,7 @@ def test_delete_dialog_footer_has_no_button_overflow():
     from pathlib import Path
 
     base = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -506,7 +506,7 @@ def test_action_button_supports_danger_role():
     from pathlib import Path
 
     ab = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -532,7 +532,7 @@ def test_command_inspector_has_direct_skill_binding():
     from pathlib import Path
 
     inspector = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -550,7 +550,7 @@ def test_command_inspector_no_body_content_workaround():
     from pathlib import Path
 
     inspector = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"
@@ -567,7 +567,7 @@ def test_command_inspector_on_skill_changed_handler():
     from pathlib import Path
 
     inspector = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parent.parent.parent
         / "src"
         / "skill_manager"
         / "SkillManagerComponents"

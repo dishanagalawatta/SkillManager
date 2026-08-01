@@ -13,7 +13,10 @@ from pathlib import Path
 import pytest
 
 QML_DIR = (
-    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "skill_manager"
+    / "SkillManagerComponents"
 )
 
 

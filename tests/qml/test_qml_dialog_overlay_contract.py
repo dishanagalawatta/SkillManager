@@ -9,7 +9,10 @@ width and height bounds based on Overlay.overlay.
 from pathlib import Path
 
 COMPONENTS_DIR = (
-    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "skill_manager"
+    / "SkillManagerComponents"
 )
 DIALOGS_DIR = COMPONENTS_DIR / "dialogs"
 
