@@ -3,9 +3,27 @@ Tests the build script functionality.
 """
 
 import os
+import shutil
 import subprocess
+from pathlib import Path
 
 from PIL import Image
+
+
+def _find_uv() -> str:
+    """Locate the uv executable: PATH first, then the standalone installer dir.
+
+    Minimal shells (and GUI-spawned processes) may not have ~/.local/bin on
+    PATH, so a bare "uv" subprocess would raise FileNotFoundError — the same
+    failure mode the MCP client launcher solves (scripts/mcp_launcher.sh).
+    """
+    found = shutil.which("uv")
+    if found:
+        return found
+    candidate = Path.home() / ".local" / "bin" / ("uv.exe" if os.name == "nt" else "uv")
+    if candidate.is_file():
+        return str(candidate)
+    return "uv"
 
 
 def test_build_script_dry_run():
@@ -19,7 +37,7 @@ def test_build_script_dry_run():
         os.remove(ico_path)
 
     # Execute build script in dry-run mode
-    cmd = ["uv", "run", "python", build_script, "--dry-run"]
+    cmd = [_find_uv(), "run", "python", build_script, "--dry-run"]
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Assert execution succeeds
