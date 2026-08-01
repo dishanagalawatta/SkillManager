@@ -3,7 +3,7 @@
   "mcp": {
     "skillmanager": {
       "type": "local",
-      "command": ["uv", "run", "skill-manager", "--mcp-light"],
+      "command": ["bash", "scripts/mcp_launcher.sh", "--mcp-light"],
       "enabled": true
     }
   },
