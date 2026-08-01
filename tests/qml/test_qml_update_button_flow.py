@@ -457,7 +457,7 @@ class TestUpdateErrorTracking:
 
     @patch("skill_manager.controllers.update_controller.QTimer")
     @patch("skill_manager.controllers.update_controller.capture_event")
-    @patch("skill_manager.core.skill_packages.run_skill_package_update")
+    @patch("skill_manager.core.update_service.run_skill_package_update")
     def test_update_error_cleared_on_click(
         self, _mock_run_update, _mock_event, _mock_timer, ctrl, mock_app
     ):

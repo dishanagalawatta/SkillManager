@@ -96,7 +96,10 @@ def resolve_resilient_path(path_str):
             if path.is_dir() and path.name.lower() not in ("skills", ".agents"):
                 potential = path / ".agents" / "skills"
                 if potential.exists() and potential.is_dir():
-                    return potential.resolve()
+                    # Local import: copier imports quick_copy at module level.
+                    from skill_manager.core.copier import auto_detect_skills_dir
+
+                    return auto_detect_skills_dir(path)
             return path.resolve()
     except OSError:
         pass

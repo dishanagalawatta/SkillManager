@@ -636,18 +636,18 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
             "skill_manager.controllers.update_controller.UpdateController._resolvePackageStorageState"
         ),
         patch(
-            "skill_manager.core.skill_packages.run_skill_package_update",
+            "skill_manager.core.update_service.run_skill_package_update",
             return_value={"name": "Repo", "source_type": "git", "package_path": "x"},
         ),
         patch(
-            "skill_manager.core.skill_packages.scan_package_inventory",
+            "skill_manager.core.update_service.scan_package_inventory",
             return_value={"scan_ok": True, "skills": {}},
         ),
         patch(
-            "skill_manager.core.skill_packages.diff_package_inventory",
+            "skill_manager.core.update_service.diff_package_inventory",
             return_value={"removed": [], "added": [], "updated": []},
         ),
-        patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=True),
+        patch("skill_manager.core.update_service.inventory_removals_verified", return_value=True),
         patch("skill_manager.controllers.update_controller.capture_event"),
     ):
         controller.runPackageUpdate(0)

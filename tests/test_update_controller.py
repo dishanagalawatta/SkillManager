@@ -125,7 +125,7 @@ def test_run_package_update_skips_project_root_conflict(update_controller, mock_
             side_effect=lambda _ms, _receiver, callback: callback(),
         ),
         patch(
-            "skill_manager.core.skill_packages.run_skill_package_update"
+            "skill_manager.core.update_service.run_skill_package_update"
         ) as run_skill_package_update,
     ):
         update_controller.runPackageUpdate(0)
@@ -280,18 +280,18 @@ def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_pa
         ),
         patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
         patch(
-            "skill_manager.core.skill_packages.run_skill_package_update",
+            "skill_manager.core.update_service.run_skill_package_update",
             return_value={"status": "ok"},
         ),
         patch(
-            "skill_manager.core.skill_packages.scan_package_inventory",
+            "skill_manager.core.update_service.scan_package_inventory",
             return_value={"scan_ok": True, "skills": {"new_skill": {"name": "new_skill"}}},
         ),
         patch(
-            "skill_manager.core.skill_packages.diff_package_inventory",
+            "skill_manager.core.update_service.diff_package_inventory",
             return_value={"added": ["new_skill"], "updated": [], "removed": []},
         ),
-        patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=False),
+        patch("skill_manager.core.update_service.inventory_removals_verified", return_value=False),
         patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add") as mock_patch_cache,
@@ -350,18 +350,18 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
         ),
         patch("skill_manager.core.skill_packages.package_project_path_conflicts", return_value=[]),
         patch(
-            "skill_manager.core.skill_packages.run_skill_package_update",
+            "skill_manager.core.update_service.run_skill_package_update",
             return_value={"status": "ok"},
         ),
         patch(
-            "skill_manager.core.skill_packages.scan_package_inventory",
+            "skill_manager.core.update_service.scan_package_inventory",
             return_value={"scan_ok": True, "skills": {"kept_skill": {"name": "kept_skill"}}},
         ),
         patch(
-            "skill_manager.core.skill_packages.diff_package_inventory",
+            "skill_manager.core.update_service.diff_package_inventory",
             return_value={"added": [], "updated": [], "removed": ["old_skill"]},
         ),
-        patch("skill_manager.core.skill_packages.inventory_removals_verified", return_value=True),
+        patch("skill_manager.core.update_service.inventory_removals_verified", return_value=True),
         patch("skill_manager.core.persistence.load_package_skill_inventory", return_value={}),
         patch("skill_manager.core.persistence.save_package_skill_inventory"),
         patch("skill_manager.core.persistence.patch_cache_add"),
