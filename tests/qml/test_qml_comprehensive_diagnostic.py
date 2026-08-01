@@ -27,7 +27,10 @@ from PySide6.QtWidgets import QApplication
 from skill_manager.controllers.font_database_bridge import FontDatabaseBridge
 
 QML_DIR = (
-    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "skill_manager"
+    / "SkillManagerComponents"
 )
 VIEWS_DIR = QML_DIR / "views"
 DIALOGS_DIR = QML_DIR / "dialogs"

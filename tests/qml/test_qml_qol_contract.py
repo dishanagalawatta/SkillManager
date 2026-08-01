@@ -2,7 +2,10 @@ import re
 from pathlib import Path
 
 QML_DIR = (
-    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "skill_manager"
+    / "SkillManagerComponents"
 )
 
 
@@ -291,7 +294,7 @@ def test_scrollbar_presence_in_lists():
 
 def test_expand_collapse_arrow_icons_presence_and_dark_mode():
     """Verify that new expand/collapse SVG arrows are present and properly themed for dark mode in QML files."""
-    assets_dir = Path(__file__).resolve().parent.parent / "assets" / "ui"
+    assets_dir = Path(__file__).resolve().parent.parent.parent / "assets" / "ui"
 
     # 1. Verify files exist
     assert (assets_dir / "collapse-arrow-icon-light.svg").is_file()
