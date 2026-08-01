@@ -56,6 +56,7 @@ class SkillModel(QAbstractListModel):
     SubCategoryNameRole: ClassVar[int]
     IsPackageRole: ClassVar[int]
     IsScreenshotRole: ClassVar[int]
+    EmojiRole: ClassVar[int]
 
     # Signals
     filterChanged: ClassVar[Signal]
