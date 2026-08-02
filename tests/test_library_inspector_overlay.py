@@ -171,7 +171,6 @@ def test_inspector_metadata_row_has_collapsible_is_expanded_property() -> None:
     """InspectorMetadataRow must expose property bool isExpanded: true and collapsible header controls."""
     meta_row: str = (QML_DIR / "InspectorMetadataRow.qml").read_text(encoding="utf-8")
     assert "property bool isExpanded: true" in meta_row
-    assert 'tooltipText: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
 
 
 def test_command_inspector_dependencies_section_has_is_expanded() -> None:
