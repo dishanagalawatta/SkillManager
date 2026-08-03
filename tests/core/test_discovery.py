@@ -156,6 +156,7 @@ def test_fingerprint_includes_child_names_hash_component():
     import time
 
     from skill_manager.core.discovery import _fp_memo
+
     _fp_memo.clear()
     tmp = Path(__file__).parent / "test_fingerprint_tmp"  # noqa: S100
 
@@ -182,6 +183,7 @@ def test_fingerprint_includes_child_names_hash_component():
 def test_fingerprint_changes_when_child_dir_added(tmp_path):
     """Adding a child directory changes the fingerprint."""
     from skill_manager.core.discovery import _fp_memo
+
     _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
@@ -197,6 +199,7 @@ def test_fingerprint_changes_when_child_dir_added(tmp_path):
 def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
     """Deleting a child directory changes the fingerprint (the brainstorming case)."""
     from skill_manager.core.discovery import _fp_memo
+
     _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
@@ -217,6 +220,7 @@ def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
 def test_fingerprint_changes_when_child_dir_renamed(tmp_path):
     """Renaming a child directory changes the fingerprint."""
     from skill_manager.core.discovery import _fp_memo
+
     _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
