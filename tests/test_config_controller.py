@@ -42,6 +42,7 @@ def test_config_controller_remove_source(config_controller, mock_app):
 def test_config_controller_add_project(config_controller, mock_app, tmp_path):
     proj_dir = tmp_path / "my_project"
     proj_dir.mkdir()
+    (proj_dir / ".agents" / "skills").mkdir(parents=True)
     file_url = f"file://{proj_dir.as_posix()}"
     config_controller.addProject(file_url)
     assert any(str(proj_dir.name) in p for p in mock_app._projects)
@@ -49,11 +50,17 @@ def test_config_controller_add_project(config_controller, mock_app, tmp_path):
 
 
 def test_url_to_local_path_formatting():
+    import sys
+
     from skill_manager.core.copier import url_to_local_path
 
     # Posix absolute file URL
     posix_url = "file:///home/dikka/Documents/Project"
-    assert url_to_local_path(posix_url).replace("\\", "/") == "/home/dikka/Documents/Project"
+    res = url_to_local_path(posix_url).replace("\\", "/")
+    if sys.platform == "win32":
+        assert res.endswith("/home/dikka/Documents/Project")
+    else:
+        assert res == "/home/dikka/Documents/Project"
 
     # Non-existent path rejection check
     assert url_to_local_path("") == ""

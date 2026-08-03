@@ -51,6 +51,7 @@ def test_send_ctrl_v_all_fail():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux._has_ydotool", return_value=False),
+        patch.dict("sys.modules", {"pyautogui": None}),
     ):
         assert linux.send_ctrl_v() is False
 
@@ -105,6 +106,7 @@ def test_move_mouse_no_tools():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux.shutil.which", return_value=None),
+        patch.dict("sys.modules", {"pyautogui": None}),
     ):
         assert linux.move_mouse(100, 200) is False
 
@@ -113,6 +115,7 @@ def test_type_text_no_tools():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux.shutil.which", return_value=None),
+        patch.dict("sys.modules", {"pyautogui": None}),
     ):
         assert linux.type_text("hello") == 0
 

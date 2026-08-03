@@ -153,8 +153,13 @@ def test_compute_dir_fingerprint(temp_dir):
 
 def test_fingerprint_includes_child_names_hash_component():
     """Fingerprint changes when child directory names change."""
+    import time
+
+    from skill_manager.core.discovery import _fp_memo
+    _fp_memo.clear()
     tmp = Path(__file__).parent / "test_fingerprint_tmp"  # noqa: S100
 
+    shutil.rmtree(tmp, ignore_errors=True)
     # Create dir with one child
     d = tmp / "base"
     d.mkdir(parents=True, exist_ok=True)
@@ -163,6 +168,8 @@ def test_fingerprint_includes_child_names_hash_component():
     fp1 = compute_dir_fingerprint(d)
 
     # Add a new child
+    _fp_memo.clear()
+    time.sleep(0.05)
     (d / "bravo").mkdir(exist_ok=True)
     fp2 = compute_dir_fingerprint(d)
 
@@ -174,10 +181,13 @@ def test_fingerprint_includes_child_names_hash_component():
 
 def test_fingerprint_changes_when_child_dir_added(tmp_path):
     """Adding a child directory changes the fingerprint."""
+    from skill_manager.core.discovery import _fp_memo
+    _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
     fp_before = compute_dir_fingerprint(d)
 
+    _fp_memo.clear()
     (d / "new-child").mkdir()
     fp_after = compute_dir_fingerprint(d)
 
@@ -186,6 +196,8 @@ def test_fingerprint_changes_when_child_dir_added(tmp_path):
 
 def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
     """Deleting a child directory changes the fingerprint (the brainstorming case)."""
+    from skill_manager.core.discovery import _fp_memo
+    _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
     (d / "child-a").mkdir()
@@ -195,6 +207,7 @@ def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
 
     # Delete one child (simulates removing brainstorming skill)
     shutil.rmtree(d / "child-a")
+    _fp_memo.clear()
 
     fp_after = compute_dir_fingerprint(d)
 
@@ -203,6 +216,8 @@ def test_fingerprint_changes_when_child_dir_deleted(tmp_path):
 
 def test_fingerprint_changes_when_child_dir_renamed(tmp_path):
     """Renaming a child directory changes the fingerprint."""
+    from skill_manager.core.discovery import _fp_memo
+    _fp_memo.clear()
     d = tmp_path / "dir"
     d.mkdir()
     (d / "old-name").mkdir()
@@ -210,6 +225,7 @@ def test_fingerprint_changes_when_child_dir_renamed(tmp_path):
     fp_before = compute_dir_fingerprint(d)
 
     (d / "old-name").rename(d / "new-name")
+    _fp_memo.clear()
     fp_after = compute_dir_fingerprint(d)
 
     assert fp_before != fp_after
