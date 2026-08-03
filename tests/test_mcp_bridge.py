@@ -167,11 +167,18 @@ def test_input_tools_run_when_gui_window_present(
     monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
     monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
     try:
-        from skill_manager.utils import win32 as win32_utils
+        import sys
 
-        monkeypatch.setattr(win32_utils, "move_mouse", lambda x, y: True)
-        monkeypatch.setattr(win32_utils, "click_mouse", lambda x, y, button: True)
-        monkeypatch.setattr(win32_utils, "type_text", lambda text: len(text))
+        if sys.platform == "win32":
+            from skill_manager.mcp.bridge import _input
+
+            monkeypatch.setattr(
+                _input, "_send_type_text_win32", lambda text: {"ok": True, "chars": len(text)}
+            )
+            from skill_manager.utils import win32 as win32_utils
+
+            monkeypatch.setattr(win32_utils, "move_mouse", lambda x, y: True)
+            monkeypatch.setattr(win32_utils, "click_mouse", lambda x, y, button: True)
     except Exception:
         pass
 

@@ -40,10 +40,14 @@ def test_config_controller_remove_source(config_controller, mock_app):
 
 
 def test_config_controller_add_project(config_controller, mock_app, tmp_path):
+    import sys
+
     proj_dir = tmp_path / "my_project"
     proj_dir.mkdir()
     (proj_dir / ".agents" / "skills").mkdir(parents=True)
     file_url = f"file://{proj_dir.as_posix()}"
+    if sys.platform == "win32":
+        file_url = f"file:///{proj_dir.as_posix()}"
     config_controller.addProject(file_url)
     assert any(str(proj_dir.name) in p for p in mock_app._projects)
     mock_app.projectsChanged.emit.assert_called_once()
