@@ -444,6 +444,19 @@ def ci_sigint_dump(request):
     signal.raise_signal = _hooked_raise_signal
     signal.signal = _hooked_signal
 
+    import atexit as _atexit
+
+    def _atexit_probe() -> None:
+        # Fires only if interpreter finalization completes normally; if the
+        # process is terminated externally (e.g. TerminateProcess) this never
+        # runs, which distinguishes a silent kill from a Python-side exit 1.
+        _emit(
+            f"\n=== CI_DIAG ATEXIT at {time.strftime('%H:%M:%S')} "
+            f"elapsed={time.monotonic() - session_start:.3f}s ===\n"
+        )
+
+    _atexit.register(_atexit_probe)
+
     for sig in _interrupt_signals:
         with contextlib.suppress(Exception):
             previous[sig] = signal.signal(sig, _dump)
@@ -454,3 +467,31 @@ def ci_sigint_dump(request):
         # also fires after the session ends (during interpreter finalization),
         # where an unhandled KeyboardInterrupt would flip a green run to exit 1.
         request.config.pluginmanager.unregister(tracker)
+
+
+def _ci_diag_active() -> bool:
+    return os.name == "nt" and os.environ.get("SKILL_MANAGER_CI_DIAG") == "1"
+
+
+def pytest_sessionfinish(session, exitstatus):  # pragma: no cover - CI-only probe
+    if not _ci_diag_active():
+        return
+    _ci_diag_emit(f"\n=== CI_DIAG SESSIONFINISH exitstatus={exitstatus} ===\n")
+
+
+def pytest_unconfigure(config):  # pragma: no cover - CI-only probe
+    if not _ci_diag_active():
+        return
+    _ci_diag_emit("\n=== CI_DIAG UNCONFIGURE ===\n")
+
+
+def _ci_diag_emit(message: str) -> None:
+    import time
+
+    stamp = time.strftime("%H:%M:%S")
+    for stream in (sys.__stderr__, sys.__stdout__):
+        with contextlib.suppress(Exception):
+            stream.write(f"{stamp} {message}")
+            stream.flush()
+    with contextlib.suppress(Exception):
+        os.write(2, f"{stamp} {message}".encode())

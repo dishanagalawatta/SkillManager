@@ -31,7 +31,12 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
+        run: |
+          set +e
+          uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
+          code=$?
+          echo "UV_RUN_PYTEST_EXIT=$code"
+          exit $code
         env:
           QT_QPA_PLATFORM: offscreen
           SKILL_MANAGER_CI_DIAG: "1"
