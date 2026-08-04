@@ -312,3 +312,67 @@ def reset_shutdown_flag():
     yield
     if hasattr(sys, "is_shutting_down"):
         delattr(sys, "is_shutting_down")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ci_sigint_dump():
+    """CI-only diagnostic: capture all thread stacks when SIGINT/SIGBREAK fires.
+
+    Windows CI dies with a KeyboardInterrupt at a fixed point in the suite,
+    delivered in the main thread but injected from outside the visible stack.
+    This handler dumps every thread's current frame at delivery time — which
+    identifies the injecting thread — then re-raises so pytest behaviour is
+    unchanged. Active only on Windows when ``SKILL_MANAGER_CI_DIAG=1`` is set
+    by the CI workflow; remove together with the workflow variable once the
+    root cause is fixed.
+    """
+    if os.name != "nt" or os.environ.get("SKILL_MANAGER_CI_DIAG") != "1":
+        yield
+        return
+
+    import signal
+    import threading
+    import time
+    import traceback
+
+    dump_path = Path(os.environ.get("SKILL_MANAGER_CI_DIAG_FILE", "sigint_dump.log"))
+    previous = {}
+
+    def _dump(signum, frame):
+        lines = [
+            f"\n=== CI_SIGINT_DIAG signum={signum} at {time.strftime('%H:%M:%S')} ===",
+            "main frame: "
+            + (
+                f"{frame.f_code.co_filename}:{frame.f_lineno} in {frame.f_code.co_name}"
+                if frame
+                else "None"
+            ),
+            f"active threads: {threading.active_count()}",
+        ]
+        for thread_id, fr in sys._current_frames().items():
+            thread = next((t for t in threading.enumerate() if t.ident == thread_id), None)
+            name = thread.name if thread else f"tid-{thread_id}"
+            daemon = thread.daemon if thread else "?"
+            lines.append(f"\n--- Thread {name} (daemon={daemon}) ---")
+            for entry in traceback.extract_stack(fr)[-6:]:
+                lines.append(f"  {entry.filename}:{entry.lineno} in {entry.name}")
+        message = "\n".join(lines) + "\n"
+        with contextlib.suppress(Exception):
+            os.write(2, message.encode())
+        with contextlib.suppress(Exception), dump_path.open("a", encoding="utf-8") as f:
+            f.write(message)
+        raise KeyboardInterrupt
+
+    signals = [signal.SIGINT]
+    if hasattr(signal, "SIGBREAK"):
+        signals.append(signal.SIGBREAK)
+
+    for sig in signals:
+        with contextlib.suppress(Exception):
+            previous[sig] = signal.signal(sig, _dump)
+    try:
+        yield
+    finally:
+        for sig, handler in previous.items():
+            with contextlib.suppress(Exception):
+                signal.signal(sig, handler)
