@@ -44,5 +44,14 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+      - name: Upload SIGINT diagnostic dump
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sigint-dump-py${{ inputs.python-version }}
+          path: sigint_dump.log
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Enforce coverage threshold
         run: uv run coverage report --fail-under=80

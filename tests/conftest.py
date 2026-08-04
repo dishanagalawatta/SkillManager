@@ -357,6 +357,12 @@ def ci_sigint_dump():
             for entry in traceback.extract_stack(fr)[-6:]:
                 lines.append(f"  {entry.filename}:{entry.lineno} in {entry.name}")
         message = "\n".join(lines) + "\n"
+        # pytest's capture machinery redirects sys.stderr/fd 2 during test
+        # execution, so write to the real stderr to reach the CI log.
+        for stream in (sys.__stderr__, sys.__stdout__):
+            with contextlib.suppress(Exception):
+                stream.write(message)
+                stream.flush()
         with contextlib.suppress(Exception):
             os.write(2, message.encode())
         with contextlib.suppress(Exception), dump_path.open("a", encoding="utf-8") as f:
