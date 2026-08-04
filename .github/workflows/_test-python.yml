@@ -31,12 +31,15 @@ jobs:
         run: uv sync
 
       - name: Run tests
+        shell: bash
         run: |
           set +e
-          # The phantom console Ctrl+C also reaches bash; bash defers SIGINT
-          # while waiting on uv and re-raises it (dying, exit 1) the moment
-          # pytest exits. Ignoring SIGINT in the shell lets pytest's real
-          # exit code propagate to the runner.
+          # The phantom console Ctrl+C also reaches the step shell. Under bash,
+          # SIGINT received while waiting on a foreground child is deferred and
+          # re-raised the moment the child exits, killing the script before it
+          # can propagate pytest's real exit code. Ignoring SIGINT lets the
+          # runner see the true result; pytest itself still swallows the
+          # console event via the ci_sigint_dump fixture.
           trap '' INT
           uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
           code=$?
