@@ -11,9 +11,16 @@ Button {
     property string iconSource: ""
     property string labelText: ""
     property bool showLabel: true
+    property string tooltipText: labelText
 
     padding: 0
     implicitHeight: 36
+
+    SleekToolTip {
+        id: btnToolTip
+        visible: (control.hovered || control.visualFocus) && !control.showLabel && control.tooltipText !== ""
+        text: control.tooltipText
+    }
 
     contentItem: Item {
         implicitHeight: 36
@@ -26,8 +33,8 @@ Button {
 
             Item {
                 visible: control.iconText !== "" || control.iconSource !== ""
-                width: 16
-                height: 16
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
                 Layout.alignment: Qt.AlignVCenter
 
                 Text {
@@ -95,7 +102,7 @@ Button {
         }
     }
     Accessible.role: Accessible.Button
-    Accessible.name: control.labelText
+    Accessible.name: control.tooltipText
 
     HoverHandler {
         cursorShape: Qt.PointingHandCursor
