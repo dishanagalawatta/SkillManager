@@ -312,3 +312,30 @@ def reset_shutdown_flag():
     yield
     if hasattr(sys, "is_shutting_down"):
         delattr(sys, "is_shutting_down")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def windows_ci_sigint_guard():
+    """Swallow the phantom console-wide SIGINT delivered once per GHA Windows run.
+
+    GHA Windows CI delivers one external CTRL+C event per run (the same
+    console-wide event the step shell sees; see ``_test-python.yml``). Without
+    a handler, Python's default KeyboardInterrupt aborts the suite mid-run at
+    a fixed test. The handler swallows every SIGINT for the whole process
+    lifetime and is deliberately never restored, so a late delivery during
+    interpreter finalization cannot flip a green run to exit 1. Active only on
+    Windows when ``SKILL_MANAGER_WIN_SIGINT_GUARD=1`` is set by the CI
+    workflow, so local Ctrl+C still interrupts test runs.
+    """
+    if os.name != "nt" or os.environ.get("SKILL_MANAGER_WIN_SIGINT_GUARD") != "1":
+        yield
+        return
+
+    import signal
+
+    def _swallow(signum, frame):
+        return None
+
+    with contextlib.suppress(Exception):
+        signal.signal(signal.SIGINT, _swallow)
+    yield

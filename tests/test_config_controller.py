@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,7 +54,23 @@ def test_url_to_local_path_formatting():
 
     # Posix absolute file URL
     posix_url = "file:///home/dikka/Documents/Project"
-    assert url_to_local_path(posix_url).replace("\\", "/") == "/home/dikka/Documents/Project"
+    posix_path = url_to_local_path(posix_url).replace("\\", "/")
+    if sys.platform == "win32":
+        # nturl2path maps /home -> \home (drive-less root-relative), then
+        # Path.resolve() prefixes the current drive: only the suffix is
+        # stable on Windows.
+        assert posix_path.endswith("/home/dikka/Documents/Project")
+    else:
+        assert posix_path == "/home/dikka/Documents/Project"
+
+    # Windows drive-letter file URL: urlparse puts the drive in netloc for
+    # file://C:/..., so the drive must survive conversion on both platforms.
+    drive_url = "file://C:/Users/runneradmin/Project"
+    drive_path = url_to_local_path(drive_url).replace("\\", "/")
+    if sys.platform == "win32":
+        assert drive_path == "C:/Users/runneradmin/Project"
+    else:
+        assert drive_path.endswith("/C:/Users/runneradmin/Project")
 
     # Non-existent path rejection check
     assert url_to_local_path("") == ""

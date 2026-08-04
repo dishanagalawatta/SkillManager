@@ -186,8 +186,10 @@ def _send_type_text_win32(text: str) -> dict[str, Any]:
         for ch in text:
             vk = _vk.get(ch)
             if vk is None:
-                lower = ch.lower()
-                vk = _vk.get(lower)
+                # The vk table holds uppercase A-Z and shifted symbols only:
+                # resolve lowercase letters to their uppercase virtual key
+                # (typing them needs no shift).
+                vk = _vk.get(ch.upper())
                 if vk is None:
                     continue
 
