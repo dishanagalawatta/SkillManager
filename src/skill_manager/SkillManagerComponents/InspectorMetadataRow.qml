@@ -24,8 +24,28 @@ ColumnLayout {
 
     // Section Header Row
     Item {
+        id: headerItem
         Layout.fillWidth: true
         implicitHeight: metaHeaderRow.implicitHeight
+        activeFocusOnTab: true
+
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.isExpanded = !root.isExpanded
+                event.accepted = true
+            } else {
+                event.accepted = false
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: headerItem.activeFocus ? Theme.glassActive : (headerHover.hovered ? Theme.glassHover : "transparent")
+            radius: Theme.radiusSmall
+            border.color: headerItem.activeFocus ? Theme.accent : "transparent"
+            border.width: headerItem.activeFocus ? 2 : 0
+            anchors.margins: -4
+        }
 
         RowLayout {
             id: metaHeaderRow
@@ -48,18 +68,30 @@ ColumnLayout {
                 buttonSize: 18
                 iconSize: 12
                 role: "ghost"
-                tooltipText: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"
+                focusPolicy: Qt.NoFocus
+                tooltipText: "" // Handled by headerItem
                 iconSource: root.isExpanded ?
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
             }
         }
 
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.isExpanded = !root.isExpanded
+        TapHandler {
+            onTapped: root.isExpanded = !root.isExpanded
         }
+
+        HoverHandler {
+            id: headerHover
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        SleekToolTip {
+            visible: headerHover.hovered || headerItem.activeFocus
+            text: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"
+        }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"
     }
 
     Flow {
