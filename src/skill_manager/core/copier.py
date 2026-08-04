@@ -290,15 +290,22 @@ def repair_malformed_path(raw_path: str) -> str:
 def url_to_local_path(raw_input: str) -> str:
     """Convert file URLs (file://...) or raw path strings to clean absolute local paths.
 
-    Handles Linux/macOS file:///home/... and Windows file:///C:/... correctly
-    without stripping leading root slashes.
+    Handles Linux/macOS file:///home/..., Windows file://C:/... and
+    file:///C:/... correctly without stripping leading root slashes or
+    dropping the drive letter.
     """
     if not raw_input or not str(raw_input).strip():
         return ""
     cleaned = str(raw_input).strip()
     if cleaned.startswith("file://"):
         parsed = urlparse(cleaned)
-        path_str = url2pathname(unquote(parsed.path))
+        # Reconstruct netloc + path so Windows drive letters survive:
+        # urlparse puts the drive in netloc for file://C:/..., so feeding
+        # parsed.path alone into url2pathname would drop it.  ``localhost``
+        # is a no-op host and must not be joined onto the path.
+        netloc = parsed.netloc
+        url_path = netloc + parsed.path if netloc and netloc.lower() != "localhost" else parsed.path
+        path_str = url2pathname(unquote(url_path))
     else:
         path_str = cleaned
 

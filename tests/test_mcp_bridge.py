@@ -10,14 +10,17 @@ application is constructed.
 
 from __future__ import annotations
 
+import ctypes
+import sys
 import time
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 import skill_manager.utils.linux as linux_utils
 from skill_manager.mcp import bridge
-from skill_manager.mcp.bridge import _static as bridge_static
+from skill_manager.mcp.bridge import _input as bridge_input, _static as bridge_static
 from skill_manager.utils import input_guard
 
 
@@ -163,9 +166,17 @@ def test_input_tools_run_when_gui_window_present(
     """With a live GUI window present, tools delegate to the platform backends."""
     _clear_injection_env(monkeypatch)
     monkeypatch.setattr(input_guard, "gui_window_present", lambda: True)
-    monkeypatch.setattr(linux_utils, "move_mouse", lambda x, y: True)
-    monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
-    monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
+    if sys.platform == "win32":
+        # The bridge dispatches to the Win32 backend on Windows: stub the
+        # user32 surface so no real input reaches the runner's desktop.
+        fake_user32 = MagicMock()
+        fake_user32.SetCursorPos.return_value = 1
+        fake_user32.SendInput.return_value = 5
+        monkeypatch.setattr(ctypes.windll, "user32", fake_user32)
+    else:
+        monkeypatch.setattr(linux_utils, "move_mouse", lambda x, y: True)
+        monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
+        monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
 
     move = bridge.send_mouse_move(10, 10)
     click = bridge.send_mouse_click(10, 10)
@@ -174,3 +185,23 @@ def test_input_tools_run_when_gui_window_present(
     assert move["ok"] is True
     assert click["ok"] is True
     assert typed == {"ok": True, "chars": 5}
+
+
+def test_send_type_text_win32_handles_lowercase(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Win32 typing must emit events for lowercase letters.
+
+    Regression: the vk table only holds uppercase A-Z, and the fallback
+    lowered the char again, so ``"hello"`` produced an empty event list and
+    returned ``{"ok": True, "chars": 0}`` on Windows.
+    """
+    fake_user32 = MagicMock()
+    fake_user32.SendInput.side_effect = lambda n, inputs, size: n
+    loader = MagicMock()
+    loader.user32 = fake_user32
+    # ctypes.windll does not exist on non-Windows: allow creating it.
+    monkeypatch.setattr(ctypes, "windll", loader, raising=False)
+
+    result = bridge_input._send_type_text_win32("hello")
+
+    # 5 chars x (keydown + keyup) = 10 events delivered to SendInput.
+    assert result == {"ok": True, "chars": 10}

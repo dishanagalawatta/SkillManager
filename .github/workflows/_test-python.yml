@@ -31,9 +31,24 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q
+        shell: bash
+        run: |
+          set +e
+          # The phantom console Ctrl+C also reaches the step shell. Under bash,
+          # SIGINT received while waiting on a foreground child is deferred and
+          # re-raised the moment the child exits, killing the script before it
+          # can propagate pytest's real exit code. Ignoring SIGINT lets the
+          # runner see the true result; pytest itself still swallows the
+          # console event via the windows_ci_sigint_guard fixture.
+          trap '' INT
+          uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
+          code=$?
+          trap - INT
+          echo "UV_RUN_PYTEST_EXIT=$code"
+          exit $code
         env:
           QT_QPA_PLATFORM: offscreen
+          SKILL_MANAGER_WIN_SIGINT_GUARD: "1"
 
       - name: Upload coverage artifact
         if: always()

@@ -29,14 +29,6 @@ from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers
 
 logger = logging.getLogger(__name__)
 
-# Process-lifetime memo for compute_dir_fingerprint.
-# Keyed by normcase(dir_path) -> (prefix_tuple, fingerprint) where
-# prefix_tuple = (st_mtime, st_size, skill_count, max_sub_mtime).
-# A directory whose cheap prefix is unchanged cannot have changed its set
-# of child directory names within this process, so the cached fingerprint
-# is bit-identical and we can skip the expensive _hash_child_names call.
-_fp_memo: dict[str, tuple[tuple, str]] = {}
-
 
 def get_discovery_cache() -> Cache:
     """Returns a diskcache instance for discovery results."""
@@ -57,6 +49,11 @@ def _hash_child_names(dir_path: Path) -> str:
         return ""
 
 
+# In-process memo: normcase(dir) -> (prefix_tuple, child_names_hash, fp).
+# Keyed by normcase so Windows paths differing only in case share an entry.
+_fp_memo: dict[str, tuple[tuple[float, int, int, float], str, str]] = {}
+
+
 def compute_dir_fingerprint(dir_path: Path) -> str:
     """Compute a lightweight fingerprint for a directory.
 
@@ -65,11 +62,13 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
     internal file changes including skill-folder deletions that leave the
     parent's mtime unchanged.
 
-    Within a single process, results are memoized by the cheap prefix
-    (mtime, size, skill_count, max_sub_mtime) to skip the costly
-    _hash_child_names recursion on silent background refreshes when
-    nothing has changed. The memo cannot mask real changes: any actual
-    mutation shifts one of the four prefix fields, evicting the cache.
+    Within a single process, results are memoized by the stat prefix
+    (mtime, size, skill_count, max_sub_mtime) PLUS the child-name hash.
+    The child-name hash is always recomputed and re-verified on every
+    call: on Windows a directory's stat tuple can be stale after
+    directory-entry mutations (NTFS delays metadata replication), so the
+    stat prefix alone is not trustworthy. Only when both match is the
+    cached fingerprint reused, skipping the md5 recompute.
     """
     try:
         stat = dir_path.stat()
@@ -87,14 +86,14 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
 
         prefix_tuple = (stat.st_mtime, stat.st_size, skill_count, max_sub_mtime)
         key = os.path.normcase(str(dir_path))
-        cached = _fp_memo.get(key)
-        if cached is not None and cached[0] == prefix_tuple:
-            return cached[1]
-
         child_names_hash = _hash_child_names(dir_path)
+        cached = _fp_memo.get(key)
+        if cached is not None and cached[0] == prefix_tuple and cached[1] == child_names_hash:
+            return cached[2]
+
         raw = f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}"
         fp = hashlib.md5(raw.encode()).hexdigest()
-        _fp_memo[key] = (prefix_tuple, fp)
+        _fp_memo[key] = (prefix_tuple, child_names_hash, fp)
         return fp
     except OSError as e:
         logger.debug("[DISCOVERY] Fingerprint error for %s: %s", dir_path, e)

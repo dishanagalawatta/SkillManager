@@ -175,7 +175,7 @@ def test_inspector_metadata_row_has_collapsible_is_expanded_property() -> None:
     assert "root.isExpanded = !root.isExpanded" in meta_row
     assert 'text: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
     assert "Accessible.role: Accessible.Button" in meta_row
-    assert "Accessible.name: root.isExpanded ? \"Collapse Metadata\" : \"Expand Metadata\"" in meta_row
+    assert 'Accessible.name: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
 
 
 def test_command_inspector_dependencies_section_has_is_expanded() -> None:

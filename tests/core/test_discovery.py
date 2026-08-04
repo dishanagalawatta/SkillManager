@@ -292,9 +292,10 @@ def test_fingerprint_matches_unmemoized_formula(tmp_path: Path) -> None:
     assert compute_dir_fingerprint(d) == expected_fp
 
 
-def test_second_call_hits_memo_and_skips_child_hash(tmp_path: Path) -> None:
-    """When the cheap prefix is unchanged, the second call does NOT
-    invoke _hash_child_names (the expensive iterdir + sort + sha1).
+def test_second_call_hits_memo_and_skips_md5(tmp_path: Path) -> None:
+    """On a memo hit the cached fingerprint is reused: the md5 recompute
+    is skipped, while the child-name hash IS re-verified (on Windows the
+    stat prefix alone can be stale after directory-entry mutations).
     """
     d = tmp_path / "src"
     d.mkdir()
@@ -304,21 +305,22 @@ def test_second_call_hits_memo_and_skips_child_hash(tmp_path: Path) -> None:
     fp1 = compute_dir_fingerprint(d)
     assert fp1, "Baseline fingerprint should be non-empty"
 
-    # Patch _hash_child_names with a tracking wrapper around the real impl,
-    # installed on the discovery module so compute_dir_fingerprint sees it.
-    real = _hash_child_names
-    calls = {"n": 0}
+    # Patch hashlib.md5 with a tracking wrapper: the fingerprint md5 is the
+    # step the memo must skip on a hit. (_hash_child_names uses sha1, so
+    # md5 calls come only from the fingerprint computation.)
+    calls = {"md5": 0}
+    real_md5 = hashlib.md5
 
-    def wrapper(p: Path) -> str:
-        calls["n"] += 1
-        return real(p)
+    def wrapper(data: bytes):
+        calls["md5"] += 1
+        return real_md5(data)
 
-    with patch.object(discovery, "_hash_child_names", side_effect=wrapper):
+    with patch.object(hashlib, "md5", side_effect=wrapper):
         fp2 = compute_dir_fingerprint(d)
 
     assert fp1 == fp2, "Memo hit must return the same fingerprint"
-    assert calls["n"] == 0, (
-        f"_hash_child_names must NOT run on a memo hit; ran {calls['n']} time(s)"
+    assert calls["md5"] == 0, (
+        f"md5 recompute must NOT run on a memo hit; ran {calls['md5']} time(s)"
     )
 
 
@@ -352,12 +354,13 @@ def test_memo_miss_when_dir_changes(tmp_path: Path) -> None:
         f"_hash_child_names must run exactly once on a memo miss; ran {calls['n']} time(s)"
     )
 
-    # And a third call (no further mutation) should hit the memo again.
+    # And a third call (no further mutation) should hit the memo again:
+    # same fingerprint, with the child-name hash re-verified exactly once.
     calls["n"] = 0
     with patch.object(discovery, "_hash_child_names", side_effect=wrapper):
         fp_after_again = compute_dir_fingerprint(d)
     assert fp_after_again == fp_after
-    assert calls["n"] == 0, "Third call on stable dir should be a memo hit"
+    assert calls["n"] == 1, f"Hash must be re-verified once on a memo hit; ran {calls['n']} time(s)"
 
 
 def test_memo_key_is_normcase_insensitive(tmp_path: Path) -> None:

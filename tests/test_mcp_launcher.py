@@ -79,6 +79,19 @@ def _read_argv(log: Path) -> list[str]:
     return log.read_text(encoding="utf-8").splitlines()
 
 
+def _norm_arg(arg: str) -> str:
+    """Normalize a stub-log argument for cross-platform comparison.
+
+    Git Bash (MSYS) presents Windows paths as /c/Users/... while the test
+    builds expectations from str(Path) (C:\\Users\\...): fold both to the
+    same lowercase forward-slash form.
+    """
+    n = os.path.normcase(arg).replace("\\", "/")
+    if len(n) >= 3 and n[0] == "/" and n[2] == "/" and n[1].isalpha():
+        n = n[1] + ":" + n[2:]
+    return n
+
+
 @needs_bash
 def test_launcher_prefers_project_venv_python(tmp_path: Path) -> None:
     """With a project venv present, the launcher runs it directly (no uv)."""
@@ -88,7 +101,9 @@ def test_launcher_prefers_project_venv_python(tmp_path: Path) -> None:
     result = _run_launcher(tmp_path, "--mcp", env={"LAUNCHER_ARGV_LOG": str(log)})
 
     assert result.returncode == 0, result.stderr
-    assert _read_argv(log) == [str(python_stub), *MAIN_MODULE, "--mcp"]
+    assert [_norm_arg(a) for a in _read_argv(log)] == [
+        _norm_arg(a) for a in [str(python_stub), *MAIN_MODULE, "--mcp"]
+    ]
 
 
 @needs_bash
@@ -100,7 +115,9 @@ def test_launcher_passes_light_and_write_flags(tmp_path: Path) -> None:
     for args in (("--mcp-light",), ("--mcp", "--mcp-allow-write")):
         result = _run_launcher(tmp_path, *args, env={"LAUNCHER_ARGV_LOG": str(log)})
         assert result.returncode == 0, result.stderr
-        assert _read_argv(log) == [str(python_stub), *MAIN_MODULE, *args]
+        assert [_norm_arg(a) for a in _read_argv(log)] == [
+            _norm_arg(a) for a in [str(python_stub), *MAIN_MODULE, *args]
+        ]
 
 
 @needs_bash
@@ -117,13 +134,16 @@ def test_launcher_falls_back_to_uv_on_path(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert _read_argv(log) == [
-        str(uv_stub),
-        "--directory",
-        str(tmp_path),
-        "run",
-        "skill-manager",
-        "--mcp",
+    assert [_norm_arg(a) for a in _read_argv(log)] == [
+        _norm_arg(a)
+        for a in [
+            str(uv_stub),
+            "--directory",
+            str(tmp_path),
+            "run",
+            "skill-manager",
+            "--mcp",
+        ]
     ]
 
 
@@ -145,13 +165,16 @@ def test_launcher_falls_back_to_uv_in_home_local_bin(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert _read_argv(log) == [
-        str(uv_stub),
-        "--directory",
-        str(tmp_path),
-        "run",
-        "skill-manager",
-        "--mcp",
+    assert [_norm_arg(a) for a in _read_argv(log)] == [
+        _norm_arg(a)
+        for a in [
+            str(uv_stub),
+            "--directory",
+            str(tmp_path),
+            "run",
+            "skill-manager",
+            "--mcp",
+        ]
     ]
 
 

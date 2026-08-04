@@ -5,6 +5,7 @@ ordering) without actually calling system tools.  All external
 subprocess calls are mocked.
 """
 
+import sys
 from unittest.mock import MagicMock, patch
 
 from skill_manager.utils import linux
@@ -51,6 +52,9 @@ def test_send_ctrl_v_all_fail():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux._has_ydotool", return_value=False),
+        # pyautogui is installed on Windows CI: block its import so the
+        # no-tool fallback path is exercised deterministically everywhere.
+        patch.dict(sys.modules, {"pyautogui": None}),
     ):
         assert linux.send_ctrl_v() is False
 
@@ -105,6 +109,9 @@ def test_move_mouse_no_tools():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux.shutil.which", return_value=None),
+        # pyautogui is installed on Windows CI: block its import so the
+        # no-tool fallback path is exercised deterministically everywhere.
+        patch.dict(sys.modules, {"pyautogui": None}),
     ):
         assert linux.move_mouse(100, 200) is False
 
@@ -113,6 +120,9 @@ def test_type_text_no_tools():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux.shutil.which", return_value=None),
+        # pyautogui is installed on Windows CI: block its import so the
+        # no-tool fallback path is exercised deterministically everywhere.
+        patch.dict(sys.modules, {"pyautogui": None}),
     ):
         assert linux.type_text("hello") == 0
 
