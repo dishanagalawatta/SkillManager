@@ -344,6 +344,9 @@ def ci_sigint_dump(request):
     session_start = time.monotonic()
     current_item = {"nodeid": None}
     previous = {}
+    # First phantom SIGINT on GHA Windows is external (console-wide Ctrl+C);
+    # swallow it once so pytest-cov can finish, re-raise on repeat.
+    _state = {"swallowed": False}
     _interrupt_signals = [signal.SIGINT]
     if hasattr(signal, "SIGBREAK"):
         _interrupt_signals.append(signal.SIGBREAK)
@@ -389,6 +392,10 @@ def ci_sigint_dump(request):
             for entry in traceback.extract_stack(fr)[-6:]:
                 lines.append(f"  {entry.filename}:{entry.lineno} in {entry.name}")
         _emit("\n".join(lines) + "\n")
+        if signum == signal.SIGINT and not _state["swallowed"]:
+            _state["swallowed"] = True
+            _emit("=== CI_SIGINT_SWALLOWED: first SIGINT ignored, continuing suite ===\n")
+            return
         raise KeyboardInterrupt
 
     import os as _os
