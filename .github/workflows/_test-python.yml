@@ -48,7 +48,7 @@ jobs:
           exit $code
         env:
           QT_QPA_PLATFORM: offscreen
-          SKILL_MANAGER_CI_DIAG: "1"
+          SKILL_MANAGER_WIN_SIGINT_GUARD: "1"
 
       - name: Upload coverage artifact
         if: always()
@@ -56,15 +56,6 @@ jobs:
         with:
           name: coverage-windows-py${{ inputs.python-version }}
           path: coverage.xml
-          retention-days: 7
-
-      - name: Upload SIGINT diagnostic dump
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sigint-dump-py${{ inputs.python-version }}
-          path: sigint_dump.log
-          if-no-files-found: ignore
           retention-days: 7
 
       - name: Enforce coverage threshold

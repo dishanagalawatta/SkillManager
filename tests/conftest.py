@@ -315,183 +315,27 @@ def reset_shutdown_flag():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def ci_sigint_dump(request):
-    """CI-only diagnostic: capture all thread stacks when SIGINT/SIGBREAK fires.
+def windows_ci_sigint_guard():
+    """Swallow the phantom console-wide SIGINT delivered once per GHA Windows run.
 
-    Windows CI dies with a KeyboardInterrupt at a fixed point in the suite,
-    delivered in the main thread but injected from outside the visible stack.
-    This handler dumps every thread's current frame at delivery time — which
-    identifies the injecting thread — then re-raises so pytest behaviour is
-    unchanged. It also hooks every in-process SIGINT delivery point
-    (``os.kill``, ``_thread.interrupt_main``, ``signal.raise_signal``,
-    ``signal.signal``) to log the caller's stack, and records the running
-    test item plus elapsed time so the trigger can be correlated with suite
-    progress. Active only on Windows when ``SKILL_MANAGER_CI_DIAG=1`` is set
-    by the CI workflow; remove together with the workflow variable once the
-    root cause is fixed.
+    GHA Windows CI delivers one external CTRL+C event per run (the same
+    console-wide event the step shell sees; see ``_test-python.yml``). Without
+    a handler, Python's default KeyboardInterrupt aborts the suite mid-run at
+    a fixed test. The handler swallows every SIGINT for the whole process
+    lifetime and is deliberately never restored, so a late delivery during
+    interpreter finalization cannot flip a green run to exit 1. Active only on
+    Windows when ``SKILL_MANAGER_WIN_SIGINT_GUARD=1`` is set by the CI
+    workflow, so local Ctrl+C still interrupts test runs.
     """
-    if os.name != "nt" or os.environ.get("SKILL_MANAGER_CI_DIAG") != "1":
+    if os.name != "nt" or os.environ.get("SKILL_MANAGER_WIN_SIGINT_GUARD") != "1":
         yield
         return
 
-    import _thread
     import signal
-    import threading
-    import time
-    import traceback
 
-    dump_path = Path(os.environ.get("SKILL_MANAGER_CI_DIAG_FILE", "sigint_dump.log"))
-    session_start = time.monotonic()
-    current_item = {"nodeid": None}
-    previous = {}
-    # First phantom SIGINT on GHA Windows is external (console-wide Ctrl+C);
-    # keep the handler installed for the whole process lifetime so late
-    # deliveries during finalization are also swallowed and logged.
-    _state = {"count": 0}
-    _interrupt_signals = [signal.SIGINT]
-    if hasattr(signal, "SIGBREAK"):
-        _interrupt_signals.append(signal.SIGBREAK)
+    def _swallow(signum, frame):
+        return None
 
-    def _emit(message: str) -> None:
-        # pytest's capture machinery redirects sys.stderr/fd 2 during test
-        # execution, so write to the real stderr to reach the CI log.
-        for stream in (sys.__stderr__, sys.__stdout__):
-            with contextlib.suppress(Exception):
-                stream.write(message)
-                stream.flush()
-        with contextlib.suppress(Exception):
-            os.write(2, message.encode())
-        with contextlib.suppress(Exception), dump_path.open("a", encoding="utf-8") as f:
-            f.write(message)
-
-    def _log_sender(action: str) -> None:
-        frames = [f"  {e.filename}:{e.lineno} in {e.name}" for e in traceback.extract_stack()[-8:]]
-        _emit(
-            f"\n=== CI_SIGINT_SENDER {action} at {time.strftime('%H:%M:%S')} ===\n"
-            + "\n".join(frames)
-            + "\n"
-        )
-
-    def _dump(signum, frame):
-        lines = [
-            f"\n=== CI_SIGINT_DIAG signum={signum} at {time.strftime('%H:%M:%S')} "
-            f"elapsed={time.monotonic() - session_start:.3f}s ===",
-            f"current item: {current_item['nodeid']}",
-            "main frame: "
-            + (
-                f"{frame.f_code.co_filename}:{frame.f_lineno} in {frame.f_code.co_name}"
-                if frame
-                else "None"
-            ),
-            f"active threads: {threading.active_count()}",
-        ]
-        for thread_id, fr in sys._current_frames().items():
-            thread = next((t for t in threading.enumerate() if t.ident == thread_id), None)
-            name = thread.name if thread else f"tid-{thread_id}"
-            daemon = thread.daemon if thread else "?"
-            lines.append(f"\n--- Thread {name} (daemon={daemon}) ---")
-            for entry in traceback.extract_stack(fr)[-6:]:
-                lines.append(f"  {entry.filename}:{entry.lineno} in {entry.name}")
-        _emit("\n".join(lines) + "\n")
-        if signum == signal.SIGINT:
-            # Every SIGINT is external (console-wide Ctrl+C on GHA Windows);
-            # swallow all of them, including any late delivery during
-            # interpreter finalization after the session ends.
-            _state["count"] += 1
-            _emit(f"=== CI_SIGINT_SWALLOWED #{_state['count']}: SIGINT ignored, continuing ===\n")
-            return
-        raise KeyboardInterrupt
-
-    import os as _os
-
-    _real_os_kill = _os.kill
-
-    def _hooked_os_kill(pid, sig, *args, **kwargs):
-        if sig in _interrupt_signals and pid in (0, _os.getpid(), -1):
-            _log_sender(f"os.kill(pid={pid}, sig={sig})")
-        return _real_os_kill(pid, sig, *args, **kwargs)
-
-    _real_interrupt_main = _thread.interrupt_main
-
-    def _hooked_interrupt_main():
-        _log_sender("_thread.interrupt_main()")
-        return _real_interrupt_main()
-
-    _real_raise_signal = signal.raise_signal
-
-    def _hooked_raise_signal(signum):
-        if signum in _interrupt_signals:
-            _log_sender(f"signal.raise_signal({signum})")
-        return _real_raise_signal(signum)
-
-    _real_signal = signal.signal
-
-    def _hooked_signal(signum, handler):
-        if signum in _interrupt_signals and handler not in (signal.SIG_DFL, signal.SIG_IGN, _dump):
-            _log_sender(f"signal.signal({signum}, {getattr(handler, '__name__', handler)!r})")
-        return _real_signal(signum, handler)
-
-    class _ItemTracker:
-        @pytest.hookimpl(tryfirst=True)
-        def pytest_runtest_protocol(self, item, nextitem):
-            current_item["nodeid"] = item.nodeid
-
-    tracker = _ItemTracker()
-    request.config.pluginmanager.register(tracker)
-
-    _os.kill = _hooked_os_kill
-    _thread.interrupt_main = _hooked_interrupt_main
-    signal.raise_signal = _hooked_raise_signal
-    signal.signal = _hooked_signal
-
-    import atexit as _atexit
-
-    def _atexit_probe() -> None:
-        # Fires only if interpreter finalization completes normally; if the
-        # process is terminated externally (e.g. TerminateProcess) this never
-        # runs, which distinguishes a silent kill from a Python-side exit 1.
-        _emit(
-            f"\n=== CI_DIAG ATEXIT at {time.strftime('%H:%M:%S')} "
-            f"elapsed={time.monotonic() - session_start:.3f}s ===\n"
-        )
-
-    _atexit.register(_atexit_probe)
-
-    for sig in _interrupt_signals:
-        with contextlib.suppress(Exception):
-            previous[sig] = signal.signal(sig, _dump)
-    try:
-        yield
-    finally:
-        # Deliberately do NOT restore the SIGINT handler: the phantom Ctrl+C
-        # also fires after the session ends (during interpreter finalization),
-        # where an unhandled KeyboardInterrupt would flip a green run to exit 1.
-        request.config.pluginmanager.unregister(tracker)
-
-
-def _ci_diag_active() -> bool:
-    return os.name == "nt" and os.environ.get("SKILL_MANAGER_CI_DIAG") == "1"
-
-
-def pytest_sessionfinish(session, exitstatus):  # pragma: no cover - CI-only probe
-    if not _ci_diag_active():
-        return
-    _ci_diag_emit(f"\n=== CI_DIAG SESSIONFINISH exitstatus={exitstatus} ===\n")
-
-
-def pytest_unconfigure(config):  # pragma: no cover - CI-only probe
-    if not _ci_diag_active():
-        return
-    _ci_diag_emit("\n=== CI_DIAG UNCONFIGURE ===\n")
-
-
-def _ci_diag_emit(message: str) -> None:
-    import time
-
-    stamp = time.strftime("%H:%M:%S")
-    for stream in (sys.__stderr__, sys.__stdout__):
-        with contextlib.suppress(Exception):
-            stream.write(f"{stamp} {message}")
-            stream.flush()
     with contextlib.suppress(Exception):
-        os.write(2, f"{stamp} {message}".encode())
+        signal.signal(signal.SIGINT, _swallow)
+    yield
