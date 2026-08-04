@@ -10,8 +10,11 @@ application is constructed.
 
 from __future__ import annotations
 
+import ctypes
+import sys
 import time
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -163,9 +166,17 @@ def test_input_tools_run_when_gui_window_present(
     """With a live GUI window present, tools delegate to the platform backends."""
     _clear_injection_env(monkeypatch)
     monkeypatch.setattr(input_guard, "gui_window_present", lambda: True)
-    monkeypatch.setattr(linux_utils, "move_mouse", lambda x, y: True)
-    monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
-    monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
+    if sys.platform == "win32":
+        # The bridge dispatches to the Win32 backend on Windows: stub the
+        # user32 surface so no real input reaches the runner's desktop.
+        fake_user32 = MagicMock()
+        fake_user32.SetCursorPos.return_value = 1
+        fake_user32.SendInput.return_value = 5
+        monkeypatch.setattr(ctypes.windll, "user32", fake_user32)
+    else:
+        monkeypatch.setattr(linux_utils, "move_mouse", lambda x, y: True)
+        monkeypatch.setattr(linux_utils, "click_mouse", lambda x, y, button: True)
+        monkeypatch.setattr(linux_utils, "type_text", lambda text: len(text))
 
     move = bridge.send_mouse_move(10, 10)
     click = bridge.send_mouse_click(10, 10)
