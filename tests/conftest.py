@@ -345,8 +345,9 @@ def ci_sigint_dump(request):
     current_item = {"nodeid": None}
     previous = {}
     # First phantom SIGINT on GHA Windows is external (console-wide Ctrl+C);
-    # swallow it once so pytest-cov can finish, re-raise on repeat.
-    _state = {"swallowed": False}
+    # keep the handler installed for the whole process lifetime so late
+    # deliveries during finalization are also swallowed and logged.
+    _state = {"count": 0}
     _interrupt_signals = [signal.SIGINT]
     if hasattr(signal, "SIGBREAK"):
         _interrupt_signals.append(signal.SIGBREAK)
@@ -392,9 +393,12 @@ def ci_sigint_dump(request):
             for entry in traceback.extract_stack(fr)[-6:]:
                 lines.append(f"  {entry.filename}:{entry.lineno} in {entry.name}")
         _emit("\n".join(lines) + "\n")
-        if signum == signal.SIGINT and not _state["swallowed"]:
-            _state["swallowed"] = True
-            _emit("=== CI_SIGINT_SWALLOWED: first SIGINT ignored, continuing suite ===\n")
+        if signum == signal.SIGINT:
+            # Every SIGINT is external (console-wide Ctrl+C on GHA Windows);
+            # swallow all of them, including any late delivery during
+            # interpreter finalization after the session ends.
+            _state["count"] += 1
+            _emit(f"=== CI_SIGINT_SWALLOWED #{_state['count']}: SIGINT ignored, continuing ===\n")
             return
         raise KeyboardInterrupt
 
@@ -446,7 +450,7 @@ def ci_sigint_dump(request):
     try:
         yield
     finally:
-        for sig, handler in previous.items():
-            with contextlib.suppress(Exception):
-                signal.signal(sig, handler)
+        # Deliberately do NOT restore the SIGINT handler: the phantom Ctrl+C
+        # also fires after the session ends (during interpreter finalization),
+        # where an unhandled KeyboardInterrupt would flip a green run to exit 1.
         request.config.pluginmanager.unregister(tracker)
