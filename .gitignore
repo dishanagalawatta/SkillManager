@@ -16,14 +16,18 @@ Desktop.ini
 
 # ─── Python ──────────────────────────────────────────────────────
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
+.eggs/
 build/
 dist/
 .mypy_cache/
+.hypothesis/
+.tox/
+.nox/
 .venv/
 venv/
+node_modules/
 
 # ─── Testing / Linting ──────────────────────────────────────────
 .pytest_cache/
@@ -68,7 +72,10 @@ tuf_repo/
 # Large runtime diagnostic logs (also covered by *.log wildcard above)
 shutdown_diag.log
 
-# ─── Secrets (never commit) ─────────────────────────────────────
-# .env contains live API tokens (PostHog, Sentry, etc.)
-# Use .env.example as the canonical template.
+# ─── Environment / Secrets (never commit) ─────────────────────
+# .env* contains live API tokens (PostHog, Sentry, etc.)
+# .env.example is the canonical template (see ADR-0023).
 .env
+.env.*
+!.env.example
+!environments/.env.*.example

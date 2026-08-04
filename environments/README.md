@@ -3,13 +3,25 @@
 > SkillManager uses a tiered environment configuration system.
 > Each tier has specific defaults for Qt/QML, logging, and telemetry.
 
+## Tier Files
+
+| Tier | Template | Copy to | Purpose |
+|------|----------|---------|---------|
+| **Dev** | `.env.dev.example` | `.env` | Local development (default) |
+| **Staging** | `.env.staging.example` | `.env` | Staging / CI integration |
+| **Production** | `.env.prod.example` | `.env` | Production builds |
+
+> The root [`.env.example`](../.env.example) is the canonical template with
+> every supported variable; tier files are curated subsets with
+> tier-appropriate defaults.
+
 ## Tier Matrix
 
 | Tier | Log Level | Telemetry | QML Cache | Testing | Headless |
 |------|-----------|-----------|-----------|---------|----------|
 | **Dev** | `DEBUG` | Disabled | Disabled | On | `offscreen` |
 | **Staging** | `WARNING` | Enabled (staging tokens) | Disabled | On | `offscreen` |
-| **Production** | `ERROR` | Enabled (prod tokens) | Enabled | Off | Native |
+| **Production** | `ERROR` | Enabled (prod tokens) | Disabled | Off | Native |
 
 ## Setup
 

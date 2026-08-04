@@ -26,23 +26,41 @@
 
 | Tool | Mode | Description |
 |------|------|-------------|
-| `sm_list_skills` | read | List all skills with optional filters |
-| `sm_get_skill` | read | Get full skill details by ID or path |
-| `sm_search_skills` | read | Fuzzy-search skills by name/description |
-| `sm_sync_skills` | read | Force a discovery rescan |
-| `sm_analyze_skill` | read | Analyze skill quality and dependencies |
-| `sm_monitor_discovery` | read | Stream discovery progress events |
-| `sm_build_app` | read | Trigger a PyInstaller build |
-| `sm_debug_skill` | read | Run diagnostic checks on a skill |
-| `sm_get_diagnostics` | read | Retrieve structured app diagnostics |
-| `sm_screenshot` | read | Capture the current app window |
-| `sm_navigate` | read | Navigate to a view/skill in the UI |
+| `sm_list_skills` | read | List skills in the library model |
+| `sm_get_skill` | read | Full skill details (metadata, SKILL.md body, files) |
+| `sm_search_skills` | read | Search skills by name/category/tags/content |
+| `sm_sync_skills` | read | Re-scan skill source directories |
+| `sm_list_sources` | read | List configured skill source directories |
+| `sm_list_projects` | read | List configured target project directories |
+| `sm_static_analyze` | read | Safe regex grep over the repo (respects `.gitignore`) |
+| `sm_build` | read | Run `skill-manager-build` as a background job |
+| `sm_lint` | read | Run `ruff check src tests`, return structured errors |
+| `sm_run_tests` | read | Run the pytest suite as a background job |
+| `sm_job_status` | read | Poll background test/build job status |
+| `sm_get_health` | read | App & bridge health snapshot |
+| `sm_get_diagnostics` | read | Diagnostic logger ring-buffer events |
+| `sm_tail_events` | read | Tail recent telemetry / `capture_event` entries |
+| `sm_profile` | read | Run discovery pipeline profiling |
+| `sm_dump_state` | read | Export safe subset of controller state |
+| `sm_inspect_controller` | read | Introspect sub-controller methods/signals |
+| `sm_capture_errors` | read | Return error diagnostic buffer |
+| `sm_screenshot` | read | Capture live GUI window as base64 PNG |
+| `sm_navigate` | read | Navigate the GUI to a view/skill |
+| `sm_get_window_info` | read | Return live GUI window geometry |
+| `sm_mouse_move` | read* | Move system cursor (Windows; input-guarded) |
+| `sm_mouse_click` | read* | Send mouse click (Windows; input-guarded) |
+| `sm_type_text` | read* | Type text into focused window (Windows; input-guarded) |
+| `sm_toggle_debug_overlay` | read | Toggle the QML debug overlay |
 | `sm_create_skill` | **write** | Create a new skill from template |
-| `sm_update_skill` | **write** | Update an existing skill's content |
-| `sm_deploy` | **write** | Deploy a skill to a target project |
-| `sm_delete_skill` | **write** | Delete a skill by ID |
+| `sm_update_skill` | **write** | Update an existing skill's SKILL.md |
+| `sm_deploy` | **write** | Deploy a skill to `<target>/.agents/skills/` |
+| `sm_delete_skill` | **write** | Delete a skill (refuses AGENTS.md-excluded paths) |
 
 > Write tools require `--mcp-allow-write` flag.
+>
+> `sm_mouse_*` and `sm_type_text` inject real input and are gated by
+> `src/skill_manager/utils/input_guard.py` — they never run under
+> pytest/CI (see AGENTS.md rule 7).
 
 ---
 

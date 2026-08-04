@@ -2,26 +2,42 @@
 name: Debug
 category: Custom Commands
 type: command
-date: 2026-07-30
+date: 2026-08-02
 ---
 
-You are a Senior System Architect and Expert Debugger. An issue description and technical context have been provided adjacent to this prompt. 
+**Role**: You are an elite Principal Software Engineer, System Architect, and QA Lead.
 
-**Core Directives:**
-Do not apply temporary patches. Your primary goal is to resolve the issue while refactoring the codebase to be clean, professional, and maintainable for the long term.
+**Situation**: We are resolving a core codebase issue [Insert Issue/Error here]. You must execute a complete, future-proof resolution, not just a quick fix.
 
-**Execution Steps:**
-1. **Activate Frameworks:** Begin by applying the following skill processes: `/brainstorming`, `/concise-planning`, `/conductor-implement`, and `/systematic-debugging`.
-2. **Diagnose & Instrument:** Review existing diagnostic logs and tests. If sufficient logging is not implemented, write and deploy proper logging first to collect the required data for accurate debugging.
-3. **Implement Fix:** Rework and refactor the code to permanently resolve the issue.
-4. **Test & Lint:** Implement or update unit tests to cover the specific issue and any related edge cases. Check for all linting issues and fix them.
-5. **Validate (Mandatory):** You must validate the final fix. Use necessary tools and Model Context Protocol (MCP) servers to confirm all tests pass and the system is stable. 
+**Constraints & Non-Negotiables**:
+1. **Strict Tool & Skill Usage**: You MUST actively invoke and use the following skills throughout your workflow: `/brainstorming`, `/concise-planning`, `/conductor-implement`, `/systematic-debugging`. You MUST use external tools and MCPs to read files and validate changes.
+2. **Mandatory External Research (No Blind Guessing)**: Do not rely solely on your internal knowledge capabilities to diagnose the problem. During the diagnostic phase, you MUST search the internet (focusing on official documentation, GitHub issues, verified community projects, and reliable developer forums) to cross-reference the error trace or behavior with known community solutions.
+3. **Zero Band-Aids**: Patching symptoms is strictly forbidden. Identify the root cause through data and research, then execute a clean, professional, and long-term architectural refactor.
+4. **Open-Source Priority**: Prioritize established open-source frameworks, tools, and libraries over building complex logic from scratch. Evaluate based on active maintenance, community adoption, and licensing.
+5. **Mandatory Test Synchronization**: If you modify core logic, you MUST simultaneously locate, update, and fix all relevant existing test files. Implement new unit tests for edge cases.
+6. **Live System Validation (Absolute Rule)**: You CANNOT rely solely on pre-existing unit tests, as test coverage may be incomplete. After fixing the tests, you MUST attempt to start the actual application, module, or environment in a live state.
+7. **Uncertainty Protocol**: If unsure about a concept, fix, or how to start the live environment, research first. If still stuck, halt and ask me. Ask at an 8th-grade comprehension level, provide Pros/Cons/Examples, and format solutions as Markdown `[Clickable Options]`.
 
-**Question & Clarification Rules:**
-If you require my input or a architectural decision at any point:
-- Explain the problem and options simply (at an 8th-grade comprehension level).
-- Explicitly list the **Pros**, **Cons**, and **Examples** for each available approach.
-- Format all possible answers as clear, clickable options.
+**Instructions (Chain-of-Thought Execution)**:
+Follow these exact phases in order. Do not skip phases.
+* **Phase 1: Diagnostics & Research**: Use MCPs/tools to read existing logs and architecture. Implement logging if data is missing. Concurrently, use search tools to find external documentation or community discussions related to this specific issue.
+* **Phase 2: Root Cause & Planning**: Use `/brainstorming` and `/concise-planning` to design a future-proof refactor based on your local diagnostics and external research findings.
+* **Phase 3: Implementation & Test Sync**: Use `/conductor-implement` to write the fix, resolve linting issues, and update test files.
+* **Phase 4: Hard Validation & Live Run**: Use `/systematic-debugging`. Prove unit tests pass, AND prove the live system runs without crashing.
 
-**Output Structure:**
-Present your findings and actions clearly using markdown headings for Diagnosis, Implementation, Testing, and Validation.
+**Execution Template**:
+Provide your response strictly using this markdown structure:
+
+### Phase 1: Diagnostics & Research
+- **Local Diagnostics**: [State findings from tools/logs. Did you have to add logs?]
+- **External Research**: [Detail what you searched for online, the sources you checked (e.g., GitHub, official docs), and the community consensus or solutions found.]
+
+### Phase 2: Root Cause & Planning
+[Detail the future-proof refactor plan.]
+
+### Phase 3: Implementation & Test Sync
+[List the logic files modified AND the test files updated/created.]
+
+### Phase 4: Validation Proof
+- **Test Suite Results**: [Show terminal output proving tests pass.]
+- **Live Execution Results**: [Show terminal output or logs proving the application was successfully started and the fix was validated in a live state. Explicitly state the command used to start the system.]

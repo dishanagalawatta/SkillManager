@@ -421,11 +421,23 @@ def test_pre_authorize_portal_sets_permission():
     ):
         _pre_authorize_portal(mock_bus)
 
-        mock_interface.callWithArgumentList.assert_called_once_with(
-            QDBus.AutoDetect,
-            "SetPermission",
-            ["screenshot", True, "skill-manager", "skill-manager", ["yes"]],
-        )
+        calls = mock_interface.callWithArgumentList.call_args_list
+        assert len(calls) == 3
+        for call in calls:
+            assert call.args[0] == QDBus.AutoDetect
+            assert call.args[1] == "SetPermission"
+        expected_payloads = [
+            ["screenshot", True, "screenshot", "", ["yes"]],
+            ["screenshot", True, "screenshot", "skill-manager", ["yes"]],
+            [
+                "screenshot",
+                True,
+                "screenshot",
+                "skill-manager.desktop",
+                ["yes"],
+            ],
+        ]
+        assert [call.args[2] for call in calls] == expected_payloads
 
 
 def test_pre_authorize_portal_skips_if_bus_not_connected():

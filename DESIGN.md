@@ -43,6 +43,7 @@ IconButton {
     ToolTip.text: isActive ? "Remove bookmark" : "Bookmark skill"
     ToolTip.visible: hovered
 }
+```
 
 ## Architectural Patterns
 
@@ -180,16 +181,18 @@ The `src/skill_manager/mcp/` subsystem exposes all core app capabilities to AI a
 ```
 src/skill_manager/mcp/
 ├── bridge/            ← IPC bridge package: routes MCP ↔ AppController
-│   ├── __init__.py      (facade; submodules: _controller, _capture, _ipc, _skills, ...)
+│   └── __init__.py      (facade; submodules: _controller, _capture, _ipc, _skills, ...)
 ├── models.py          ← pydantic request/response schemas
 ├── server.py          ← MCP server entry point (stdio)
 └── tools/
-    ├── read_tools.py    ← sm_list_skills, sm_get_skill, sm_search_skills, sm_sync_skills
-    ├── analyze.py       ← sm_analyze_skill, sm_monitor_discovery
-    ├── build.py         ← sm_build_app
-    ├── debug.py         ← sm_debug_skill, sm_get_diagnostics
-    ├── write_tools.py   ← sm_create_skill, sm_update_skill, sm_deploy, sm_delete_skill
-    └── screenshot.py    ← sm_screenshot, sm_navigate
+    ├── skills.py        ← sm_list_skills, sm_get_skill, sm_search_skills, sm_sync_skills
+    ├── analyze.py       ← sm_list_sources, sm_list_projects, sm_static_analyze
+    ├── build.py         ← sm_build, sm_lint, sm_run_tests, sm_job_status
+    ├── debug.py         ← sm_dump_state, sm_inspect_controller, sm_capture_errors, sm_toggle_debug_overlay
+    ├── monitor.py       ← sm_get_health, sm_get_diagnostics, sm_tail_events, sm_profile
+    ├── screenshot.py    ← sm_screenshot
+    ├── gui.py           ← sm_navigate, sm_get_window_info, sm_mouse_move, sm_mouse_click, sm_type_text
+    └── write.py         ← sm_create_skill, sm_update_skill, sm_deploy, sm_delete_skill
 ```
 
 **Access modes:**

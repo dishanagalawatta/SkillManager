@@ -17,6 +17,7 @@ from skill_manager.core.persistence import (
     save_temp_screenshots_registry,
 )
 from skill_manager.core.schemas import ScreenshotParams
+from skill_manager.utils.notifications import close_notification, send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -29,26 +30,41 @@ logger = logging.getLogger(__name__)
 #
 #   1. FreeDesktop Portal        — subprocess-based GLib DBus call.
 #      Before spawning, pre-authorises via PermissionStore so the portal
-#      skips the dialog when the app has a desktop-file association.
-#      *Known issue*: on GNOME 50 the portal's Screenshot method returns
-#      a request handle but never emits the Response signal.
+#      skips the dialog entirely (GNOME refuses the dialog for unfocused
+#      apps, so pre-authorisation is what makes minimized captures work).
 #
 #   2. gnome-screenshot CLI       — last resort fallback (needs the
 #      binary installed).
 
 
+#: Permissions IDs the xdg-desktop-portal daemon (>= 1.21, incl. Ubuntu
+#: snap patches) resolves for SkillManager.  The daemon looks up the
+#: caller's *permissions ID* — derived from the systemd user unit
+#: (``sd_pid_get_user_unit``) or snap metadata — as the key in the
+#: ``screenshot`` permission table (permission ID ``screenshot``):
+#: ``""`` = terminal/ptyxis launch (no ``app-`` scope), ``skill-manager`` =
+#: desktop-file launch, ``skill-manager.desktop`` = legacy key.
+_PORTAL_PERMISSION_IDS: tuple[str, ...] = (
+    "",
+    "skill-manager",
+    "skill-manager.desktop",
+)
+
+
 def _pre_authorize_portal(bus: QDBusConnection | None = None) -> None:
     """Pre-authorize the screenshot portal via PermissionStore.
 
-    Sets a ``['yes']`` entry in the ``screenshot`` permission table for
-    the desktop-file app ID ``skill-manager``.  When SkillManager is
-    launched from the desktop (associated ``.desktop`` file), the portal
-    backend uses ``g_desktop_app_info_get_from_pid()`` to determine the
-    caller's app ID and finds this entry — skipping the permission dialog.
+    xdg-desktop-portal resolves the calling process's *permissions ID*
+    (not the desktop-file app ID) and looks it up in the ``screenshot``
+    permission table under the permission ID ``screenshot``.  Only when
+    that key is missing does the portal show the interactive access dialog
+    — which GNOME 50 refuses for unfocused apps ("Only the focused app is
+    allowed to show a system access dialog").
 
-    This is harmless if the app is launched from a terminal (no desktop-file
-    association): the portal simply won't find the entry and falls through
-    to the dialog.
+    We therefore write a ``['yes']`` entry for every permissions ID the
+    app can resolve to (terminal launch → ``""``, desktop launch →
+    ``skill-manager``) so the dialog is skipped regardless of how the app
+    was started or whether it is focused/minimized.
     """
     if bus is None:
         bus = QDBusConnection.sessionBus()
@@ -65,13 +81,13 @@ def _pre_authorize_portal(bus: QDBusConnection | None = None) -> None:
         logger.warning("Pre-authorize: PermissionStore interface not available")
         return
 
-    app_id = "skill-manager"
-    store.callWithArgumentList(
-        QDBus.AutoDetect,
-        "SetPermission",
-        ["screenshot", True, app_id, app_id, ["yes"]],
-    )
-    logger.info("Pre-authorized screenshot portal for app_id=%s", app_id)
+    for permission_id in _PORTAL_PERMISSION_IDS:
+        store.callWithArgumentList(
+            QDBus.AutoDetect,
+            "SetPermission",
+            ["screenshot", True, "screenshot", permission_id, ["yes"]],
+        )
+        logger.info("Pre-authorized screenshot portal for permission_id=%r", permission_id)
 
 
 def _find_portal_python() -> str | None:
@@ -249,6 +265,27 @@ class ScreenshotController(QObject):
         self.current_full_pixmap = None
         self._wayland_deferred = False
         logger.info("Screenshot capture cancelled.")
+
+    @Slot()
+    def notifyCapturePending(self):
+        """Show a notification inviting the user to activate the capture.
+
+        Called by Main.qml when the overlay cannot be raised because the app
+        is not the active window (GNOME Wayland stacks inactive windows
+        below).  Clicking the notification makes the app active, which lets
+        the overlay map on top.
+        """
+        send_notification("Skill Manager", "Capture is ready — click to start selecting")
+
+    @Slot()
+    def notifyCaptureActivation(self):
+        """Dismiss the 'activation pending' notification once the app is active.
+
+        Called by Main.qml when the capture-activation gate completes (the
+        user clicked the notification or the taskbar entry, making the app
+        active again).  The notification is closed so it does not linger.
+        """
+        close_notification()
 
     # ------------------------------------------------------------------
     # Capture entry-points

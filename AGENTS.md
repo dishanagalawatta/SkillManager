@@ -126,7 +126,9 @@
 |------|---------|
 | Run app | `uv run skill-manager` |
 | Lint | `uv run ruff check src tests` |
+| Lint (single file) | `uv run ruff check <path>` |
 | Format | `uv run ruff format src tests` |
+| Format (single file) | `uv run ruff format <path>` |
 | Test (parallel) | `uv run pytest -n auto` |
 | Test (single file) | `uv run pytest tests/test_config.py` |
 | All checks | `python scripts/dev_test.py` |
