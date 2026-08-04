@@ -31,7 +31,7 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q
+        run: uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
         env:
           QT_QPA_PLATFORM: offscreen
 
