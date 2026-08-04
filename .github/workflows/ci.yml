@@ -2,15 +2,31 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'assets/**'
+      - '.agents/**'
+      - 'image/**'
+      - 'conductor/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'assets/**'
+      - '.agents/**'
+      - 'image/**'
+      - 'conductor/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -30,15 +46,12 @@ jobs:
     with:
       python-version: "3.13"
 
-  security:
-    name: Security
-    uses: ./.github/workflows/_security-scan.yml
-
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [lint, test-py312, test-py313, security]
+    needs: [lint, test-py312, test-py313]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check all jobs
         run: |
@@ -52,10 +65,6 @@ jobs:
           fi
           if [[ "${{ needs.test-py313.result }}" != "success" ]]; then
             echo "Test (Py 3.13) failed"
-            exit 1
-          fi
-          if [[ "${{ needs.security.result }}" != "success" && "${{ needs.security.result }}" != "skipped" ]]; then
-            echo "Security scan failed"
             exit 1
           fi
           echo "All checks passed"

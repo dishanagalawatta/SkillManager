@@ -12,6 +12,7 @@ jobs:
   test:
     name: Test (Python ${{ inputs.python-version }})
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -28,7 +29,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Run tests
         shell: bash
