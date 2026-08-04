@@ -20,7 +20,7 @@ import pytest
 
 import skill_manager.utils.linux as linux_utils
 from skill_manager.mcp import bridge
-from skill_manager.mcp.bridge import _static as bridge_static
+from skill_manager.mcp.bridge import _input as bridge_input, _static as bridge_static
 from skill_manager.utils import input_guard
 
 
@@ -185,3 +185,23 @@ def test_input_tools_run_when_gui_window_present(
     assert move["ok"] is True
     assert click["ok"] is True
     assert typed == {"ok": True, "chars": 5}
+
+
+def test_send_type_text_win32_handles_lowercase(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Win32 typing must emit events for lowercase letters.
+
+    Regression: the vk table only holds uppercase A-Z, and the fallback
+    lowered the char again, so ``"hello"`` produced an empty event list and
+    returned ``{"ok": True, "chars": 0}`` on Windows.
+    """
+    fake_user32 = MagicMock()
+    fake_user32.SendInput.side_effect = lambda n, inputs, size: n
+    loader = MagicMock()
+    loader.user32 = fake_user32
+    # ctypes.windll does not exist on non-Windows: allow creating it.
+    monkeypatch.setattr(ctypes, "windll", loader, raising=False)
+
+    result = bridge_input._send_type_text_win32("hello")
+
+    # 5 chars x (keydown + keyup) = 10 events delivered to SendInput.
+    assert result == {"ok": True, "chars": 10}
