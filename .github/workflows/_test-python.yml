@@ -39,7 +39,7 @@ jobs:
           # re-raised the moment the child exits, killing the script before it
           # can propagate pytest's real exit code. Ignoring SIGINT lets the
           # runner see the true result; pytest itself still swallows the
-          # console event via the ci_sigint_dump fixture.
+          # console event via the windows_ci_sigint_guard fixture.
           trap '' INT
           uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
           code=$?
