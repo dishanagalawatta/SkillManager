@@ -190,3 +190,17 @@ def test_search_fast_path_matches_fuzzy_only_path(sample_skills):
         assert fast_path == fuzzy_only, (
             f"Fast path disagrees with fuzzy-only path for {query!r}: {fast_path} != {fuzzy_only}"
         )
+
+
+def test_search_short_prefix_fast_path(sample_skills):
+    """Short 2-char prefixes must still surface substring matches.
+
+    A query token that is a substring of full_text but not an exact document
+    token must pass the token-match gate through the substring fast path.
+    Otherwise fuzzy.ratio (e.g. 'br' vs 'brainstorming' ~ 27%) falls below
+    the 65 gate and valid skills vanish from results entirely.
+    """
+    engine = SearchEngine(sample_skills)
+    assert [r[0]["name"] for r in engine.query("br")] == ["brainstorming"]
+    assert [r[0]["name"] for r in engine.query("py")] == ["python_test"]
+    assert [r[0]["name"] for r in engine.query("au")] == ["auto_commit"]
