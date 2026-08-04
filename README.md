@@ -5,6 +5,26 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.8.0-orange.svg)](pyproject.toml)
+[![CI](https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml/badge.svg)](https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-docs%2FREADME.md-blueviolet.svg)](docs/README.md)
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Building](#building)
+- [Documentation](#documentation)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Release Strategy](#release-strategy)
+- [License](#license)
+- [Contributing](#contributing)
 
 ## Overview
 

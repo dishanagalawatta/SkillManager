@@ -5,6 +5,7 @@ import App 1.0
 
 Window {
     id: overlay
+    objectName: "screenshotOverlayWindow"
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     visibility: Window.Hidden
     color: "transparent"
@@ -291,23 +292,26 @@ Window {
         }
     }
 
-    Connections {
-        target: AppController.screenshot_controller
-        function onShowOverlay() {
-            overlay.mode = "selecting"
-            overlay.isRedacting = false
-            overlay.selectionRect = Qt.rect(0,0,0,0)
-            overlay.redactionRects = []
-            // Avoid Window.FullScreen: on Wayland it creates an opaque full-screen
-            // surface that ignores transparency (shows black). Use a manually-sized
-            // window so the compositor treats it as a regular transparent surface.
-            overlay.showNormal()
-            overlay.x = 0
-            overlay.y = 0
-            overlay.width = Screen.width
-            overlay.height = Screen.height
-            overlay.raise()
-            overlay.requestActivate()
-        }
+    // Invoked by Main.qml's capture-activation gate. On GNOME Wayland the
+    // overlay only maps on top of the ACTIVE app's windows (focus-stealing
+    // prevention), so Main.qml restores + activates the main window first and
+    // calls this once the app is (re)active — otherwise the overlay would be
+    // stacked below the active window and never receive the pointer, so the
+    // CrossCursor would not show.
+    function showOverlay() {
+        mode = "selecting"
+        isRedacting = false
+        selectionRect = Qt.rect(0,0,0,0)
+        redactionRects = []
+        // Avoid Window.FullScreen: on Wayland it creates an opaque full-screen
+        // surface that ignores transparency (shows black). Use a manually-sized
+        // window so the compositor treats it as a regular transparent surface.
+        showNormal()
+        x = 0
+        y = 0
+        width = Screen.width
+        height = Screen.height
+        raise()
+        requestActivate()
     }
 }

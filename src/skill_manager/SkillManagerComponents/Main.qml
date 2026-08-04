@@ -126,9 +126,11 @@ Window {
     property real savedY: 0
     property real savedWidth: 0
     property real savedHeight: 0
-    property real savedOpacity: 1
     property bool pendingScreenshot: false
     property bool _isHidingForScreenshot: false
+    // True while the capture overlay is waiting for the app to become active
+    // again (see captureActivationTimer + onShowOverlay below).
+    property bool captureAwaitingActivation: false
 
     function saveWindowState() {
         wasMaximized = (window.visibility === Window.Maximized)
@@ -136,25 +138,22 @@ Window {
         savedY = window.y
         savedWidth = window.width
         savedHeight = window.height
-        savedOpacity = window.opacity
     }
 
-    function hideWindowInstantly() {
+    function minimizeWindowInstantly() {
         _isHidingForScreenshot = true
-        window.opacity = 0
-        // Intentionally do NOT move the window off-screen.
-        // The ScreenshotOverlay is a child Window declared inside this Window,
-        // so its x/y coordinate space is relative to our position.
-        // Moving to (-32000, -32000) would place the overlay off-screen too,
-        // preventing it from displaying correctly after capture.
-        // Opacity=0 alone is sufficient: on all modern compositing desktops
-        // the compositor excludes fully-transparent windows from grabWindow(0),
-        // and on non-compositing X11 grabWindow(0) captures only the root window.
+        // Use a REAL minimize (showMinimized) instead of opacity=0:
+        // Qt's Wayland platform plugin does not support window opacity
+        // ("This plugin does not support setting window opacity"), so the
+        // window stays fully visible — and therefore appears in its own
+        // screenshot. A minimized window is unmapped by the compositor on
+        // every platform (X11, Wayland, Windows, macOS), guaranteeing it is
+        // excluded from the capture.
+        window.showMinimized()
     }
 
     function restoreWindowState() {
         _isHidingForScreenshot = false
-        window.opacity = savedOpacity
         if (wasMaximized) {
             window.showMaximized()
         } else {
@@ -195,7 +194,7 @@ Window {
     // --- Find & Select ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSelectAllEnabled; sequence: AppController.config_controller.shortcutSelectAll; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
 
     // --- Clipboard ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
@@ -258,13 +257,6 @@ Window {
         interval: 150
         onTriggered: {
             AppController.screenshot_controller.captureScreen()
-            // Restore opacity after capture so the window is visible underneath
-            // the overlay.  Keep pendingScreenshot=true so that onCaptureFinished
-            // / onCaptureCancelled still raise+activate the window when the
-            // overlay closes (the user expects the app to come to front).
-            if (window.pendingScreenshot) {
-                window.restoreWindowState()
-            }
         }
     }
 
@@ -273,20 +265,75 @@ Window {
         function onMinimizeRequested() {
             window.saveWindowState()
             window.pendingScreenshot = true
-            window.hideWindowInstantly()
+            window.minimizeWindowInstantly()
             screenshotDelayTimer.start()
         }
+        // GNOME Wayland stacks windows of the ACTIVE app above all others
+        // (focus-stealing prevention).  A global hotkey carries no
+        // xdg-activation token, so an overlay shown while the app is
+        // minimized/inactive maps BELOW the active window — the crosshair
+        // cursor never appears.  Restore the window, invite the user to
+        // activate the app (notification), and only show the overlay once
+        // the app is active again.
+        function onShowOverlay() {
+            if (window.pendingScreenshot) {
+                window.restoreWindowState()
+            }
+            if (window.active) {
+                screenshotOverlay.showOverlay()
+                return
+            }
+            window.captureAwaitingActivation = true
+            AppController.screenshot_controller.notifyCapturePending()
+            captureActivationTimer.start()
+        }
+    }
+
+    Timer {
+        id: captureActivationTimer
+        interval: 100
+        repeat: true
+        onTriggered: {
+            if (!window.captureAwaitingActivation) {
+                stop()
+                return
+            }
+            if (window.active) {
+                stop()
+                window.captureAwaitingActivation = false
+                AppController.screenshot_controller.notifyCaptureActivation()
+                screenshotOverlay.showOverlay()
+            }
+        }
+    }
+
+    // Lets the user cancel a pending capture activation (before the overlay
+    // is shown).  The default clear_selection shortcut is also "Esc" but it
+    // is disabled while captureAwaitingActivation is true (see above), so
+    // these two do not conflict.
+    Shortcut {
+        enabled: window.captureAwaitingActivation
+        sequence: "Esc"
+        context: Qt.ApplicationShortcut
+        onActivated: AppController.screenshot_controller.cancelCapture()
     }
 
     Connections {
         target: AppController.screenshot_controller
         function onCaptureFinished() {
+            captureActivationTimer.stop()
+            window.captureAwaitingActivation = false
             if (window.pendingScreenshot) {
                 window.pendingScreenshot = false
                 window.restoreWindowState()
             }
         }
         function onCaptureCancelled() {
+            captureActivationTimer.stop()
+            if (window.captureAwaitingActivation) {
+                window.captureAwaitingActivation = false
+                AppController.screenshot_controller.notifyCaptureActivation()
+            }
             if (window.pendingScreenshot) {
                 window.pendingScreenshot = false
                 window.restoreWindowState()
@@ -422,6 +469,47 @@ Window {
                 id: statusTimer
                 interval: 5000
                 onTriggered: statusToast.opacity = 0
+            }
+        }
+
+        // Shown while the capture overlay is waiting for the app to become
+        // active again (captureAwaitingActivation).  The user must click the
+        // desktop notification (or the taskbar entry) so the overlay can map
+        // on top of the ACTIVE window on GNOME Wayland.
+        Rectangle {
+            id: captureAwaitingPill
+            objectName: "captureAwaitingPill"
+            visible: window.captureAwaitingActivation
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            width: captureAwaitingPillText.implicitWidth + 40
+            height: 36
+            radius: Theme.radiusPill
+            color: Theme.alpha(Theme.glassPill, 0.95)
+            border.color: Theme.glassBorder
+            border.width: 1
+            z: 100
+
+            RowLayout {
+                id: captureAwaitingPillRow
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 8
+
+                Text {
+                    id: captureAwaitingPillText
+                    objectName: "captureAwaitingPillText"
+                    text: "Click the notification to start the capture (Esc to cancel)"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.label
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideMiddle
+                }
             }
         }
     }

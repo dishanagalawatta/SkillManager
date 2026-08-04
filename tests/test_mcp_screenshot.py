@@ -148,6 +148,32 @@ def test_command_channel_handles_navigate(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# CommandChannel._normalize_capture_image (window-only grab → PIL-readable PNG)
+# ---------------------------------------------------------------------------
+def test_normalize_capture_image_produces_pil_readable_png(tmp_path):
+    from PySide6.QtGui import QImage
+
+    from skill_manager.controllers.command_channel import _normalize_capture_image
+
+    # A 30-bit BGR image at a fractional DPR mirrors the Wayland
+    # grabWindow() state that made Qt's PNG writer emit a corrupt IDAT.
+    image = QImage(64, 48, QImage.Format.Format_BGR30)
+    image.fill(0x00FF0000)
+    image.setDevicePixelRatio(1.3046875)
+
+    normalized = _normalize_capture_image(image)
+
+    assert normalized.format() == QImage.Format.Format_RGBA8888
+    assert normalized.devicePixelRatio() == 1.0
+    assert (normalized.width(), normalized.height()) == (64, 48)
+
+    out_path = tmp_path / "normalized.png"
+    assert normalized.save(str(out_path), "PNG")
+    img = Image.open(out_path)
+    assert img.size == (64, 48)
+
+
+# ---------------------------------------------------------------------------
 # tools/screenshot.py — sm_screenshot handler
 # ---------------------------------------------------------------------------
 def _make_png_b64(size=(10, 10), color="blue"):

@@ -136,9 +136,12 @@ def _pre_authorize_portal() -> None:
     """Pre-authorise screenshot portal access via PermissionStore.
 
     Best-effort; silently ignored if PermissionStore is not available.
-    This sets a persistent permission entry so the portal backend can
-    skip the dialog when the calling process has a desktop-file
-    association.
+    xdg-desktop-portal resolves the caller's *permissions ID* (from the
+    systemd user unit or snap metadata) and looks it up in the
+    ``screenshot`` table under the permission ID ``screenshot``; a
+    missing key forces the interactive dialog, which GNOME refuses for
+    unfocused apps.  Write ``['yes']`` for every ID the app can resolve
+    to (terminal launch → ``""``, desktop launch → ``skill-manager``).
     """
     try:
         import dbus
@@ -155,13 +158,14 @@ def _pre_authorize_portal() -> None:
             store_obj,
             "org.freedesktop.impl.portal.PermissionStore",
         )
-        store_iface.SetPermission(
-            "screenshot",
-            True,
-            "skill-manager",
-            "skill-manager",
-            ["yes"],
-        )
+        for permission_id in ("", "skill-manager", "skill-manager.desktop"):
+            store_iface.SetPermission(
+                "screenshot",
+                True,
+                "screenshot",
+                permission_id,
+                ["yes"],
+            )
     except Exception:
         pass  # best-effort
 

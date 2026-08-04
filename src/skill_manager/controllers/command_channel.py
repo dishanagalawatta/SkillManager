@@ -14,9 +14,23 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QEvent, QFileSystemWatcher, QObject, QTimer
+from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickWindow
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_capture_image(image: QImage) -> QImage:
+    """Return a copy of *image* in a canonical 8-bit format for PNG export.
+
+    ``QQuickWindow::grabWindow()`` can return an image whose native pixel
+    format (e.g. 30-bit BGR on Wayland) or device-pixel-ratio metadata makes
+    Qt's PNG writer emit a corrupt IDAT stream. Converting to plain
+    RGBA8888 at DPR 1.0 yields a PNG that PIL and other decoders can read.
+    """
+    normalized = image.convertToFormat(QImage.Format_RGBA8888)
+    normalized.setDevicePixelRatio(1.0)
+    return normalized
 
 
 class CommandChannel(QObject):
@@ -190,7 +204,7 @@ class CommandChannel(QObject):
             captures_dir = self._commands_dir.parent / "captures"
             captures_dir.mkdir(parents=True, exist_ok=True)
             out_path = captures_dir / f"{cmd_id}.png"
-            if not image.save(str(out_path)):
+            if not _normalize_capture_image(image).save(str(out_path)):
                 self._write_ack(cmd_id, ok=False, error="failed to save PNG")
                 return
 

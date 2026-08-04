@@ -242,7 +242,12 @@ def capture_app_window(
                     b64 = _pil_image_to_base64(img)
                     if b64:
                         return (b64, img.width, img.height)
-                except Exception:  # noqa: BLE001 — bad PNG, fall through
+                except Exception as exc:  # noqa: BLE001 — bad PNG, fall through
+                    get_diagnostic_logger().log_event(
+                        "WARN",
+                        "capture_ipc",
+                        f"IPC PNG unreadable ({capture_path}): {exc}",
+                    )
                     pass
 
     # ── Fallback: platform-native capture ────────────────────────────

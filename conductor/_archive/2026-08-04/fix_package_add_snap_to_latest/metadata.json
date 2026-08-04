@@ -1,0 +1,10 @@
+{
+  "slug": "fix_package_add_snap_to_latest",
+  "title": "Fix newly-added package showing as outdated",
+  "status": "completed",
+  "owner": "@DIKKA",
+  "created": "2026-06-22",
+  "completed": "2026-08-04",
+  "description": "On Add, snap current_version = latest_version so a registered package shows \"Up to Date\" until the registry moves; block save with an inline error when latest_version cannot be auto-detected.",
+  "related_adrs": ["ADR-0013"]
+}

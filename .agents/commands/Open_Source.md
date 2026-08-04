@@ -2,18 +2,26 @@
 name: Open Source
 category: Custom Commands
 type: command
-date: 2026-07-30
+date: 2026-08-02
 ---
 
-Architecture Constraints: 
-Do not build this feature or underlying system from the ground up if a high-quality, open-source framework, tool, or library exists that simplifies development and improves robustness. 
+### Open-Source Library & Tooling Policy
 
-If introducing a new dependency (tool, framework, or library), it must meet the following criteria:
-1. Actively maintained with recent updates.
-2. Widely adopted with strong community support.
-3. Well-documented with clear integration examples.
-4. Fits naturally within the existing project ecosystem.
-5. Permissive, production-friendly licensing (e.g., MIT, Apache 2.0).
+**Core Directive:** 
+When implementing, updating, or refactoring features, do not reinvent the wheel. You must prioritize using established, high-quality open-source libraries, frameworks, and packages over building custom solutions from the ground up to ensure code quality, accuracy, consistency, and professionalism.
 
-Output Format: 
-If a new dependency is selected, briefly justify the choice against the criteria above before providing the implementation code or configuration.
+**Anti-Hallucination & Tooling Mandate:**
+- NEVER rely on your internal memory for library selection, versioning, syntax, capabilities, or known bugs. Your training data is likely outdated.
+- You MUST utilize web search, context-retrieval, or external tools to research the current ecosystem of available tools before proposing or writing implementation code.
+
+**Library Evaluation Criteria:**
+Before integrating any third-party library, verify it meets the following standards via active external search:
+1. **Active Maintenance:** Evidence of recent commits, active issue triage, and regular stable releases.
+2. **Community Adoption:** High usage metrics (e.g., strong GitHub presence, active forks, high download counts on package managers like npm, PyPI, Maven, etc.).
+3. **Quality & Professionalism:** Comprehensive, up-to-date official documentation and established best practices.
+4. **Current Context:** Confirm the exact latest stable version, modern feature sets, and check for any currently critical open bugs, security vulnerabilities, or deprecation warnings.
+
+**Execution Constraints:**
+1. **Search First:** Actively search for existing libraries that solve the current requirements.
+2. **Evaluate:** Cross-reference candidates against the evaluation criteria using your search tools.
+3. **Implement:** Integrate the optimal library using its latest documented syntax and patterns.
