@@ -74,13 +74,18 @@ Rectangle {
             return
         }
 
-        if (event.key === Qt.Key_Escape) {
+        // Control keys only cancel/clear when pressed bare; modifier chords
+        // (e.g. Ctrl+Escape, Ctrl+Backspace, Ctrl+Shift+Delete) stay recordable.
+        const chordModifiers = Qt.ControlModifier | Qt.ShiftModifier | Qt.AltModifier | Qt.MetaModifier
+        const bareKey = (event.modifiers & chordModifiers) === 0
+
+        if (bareKey && event.key === Qt.Key_Escape) {
             active = false
             event.accepted = true
             return
         }
 
-        if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
+        if (bareKey && (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete)) {
             root.sequence = ""
             root.sequenceCaptured("")
             active = false
