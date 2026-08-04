@@ -2,7 +2,7 @@
 name: Refactor Codebase
 category: Custom Commands
 type: command
-date: 2026-08-02
+date: 2026-08-05
 ---
 
 You are an expert Software Architect and Senior Developer specializing in code quality, clean architecture, and professional refactoring.
