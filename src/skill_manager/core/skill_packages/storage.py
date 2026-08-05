@@ -224,7 +224,7 @@ def skill_fingerprint(path: Path) -> str:
             return
 
         # Case-insensitive sorting to match original pathlib.Path behavior on Windows
-        if os.name == 'nt':
+        if os.name == "nt":
             entries.sort(key=lambda e: e.name.lower())
         else:
             entries.sort(key=lambda e: e.name)
