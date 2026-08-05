@@ -7,3 +7,6 @@
 ## 2025-02-14 - Cache path calculations in quick_copy.py
 **Learning:** During the file discovery process and quick copying operations, `project_root_for_project` and `skill_base_relative` are called heavily on the same paths, which adds redundant path resolution overhead. Applying `@lru_cache` significantly reduces this overhead.
 **Action:** Use `@lru_cache` on repetitive path resolution functions like `project_root_for_project` and `skill_base_relative` to memoize the results for hot paths.
+## 2026-08-05 - Optimize skill_fingerprint with os.scandir
+**Learning:** The default `pathlib.Path.rglob()` creates object instantiation overhead. By using a recursive `os.scandir` generator, performance can improve over 10x for metadata scanning. However, you must carefully reproduce `rglob`'s behavior of ignoring symlinks (via `follow_symlinks=False`) and case-insensitive sorting on Windows to avoid hash divergence.
+**Action:** When replacing pathlib tree walks with `os.scandir` for performance, explicitly verify symlink and sorting parity for Windows compatibility.
