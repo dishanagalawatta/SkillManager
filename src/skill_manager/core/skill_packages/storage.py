@@ -213,16 +213,32 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
 
 def skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name)."""
-    parts = []
-    try:
-        files = sorted(p for p in path.rglob("*") if p.is_file())
-    except OSError:
-        files = []
-    for file_path in files:
+    # Perf: os.scandir is significantly faster than pathlib.Path.rglob for large directory trees.
+    stack = [str(path)]
+    path_str = str(path)
+    prefix_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
+
+    file_records = []
+    while stack:
+        d = stack.pop()
         try:
-            stat = file_path.stat()
-            rel = file_path.relative_to(path).as_posix()
-            parts.append(f"{rel}:{stat.st_mtime}:{stat.st_size}")
+            with os.scandir(d) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=True):
+                            rel = entry.path[prefix_len:].replace(os.sep, "/")
+                            # Use cached stat from DirEntry
+                            stat = entry.stat(follow_symlinks=True)
+                            file_records.append((rel, stat.st_mtime, stat.st_size))
+                    except OSError:
+                        continue
         except OSError:
-            continue
+            pass
+
+    # Sort by split relative path to match pathlib.Path tuple sorting behavior exactly
+    file_records.sort(key=lambda x: x[0].split("/"))
+
+    parts = [f"{rel}:{mtime}:{size}" for rel, mtime, size in file_records]
     return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()
