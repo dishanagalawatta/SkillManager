@@ -8,6 +8,7 @@ Item {
     property real from: 0.0
     property real to: 1.0
     property real stepSize: 0.0
+    property string accessibleName: qsTr("Slider")
 
     signal moved()
 
@@ -105,4 +106,7 @@ Item {
             if (pressed) control._updateFromPos(mouse.x)
         }
     }
+
+    Accessible.role: Accessible.Slider
+    Accessible.name: control.accessibleName
 }
