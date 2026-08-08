@@ -213,35 +213,42 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
 
 def skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name).
-    ⚡ Bolt: Replaced pathlib rglob with os.scandir for 10x faster stat retrieval."""
-    parts = []
 
-    def _scan(current_path, base_path_len):
+    Uses an iterative ``os.scandir`` walk instead of ``pathlib.Path.rglob``:
+    ``DirEntry`` objects carry cached ``stat`` results from the directory scan,
+    avoiding per-file filesystem round trips. Records are sorted by relative
+    path parts to reproduce ``rglob`` + ``sorted()`` ordering exactly
+    (case-insensitive on Windows, matching pathlib parity).
+    Symlinked files are fingerprinted (matching ``Path.is_file()``), but
+    symlinked directories are not recursed into (matching ``Path.rglob``).
+    """
+    records: list[tuple[str, float, int]] = []
+    path_str = str(path)
+    base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
+    stack = [path_str]
+
+    while stack:
+        current = stack.pop()
         try:
-            with os.scandir(current_path) as it:
+            with os.scandir(current) as it:
                 entries = list(it)
         except OSError:
-            return
-
-        if os.name == "nt":
-            entries.sort(key=lambda e: e.name.lower())
-        else:
-            entries.sort(key=lambda e: e.name)
-
+            continue
         for entry in entries:
             try:
-                # Original pathlib code implicitly resolved symlinks when statting files
-                # but rglob itself does not recurse into symlinked directories.
                 if entry.is_dir(follow_symlinks=False):
-                    _scan(entry.path, base_path_len)
+                    stack.append(entry.path)
                 elif entry.is_file(follow_symlinks=True):
                     stat = entry.stat(follow_symlinks=True)
-                    rel = entry.path[base_path_len:].replace("\\", "/")
-                    parts.append(f"{rel}:{stat.st_mtime}:{stat.st_size}")
+                    rel = entry.path[base_len:].replace(os.sep, "/")
+                    records.append((rel, stat.st_mtime, stat.st_size))
             except OSError:
                 continue
 
-    path_str = str(path)
-    base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
-    _scan(path_str, base_len)
+    if os.name == "nt":
+        records.sort(key=lambda r: tuple(p.lower() for p in r[0].split("/")))
+    else:
+        records.sort(key=lambda r: r[0].split("/"))
+
+    parts = [f"{rel}:{mtime}:{size}" for rel, mtime, size in records]
     return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()
