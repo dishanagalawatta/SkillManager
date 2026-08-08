@@ -85,3 +85,57 @@ class TestUIConfigFlow:
             config_mgr.isRecordingShortcut = True
 
         assert config_mgr.isRecordingShortcut is True
+
+    def test_add_project_auto_discovers_and_links_preexisting_skill(
+        self, qml_engine, app_controller, qtbot, tmp_path
+    ):
+        """Adding a project folder auto-discovers pre-existing skills and
+        links exact matches to package skills — no manual refresh needed."""
+        from skill_manager.core.persistence import load_project_skill_ownership
+        from skill_manager.core.update_service import UpdateService
+
+        # 1. Package source with skill "alpha"
+        content = "---\nname: alpha\n---\n# Alpha skill\n"
+        source_dir = tmp_path / "package_source"
+        alpha_src = source_dir / "alpha"
+        alpha_src.mkdir(parents=True)
+        (alpha_src / "SKILL.md").write_text(content, encoding="utf-8")
+        with qtbot.waitSignal(app_controller.sourcesChanged, timeout=1000):
+            app_controller.config_mgr.addSource(str(source_dir))
+
+        # Simulate a registered package for the added source, restoring
+        # the session-scoped app's original state afterwards.
+        original_packages = app_controller._update_packages
+        app_controller._update_packages = [
+            {"name": "Test Pkg", "package_id": "pkg-1", "package_path": str(source_dir)}
+        ]
+
+        # 2. Project with a PRE-EXISTING identical skill
+        proj_dir = tmp_path / "project"
+        skills_dir = proj_dir / ".agents" / "skills"
+        alpha_proj = skills_dir / "alpha"
+        alpha_proj.mkdir(parents=True)
+        (alpha_proj / "SKILL.md").write_text(content, encoding="utf-8")
+
+        try:
+            with qtbot.waitSignal(app_controller.projectsChanged, timeout=1000):
+                app_controller.config_mgr.addProject(str(proj_dir))
+
+            # 3. Discovery refresh ran synchronously (SynchronousTaskRunner):
+            #    the pre-existing skill is in the library model without a
+            #    manual refresh.
+            names = {
+                getattr(skill, "name", None) for skill in app_controller.libraryModel._all_skills
+            }
+            assert "alpha" in names
+            assert any(
+                not getattr(skill, "is_package", False) and getattr(skill, "name", None) == "alpha"
+                for skill in app_controller.libraryModel._all_skills
+            )
+
+            # 4. Ownership linked to the package
+            ownership = load_project_skill_ownership()
+            project_key = UpdateService.ownership_project_key(str(skills_dir.resolve()))
+            assert ownership.get(project_key, {}).get("alpha") == "pkg-1"
+        finally:
+            app_controller._update_packages = original_packages

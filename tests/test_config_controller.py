@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -576,3 +577,42 @@ def test_reset_shortcuts(config_controller, mock_app):
     args = shortcut_calls[0]
     assert "search" in args[0][1]
     mock_signal.assert_called_once()
+
+
+def test_add_project_triggers_discovery_refresh(config_controller, mock_app, tmp_path):
+    proj_dir = tmp_path / "proj_refresh"
+    (proj_dir / ".agents" / "skills").mkdir(parents=True)
+    config_controller.addProject(str(proj_dir))
+    assert mock_app.loadInitialData.called
+
+
+def test_add_project_registers_watch_paths(config_controller, mock_app, tmp_path):
+    proj_dir = tmp_path / "proj_watch"
+    skills_dir = proj_dir / ".agents" / "skills"
+    skills_dir.mkdir(parents=True)
+    config_controller.addProject(str(proj_dir))
+
+    resolved_calls = [
+        str(Path(call.args[0]).resolve()) for call in mock_app._watcher.add_path.call_args_list
+    ]
+    assert str(skills_dir.resolve()) in resolved_calls
+    assert str((proj_dir / ".agents" / "commands").resolve()) in resolved_calls
+
+
+def test_add_project_without_watcher_is_safe(config_controller, mock_app, tmp_path):
+    mock_app._watcher = None
+    proj_dir = tmp_path / "proj_no_watch"
+    (proj_dir / ".agents" / "skills").mkdir(parents=True)
+    config_controller.addProject(str(proj_dir))
+    assert mock_app.loadInitialData.called
+
+
+def test_add_source_triggers_refresh_and_watch(config_controller, mock_app, tmp_path):
+    source_dir = tmp_path / "src_refresh"
+    source_dir.mkdir()
+    config_controller.addSource(str(source_dir))
+    assert mock_app.loadInitialData.called
+    resolved_calls = [
+        str(Path(call.args[0]).resolve()) for call in mock_app._watcher.add_path.call_args_list
+    ]
+    assert str(source_dir.resolve()) in resolved_calls
