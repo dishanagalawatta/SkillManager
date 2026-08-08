@@ -65,6 +65,7 @@ class ProjectsMixin:
             self._emit_projects_changed()
             self.app._set_status(f"Added project: {resolved_str}")
             capture_event("project_target_added", {"target_count": len(self.app._projects)})
+            self._refresh_after_project_add(resolved_str)
 
             get_diagnostic_logger().log_event(
                 "INFO",
@@ -206,6 +207,53 @@ class ProjectsMixin:
         self.app.projectsChanged.emit()
         self._invalidate_project_cache()
         self.updateProjectsChanged.emit()
+
+    def _refresh_after_project_add(self, project_path: str) -> None:
+        """Register the new project's folders with the file watcher, trigger a
+        silent background discovery refresh, and link pre-existing skills that
+        exactly match a package skill — so the UI updates without a manual
+        refresh or restart."""
+        try:
+            from skill_manager.core.copier import get_commands_dir, get_skills_dir
+
+            watcher = getattr(self.app, "_watcher", None)
+            if watcher is not None:
+                watcher.add_path(str(get_skills_dir(project_path)))
+                watcher.add_path(str(get_commands_dir(project_path)))
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to register watcher paths: %s", exc)
+
+        try:
+            refresh = getattr(self.app, "loadInitialData", None)
+            if refresh is not None:
+                refresh()
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to trigger discovery refresh: %s", exc)
+
+        task_runner = getattr(self.app, "task_runner", None)
+        if task_runner is not None:
+            task_runner.run(self._link_added_project_skills, args=(project_path,))
+
+    def _link_added_project_skills(self, project_path: str) -> None:
+        """Link pre-existing project skills to package skills when folder name
+        and contents match exactly. Runs in the background task runner."""
+        from skill_manager.core.update_service import UpdateService
+
+        try:
+            update_packages = list(getattr(self.app, "_update_packages", []) or [])
+            sources = list(getattr(self.app, "_sources", []) or [])
+            for package in update_packages:
+                package_path = package.get("package_path") or package.get("local_path")
+                if package_path and package_path not in sources:
+                    sources.append(package_path)
+            UpdateService.link_exact_match_project_skills(
+                project_paths=[project_path],
+                sources=sources,
+                update_packages=update_packages,
+                project_aliases=dict(getattr(self.app, "_project_aliases", {}) or {}),
+            )
+        except Exception:
+            logger.exception("[CONFIG] Failed to link added project skills")
 
     @Slot(str, str)
     def setProjectAlias(self, path: str, alias: str):

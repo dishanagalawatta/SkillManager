@@ -50,9 +50,27 @@ class SourcesMixin:
                 self.app.sourcesChanged.emit()
                 self.app._set_status(f"Added source: {resolved_path}")
                 capture_event("skill_package_added", {"source_type": "local"})
+                self._refresh_after_source_add(resolved_path)
         except Exception as e:
             self.app._set_status(f"Failed to add source: {e}")
             capture_exception(e)
+
+    def _refresh_after_source_add(self, source_path: str) -> None:
+        """Register the new source with the file watcher and trigger a silent
+        background discovery refresh so its skills appear without restart."""
+        try:
+            watcher = getattr(self.app, "_watcher", None)
+            if watcher is not None:
+                watcher.add_path(source_path)
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to register watcher path: %s", exc)
+
+        try:
+            refresh = getattr(self.app, "loadInitialData", None)
+            if refresh is not None:
+                refresh()
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to trigger discovery refresh: %s", exc)
 
     @Slot(str)
     def removeSource(self, path: str):

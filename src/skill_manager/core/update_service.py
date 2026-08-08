@@ -2,7 +2,9 @@
 Update service for handling background skill updates and project syncing.
 """
 
+import filecmp
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -101,6 +103,32 @@ def update_single_package(
     )
     updated_source["removals_verified"] = removals_verified
     return updated_source
+
+
+def _relative_file_map(root: Path) -> dict[str, Path]:
+    """Map relative file paths (posix separators) to absolute paths under ``root``."""
+    mapping: dict[str, Path] = {}
+    if not root.is_dir():
+        return mapping
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        for filename in sorted(filenames):
+            full = Path(dirpath) / filename
+            mapping[full.relative_to(root).as_posix()] = full
+    return mapping
+
+
+def _folder_contents_equal(path_a, path_b) -> bool:
+    """True when two skill folders contain the same relative files with
+    identical byte contents. Does not compare timestamps — copied folders
+    get new mtimes but should still be treated as identical."""
+    if not path_a or not path_b:
+        return False
+    files_a = _relative_file_map(Path(path_a))
+    files_b = _relative_file_map(Path(path_b))
+    if files_a.keys() != files_b.keys():
+        return False
+    return all(filecmp.cmp(files_a[rel], files_b[rel], shallow=False) for rel in files_a)
 
 
 class UpdateService:
@@ -467,6 +495,77 @@ class UpdateService:
             ownership.setdefault(project_key, {})[folder_name] = package_id
             changed = True
 
+        if changed:
+            save_project_skill_ownership(ownership)
+
+    @classmethod
+    def link_exact_match_project_skills(
+        cls,
+        project_paths: list[str],
+        sources: list[str],
+        update_packages: list[dict[str, Any]] | None = None,
+        project_aliases: dict[str, str] | None = None,
+    ) -> None:
+        """Record package ownership for pre-existing project skills that exactly
+        match a package skill (same folder name AND identical file contents).
+
+        Runs when a project folder is added so skills that already live in the
+        project (e.g. vendored from a package) are linked to their package
+        without waiting for a full update cycle.
+        """
+        if not project_paths:
+            return
+        source_skills = discover_package_skills(
+            sources=sources,
+            parse_skill_md=parse_skill_md,
+            categorize_skill=categorize_skill,
+            build_search_text=build_skill_search_text,
+        )
+        package_id_by_source: dict[str, str] = {}
+        for package in update_packages or []:
+            package_id = package.get("package_id")
+            package_path = package.get("package_path") or package.get("local_path")
+            if package_id and package_path:
+                package_id_by_source[cls.ownership_project_key(package_path)] = package_id
+
+        source_by_folder: dict[str, list[dict[str, Any]]] = {}
+        for skill in source_skills:
+            folder_name = skill.get("folder_name")
+            if not folder_name:
+                continue
+            package_id = package_id_by_source.get(
+                cls.ownership_project_key(skill.get("source_path", ""))
+            )
+            if package_id:
+                source_by_folder.setdefault(folder_name, []).append(
+                    {**skill, "package_id": package_id}
+                )
+        if not source_by_folder:
+            return
+
+        projects_state = discover_project_skills(
+            projects=project_paths,
+            parse_skill_md=parse_skill_md,
+            categorize_skill=categorize_skill,
+            build_search_text=build_skill_search_text,
+            project_aliases=project_aliases or {},
+        )
+
+        ownership = load_project_skill_ownership()
+        changed = False
+        for project in projects_state:
+            project_key = cls.ownership_project_key(project.get("project_path", ""))
+            for skill in project.get("skills", []):
+                folder_name = skill.get("folder_name")
+                for source_skill in source_by_folder.get(folder_name, []):
+                    if _folder_contents_equal(
+                        skill.get("local_path"), source_skill.get("local_path")
+                    ):
+                        ownership.setdefault(project_key, {})[folder_name] = source_skill[
+                            "package_id"
+                        ]
+                        changed = True
+                        break
         if changed:
             save_project_skill_ownership(ownership)
 
