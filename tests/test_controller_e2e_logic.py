@@ -1,7 +1,7 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
-from PySide6.QtGui import QGuiApplication
 
 from skill_manager.app import AppController
 from skill_manager.utils.task_runner import SynchronousTaskRunner
@@ -125,13 +125,29 @@ def test_controller_quick_copy_workflow(app_controller):
     # Set client format to Antigravity (returns /Name)
     app_controller.ui.setClientFormat("Antigravity")
 
-    # Execute copy
-    app_controller.ops.copySelectedSkillsToClipboard()
+    # The app writes via native tools (system-truth) when prefer_native is
+    # enabled, so Qt's cached clipboard is not updated. Simulate a working
+    # wl-copy/wl-paste to keep the test hermetic and assert on the content
+    # the native write served.
+    stored: dict[str, str] = {}
 
-    # Verify clipboard
-    clipboard = QGuiApplication.clipboard()
-    text = clipboard.text()
-    assert text == "/Project Skill"
+    def _fake_set_clipboard(text: str) -> bool:
+        stored["content"] = text
+        return True
+
+    def _fake_get_clipboard() -> str | None:
+        return stored.get("content")
+
+    with (
+        patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
+        patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
+    ):
+        # Execute copy
+        app_controller.ops.copySelectedSkillsToClipboard()
+
+        # Verify clipboard
+        text = stored.get("content", "")
+        assert text == "/Project Skill"
 
 
 def test_controller_skill_deletion_workflow(app_controller, temp_dir):

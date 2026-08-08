@@ -5,6 +5,7 @@ ordering) without actually calling system tools.  All external
 subprocess calls are mocked.
 """
 
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +19,17 @@ def test_set_clipboard_wl_copy_success():
     ):
         mock_run.return_value = MagicMock(returncode=0)
         assert linux.set_clipboard("hello") is True
-        mock_run.assert_called_once()
+        # stdout/stderr must go to DEVNULL: wl-copy forks a child that
+        # inherits pipes, so capture_output would block until the child
+        # exits (i.e. when the selection is lost).
+        mock_run.assert_called_once_with(
+            ["wl-copy"],
+            input="hello",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
 
 
 def test_set_clipboard_all_fail():

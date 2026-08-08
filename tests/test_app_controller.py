@@ -107,8 +107,9 @@ def test_controller_copy_single_skill(controller):
     skill_data = {"name": "S1", "local_path": "/p1", "is_package": True}
     controller.skillModel.setSkills([skill_data])
 
-    with patch.object(controller, "_clipboard"):
+    with patch.object(controller.clipboard_service, "copy_text", return_value=True) as mock_copy:
         controller.copySkillToClipboard("/p1")
+        mock_copy.assert_called_once()
         # copySkillToClipboard calls copySkillReference which sets "Copied reference: ..."
         assert controller.statusMessage.startswith("Copied reference:")
 
@@ -246,16 +247,18 @@ def test_controller_selection_and_clipboard_paths(controller):
     controller.selectSkill(-1)
     assert controller.selectedSkill.name == ""
 
-    controller._clipboard = MagicMock()
+    controller.clipboard_service = MagicMock()
+    controller.clipboard_service.copy_text.return_value = True
     controller.copyTextToClipboard("hello")
-    controller._clipboard.setText.assert_called_with("hello")
+    controller.clipboard_service.copy_text.assert_called_with("hello")
     assert controller.statusMessage == "Copied to clipboard"
 
 
 def test_controller_small_branch_slots(controller):
-    controller._clipboard = MagicMock()
+    controller.clipboard_service = MagicMock()
+    controller.clipboard_service.copy_text.return_value = True
     controller.copySkillReference({"name": "S1", "folder_name": "s1"}, "topic")
-    assert controller._clipboard.setText.call_args.args[0].endswith("(topic)")
+    assert controller.clipboard_service.copy_text.call_args.args[0].endswith("(topic)")
 
     controller.skillModel.setSkills([{"name": "S1", "local_path": "/p1", "is_package": True}])
 
@@ -287,11 +290,12 @@ def test_controller_copy_selected_skills_to_clipboard(controller):
     ]
     controller.skillModel.setSkills(skills)
     controller.skillModel.selectByPaths(["/p1", "/missing"])
-    controller._clipboard = MagicMock()
+    controller.clipboard_service = MagicMock()
+    controller.clipboard_service.copy_text.return_value = True
 
     controller.copySelectedSkillsToClipboard()
 
-    copied = controller._clipboard.setText.call_args.args[0]
+    copied = controller.clipboard_service.copy_text.call_args.args[0]
     assert "/S1" in copied
     assert controller.statusMessage == "Copied 1 skills to clipboard"
 
@@ -430,14 +434,15 @@ def test_controller_daily_speed_actions(controller):
         {"name": "S2", "local_path": "/p2", "folder_name": "skill-two", "is_package": True},
     ]
     controller.skillModel.setSkills(skills)
-    controller._clipboard = MagicMock()
+    controller.clipboard_service = MagicMock()
+    controller.clipboard_service.copy_text.return_value = True
 
     controller.copyCurrentSelectionOrFocusedSkill()
-    assert "/S1" in controller._clipboard.setText.call_args.args[0]
+    assert "/S1" in controller.clipboard_service.copy_text.call_args.args[0]
 
     controller.selectSkill(1)
     controller.copyCurrentSelectionOrFocusedSkill()
-    assert "/S2" in controller._clipboard.setText.call_args.args[0]
+    assert "/S2" in controller.clipboard_service.copy_text.call_args.args[0]
 
     controller.selectAllVisibleSkills()
     assert controller.skillModel.selectedCount == 2

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtQuick import QQuickItem
@@ -123,17 +123,30 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     qtbot.waitUntil(lambda: root.findChild(QQuickItem, "copySelectedBtn") is not None, timeout=3000)
     copy_btn = root.findChild(QQuickItem, "copySelectedBtn")
     assert copy_btn is not None
-    copy_btn.clicked.emit()
-    qapp.processEvents()
 
-    # Verify clipboard
-    from PySide6.QtGui import QGuiApplication
+    # The app writes via native tools (system-truth) when prefer_native is
+    # enabled, so Qt's cached clipboard is not updated. Simulate a working
+    # wl-copy/wl-paste to keep the test hermetic and assert on the content
+    # the native write served.
+    stored: dict[str, str] = {}
 
-    clipboard = QGuiApplication.clipboard()
-    # We added "Project Skill" in a folder named "proj-skill"
-    # The copier might copy the name or the command reference like /proj-skill
-    text = clipboard.text()
-    assert "proj-skill" in text or "Project Skill" in text
+    def _fake_set_clipboard(text: str) -> bool:
+        stored["content"] = text
+        return True
+
+    def _fake_get_clipboard() -> str | None:
+        return stored.get("content")
+
+    with (
+        patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
+        patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
+    ):
+        copy_btn.clicked.emit()
+        qapp.processEvents()
+        # We added "Project Skill" in a folder named "proj-skill"
+        # The copier might copy the name or the command reference like /proj-skill
+        text = stored.get("content", "")
+        assert "proj-skill" in text or "Project Skill" in text
 
 
 def test_ui_updates_flow(qtbot, qml_engine, app_controller, setup_controller_data):

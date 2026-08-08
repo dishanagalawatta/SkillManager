@@ -39,7 +39,7 @@ Rectangle {
             text: "Copy Image Path"
             iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
             onTriggered: {
-                AppController.clipboard.setText(root.imagePath)
+                if (AppController.ops_controller) AppController.ops_controller.copyTextToClipboard(root.imagePath)
             }
         }
 

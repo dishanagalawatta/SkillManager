@@ -79,13 +79,19 @@ def set_clipboard(text: str) -> bool:
 
     Tries ``wl-copy`` first (Wayland), then ``pyperclip`` (X11 fallback).
     Returns ``True`` on success.
+
+    ``wl-copy`` forks a child that owns the Wayland selection and inherits
+    any open pipes; capturing stdout/stderr would make ``subprocess.run``
+    block on the inherited pipe FDs until the child exits (i.e. when the
+    selection is lost).  Both streams are therefore redirected to DEVNULL.
     """
     if _has_wl_copy():
         try:
             proc = subprocess.run(
                 ["wl-copy"],
                 input=text,
-                capture_output=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 text=True,
                 timeout=5,
             )
