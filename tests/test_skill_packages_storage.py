@@ -1,4 +1,7 @@
 import hashlib
+import os
+from contextlib import suppress
+from pathlib import Path
 from unittest.mock import patch
 
 from skill_manager.core.skill_packages.storage import (
@@ -210,10 +213,56 @@ def testskill_fingerprint_oserror(tmp_path):
     f1 = skill_dir / "SKILL.md"
     f1.write_text("abc")
 
-    with patch("pathlib.Path.rglob", side_effect=OSError("Permission denied")):
+    with patch("os.scandir", side_effect=OSError("Permission denied")):
         fp = skill_fingerprint(skill_dir)
 
     assert fp == hashlib.sha1().hexdigest()
+
+
+def test_skill_fingerprint_deterministic(tmp_path):
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("abc")
+    (skill_dir / "sub").mkdir()
+    (skill_dir / "sub" / "helper.py").write_text("def helper(): pass")
+    (skill_dir / "empty").mkdir()
+
+    assert skill_fingerprint(skill_dir) == skill_fingerprint(skill_dir)
+
+
+def test_skill_fingerprint_parity_with_rglob(tmp_path):
+    """New scandir walk must produce the exact same fingerprint as the
+    original pathlib rglob implementation for the same tree."""
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("abc")
+    (skill_dir / "notes.txt").write_text("hello")
+    (skill_dir / "sub").mkdir()
+    (skill_dir / "sub" / "helper.py").write_text("def helper(): pass")
+    (skill_dir / "sub" / "deep").mkdir()
+    (skill_dir / "sub" / "deep" / "asset.json").write_text('{"x": 1}')
+    (skill_dir / "empty").mkdir()
+
+    if hasattr(os, "symlink"):
+        with suppress(OSError):
+            os.symlink(skill_dir / "SKILL.md", skill_dir / "SKILL-link.md")
+
+    def reference_fingerprint(path: Path) -> str:
+        parts = []
+        try:
+            files = sorted(p for p in path.rglob("*") if p.is_file())
+        except OSError:
+            files = []
+        for file_path in files:
+            try:
+                stat = file_path.stat()
+                rel = file_path.relative_to(path).as_posix()
+                parts.append(f"{rel}:{stat.st_mtime}:{stat.st_size}")
+            except OSError:
+                continue
+        return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()
+
+    assert skill_fingerprint(skill_dir) == reference_fingerprint(skill_dir)
 
 
 def test_resolve_package_storage_exact_conflict(tmp_path):

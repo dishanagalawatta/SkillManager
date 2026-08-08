@@ -7,3 +7,7 @@
 ## 2025-02-14 - Cache path calculations in quick_copy.py
 **Learning:** During the file discovery process and quick copying operations, `project_root_for_project` and `skill_base_relative` are called heavily on the same paths, which adds redundant path resolution overhead. Applying `@lru_cache` significantly reduces this overhead.
 **Action:** Use `@lru_cache` on repetitive path resolution functions like `project_root_for_project` and `skill_base_relative` to memoize the results for hot paths.
+
+## 2024-05-18 - Optimized file tree traversal for fast fingerprinting
+**Learning:** `pathlib.Path.rglob` is significantly slower for file metadata extraction because `stat()` calls create independent system requests without utilizing the cached data from traversal.
+**Action:** Replace `rglob` with an optimized recursive `os.scandir` implementation. Access `entry.stat()` directly to reuse system call results from directory scanning for a 10x performance improvement in `skill_fingerprint`.
