@@ -1,7 +1,9 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from skill_manager.core.persistence import load_project_skill_ownership
 from skill_manager.core.update_service import UpdateService
 
 
@@ -439,3 +441,63 @@ def test_scan_for_updates_top_level_error_reports_status(mock_src, service):
 
     assert status_cb.call_args_list[-1].args[0] == "Scan failed: scan failed"
     comp_cb.assert_not_called()
+
+
+def _write_skill_folder(root: Path, folder: str, content: str) -> None:
+    skill_dir = root / folder
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+
+def test_link_exact_match_records_ownership(tmp_path):
+    source_dir = tmp_path / "pkg_source"
+    skills_dir = tmp_path / "project" / ".agents" / "skills"
+    content = "---\nname: alpha\n---\n# Alpha skill\n"
+
+    _write_skill_folder(source_dir, "alpha", content)
+    _write_skill_folder(skills_dir, "alpha", content)
+
+    UpdateService.link_exact_match_project_skills(
+        project_paths=[str(skills_dir)],
+        sources=[str(source_dir)],
+        update_packages=[{"package_id": "pkg-1", "package_path": str(source_dir)}],
+    )
+
+    ownership = load_project_skill_ownership()
+    project_key = UpdateService.ownership_project_key(str(skills_dir.resolve()))
+    assert ownership.get(project_key, {}).get("alpha") == "pkg-1"
+
+
+def test_link_exact_match_skips_different_contents(tmp_path):
+    source_dir = tmp_path / "pkg_source_diff"
+    skills_dir = tmp_path / "project" / ".agents" / "skills"
+    _write_skill_folder(source_dir, "alpha", "---\nname: alpha\n---\n# Version A\n")
+    _write_skill_folder(skills_dir, "alpha", "---\nname: alpha\n---\n# Version B\n")
+
+    UpdateService.link_exact_match_project_skills(
+        project_paths=[str(skills_dir)],
+        sources=[str(source_dir)],
+        update_packages=[{"package_id": "pkg-1", "package_path": str(source_dir)}],
+    )
+
+    ownership = load_project_skill_ownership()
+    project_key = UpdateService.ownership_project_key(str(skills_dir.resolve()))
+    assert "alpha" not in ownership.get(project_key, {})
+
+
+def test_link_exact_match_skips_different_file_sets(tmp_path):
+    source_dir = tmp_path / "pkg_source_extra"
+    skills_dir = tmp_path / "project" / ".agents" / "skills"
+    _write_skill_folder(source_dir, "alpha", "---\nname: alpha\n---\n# Alpha\n")
+    (source_dir / "alpha" / "extra.md").write_text("extra", encoding="utf-8")
+    _write_skill_folder(skills_dir, "alpha", "---\nname: alpha\n---\n# Alpha\n")
+
+    UpdateService.link_exact_match_project_skills(
+        project_paths=[str(skills_dir)],
+        sources=[str(source_dir)],
+        update_packages=[{"package_id": "pkg-1", "package_path": str(source_dir)}],
+    )
+
+    ownership = load_project_skill_ownership()
+    project_key = UpdateService.ownership_project_key(str(skills_dir.resolve()))
+    assert "alpha" not in ownership.get(project_key, {})
