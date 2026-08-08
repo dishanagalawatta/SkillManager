@@ -5,12 +5,19 @@ import logging
 from PySide6.QtCore import Slot
 
 from skill_manager.controllers.ops._helpers import QTimer, _get_item_attr
+from skill_manager.core.diagnostics import get_diagnostic_logger
 
 logger = logging.getLogger(__name__)
 
 
 class ClipboardMixin:
-    """Copy skill references/text to the system clipboard."""
+    """Copy skill references/text to the system clipboard.
+
+    All writes go through :meth:`_write_clipboard`, which delegates to the
+    app's :class:`~skill_manager.utils.clipboard_service.ClipboardService`
+    (verified Qt write with native fallback) and only reports success when
+    the write actually landed.
+    """
 
     def _maybeMinimizeOnCopy(self):
         """Requests app minimization if the setting is enabled and current view is QuickCopy."""
@@ -20,6 +27,41 @@ class ClipboardMixin:
         ):
             self.minimizeAppRequested.emit()
             logger.info("Auto-minimize on Quick Copy triggered.")
+
+    def _write_clipboard(self, content: str) -> bool:
+        """Write *content* to the clipboard via the ClipboardService.
+
+        Returns ``True`` only when the write was verified or a native
+        fallback succeeded.
+        """
+        service = getattr(self.app, "clipboard_service", None)
+        if service is not None:
+            return bool(service.copy_text(content))
+        qt = getattr(self.app, "_clipboard", None)
+        if qt is not None:
+            qt.setText(content)
+            return True
+        logger.error("No clipboard backend available on AppController")
+        return False
+
+    def _safe_format_reference(self, skill, fallback: str) -> str:
+        """Format a skill reference; a malformed skill must never abort the copy."""
+        from skill_manager.core.quick_copy import format_project_skill_reference
+
+        try:
+            return format_project_skill_reference(
+                skill,
+                self.app._client_format,
+                all_skills=self.app.skillModel._all_skills,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to format skill reference for %r: %s", fallback, exc)
+            get_diagnostic_logger().log_event(
+                "WARNING",
+                "clipboard",
+                f"format reference failed for {fallback}: {exc}",
+            )
+            return fallback
 
     @Slot(str)
     def copySkillToClipboard(self, path: str):
@@ -63,8 +105,6 @@ class ClipboardMixin:
     @Slot()
     def copySelectedSkillsToClipboard(self):
         """Copies selected skill references for the current project to clipboard."""
-        from skill_manager.core.quick_copy import format_project_skill_reference
-
         paths = self.app.skillModel.getFilteredSelectedPaths()
         if not paths:
             self.app._set_status("No skills selected")
@@ -76,45 +116,41 @@ class ClipboardMixin:
                 (s for s in self.app.skillModel._all_filtered_skills if s.local_path == path), None
             )
             if skill:
-                references.append(
-                    format_project_skill_reference(
-                        skill, self.app._client_format, all_skills=self.app.skillModel._all_skills
-                    )
-                )
+                references.append(self._safe_format_reference(skill, path))
             else:
                 references.append(path)
 
         content = " ".join(references)
-        self.app._clipboard.setText(content)
-        self.app._set_status(f"Copied {len(references)} skills to clipboard")
-        self._maybeMinimizeOnCopy()
+        if self._write_clipboard(content):
+            self.app._set_status(f"Copied {len(references)} skills to clipboard")
+            self._maybeMinimizeOnCopy()
+        else:
+            self.app._set_status("Copy failed — clipboard unavailable")
 
     @Slot(str)
     def copyTextToClipboard(self, content: str):
         """Copies raw text to system clipboard."""
-        self.app._clipboard.setText(str(content))
-        self.app._set_status("Copied to clipboard")
-        self._maybeMinimizeOnCopy()
+        if self._write_clipboard(str(content)):
+            self.app._set_status("Copied to clipboard")
+            self._maybeMinimizeOnCopy()
+        else:
+            self.app._set_status("Copy failed — clipboard unavailable")
 
     @Slot(dict, str)
     def copySkillReference(self, skill: dict, arg: str = ""):
         """Copies a formatted skill reference to clipboard."""
-        from skill_manager.core.quick_copy import format_project_skill_reference
-
-        ref = format_project_skill_reference(
-            skill, self.app._client_format, all_skills=self.app.skillModel._all_skills
-        )
+        ref = self._safe_format_reference(skill, _get_item_attr(skill, "local_path"))
         if arg:
             ref += f"({arg})"
-        self.app._clipboard.setText(ref)
-        self.app._set_status(f"Copied reference: {ref}")
-        self._maybeMinimizeOnCopy()
+        if self._write_clipboard(ref):
+            self.app._set_status(f"Copied reference: {ref}")
+            self._maybeMinimizeOnCopy()
+        else:
+            self.app._set_status("Copy failed — clipboard unavailable")
 
     @Slot(str)
     def copyCollectionToClipboard(self, name: str):
         """Copies a collection's skill references to clipboard and auto-pastes."""
-        from skill_manager.core.quick_copy import format_project_skill_reference
-
         entry = self.app._custom_collections.get(name, {})
         if not isinstance(entry, dict):
             return
@@ -128,18 +164,14 @@ class ClipboardMixin:
         for path in paths:
             skill = next((s for s in self.app.skillModel._all_skills if s.local_path == path), None)
             if skill:
-                references.append(
-                    format_project_skill_reference(
-                        skill,
-                        self.app._client_format,
-                        all_skills=self.app.skillModel._all_skills,
-                    )
-                )
+                references.append(self._safe_format_reference(skill, path))
             else:
                 references.append(path)
 
         content = " ".join(references)
-        self.app._clipboard.setText(content)
+        if not self._write_clipboard(content):
+            self.app._set_status("Copy failed — clipboard unavailable")
+            return
         self.app._set_status(f"Copied collection '{name}' ({len(references)} skills)")
 
         # Auto-paste after a short delay to allow focus to settle

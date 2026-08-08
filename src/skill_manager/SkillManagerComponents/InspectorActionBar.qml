@@ -100,8 +100,8 @@ RowLayout {
         Layout.preferredHeight: 32
         visible: root.selectedSkill && root.selectedSkill.local_path !== undefined
         onClicked: (mouse) => {
-            if (root.selectedSkill && root.selectedSkill.local_path) {
-                AppController.ui_controller.copyToClipboard(root.selectedSkill.local_path)
+            if (root.selectedSkill && root.selectedSkill.local_path && AppController.ops_controller) {
+                AppController.ops_controller.copyTextToClipboard(root.selectedSkill.local_path)
             }
             root.copyPathClicked()
         }

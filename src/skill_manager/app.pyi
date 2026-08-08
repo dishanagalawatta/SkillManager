@@ -160,6 +160,7 @@ class AppController(AppControllerProxyMixin, QObject):
     _discovered_projects: list[str]
     _categories: list[str]
     _clipboard: Any
+    clipboard_service: Any
     _is_recording_shortcut: bool
     _client_format: str
     _sources: list[str]

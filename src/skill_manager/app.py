@@ -72,6 +72,7 @@ from skill_manager.core.persistence import (  # noqa: E402
     load_starred,
 )
 from skill_manager.core.schemas import UpdatePackageRecord  # noqa: E402
+from skill_manager.utils.clipboard_service import ClipboardService  # noqa: E402
 from skill_manager.utils.native_styling import (  # noqa: E402
     DWMWA_USE_IMMERSIVE_DARK_MODE,  # noqa: F401
     HAS_PYWINSTYLES,  # noqa: F401
@@ -178,6 +179,10 @@ class AppController(AppControllerProxyMixin, QObject):
         self._last_poll_ts = 0.0
         self._categories = []
         self._clipboard = QGuiApplication.clipboard()
+        self.clipboard_service = ClipboardService(
+            self._clipboard,
+            prefer_native=sys.platform == "linux",
+        )
         self._is_recording_shortcut = False
 
         default_client = self._config.get("default_client", "Last Selected")

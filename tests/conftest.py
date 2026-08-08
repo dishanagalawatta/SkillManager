@@ -180,6 +180,8 @@ def mock_app():
     # Dependencies
     app._config = MagicMock()
     app._clipboard = MagicMock()
+    app.clipboard_service = MagicMock()
+    app.clipboard_service.copy_text.return_value = True
 
     # Common methods
     app._set_status = MagicMock()

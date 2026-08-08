@@ -465,11 +465,11 @@ def test_ops_controller_clipboard_operations(ops_controller, mock_app):
     # Test copySkillToClipboard (skill exists)
     with patch("skill_manager.core.quick_copy.format_project_skill_reference", return_value="REF"):
         ops_controller.copySkillToClipboard("/p1")
-        mock_app._clipboard.setText.assert_called_with("REF")
+        mock_app.clipboard_service.copy_text.assert_called_with("REF")
 
     # Test copySkillToClipboard (raw text)
     ops_controller.copySkillToClipboard("raw text")
-    mock_app._clipboard.setText.assert_called_with("raw text")
+    mock_app.clipboard_service.copy_text.assert_called_with("raw text")
 
     # Test auto-minimize signal
     mock_app.config_controller.autoMinimizeOnQuickCopy = True
@@ -564,7 +564,24 @@ def test_ops_controller_delete_skills_empty(ops_controller, mock_app):
 
 def test_ops_controller_copy_text_to_clipboard(ops_controller, mock_app):
     ops_controller.copyTextToClipboard("test text")
-    mock_app._clipboard.setText.assert_called_with("test text")
+    mock_app.clipboard_service.copy_text.assert_called_with("test text")
+
+
+def test_ops_controller_copy_text_clipboard_failure(ops_controller, mock_app):
+    mock_app.clipboard_service.copy_text.return_value = False
+    ops_controller.copyTextToClipboard("test text")
+    mock_app._set_status.assert_called_with("Copy failed — clipboard unavailable")
+
+
+def test_ops_controller_copy_skill_reference_format_error_falls_back(ops_controller, mock_app):
+    mock_app._selected_skill = {"local_path": "/p1", "name": "S1"}
+    mock_app.config_controller.autoMinimizeOnQuickCopy = False
+    with patch(
+        "skill_manager.core.quick_copy.format_project_skill_reference",
+        side_effect=ValueError("malformed skill"),
+    ):
+        ops_controller.copySkillReference(mock_app._selected_skill, "topic")
+        mock_app.clipboard_service.copy_text.assert_called_with("/p1(topic)")
 
 
 def test_set_project_alias_targeted_update(mock_app):
@@ -804,7 +821,7 @@ def test_copy_collection_to_clipboard(mock_timer, ops_controller, mock_app):
         ops_controller.copyCollectionToClipboard("MyCollection")
 
         assert mock_fmt.call_count == 2
-        mock_app._clipboard.setText.assert_called_once_with("ref:SkillA ref:SkillB")
+        mock_app.clipboard_service.copy_text.assert_called_once_with("ref:SkillA ref:SkillB")
         mock_app._set_status.assert_called_with("Copied collection 'MyCollection' (2 skills)")
         mock_timer.assert_called_once_with(50, ops_controller._send_paste_to_focused_window)
 
@@ -814,7 +831,7 @@ def test_copy_collection_to_clipboard_no_paths(mock_timer, ops_controller, mock_
     mock_app._custom_collections = {"Empty": {"paths": [], "projects": []}}
     ops_controller.copyCollectionToClipboard("Empty")
     mock_app._set_status.assert_called_with("Collection 'Empty' has no skills")
-    mock_app._clipboard.setText.assert_not_called()
+    mock_app.clipboard_service.copy_text.assert_not_called()
 
 
 @patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
@@ -833,7 +850,32 @@ def test_copy_collection_to_clipboard_missing_skill(mock_timer, ops_controller, 
     with patch("skill_manager.core.quick_copy.format_project_skill_reference") as mock_fmt:
         ops_controller.copyCollectionToClipboard("Partial")
         mock_fmt.assert_not_called()
-        mock_app._clipboard.setText.assert_called_once_with("/skill/a")
+        mock_app.clipboard_service.copy_text.assert_called_once_with("/skill/a")
+        mock_timer.assert_called_once_with(50, ops_controller._send_paste_to_focused_window)
+
+
+@patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
+def test_copy_collection_to_clipboard_format_error_falls_back(mock_timer, ops_controller, mock_app):
+    skill = MagicMock(local_path="/skill/a", name="SkillA")
+    mock_app.skillModel._all_skills = [skill]
+    mock_app._client_format = "Gemini"
+    mock_app._custom_collections = {
+        "Robust": {
+            "paths": ["/skill/a"],
+            "projects": [],
+            "shortcut": "",
+            "shortcut_enabled": True,
+        }
+    }
+    mock_app.config_controller.autoMinimizeOnQuickCopy = False
+
+    with patch(
+        "skill_manager.core.quick_copy.format_project_skill_reference",
+        side_effect=ValueError("malformed skill"),
+    ):
+        ops_controller.copyCollectionToClipboard("Robust")
+        mock_app.clipboard_service.copy_text.assert_called_once_with("/skill/a")
+        mock_app._set_status.assert_called_with("Copied collection 'Robust' (1 skills)")
         mock_timer.assert_called_once_with(50, ops_controller._send_paste_to_focused_window)
 
 
@@ -841,7 +883,7 @@ def test_copy_collection_to_clipboard_missing_skill(mock_timer, ops_controller, 
 def test_copy_collection_to_clipboard_non_dict_entry(mock_timer, ops_controller, mock_app):
     mock_app._custom_collections = {"Bad": "not a dict"}
     ops_controller.copyCollectionToClipboard("Bad")
-    mock_app._clipboard.setText.assert_not_called()
+    mock_app.clipboard_service.copy_text.assert_not_called()
 
 
 @patch("skill_manager.controllers.ops._helpers.QTimer.singleShot")
