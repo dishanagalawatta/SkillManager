@@ -63,6 +63,8 @@ When you modify a skill in your central library, you need to push those changes 
 - **Syncing**: Update individual skills in specific projects, or use sync to bring all projects up to date.
 - **Skill Package Management**: Add, edit, and remove update sources (Git repos or local paths).
 - **Source Updating**: Run batch updates on all or selected skill packages.
+- **Instant Discovery on Add**: Adding a project or package folder registers it with the file watcher and triggers a silent background refresh — its skills appear in the Library immediately, with no restart or manual refresh needed.
+- **Automatic Skill Linking**: When you add a project folder, any skill already present there that matches a package skill by name **and** identical file contents is automatically linked to that package. Linked skills are tracked as package-owned, so future updates and syncs manage them correctly without a full update cycle.
 
 ---
 
