@@ -82,7 +82,7 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | Service | Module | Purpose |
 |---------|--------|---------|
 | `DiscoveryService` | `discovery.py` | Filesystem scanning → model population |
-| `UpdateService` | `update_service.py` | Version comparison, surgical file updates |
+| `UpdateService` | `update_service.py` | Version comparison, surgical file updates, exact-match project-skill ownership linking |
 | `ConfigManager` | `config.py` | JSON-based `config.json` persistence |
 | `SkillFolderWatcher` | `file_watch.py` | Watchdog-based filesystem monitoring |
 | `BackgroundTaskRunner` | `utils/task_runner.py` | Concurrent background task execution |
@@ -219,6 +219,23 @@ All cache-refresh paths share a single architecture:
 - **Silent UI**: No `isLoading` flag; diagnostic events only
 - **Cancellation**: Generation counter (`_refresh_generation`) for cooperative cancellation
 - **Debounce**: 400 ms `QTimer` trailing-edge debounce for filesystem events
+
+### Add-Time Hooks
+
+Adding a folder through `ConfigController.addSource` / `addProject` wires it into
+the refresh pipeline without a restart:
+
+1. **Watcher registration** — the folder (plus the project's `.agents/skills` and
+   commands dirs) is registered with `SkillFolderWatcher` so later file changes
+   trigger incremental rescans.
+2. **Silent refresh** — `loadInitialData()` runs the same prepared-state pipeline
+   above, so new skills appear in the Library immediately.
+3. **Exact-match linking** (projects only) — a `BackgroundTaskRunner` task calls
+   `UpdateService.link_exact_match_project_skills()`, which records package
+   ownership for pre-existing project skills whose folder name **and** file
+   contents match a package skill exactly. The result is persisted to
+   `project_skill_ownership.json`, so update cycles treat those skills as
+   package-owned without a full sync first.
 
 ---
 
