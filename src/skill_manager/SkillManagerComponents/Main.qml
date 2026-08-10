@@ -194,7 +194,7 @@ Window {
     // --- Find & Select ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSelectAllEnabled; sequence: AppController.config_controller.shortcutSelectAll; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; context: Qt.ApplicationShortcut; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
 
     // --- Clipboard ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
@@ -217,7 +217,7 @@ Window {
 
     // --- Tools ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutScreenshotEnabled && !screenshotOverlay.visible; sequence: AppController.config_controller.shortcutScreenshot; context: Qt.ApplicationShortcut; onActivated: AppController.screenshot_controller.takeScreenshot() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutScreenshotEnabled && !screenshotOverlay.visible && !AppController.global_hotkey_controller.isAvailable; sequence: AppController.config_controller.shortcutScreenshot; onActivated: AppController.screenshot_controller.takeScreenshot() }
 
     Instantiator {
         model: AppController.customCollections || []
@@ -226,7 +226,6 @@ Window {
                   && AppController.config_controller.getCollectionShortcutEnabled(modelData)
                   && AppController.config_controller.getCollectionShortcut(modelData) !== ""
             sequence: AppController.config_controller.getCollectionShortcut(modelData)
-            context: Qt.ApplicationShortcut
             onActivated: AppController.copyCollectionToClipboard(modelData)
         }
     }
@@ -314,7 +313,6 @@ Window {
     Shortcut {
         enabled: window.captureAwaitingActivation
         sequence: "Esc"
-        context: Qt.ApplicationShortcut
         onActivated: AppController.screenshot_controller.cancelCapture()
     }
 

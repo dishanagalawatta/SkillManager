@@ -1785,7 +1785,6 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Z"
-        context: Qt.ApplicationShortcut
         onActivated: {
             if (root.annotations.length > 0) {
                 if (root.selectedIndex >= 0) {
@@ -1805,7 +1804,6 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Escape"
-        context: Qt.ApplicationShortcut
         onActivated: {
             if (root.isTextInputActive) {
                 root.isTextInputActive = false
@@ -1822,28 +1820,24 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+0"
-        context: Qt.ApplicationShortcut
         onActivated: zoomToFit()
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+1"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = 1.0
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Plus"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = Math.min(root.maxZoom, root.zoomLevel + 0.25)
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Minus"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = Math.max(root.minZoom, root.zoomLevel - 0.25)
     }
 

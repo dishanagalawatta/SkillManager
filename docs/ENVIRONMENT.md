@@ -25,7 +25,6 @@ changes. `.env` overrides process environment.
 | `SKILL_MANAGER_SKIP_INITIAL_LOAD` | test only | unset | Skip initial skill load. |
 | `SKILL_MANAGER_DATA_DIR` | optional | platformdirs | Override user data dir. |
 | `SKILL_MANAGER_LOG_LEVEL` | optional | `INFO` | QML console bridge log level. |
-| `SKILL_MANAGER_HOTKEY` | optional | `ctrl+shift+s` | Global hotkey to summon the UI. |
 | `SKILL_MANAGER_DIAG` | debug only | unset | Set to `1` to enable shutdown diagnostics (`<data>/shutdown_diag.log`). Leave unset in production. |
 
 ## Telemetry
@@ -51,7 +50,6 @@ details and file paths.
 | `SKILL_MANAGER_SKIP_INITIAL_LOAD` | `1` | `1` | (unset) |
 | `SKILL_MANAGER_DATA_DIR` | (unset) | (unset) | (unset) |
 | `SKILL_MANAGER_LOG_LEVEL` | `DEBUG` | `WARNING` | `ERROR` |
-| `SKILL_MANAGER_HOTKEY` | `ctrl+shift+s` | `ctrl+shift+s` | `ctrl+shift+s` |
 | `POSTHOG_PROJECT_TOKEN` | (empty) | (empty) | (required) |
 | `POSTHOG_HOST` | (empty) | (empty) | (required) |
 | `SENTRY_DSN` | (empty) | (empty) | (required) |
