@@ -5,7 +5,7 @@ import App 1.0
 
 Window {
     id: overlay
-    objectName: "screenshotOverlayWindow"
+    objectName: "snapOverlayWindow"
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     visibility: Window.Hidden
     color: "transparent"
@@ -22,7 +22,7 @@ Window {
     onClosing: {
         if (!savingInProgress) {
             try {
-                AppController.screenshot_controller.cancelCapture()
+                AppController.snap_controller.cancelCapture()
             } catch (e) {
                 console.error("Failed to cancel capture:", e)
             }
@@ -33,8 +33,8 @@ Window {
     Image {
         id: bg
         anchors.fill: parent
-        source: AppController.screenshot_controller.screenshotValid
-                ? "image://screenshot/current?v=" + AppController.screenshot_controller.screenshotVersion
+        source: AppController.snap_controller.snapValid
+                ? "image://snap/current?v=" + AppController.snap_controller.snapVersion
                 : ""
         cache: false
     }
@@ -218,7 +218,7 @@ Window {
             ActionButton {
                 text: "Cancel"
                 onClicked: {
-                    AppController.screenshot_controller.cancelCapture()
+                    AppController.snap_controller.cancelCapture()
                     overlay.close()
                 }
             }
@@ -261,7 +261,7 @@ Window {
         overlay.close()
         // Defer save to next event cycle so overlay is fully hidden before capture
         Qt.callLater(function() {
-            AppController.screenshot_controller.saveScreenshot(savedRect, relativeRedactions)
+            AppController.snap_controller.saveSnap(savedRect, relativeRedactions)
             savingInProgress = false
         })
     }
@@ -286,7 +286,7 @@ Window {
         context: Qt.ApplicationShortcut
         onActivated: {
             if (overlay.visible) {
-                AppController.screenshot_controller.cancelCapture()
+                AppController.snap_controller.cancelCapture()
                 overlay.close()
             }
         }

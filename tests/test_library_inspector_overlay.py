@@ -36,11 +36,11 @@ def test_connections_block_sets_all_three_flags() -> None:
     assert "showImageInspector" in overlay
 
 
-def test_connections_block_uses_explicit_is_command_is_screenshot() -> None:
-    """onSelectedSkillChanged must check skill.is_command and skill.is_screenshot to set flags."""
+def test_connections_block_uses_explicit_is_command_is_snap() -> None:
+    """onSelectedSkillChanged must check skill.is_command and skill.is_snap to set flags."""
     overlay: str = (QML_DIR / "SkillInspectorOverlay.qml").read_text(encoding="utf-8")
     assert "skill.is_command" in overlay
-    assert "skill.is_screenshot" in overlay
+    assert "skill.is_snap" in overlay
 
 
 # ── Inspector visible bindings use selectedSkillValid ────────────

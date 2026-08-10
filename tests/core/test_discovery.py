@@ -543,9 +543,9 @@ def test_scan_single_project_with_screenshots(temp_dir, service):
     (skill_dir / "SKILL.md").write_text("---\nname: Real Skill\n---")
 
     # Add screenshots
-    screenshot_dir = proj_dir / ".agents" / "screenshots"
-    screenshot_dir.mkdir(parents=True)
-    (screenshot_dir / "shot1.png").write_text("data")
+    snap_dir = proj_dir / ".agents" / "screenshots"
+    snap_dir.mkdir(parents=True)
+    (snap_dir / "shot1.png").write_text("data")
 
     def parse_fn(p):
         return {"name": "Real Skill", "metadata": {}}
@@ -556,11 +556,11 @@ def test_scan_single_project_with_screenshots(temp_dir, service):
     res = service._scan_single_project(str(proj_dir), proj_dir, parse_fn, cat_fn)
 
     assert res is not None
-    assert len(res["skills"]) == 2  # 1 skill + 1 screenshot
+    assert len(res["skills"]) == 2  # 1 skill + 1 snap
 
-    screenshot = next(s for s in res["skills"] if s.get("is_screenshot"))
-    assert screenshot["name"] == "shot1.png"
-    assert screenshot["category"] == "Screenshots"
+    snap = next(s for s in res["skills"] if s.get("is_snap"))
+    assert snap["name"] == "shot1.png"
+    assert snap["category"] == "Snaps"
 
 
 def test_discovery_permission_error_handling(temp_dir, disk_cache, service):

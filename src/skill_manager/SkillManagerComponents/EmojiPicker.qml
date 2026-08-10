@@ -114,7 +114,7 @@ Popup {
         { emoji: "🐛", name: "bug insect debug" },
         { emoji: "🔨", name: "hammer build fix" },
         { emoji: "🎨", name: "art palette design color" },
-        { emoji: "📸", name: "camera photo screenshot" },
+        { emoji: "📸", name: "camera photo snap" },
         { emoji: "🔊", name: "volume sound audio" },
         { emoji: "🔔", name: "bell notification alert" },
         { emoji: "⏰", name: "clock timer schedule" },

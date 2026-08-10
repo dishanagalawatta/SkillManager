@@ -75,8 +75,8 @@ class ShortcutsMixin:
         return self.get_shortcut("theme_toggle")
 
     @Property(str, notify=shortcutsChanged)
-    def shortcutScreenshot(self):
-        return self.get_shortcut("screenshot")
+    def shortcutSnap(self):
+        return self.get_shortcut("snap")
 
     # --- Per-shortcut enabled state (read-only properties) ---
 
@@ -141,8 +141,8 @@ class ShortcutsMixin:
         return self.isShortcutEnabled("theme_toggle")
 
     @Property(bool, notify=shortcutsChanged)
-    def shortcutScreenshotEnabled(self):
-        return self.isShortcutEnabled("screenshot")
+    def shortcutSnapEnabled(self):
+        return self.isShortcutEnabled("snap")
 
     @Property(bool, notify=isRecordingShortcutChanged)
     def isRecordingShortcut(self):  # type: ignore[reportRedeclaration]

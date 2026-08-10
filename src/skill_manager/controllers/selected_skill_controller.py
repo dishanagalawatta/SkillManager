@@ -50,7 +50,7 @@ class SelectedSkillController(QObject):
     descriptionChanged = Signal()
     localPathChanged = Signal()
     isCommandChanged = Signal()
-    isScreenshotChanged = Signal()
+    isSnapChanged = Signal()
     isStarredChanged = Signal()
     isArchivedChanged = Signal()
     categoryChanged = Signal()
@@ -74,7 +74,7 @@ class SelectedSkillController(QObject):
         self._description: str = ""
         self._local_path: str = ""
         self._is_command: bool = False
-        self._is_screenshot: bool = False
+        self._is_snap: bool = False
         self._is_starred: bool = False
         self._is_archived: bool = False
         self._category: str = ""
@@ -151,15 +151,15 @@ class SelectedSkillController(QObject):
             self._is_command = value
             self.isCommandChanged.emit()
 
-    @Property(bool, notify=isScreenshotChanged)
-    def is_screenshot(self) -> bool:
-        return self._is_screenshot
+    @Property(bool, notify=isSnapChanged)
+    def is_snap(self) -> bool:
+        return self._is_snap
 
-    @is_screenshot.setter
-    def is_screenshot(self, value: bool) -> None:
-        if self._is_screenshot != value:
-            self._is_screenshot = value
-            self.isScreenshotChanged.emit()
+    @is_snap.setter
+    def is_snap(self, value: bool) -> None:
+        if self._is_snap != value:
+            self._is_snap = value
+            self.isSnapChanged.emit()
 
     @Property(bool, notify=isStarredChanged)
     def is_starred(self) -> bool:
@@ -302,7 +302,7 @@ class SelectedSkillController(QObject):
         self.description = d.get("description", "")
         self.local_path = d.get("local_path", "")
         self.is_command = bool(d.get("is_command", False))
-        self.is_screenshot = bool(d.get("is_screenshot", False))
+        self.is_snap = bool(d.get("is_snap", d.get("is_screenshot", False)))
         self.is_starred = bool(d.get("is_starred", False))
         self.is_archived = bool(d.get("is_archived", False))
         self.category = d.get("category", "")
@@ -371,8 +371,8 @@ class SelectedSkillController(QObject):
             self.is_starred = bool(idx.data(model.IsStarredRole))
         if not roles_set or model.IsCommandRole in roles_set:
             self.is_command = bool(idx.data(model.IsCommandRole))
-        if not roles_set or model.IsScreenshotRole in roles_set:
-            self.is_screenshot = bool(idx.data(model.IsScreenshotRole))
+        if not roles_set or model.IsSnapRole in roles_set:
+            self.is_snap = bool(idx.data(model.IsSnapRole))
         if not roles_set or model.IsArchivedRole in roles_set:
             self.is_archived = bool(idx.data(model.IsArchivedRole))
         if not roles_set or model.CategoryRole in roles_set:

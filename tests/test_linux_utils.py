@@ -179,11 +179,11 @@ def test_input_injection_blocked_offscreen():
 def test_capture_screen_all_strategies_fail():
     with (
         patch(
-            "skill_manager.controllers.screenshot_controller._portal_capture",
+            "skill_manager.controllers.snap_controller._portal_capture",
             return_value=None,
         ),
         patch(
-            "skill_manager.controllers.screenshot_controller._gnome_screenshot_capture",
+            "skill_manager.controllers.snap_controller._gnome_snap_capture",
             return_value=None,
         ),
     ):
@@ -193,7 +193,7 @@ def test_capture_screen_all_strategies_fail():
 
 def test_capture_screen_portal_succeeds():
     with patch(
-        "skill_manager.controllers.screenshot_controller._portal_capture",
+        "skill_manager.controllers.snap_controller._portal_capture",
         return_value="/tmp/portal_test.png",
     ):
         result = linux.capture_screen()

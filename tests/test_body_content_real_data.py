@@ -117,7 +117,7 @@ def test_set_selected_skill_preserves_real_body_content(app_controller):
         "local_path": str(sf),
         "body_content": result.get("body_content", ""),
         "is_command": False,
-        "is_screenshot": False,
+        "is_snap": False,
     }
 
     app_controller.set_selected_skill(skill_dict)

@@ -62,6 +62,9 @@ CATEGORY_EMOJI_MAP = {
     "Design": "🎨",
     "Communications": "📧",
     "Social Media": "💬",
+    "Snap": "🖼️",
+    "Snaps": "🖼️",
+    # Legacy pre-rename categories kept for cached skill JSON read-compat
     "Screenshot": "🖼️",
     "Screenshots": "🖼️",
     "Localization": "🌍",

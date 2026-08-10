@@ -89,7 +89,7 @@ SHARED_COMPONENTS = [
     "ImageInspector.qml",
     "KeySequenceCapture.qml",
     "Main.qml",
-    "ScreenshotOverlay.qml",
+    "SnapOverlay.qml",
     "SkillInspector.qml",
     "SkillItem.qml",
     "SmoothListView.qml",

@@ -161,10 +161,10 @@ Item {
                     Accessible.description: "Skill item"
 
                     Loader {
-                        active: mouseArea.containsMouse && model && model.isScreenshot && model.path
+                        active: mouseArea.containsMouse && model && model.isSnap && model.path
                         asynchronous: false
                         sourceComponent: ToolTip {
-                            id: screenshotTooltip
+                            id: snapTooltip
                             visible: true
                             delay: 450
                             timeout: 8000
@@ -193,7 +193,7 @@ Item {
                                 Image {
                                     id: previewImg
                                     anchors.fill: parent
-                                    source: (model && model.isScreenshot && model.path) ? root.formatFileUrl(model.path) : ""
+                                    source: (model && model.isSnap && model.path) ? root.formatFileUrl(model.path) : ""
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: false
                                     // Setting only width preserves the original aspect ratio for the pixmap
@@ -214,7 +214,7 @@ Item {
                                     return truncated.substring(0, 180).trim() + '\n...';
                                 }
                                 return truncated;
-                            } else if (!model.isScreenshot && !model.isCommand && !model.isCollection && model.description) {
+                            } else if (!model.isSnap && !model.isCommand && !model.isCollection && model.description) {
                                 if (model.description.length > 180) {
                                     return model.description.substring(0, 180).trim() + '...';
                                 }
@@ -331,7 +331,7 @@ Item {
                                 if (!model) return ""
                                 if (model.isCollection) return "📦"
                                 if (model.isCommand) return model.emoji || "⚡"
-                                if (model.isScreenshot) return "🖼️"
+                                if (model.isSnap) return "🖼️"
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily

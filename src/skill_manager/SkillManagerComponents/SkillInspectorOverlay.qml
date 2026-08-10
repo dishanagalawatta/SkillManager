@@ -252,11 +252,11 @@ Item {
         function onSelectedSkillChanged() {
             var skill = AppController.selectedSkill
             var isCommand = !!(skill && skill.is_command)
-            var isScreenshot = !!(skill && skill.is_screenshot)
+            var isSnap = !!(skill && skill.is_snap)
             // Calculate directly instead of reading via binding chain
             // to avoid staleness in the QQmlComponent test environment.
             var sv = !!(skill && skill.local_path !== undefined && skill.local_path !== "")
-            var showSkill = !isCommand && !isScreenshot && sv
+            var showSkill = !isCommand && !isSnap && sv
 
             // DIAG: log what QML sees for body_content
             var bc = (skill && skill.body_content) || ""
@@ -264,17 +264,17 @@ Item {
                 + " path=" + (skill ? (skill.local_path || "NONE") : "NONE")
                 + " bcLen=" + bc.length
                 + " bcPreview=" + (bc.length > 0 ? bc.substring(0, 60) : "(empty)")
-                + " isCmd=" + isCommand + " isScr=" + isScreenshot
+                + " isCmd=" + isCommand + " isScr=" + isSnap
                 + " sv=" + sv + " showSkill=" + showSkill)
 
             root.showCommandInspector = isCommand
-            root.showImageInspector = isScreenshot
+            root.showImageInspector = isSnap
             root.showSkillInspector = showSkill
 
             // Imperative visible + overlayVisible to bypass QML binding staleness.
             commandPanel.visible = isCommand
             commandPanel.overlayVisible = isCommand
-            imagePanel.visible = isScreenshot
+            imagePanel.visible = isSnap
             inspector.visible = showSkill
             inspector.overlayVisible = showSkill
         }

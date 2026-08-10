@@ -142,17 +142,17 @@ def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock
 
 
 def test_ops_controller_delete_screenshots(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    screenshot.write_text("fake-image-data")
+    snap = tmp_path / "Screenshot_test.png"
+    snap.write_text("fake-image-data")
 
-    items = [{"name": "Screenshot", "local_path": str(screenshot), "is_screenshot": True}]
+    items = [{"name": "Snap", "local_path": str(snap), "is_snap": True}]
     with (
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_patch,
         patch("skill_manager.controllers.ops._helpers.QTimer.singleShot"),
     ):
         ops_controller.deleteSkills(items)
-        assert not screenshot.exists()
-        mock_patch.assert_called_with([str(screenshot)])
+        assert not snap.exists()
+        mock_patch.assert_called_with([str(snap)])
 
 
 def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
@@ -175,48 +175,48 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
         mock_save.assert_called_with([])
 
 
-def test_ops_controller_cleanup_temp_screenshots(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    screenshot.write_text("fake-image-data")
-    cache_entry_path = str(screenshot)
+def test_ops_controller_cleanup_temp_snaps(ops_controller, tmp_path):
+    snap = tmp_path / "Screenshot_test.png"
+    snap.write_text("fake-image-data")
+    cache_entry_path = str(snap)
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
+        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
-        assert not screenshot.exists()
+        assert not snap.exists()
         mock_cache_remove.assert_called_with([cache_entry_path])
         mock_save.assert_called_with([])
 
 
-def test_ops_controller_cleanup_temp_screenshots_empty(ops_controller):
+def test_ops_controller_cleanup_temp_snaps_empty(ops_controller):
     with patch(
-        "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+        "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
         return_value=[],
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
 
-def test_ops_controller_cleanup_temp_screenshots_crash_recovery(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    cache_entry_path = str(screenshot)
-    assert not screenshot.exists()
+def test_ops_controller_cleanup_temp_snaps_crash_recovery(ops_controller, tmp_path):
+    snap = tmp_path / "Screenshot_test.png"
+    cache_entry_path = str(snap)
+    assert not snap.exists()
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
+        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
         mock_cache_remove.assert_called_with([cache_entry_path])
         mock_save.assert_called_with([])

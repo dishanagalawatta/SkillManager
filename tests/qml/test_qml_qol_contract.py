@@ -43,17 +43,15 @@ def test_skill_rows_are_selection_first_in_main_views():
     assert "showInlineDelete: false" in library
 
 
-def test_screenshot_hover_tooltip_exists_in_skill_item():
+def test_snap_hover_tooltip_exists_in_skill_item():
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
 
     assert "ToolTip {" in skill_item
-    assert "id: screenshotTooltip" in skill_item
-    assert (
-        "active: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
-    )
+    assert "id: snapTooltip" in skill_item
+    assert "active: mouseArea.containsMouse && model && model.isSnap && model.path" in skill_item
     assert "delay: 450" in skill_item
     assert (
-        'source: (model && model.isScreenshot && model.path) ? root.formatFileUrl(model.path) : ""'
+        'source: (model && model.isSnap && model.path) ? root.formatFileUrl(model.path) : ""'
         in skill_item
     )
     assert "fillMode: Image.PreserveAspectFit" in skill_item
@@ -478,7 +476,7 @@ def test_key_sequence_capture_proper_controller_path():
 
 def test_popup_shortcuts_are_gated_by_visibility():
     """Verify that all shortcuts in auxiliary popup windows are disabled when the window is hidden to prevent ambiguous shortcut drops."""
-    screenshot = (QML_DIR / "ScreenshotOverlay.qml").read_text(encoding="utf-8")
+    snap = (QML_DIR / "SnapOverlay.qml").read_text(encoding="utf-8")
     inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
 
     def count_shortcuts(content: str) -> int:
@@ -487,8 +485,8 @@ def test_popup_shortcuts_are_gated_by_visibility():
     def count_enabled_shortcuts(content: str, visibility_var: str) -> int:
         return len(re.findall(rf"enabled:\s*{visibility_var}\.visible", content))
 
-    assert count_shortcuts(screenshot) == count_enabled_shortcuts(screenshot, "overlay"), (
-        "Not all shortcuts in ScreenshotOverlay are gated by overlay.visible"
+    assert count_shortcuts(snap) == count_enabled_shortcuts(snap, "overlay"), (
+        "Not all shortcuts in SnapOverlay are gated by overlay.visible"
     )
     assert count_shortcuts(inspector) == count_enabled_shortcuts(inspector, "root"), (
         "Not all shortcuts in ImageInspector are gated by root.visible"
@@ -593,13 +591,13 @@ def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
 
     Esc and per-collection shortcuts must NOT use Qt.ApplicationShortcut,
     otherwise they fire while SkillManager is in the background and hijack
-    other applications. Only ScreenshotOverlay (its own window, gated by
+    other applications. Only SnapOverlay (its own window, gated by
     overlay.visible) may keep ApplicationShortcut so Esc cancels an active
     capture even when the main window is minimized.
     """
     main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
     inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
-    overlay = (QML_DIR / "ScreenshotOverlay.qml").read_text(encoding="utf-8")
+    overlay = (QML_DIR / "SnapOverlay.qml").read_text(encoding="utf-8")
 
     # Main window and inspector are hosted in the main window: all shortcuts
     # must be window-scoped (the QML default), never app-scoped.
@@ -611,19 +609,19 @@ def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
         "ImageInspector.qml shortcuts must be window-scoped, not application-scoped"
     )
 
-    # ScreenshotOverlay is a separate Window: its shortcuts keep
+    # SnapOverlay is a separate Window: its shortcuts keep
     # ApplicationShortcut (gated by overlay.visible) so Esc cancels a capture
     # even when the main window is minimized/snapped away.
     assert overlay.count("Qt.ApplicationShortcut") == 3, (
-        "ScreenshotOverlay.qml must keep exactly 3 ApplicationShortcut contexts "
+        "SnapOverlay.qml must keep exactly 3 ApplicationShortcut contexts "
         "(Return/Enter confirm + Esc cancel) for the minimized-snap edge case"
     )
 
 
-def test_screenshot_shortcut_disabled_when_global_hotkey_available():
-    """Verify the in-app screenshot shortcut is gated on the global hotkey.
+def test_snap_shortcut_disabled_when_global_hotkey_available():
+    """Verify the in-app snap shortcut is gated on the global hotkey.
 
-    When the global hotkey controller is available, the QML screenshot
+    When the global hotkey controller is available, the QML snap
     shortcut must be disabled so Ctrl+Shift+S does not double-fire (the
     global hotkey is the sole path). The QML shortcut is only a fallback
     when the global hotkey cannot be registered (e.g. X11 X authorization
@@ -632,6 +630,6 @@ def test_screenshot_shortcut_disabled_when_global_hotkey_available():
     main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
 
     assert "AppController.global_hotkey_controller.isAvailable" in main_qml, (
-        "Main.qml screenshot shortcut must be gated on "
+        "Main.qml snap shortcut must be gated on "
         "AppController.global_hotkey_controller.isAvailable to avoid double-fire"
     )
