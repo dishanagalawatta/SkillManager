@@ -321,7 +321,7 @@ Item {
                         ColorOverlay {
                             anchors.fill: starImg
                             source: starImg
-                            color: "#FFD700"
+                            color: Theme.accent
                             visible: starImg.visible
                         }
 

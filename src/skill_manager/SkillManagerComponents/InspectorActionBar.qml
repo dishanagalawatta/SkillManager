@@ -52,7 +52,7 @@ RowLayout {
         iconSource: (root.selectedSkill && root.selectedSkill.is_starred)
             ? AppController.ui_controller.getAssetUri("ui/star-filled.svg")
             : AppController.ui_controller.getAssetUri("ui/star-outline.svg")
-        customIconColor: (root.selectedSkill && root.selectedSkill.is_starred) ? "#FFD700" : Theme.secondaryLabel
+        customIconColor: (root.selectedSkill && root.selectedSkill.is_starred) ? Theme.accent : Theme.secondaryLabel
         iconSize: 20
         flat: true
         Layout.preferredWidth: 32
