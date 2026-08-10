@@ -106,7 +106,6 @@ cp .env.example .env
 | Variable | Default | Purpose |
 |----------|---------|----------|
 | `SKILL_MANAGER_LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `SKILL_MANAGER_HOTKEY` | `ctrl+shift+s` | Global hotkey to summon the UI |
 | `SKILL_MANAGER_DIAG` | — | Set `1` to enable shutdown diagnostics logging (debug only) |
 | `QT_QPA_PLATFORM` | native | Set `offscreen` for headless/CI |
 | `POSTHOG_PROJECT_TOKEN` | — | PostHog analytics token (opt-in) |
@@ -224,7 +223,7 @@ SkillManager/
 | `Could not load Qt platform plugin "xcb"` | `export QT_QPA_PLATFORM=offscreen` then re-run |
 | `ModuleNotFoundError: No module named 'PySide6'` | `uv sync` then retry |
 | App doesn't start after build | Run with `uv run skill-manager` (not direct Python) |
-| Global hotkey not working | Check `SKILL_MANAGER_HOTKEY` in `.env`; default is `ctrl+shift+s` |
+| Global hotkey not working | Set the Screenshot shortcut in Settings (default `Ctrl+Shift+S`); requires X11 (pynput) or a Wayland portal backend |
 | Tests failing with `QML module not found` | Set `QML_DISABLE_DISK_CACHE=1 QT_QPA_PLATFORM=offscreen` before running tests |
 
 For more, see [`environments/README.md`](environments/README.md) and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).

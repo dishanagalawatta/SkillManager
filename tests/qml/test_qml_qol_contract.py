@@ -586,3 +586,52 @@ def test_updates_view_responsive_layout_contract():
     )
     assert "iconOnlyMode: uv_packagesHeader.width < 340" in updates_qml
     assert "iconOnlyMode: uv_projectsHeader.width < 320" in updates_qml
+
+
+def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
+    """Verify main-window shortcuts use the default WindowShortcut context.
+
+    Esc and per-collection shortcuts must NOT use Qt.ApplicationShortcut,
+    otherwise they fire while SkillManager is in the background and hijack
+    other applications. Only ScreenshotOverlay (its own window, gated by
+    overlay.visible) may keep ApplicationShortcut so Esc cancels an active
+    capture even when the main window is minimized.
+    """
+    main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+    inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
+    overlay = (QML_DIR / "ScreenshotOverlay.qml").read_text(encoding="utf-8")
+
+    # Main window and inspector are hosted in the main window: all shortcuts
+    # must be window-scoped (the QML default), never app-scoped.
+    assert "Qt.ApplicationShortcut" not in main_qml, (
+        "Main.qml shortcuts must use the default WindowShortcut context "
+        "(no Qt.ApplicationShortcut) so Esc passes through in the background"
+    )
+    assert "Qt.ApplicationShortcut" not in inspector, (
+        "ImageInspector.qml shortcuts must be window-scoped, not application-scoped"
+    )
+
+    # ScreenshotOverlay is a separate Window: its shortcuts keep
+    # ApplicationShortcut (gated by overlay.visible) so Esc cancels a capture
+    # even when the main window is minimized/snapped away.
+    assert overlay.count("Qt.ApplicationShortcut") == 3, (
+        "ScreenshotOverlay.qml must keep exactly 3 ApplicationShortcut contexts "
+        "(Return/Enter confirm + Esc cancel) for the minimized-snap edge case"
+    )
+
+
+def test_screenshot_shortcut_disabled_when_global_hotkey_available():
+    """Verify the in-app screenshot shortcut is gated on the global hotkey.
+
+    When the global hotkey controller is available, the QML screenshot
+    shortcut must be disabled so Ctrl+Shift+S does not double-fire (the
+    global hotkey is the sole path). The QML shortcut is only a fallback
+    when the global hotkey cannot be registered (e.g. X11 X authorization
+    unavailable on Wayland without a portal backend).
+    """
+    main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+
+    assert "AppController.global_hotkey_controller.isAvailable" in main_qml, (
+        "Main.qml screenshot shortcut must be gated on "
+        "AppController.global_hotkey_controller.isAvailable to avoid double-fire"
+    )
