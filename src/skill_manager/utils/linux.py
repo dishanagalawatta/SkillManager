@@ -144,34 +144,89 @@ def get_clipboard() -> str | None:
 _KEY_CTRL = 29  # ydotool KEY_LEFTCTRL
 _KEY_V = 47  # ydotool KEY_V
 
+# ydotool's "+" combos (e.g. "29+47") can leave modifiers stuck; use an
+# explicit press/release sequence instead.
+_CTRL_V_SEQUENCE = (
+    f"{_KEY_CTRL}:1",
+    f"{_KEY_V}:1",
+    f"{_KEY_V}:0",
+    f"{_KEY_CTRL}:0",
+)
+
+
+def _ydotool_daemon_socket() -> str:
+    """Return the ydotool daemon socket path (matches ydotool's lookup)."""
+    socket_path = os.environ.get("YDOTOOL_SOCKET")
+    if socket_path:
+        return socket_path
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        return os.path.join(runtime_dir, ".ydotool_socket")
+    return "/tmp/.ydotool_socket"
+
+
+def _ydotool_daemon_alive() -> bool:
+    """Return True when the ydotool daemon socket exists on disk."""
+    return os.path.exists(_ydotool_daemon_socket())
+
+
+def ydotool_daemon_health() -> str:
+    """Describe ydotool daemon state for actionable error messages.
+
+    Returns ``"not-installed"`` when the binary is missing, ``"daemon-down"``
+    when the binary exists but ``ydotoold`` is unreachable, else ``"ok"``.
+    """
+    if not _has_ydotool():
+        return "not-installed"
+    try:
+        proc = subprocess.run(
+            ["ydotool", "debug"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return "ok" if proc.returncode == 0 else "daemon-down"
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("ydotool debug probe failed: %s", exc)
+        return "daemon-down"
+
 
 def send_ctrl_v() -> bool:
     """Send Ctrl+V (paste) keystroke to the focused window.
 
-    Tries ``ydotool`` first (Wayland uinput), then falls back gracefully.
+    Tries ``ydotool`` first (Wayland uinput) with an explicit
+    press/release sequence, then ``pyautogui`` on X11 only.
     Returns ``True`` on success.
     """
     if not injection_allowed():
         return False
-    if _has_ydotool():
+    if _has_ydotool() and _ydotool_daemon_alive():
         try:
-            subprocess.run(
-                ["ydotool", "key", f"{_KEY_CTRL}+{_KEY_V}"],
+            proc = subprocess.run(
+                ["ydotool", "key", *_CTRL_V_SEQUENCE],
                 capture_output=True,
+                text=True,
                 timeout=5,
             )
-            return True
+            if proc.returncode == 0:
+                return True
+            logger.warning(
+                "ydotool Ctrl+V failed (rc=%d): %s",
+                proc.returncode,
+                proc.stderr.strip(),
+            )
         except Exception as exc:  # noqa: BLE001
             logger.debug("ydotool Ctrl+V failed: %s", exc)
 
-    # Try pyautogui hotkey as X11 fallback (fails silently on pure Wayland)
-    try:
-        import pyautogui  # type: ignore[import-not-found]
+    # pyautogui is an X11-only fallback (fails silently on pure Wayland)
+    if os.environ.get("XDG_SESSION_TYPE") == "x11":
+        try:
+            import pyautogui  # type: ignore[import-not-found]
 
-        pyautogui.hotkey("ctrl", "v")
-        return True
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("pyautogui.hotkey('ctrl', 'v') failed: %s", exc)
+            pyautogui.hotkey("ctrl", "v")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("pyautogui.hotkey('ctrl', 'v') failed: %s", exc)
 
     return False
 

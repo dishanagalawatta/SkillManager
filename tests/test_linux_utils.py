@@ -53,10 +53,30 @@ def test_send_ctrl_v_ydotool():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux._has_ydotool", return_value=True),
+        patch("skill_manager.utils.linux._ydotool_daemon_alive", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
+        mock_run.return_value = MagicMock(returncode=0)
         assert linux.send_ctrl_v() is True
-        mock_run.assert_called_once()
+        mock_run.assert_called_once_with(
+            ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+
+def test_send_ctrl_v_daemon_down():
+    """Daemon down: ydotool path must be skipped, no subprocess call."""
+    with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
+        patch("skill_manager.utils.linux._has_ydotool", return_value=True),
+        patch("skill_manager.utils.linux._ydotool_daemon_alive", return_value=False),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+        patch("skill_manager.utils.linux.os.environ.get", return_value="wayland"),
+    ):
+        assert linux.send_ctrl_v() is False
+        mock_run.assert_not_called()
 
 
 def test_send_ctrl_v_all_fail():

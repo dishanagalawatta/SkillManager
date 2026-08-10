@@ -18,12 +18,15 @@ the Windows keyboard hook.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
 from skill_manager.core.global_hotkey import (
     LISTENER_JOIN_TIMEOUT,  # type: ignore[attr-defined]
+    PORTAL_HELPER_STOP_TIMEOUT,  # type: ignore[attr-defined]
     GlobalHotkeyManager,
+    PortalHotkeyBackend,
 )
 
 
@@ -298,3 +301,267 @@ class TestListenerLifecycle:
         assert hasattr(manager, "_stop_lock")
         assert hasattr(manager._stop_lock, "acquire")
         assert hasattr(manager._stop_lock, "release")
+
+
+def _fake_proc() -> MagicMock:
+    """A fake Popen handle with a working stdin and an idle stdout pipe."""
+    proc = MagicMock()
+    proc.poll.return_value = None
+    proc.stdin = MagicMock()
+    proc.stdin.write = MagicMock()
+    proc.stdin.flush = MagicMock()
+    proc.stdout = iter([])
+    proc.wait = MagicMock()
+    return proc
+
+
+class TestPortalBackend:
+    """Unit tests for PortalHotkeyBackend (spawn/protocol/stop)."""
+
+    def test_start_spawns_helper_with_found_python(self):
+        backend = PortalHotkeyBackend()
+        proc = _fake_proc()
+
+        with (
+            patch(
+                "skill_manager.controllers.screenshot_controller._find_portal_python",
+                return_value="/usr/bin/python3",
+            ),
+            patch("skill_manager.core.global_hotkey.subprocess.Popen", return_value=proc) as popen,
+            patch("skill_manager.core.global_hotkey.threading.Thread") as thread_cls,
+        ):
+            assert backend.start() is True
+
+        popen.assert_called_once()
+        args = popen.call_args[0][0]
+        assert args[0] == "/usr/bin/python3"
+        assert args[1].endswith("portal_hotkeys.py")
+        thread_cls.assert_called_once()
+        assert backend._started is True
+
+    def test_start_returns_false_when_no_portal_python(self):
+        backend = PortalHotkeyBackend()
+        with patch(
+            "skill_manager.controllers.screenshot_controller._find_portal_python",
+            return_value=None,
+        ):
+            assert backend.start() is False
+        assert backend.available is False
+
+    def test_start_returns_false_when_import_fails(self):
+        backend = PortalHotkeyBackend()
+        fake_module = MagicMock()
+        del fake_module._find_portal_python
+        with patch.dict(
+            sys.modules,
+            {"skill_manager.controllers.screenshot_controller": fake_module},
+        ):
+            assert backend.start() is False
+
+    def test_start_returns_false_on_popen_oserror(self):
+        backend = PortalHotkeyBackend()
+        with (
+            patch(
+                "skill_manager.controllers.screenshot_controller._find_portal_python",
+                return_value="/usr/bin/python3",
+            ),
+            patch(
+                "skill_manager.core.global_hotkey.subprocess.Popen",
+                side_effect=OSError("no such file"),
+            ),
+        ):
+            assert backend.start() is False
+        assert backend._proc is None
+
+    def test_register_sends_bind_command_with_gtk_trigger(self):
+        backend = PortalHotkeyBackend()
+        proc = _fake_proc()
+        backend._proc = proc
+        backend._started = True
+
+        assert backend.register(7, "Ctrl+Shift+S") is True
+
+        written = proc.stdin.write.call_args[0][0]
+        import json as _json
+
+        payload = _json.loads(written)
+        assert payload == {
+            "cmd": "bind",
+            "id": "sm_7",
+            "description": "SkillManager hotkey",
+            "preferred_trigger": "<Control><Shift>S",
+        }
+
+    def test_register_rejected_when_not_available(self):
+        backend = PortalHotkeyBackend()
+        backend._started = False
+        assert backend.register(7, "Ctrl+Shift+S") is False
+
+    def test_unregister_sends_remove_command(self):
+        backend = PortalHotkeyBackend()
+        proc = _fake_proc()
+        backend._proc = proc
+        backend._started = True
+        backend._shortcut_ids = {3: "sm_3"}
+
+        backend.unregister(3)
+
+        import json as _json
+
+        payload = _json.loads(proc.stdin.write.call_args[0][0])
+        assert payload == {"cmd": "remove", "id": "sm_3"}
+        assert 3 not in backend._shortcut_ids
+
+    def test_stop_sends_quit_and_waits(self):
+        backend = PortalHotkeyBackend()
+        proc = _fake_proc()
+        backend._proc = proc
+        backend._started = True
+
+        backend.stop()
+
+        import json as _json
+
+        payload = _json.loads(proc.stdin.write.call_args[0][0])
+        assert payload == {"cmd": "quit"}
+        proc.wait.assert_called_once_with(timeout=PORTAL_HELPER_STOP_TIMEOUT)
+        assert backend._proc is None
+        assert backend._started is False
+
+    def test_stop_terminates_on_timeout(self):
+        backend = PortalHotkeyBackend()
+        proc = _fake_proc()
+        proc.wait.side_effect = subprocess.TimeoutExpired(cmd="portal_hotkeys.py", timeout=2.0)
+        backend._proc = proc
+        backend._started = True
+
+        backend.stop()
+
+        proc.terminate.assert_called_once()
+        assert backend._proc is None
+
+    def test_activated_event_forwards_hotkey_id(self):
+        backend = PortalHotkeyBackend()
+        backend._shortcut_ids = {5: "sm_5"}
+        received: list[int] = []
+        backend.hotkeyPressed.connect(received.append)
+
+        backend._handle_event({"event": "activated", "id": "sm_5", "timestamp": 123})
+
+        assert received == [5]
+
+    def test_activated_unknown_id_ignored(self):
+        backend = PortalHotkeyBackend()
+        backend._shortcut_ids = {}
+        received: list[int] = []
+        backend.hotkeyPressed.connect(received.append)
+
+        backend._handle_event({"event": "activated", "id": "sm_unknown"})
+
+        assert received == []
+
+    def test_malformed_event_line_logs_warning(self):
+        backend = PortalHotkeyBackend()
+        import io
+
+        stream = io.StringIO("not json\n")
+        backend._proc = _fake_proc()
+        backend._proc.stdout = stream
+        with patch("skill_manager.core.global_hotkey.logger") as mock_logger:
+            backend._read_events()
+        mock_logger.warning.assert_called_once()
+
+
+class TestManagerPortalFallback:
+    """GlobalHotkeyManager falls back to the portal backend on Wayland."""
+
+    def test_ensure_portal_disabled_in_testing_mode(self):
+        manager = GlobalHotkeyManager()
+        with patch.dict("os.environ", {"SKILL_MANAGER_TESTING": "1"}):
+            assert manager._ensure_portal() is False
+
+    def test_ensure_portal_skipped_on_non_wayland(self):
+        manager = GlobalHotkeyManager()
+        with (
+            patch.dict("os.environ", {"SKILL_MANAGER_TESTING": "0"}),
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=("X11", True, "x11 display"),
+            ),
+        ):
+            assert manager._ensure_portal() is False
+
+    def test_ensure_portal_starts_backend_on_wayland(self):
+        manager = GlobalHotkeyManager()
+        backend = MagicMock()
+        backend.start.return_value = True
+
+        with (
+            patch.dict("os.environ", {"SKILL_MANAGER_TESTING": "0"}),
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=("Wayland (gnome)", True, "wayland"),
+            ),
+            patch(
+                "skill_manager.core.global_hotkey.PortalHotkeyBackend",
+                return_value=backend,
+            ),
+        ):
+            assert manager._ensure_portal() is True
+
+        assert manager._portal_backend is backend
+        backend.hotkeyPressed.connect.assert_called_once()
+        assert "portal backend" in manager._availability_reason
+
+    def test_ensure_portal_backend_failure_reports_reason(self):
+        manager = GlobalHotkeyManager()
+        backend = MagicMock()
+        backend.start.return_value = False
+
+        with (
+            patch.dict("os.environ", {"SKILL_MANAGER_TESTING": "0"}),
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=("Wayland (gnome)", True, "wayland"),
+            ),
+            patch(
+                "skill_manager.core.global_hotkey.PortalHotkeyBackend",
+                return_value=backend,
+            ),
+        ):
+            assert manager._ensure_portal() is False
+
+        assert manager._portal_backend is None
+        assert "failed to start" in manager._availability_reason
+
+    def test_register_falls_back_to_portal_backend(self):
+        manager = GlobalHotkeyManager()
+        manager._pynput_available = False
+        backend = MagicMock()
+        backend.register.return_value = True
+        manager._portal_backend = backend
+        manager._portal_available = True
+
+        assert manager.register(11, "Meta+Shift+F12") is True
+        backend.register.assert_called_once_with(11, "Meta+Shift+F12")
+
+    def test_unregister_delegates_to_portal_backend(self):
+        manager = GlobalHotkeyManager()
+        manager._pynput_available = False
+        backend = MagicMock()
+        manager._portal_backend = backend
+
+        manager.unregister(11)
+
+        backend.unregister.assert_called_once_with(11)
+
+    def test_stop_cleans_up_portal_backend(self):
+        manager = GlobalHotkeyManager()
+        backend = MagicMock()
+        manager._portal_backend = backend
+
+        manager.stop()
+
+        backend.stop.assert_called_once()
+        assert manager._portal_backend is None
+        assert manager._portal_available is None

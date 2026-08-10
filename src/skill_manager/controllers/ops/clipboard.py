@@ -191,7 +191,24 @@ class ClipboardMixin:
         if _sys.platform == "win32":
             from skill_manager.utils.win32 import send_paste_to_focused_window as _paste
         else:
-            from skill_manager.utils.linux import send_paste_to_focused_window as _paste
+            from skill_manager.utils.linux import (
+                send_paste_to_focused_window as _paste,
+                ydotool_daemon_health,
+            )
 
-        if not _paste():
-            self.app._set_status("Copied, but could not paste automatically")
+        if _paste():
+            return
+        if _sys.platform != "win32":
+            health = ydotool_daemon_health()
+            if health == "not-installed":
+                self.app._set_status(
+                    "Copied, but could not paste automatically — ydotool is not installed"
+                )
+                return
+            if health == "daemon-down":
+                self.app._set_status(
+                    "Copied, but could not paste automatically — ydotool daemon "
+                    "(ydotoold) is not running"
+                )
+                return
+        self.app._set_status("Copied, but could not paste automatically")
