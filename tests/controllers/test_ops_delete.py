@@ -81,7 +81,7 @@ def test_is_deleting_set_true_during_delete(ops_controller, mock_app):
     with patch("skill_manager.controllers.ops.delete.delete_project_skill_folders") as mock_del:
         mock_del.return_value = {"deleted": 0, "failed": 0, "details": []}
         ops_controller.deleteSkills(
-            [{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}]
+            [{"name": "X", "local_path": "/x", "is_command": True, "is_snap": False}]
         )
 
     # After synchronous task_runner.run, _is_deleting should be False again
@@ -270,7 +270,7 @@ def test_delete_logs_entry(ops_controller, caplog):
     """deleteSkills should log entry with item count."""
     with caplog.at_level(logging.INFO):
         ops_controller.deleteSkills(
-            [{"name": "X", "local_path": "/x", "is_command": True, "is_screenshot": False}]
+            [{"name": "X", "local_path": "/x", "is_command": True, "is_snap": False}]
         )
 
     assert "[DELETE] deleteSkills called with" in caplog.text
@@ -281,7 +281,7 @@ def test_delete_logs_warning_for_skipped(ops_controller, tmp_path, caplog):
     # A path that is a directory (not a file) should be skipped
     d = tmp_path / "not_a_file"
     d.mkdir()
-    items = [{"name": "Bad", "local_path": str(d), "is_command": True, "is_screenshot": False}]
+    items = [{"name": "Bad", "local_path": str(d), "is_command": True, "is_snap": False}]
 
     with caplog.at_level(logging.WARNING):
         ops_controller.deleteSkills(items)
@@ -294,7 +294,7 @@ def test_delete_logs_failed_item(ops_controller, tmp_path, caplog):
     # Create a read-only file to cause unlink failure
     f = tmp_path / "readonly.md"
     f.write_text("data")
-    items = [{"name": "RO", "local_path": str(f), "is_command": True, "is_screenshot": False}]
+    items = [{"name": "RO", "local_path": str(f), "is_command": True, "is_snap": False}]
 
     with (
         patch(
@@ -380,42 +380,42 @@ def test_delete_by_paths_dataclass_skill(mock_app, ops_controller):
 
 def test_delete_by_paths_direct_file_fallback(tmp_path, mock_app, ops_controller):
     """deleteSkillsByPaths should delete unindexed direct files on disk."""
-    screenshot_file = tmp_path / "screenshots" / "Screenshot_123.png"
-    screenshot_file.parent.mkdir(parents=True, exist_ok=True)
-    screenshot_file.write_text("dummy image data")
+    snap_file = tmp_path / "screenshots" / "Screenshot_123.png"
+    snap_file.parent.mkdir(parents=True, exist_ok=True)
+    snap_file.write_text("dummy image data")
 
     mock_app._library_model._all_skills = []
     mock_app._quick_copy_model._all_skills = []
 
     with patch.object(ops_controller, "deleteSkills") as mock_delete:
-        ops_controller.deleteSkillsByPaths([str(screenshot_file)])
+        ops_controller.deleteSkillsByPaths([str(snap_file)])
         mock_delete.assert_called_once()
         records = mock_delete.call_args[0][0]
         assert len(records) == 1
-        assert records[0]["local_path"] == str(screenshot_file)
-        assert records[0]["is_screenshot"] is True
+        assert records[0]["local_path"] == str(snap_file)
+        assert records[0]["is_snap"] is True
 
 
 def test_delete_skill_from_projects_screenshot(tmp_path, mock_app, ops_controller):
-    """deleteSkillFromProjects should handle screenshot files under .agents/screenshots/."""
+    """deleteSkillFromProjects should handle snap files under .agents/screenshots/."""
     from skill_manager.core.commands import project_label
 
     proj_dir = tmp_path / "my_project"
     scr_dir = proj_dir / ".agents" / "screenshots"
     scr_dir.mkdir(parents=True, exist_ok=True)
-    screenshot_file = scr_dir / "Screenshot_456.png"
-    screenshot_file.write_text("image content")
+    snap_file = scr_dir / "Screenshot_456.png"
+    snap_file.write_text("image content")
 
     mock_app._projects = [str(proj_dir)]
     label = project_label(proj_dir)
 
     with patch.object(ops_controller, "deleteSkills") as mock_delete:
-        ops_controller.deleteSkillFromProjects(str(screenshot_file), [label])
+        ops_controller.deleteSkillFromProjects(str(snap_file), [label])
         mock_delete.assert_called_once()
         records = mock_delete.call_args[0][0]
         assert len(records) == 1
-        assert records[0]["local_path"] == str(screenshot_file)
-        assert records[0]["is_screenshot"] is True
+        assert records[0]["local_path"] == str(snap_file)
+        assert records[0]["is_snap"] is True
 
 
 def test_delete_resets_selected_skill_and_closes_inspector(mock_app, ops_controller):

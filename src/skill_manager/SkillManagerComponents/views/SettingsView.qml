@@ -380,10 +380,10 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Auto-minimize on Screenshot"
+                                    titleText: "Auto-minimize on Snap"
                                     GlassSwitch {
-                                        checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnScreenshot : false
-                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnScreenshot = checked
+                                        checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnSnap : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnSnap = checked
                                     }
                                 }
                                 Separator {}
@@ -396,26 +396,26 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Auto-select Screenshot in Quick Copy"
+                                    titleText: "Auto-select Snap in Quick Copy"
                                     GlassSwitch {
-                                        checked: AppController.config_controller ? AppController.config_controller.autoSelectScreenshotInQuickCopy : false
-                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoSelectScreenshotInQuickCopy = checked
+                                        checked: AppController.config_controller ? AppController.config_controller.autoSelectSnapInQuickCopy : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoSelectSnapInQuickCopy = checked
                                     }
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Copy Screenshot in Client Format"
+                                    titleText: "Copy Snap in Client Format"
                                     GlassSwitch {
-                                        checked: AppController.config_controller ? AppController.config_controller.autoCopyScreenshotClientFormat : false
-                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoCopyScreenshotClientFormat = checked
+                                        checked: AppController.config_controller ? AppController.config_controller.autoCopySnapClientFormat : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoCopySnapClientFormat = checked
                                     }
                                 }
                                 Separator {}
                                 SettingsRow {
                                     titleText: "Temporary Screenshots"
                                     GlassSwitch {
-                                        checked: AppController.config_controller ? AppController.config_controller.temporaryScreenshots : false
-                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.temporaryScreenshots = checked
+                                        checked: AppController.config_controller ? AppController.config_controller.temporarySnaps : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.temporarySnaps = checked
                                     }
                                 }
                                 Separator {}

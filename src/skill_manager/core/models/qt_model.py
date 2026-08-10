@@ -32,8 +32,8 @@ from skill_manager.core.models.roles import (
     IsFirstInSubcategoryRole,
     IsMainCollapsedRole,
     IsPackageRole,
-    IsScreenshotRole,
     IsSelectedRole,
+    IsSnapRole,
     IsStarredRole,
     IsSubCollapsedRole,
     MainCategoryNameRole,
@@ -210,8 +210,8 @@ class SkillModel(
             return skill.sub_category_name or self._engine.get_sub_category(skill)
         if role == self.IsPackageRole:
             return skill.is_package
-        if role == self.IsScreenshotRole:
-            return skill.is_screenshot
+        if role == self.IsSnapRole:
+            return skill.is_snap
         if role == self.EmojiRole:
             if not skill.is_command:
                 return None
@@ -248,7 +248,7 @@ class SkillModel(
             IsSubCollapsedRole: QByteArray(b"isSubCollapsed"),
             SubCategoryNameRole: QByteArray(b"subCategoryName"),
             IsPackageRole: QByteArray(b"isPackage"),
-            IsScreenshotRole: QByteArray(b"isScreenshot"),
+            IsSnapRole: QByteArray(b"isSnap"),
             EmojiRole: QByteArray(b"emoji"),
         }
 

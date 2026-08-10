@@ -4,7 +4,7 @@ Architecture:
 - Pure key-sequence conversion lives in ``skill_manager.core.keymap``
 - pynput is lazy-imported only when ``register()`` is called
 - Graceful degradation: if pynput is unavailable, ``register()`` returns
-  ``False`` and the app continues to function (screenshot hotkey is the
+  ``False`` and the app continues to function (snap hotkey is the
   only feature using this)
 
 Per pynput's official documentation, the recommended pattern for
@@ -117,7 +117,7 @@ class PortalHotkeyBackend(QObject):
     def start(self) -> bool:
         """Locate a portal-capable Python and spawn the helper subprocess."""
         try:
-            from skill_manager.controllers.screenshot_controller import _find_portal_python
+            from skill_manager.controllers.snap_controller import _find_portal_python
         except ImportError:
             return False
         python = _find_portal_python()

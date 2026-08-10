@@ -31,10 +31,10 @@ Window {
             "Component.onCompleted: window configured at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height)
     }
 
-    onWidthChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowWidth = width
-    onHeightChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowHeight = height
-    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowX = x
-    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForScreenshot) AppController.ui_controller.windowY = y
+    onWidthChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowWidth = width
+    onHeightChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowHeight = height
+    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowX = x
+    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowY = y
 
     onClosing: (close) => {
         isClosing = true
@@ -120,14 +120,14 @@ Window {
     property string currentView: AppController.ui_controller.currentView
     onCurrentViewChanged: AppController.ui_controller.currentView = currentView
 
-    // Window state for auto-minimize on screenshot
+    // Window state for auto-minimize on snap
     property bool wasMaximized: false
     property real savedX: 0
     property real savedY: 0
     property real savedWidth: 0
     property real savedHeight: 0
-    property bool pendingScreenshot: false
-    property bool _isHidingForScreenshot: false
+    property bool pendingSnap: false
+    property bool _isHidingForSnap: false
     // True while the capture overlay is waiting for the app to become active
     // again (see captureActivationTimer + onShowOverlay below).
     property bool captureAwaitingActivation: false
@@ -141,19 +141,19 @@ Window {
     }
 
     function minimizeWindowInstantly() {
-        _isHidingForScreenshot = true
+        _isHidingForSnap = true
         // Use a REAL minimize (showMinimized) instead of opacity=0:
         // Qt's Wayland platform plugin does not support window opacity
         // ("This plugin does not support setting window opacity"), so the
         // window stays fully visible — and therefore appears in its own
-        // screenshot. A minimized window is unmapped by the compositor on
+        // snap. A minimized window is unmapped by the compositor on
         // every platform (X11, Wayland, Windows, macOS), guaranteeing it is
         // excluded from the capture.
         window.showMinimized()
     }
 
     function restoreWindowState() {
-        _isHidingForScreenshot = false
+        _isHidingForSnap = false
         if (wasMaximized) {
             window.showMaximized()
         } else {
@@ -194,7 +194,7 @@ Window {
     // --- Find & Select ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSelectAllEnabled; sequence: AppController.config_controller.shortcutSelectAll; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !screenshotOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !snapOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
 
     // --- Clipboard ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
@@ -217,7 +217,7 @@ Window {
 
     // --- Tools ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutScreenshotEnabled && !screenshotOverlay.visible && !AppController.global_hotkey_controller.isAvailable; sequence: AppController.config_controller.shortcutScreenshot; onActivated: AppController.screenshot_controller.takeScreenshot() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !snapOverlay.visible && !AppController.global_hotkey_controller.isAvailable; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
 
     Instantiator {
         model: AppController.customCollections || []
@@ -230,8 +230,8 @@ Window {
         }
     }
 
-    ScreenshotOverlay {
-        id: screenshotOverlay
+    SnapOverlay {
+        id: snapOverlay
     }
 
     Timer {
@@ -252,20 +252,20 @@ Window {
     }
 
     Timer {
-        id: screenshotDelayTimer
+        id: snapDelayTimer
         interval: 150
         onTriggered: {
-            AppController.screenshot_controller.captureScreen()
+            AppController.snap_controller.captureScreen()
         }
     }
 
     Connections {
-        target: AppController.screenshot_controller
+        target: AppController.snap_controller
         function onMinimizeRequested() {
             window.saveWindowState()
-            window.pendingScreenshot = true
+            window.pendingSnap = true
             window.minimizeWindowInstantly()
-            screenshotDelayTimer.start()
+            snapDelayTimer.start()
         }
         // GNOME Wayland stacks windows of the ACTIVE app above all others
         // (focus-stealing prevention).  A global hotkey carries no
@@ -275,15 +275,15 @@ Window {
         // activate the app (notification), and only show the overlay once
         // the app is active again.
         function onShowOverlay() {
-            if (window.pendingScreenshot) {
+            if (window.pendingSnap) {
                 window.restoreWindowState()
             }
             if (window.active) {
-                screenshotOverlay.showOverlay()
+                snapOverlay.showOverlay()
                 return
             }
             window.captureAwaitingActivation = true
-            AppController.screenshot_controller.notifyCapturePending()
+            AppController.snap_controller.notifyCapturePending()
             captureActivationTimer.start()
         }
     }
@@ -300,8 +300,8 @@ Window {
             if (window.active) {
                 stop()
                 window.captureAwaitingActivation = false
-                AppController.screenshot_controller.notifyCaptureActivation()
-                screenshotOverlay.showOverlay()
+                AppController.snap_controller.notifyCaptureActivation()
+                snapOverlay.showOverlay()
             }
         }
     }
@@ -313,16 +313,16 @@ Window {
     Shortcut {
         enabled: window.captureAwaitingActivation
         sequence: "Esc"
-        onActivated: AppController.screenshot_controller.cancelCapture()
+        onActivated: AppController.snap_controller.cancelCapture()
     }
 
     Connections {
-        target: AppController.screenshot_controller
+        target: AppController.snap_controller
         function onCaptureFinished() {
             captureActivationTimer.stop()
             window.captureAwaitingActivation = false
-            if (window.pendingScreenshot) {
-                window.pendingScreenshot = false
+            if (window.pendingSnap) {
+                window.pendingSnap = false
                 window.restoreWindowState()
             }
         }
@@ -330,10 +330,10 @@ Window {
             captureActivationTimer.stop()
             if (window.captureAwaitingActivation) {
                 window.captureAwaitingActivation = false
-                AppController.screenshot_controller.notifyCaptureActivation()
+                AppController.snap_controller.notifyCaptureActivation()
             }
-            if (window.pendingScreenshot) {
-                window.pendingScreenshot = false
+            if (window.pendingSnap) {
+                window.pendingSnap = false
                 window.restoreWindowState()
             }
         }

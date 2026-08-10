@@ -11,7 +11,7 @@ def _make_skill(name, folder_name=None, local_path=None, **extra):
         "folder_name": folder_name or name.lower(),
         "local_path": local_path or f"/skills/{(folder_name or name).lower()}",
         "is_command": extra.pop("is_command", False),
-        "is_screenshot": extra.pop("is_screenshot", False),
+        "is_snap": extra.pop("is_snap", False),
         **extra,
     }
 

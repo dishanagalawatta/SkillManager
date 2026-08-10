@@ -40,7 +40,7 @@ CommandRemovalConfirmDialog 1.0 dialogs/CommandRemovalConfirmDialog.qml
 ArchiveConfirmDialog 1.0 dialogs/ArchiveConfirmDialog.qml
 ProjectReorderDialog 1.0 dialogs/ProjectReorderDialog.qml
 GlassCheckBox 1.0 GlassCheckBox.qml
-ScreenshotOverlay 1.0 ScreenshotOverlay.qml
+SnapOverlay 1.0 SnapOverlay.qml
 CommandCarrySkillsDialog 1.0 dialogs/CommandCarrySkillsDialog.qml
 MissingSkillsDialog 1.0 dialogs/MissingSkillsDialog.qml
 CommandInspectorPanel 1.0 CommandInspectorPanel.qml

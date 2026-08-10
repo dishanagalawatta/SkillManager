@@ -11,8 +11,8 @@ Available tool probes:
 - ``pyperclip`` for X11 / cross-platform clipboard fallback
 - ``ydotool`` for Wayland keyboard/mouse injection (if installed)
 - ``pyautogui`` for X11 keyboard/mouse injection (if display available)
-- ``gdbus`` / ``dbus-send`` for FreeDesktop Portal screenshot (Wayland)
-- ``gnome-screenshot`` for GNOME Screenshot CLI fallback
+- ``gdbus`` / ``dbus-send`` for FreeDesktop Portal snap (Wayland)
+- ``gnome-screenshot`` for GNOME screenshot CLI fallback
 """
 
 from __future__ import annotations
@@ -296,7 +296,7 @@ def capture_screen(output_path: str | None = None) -> str | None:
 
     Returns the path to the saved PNG or ``None`` on failure.
     """
-    from skill_manager.controllers.screenshot_controller import _portal_capture
+    from skill_manager.controllers.snap_controller import _portal_capture
 
     return _portal_capture(output_path)
 

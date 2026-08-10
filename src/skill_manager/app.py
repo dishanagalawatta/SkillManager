@@ -46,10 +46,10 @@ from skill_manager.controllers.image_inspector_controller import (  # noqa: E402
     ImageInspectorController,
 )
 from skill_manager.controllers.ops_controller import OpsController  # noqa: E402
-from skill_manager.controllers.screenshot_controller import ScreenshotController  # noqa: E402
 from skill_manager.controllers.selected_skill_controller import (  # noqa: E402
     SelectedSkillController,
 )
+from skill_manager.controllers.snap_controller import SnapController  # noqa: E402
 from skill_manager.controllers.ui_controller import UIController  # noqa: E402
 from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
 from skill_manager.core.analytics import shutdown as posthog_shutdown  # noqa: E402
@@ -65,7 +65,7 @@ from skill_manager.core.diagnostics import (  # noqa: E402
 )
 from skill_manager.core.file_watch import SkillFolderWatcher  # noqa: E402
 from skill_manager.core.global_hotkey import GlobalHotkeyManager  # noqa: E402
-from skill_manager.core.image_provider import ScreenshotImageProvider  # noqa: E402
+from skill_manager.core.image_provider import SnapImageProvider  # noqa: E402
 from skill_manager.core.models import SkillModel  # noqa: E402
 from skill_manager.core.persistence import (  # noqa: E402
     load_archive,
@@ -106,7 +106,7 @@ class AppController(AppControllerProxyMixin, QObject):
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
 
-    # QML engine — set by main() after construction. Used by CommandChannel._capture_screenshot
+    # QML engine — set by main() after construction. Used by CommandChannel._capture_snap
     # to grab the live window via QQuickWindow::grabWindow() (works minimised, no colour cast).
     _qml_engine: QQmlApplicationEngine | None = None
 
@@ -234,7 +234,7 @@ class AppController(AppControllerProxyMixin, QObject):
         # Runtime is unaffected — these are not local re-bindings, just construction.
         self.ui = UIController(self)  # type: ignore[arg-type]
 
-        # Navigation IPC channel for the MCP sm_screenshot tool (file-based).
+        # Navigation IPC channel for the MCP sm_snap tool (file-based).
         # Guarded: degrades to None if the watcher/dirs cannot be set up
         # (headless/CI), so it never crashes AppController.
         try:
@@ -244,8 +244,8 @@ class AppController(AppControllerProxyMixin, QObject):
             self.command_channel = None
         self.config_mgr = ConfigController(self)  # type: ignore[arg-type]
         self.ops = OpsController(self)  # type: ignore[arg-type]
-        self.screenshot_provider = ScreenshotImageProvider()
-        self.screenshot = ScreenshotController(self)  # type: ignore[arg-type]
+        self.snap_provider = SnapImageProvider()
+        self.snap = SnapController(self)  # type: ignore[arg-type]
         self.image_inspector = ImageInspectorController(self)  # type: ignore[arg-type]
         self.updates = UpdateController(self)  # type: ignore[arg-type]
         self.discovery = DiscoveryController(self)  # type: ignore[arg-type]
@@ -276,14 +276,14 @@ class AppController(AppControllerProxyMixin, QObject):
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
-        self.ops.cleanup_temp_screenshots()  # Crash recovery
+        self.ops.cleanup_temp_snaps()  # Crash recovery
         app_inst = QGuiApplication.instance()
         if app_inst:
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_copies)
-            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_screenshots)
+            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_snaps)
 
-        # 6. Global Hotkey Setup (screenshot hotkey works when app is minimized)
-        self._hotkey_id_screenshot = 1
+        # 6. Global Hotkey Setup (snap hotkey works when app is minimized)
+        self._hotkey_id_snap = 1
         self._setup_global_hotkeys()
 
         # 4. Initial Model Configuration
@@ -473,8 +473,8 @@ class AppController(AppControllerProxyMixin, QObject):
         return self.app_updater
 
     @Property(QObject, constant=True)
-    def screenshot_controller(self):
-        return self.screenshot
+    def snap_controller(self):
+        return self.snap
 
     @Property(QObject, constant=True)
     def image_inspector_controller(self):
@@ -803,8 +803,8 @@ class AppController(AppControllerProxyMixin, QObject):
         return self.config_mgr.shortcutThemeToggle
 
     @Property(str, notify=shortcutsChanged)
-    def shortcutScreenshot(self):
-        return self.config_mgr.shortcutScreenshot
+    def shortcutSnap(self):
+        return self.config_mgr.shortcutSnap
 
     @Property(str, notify=currentViewChanged)
     def logoSource(self):
@@ -977,7 +977,7 @@ class AppController(AppControllerProxyMixin, QObject):
 
     def _setup_global_hotkeys(self):
         """Register global hotkeys and connect signals."""
-        # Connect hotkey signal to screenshot trigger
+        # Connect hotkey signal to snap trigger
         # Use QueuedConnection because the signal is emitted from a background thread
         from PySide6.QtCore import Qt
 
@@ -985,10 +985,10 @@ class AppController(AppControllerProxyMixin, QObject):
             self._on_global_hotkey, Qt.ConnectionType.QueuedConnection
         )
 
-        # Register screenshot hotkey at startup (only if enabled)
-        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
-            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
+        # Register snap hotkey at startup (only if enabled)
+        snap_seq = self.config_mgr.get_shortcut("snap")
+        if snap_seq and self.config_mgr.isShortcutEnabled("snap"):
+            self.global_hotkey.register(self._hotkey_id_snap, snap_seq)
 
         # Re-register when shortcuts change
         self.config_mgr.shortcutsChanged.connect(self._on_shortcuts_changed)
@@ -1033,16 +1033,16 @@ class AppController(AppControllerProxyMixin, QObject):
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
         """Handle global hotkey press."""
-        if hotkey_id == self._hotkey_id_screenshot:
-            self.screenshot.takeScreenshot()
+        if hotkey_id == self._hotkey_id_snap:
+            self.snap.takeSnap()
 
     def _on_shortcuts_changed(self):
         """Re-register global hotkeys when shortcuts are updated."""
-        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
-            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
+        snap_seq = self.config_mgr.get_shortcut("snap")
+        if snap_seq and self.config_mgr.isShortcutEnabled("snap"):
+            self.global_hotkey.register(self._hotkey_id_snap, snap_seq)
         else:
-            self.global_hotkey.unregister(self._hotkey_id_screenshot)
+            self.global_hotkey.unregister(self._hotkey_id_snap)
 
     def on_quit(self):
         """Ensures all pending state is saved before exit.

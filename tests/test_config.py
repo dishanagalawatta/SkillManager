@@ -273,31 +273,31 @@ class ConfigManagerTests(unittest.TestCase):
             self.assertEqual(manager.get("projects"), ["existing-proj"])
 
     def test_auto_select_and_copy_screenshot_client_format_config(self):
-        """Test default values and setter behavior for screenshot settings."""
+        """Test default values and setter behavior for snap settings."""
         from skill_manager.controllers.config_controller import ConfigController
         from skill_manager.core.schemas import AppConfig
 
         app_config = AppConfig()
-        self.assertFalse(app_config.auto_select_screenshot_in_quick_copy)
-        self.assertFalse(app_config.auto_copy_screenshot_client_format)
+        self.assertFalse(app_config.auto_select_snap_in_quick_copy)
+        self.assertFalse(app_config.auto_copy_snap_client_format)
 
         mock_app = mock.MagicMock()
         mock_config = mock.MagicMock()
         mock_config.get.side_effect = lambda k, default=None: {
-            "auto_select_screenshot_in_quick_copy": False,
-            "auto_copy_screenshot_client_format": False,
+            "auto_select_snap_in_quick_copy": False,
+            "auto_copy_snap_client_format": False,
         }.get(k, default)
         mock_app._config = mock_config
         controller = ConfigController(mock_app)
 
-        self.assertFalse(controller.autoSelectScreenshotInQuickCopy)
-        self.assertFalse(controller.autoCopyScreenshotClientFormat)
+        self.assertFalse(controller.autoSelectSnapInQuickCopy)
+        self.assertFalse(controller.autoCopySnapClientFormat)
 
-        controller.autoSelectScreenshotInQuickCopy = True
-        mock_config.set.assert_called_with("auto_select_screenshot_in_quick_copy", True)
+        controller.autoSelectSnapInQuickCopy = True
+        mock_config.set.assert_called_with("auto_select_snap_in_quick_copy", True)
 
-        controller.autoCopyScreenshotClientFormat = True
-        mock_config.set.assert_called_with("auto_copy_screenshot_client_format", True)
+        controller.autoCopySnapClientFormat = True
+        mock_config.set.assert_called_with("auto_copy_snap_client_format", True)
 
 
 if __name__ == "__main__":

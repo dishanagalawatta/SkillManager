@@ -92,7 +92,7 @@ class ClipboardMixin:
                 "body_content": selected.body_content,
                 "description": selected.description,
                 "is_command": selected.is_command,
-                "is_screenshot": selected.is_screenshot,
+                "is_snap": selected.is_snap,
             }
             self.copySkillReference(data)
             return

@@ -87,13 +87,13 @@ def test_library_inspector_opens_on_select_skill(app_controller, qapp):
         ov_initial_prop = _read_property(inspector, "overlayVisible")
         print(f"  inspector initial visible={insp_initial} overlayVisible={ov_initial_prop}")
 
-    # Set a regular (non-command, non-screenshot) skill
+    # Set a regular (non-command, non-snap) skill
     app_controller.set_selected_skill(
         {
             "name": "TestSkill",
             "local_path": "/test/path/skill",
             "is_command": False,
-            "is_screenshot": False,
+            "is_snap": False,
         }
     )
     qapp.processEvents()
@@ -164,7 +164,7 @@ def test_command_inspector_opens_for_command(app_controller, qapp):
             "name": "TestCommand",
             "local_path": "/test/path/command",
             "is_command": True,
-            "is_screenshot": False,
+            "is_snap": False,
         }
     )
     qapp.processEvents()
@@ -187,7 +187,7 @@ def test_command_inspector_opens_for_command(app_controller, qapp):
 
 @pytest.mark.integration
 def test_image_inspector_opens_for_screenshot(app_controller, qapp):
-    """Verify ImageInspector becomes visible when a screenshot skill is selected."""
+    """Verify ImageInspector becomes visible when a snap skill is selected."""
     qml_path = QML_DIR / "views" / "LibraryView.qml"
     engine, comp, root = _load(qml_path, app_controller)
 
@@ -202,13 +202,13 @@ def test_image_inspector_opens_for_screenshot(app_controller, qapp):
             img_insp = child
             break
 
-    # Select a screenshot skill
+    # Select a snap skill
     app_controller.set_selected_skill(
         {
             "name": "TestScreenshot",
-            "local_path": "/test/path/screenshot",
+            "local_path": "/test/path/snap",
             "is_command": False,
-            "is_screenshot": True,
+            "is_snap": True,
         }
     )
     qapp.processEvents()
@@ -220,8 +220,8 @@ def test_image_inspector_opens_for_screenshot(app_controller, qapp):
         sv = _read_property(root, "selectedSkillValid")
         si = _read_property(root, "showImageInspector")
         print(f"  root.selectedSkillValid={sv} root.showImageInspector={si}")
-        assert sv is True, f"selectedSkillValid should be True for screenshot, got {sv}"
-        assert si is True, f"showImageInspector should be True for screenshot, got {si}"
+        assert sv is True, f"selectedSkillValid should be True for snap, got {sv}"
+        assert si is True, f"showImageInspector should be True for snap, got {si}"
 
         # Deselect
         app_controller.set_selected_skill({})

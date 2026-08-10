@@ -507,11 +507,9 @@ class DiscoveryService:
 
             # Screenshots discovery
             project_root_path = project_root_for_project(resolved)
-            screenshot_dir = project_root_path / ".agents" / "screenshots"
-            if screenshot_dir.is_dir():
-                for img in sorted(
-                    screenshot_dir.iterdir(), key=lambda i: i.name.lower(), reverse=True
-                ):
+            snap_dir = project_root_path / ".agents" / "screenshots"
+            if snap_dir.is_dir():
+                for img in sorted(snap_dir.iterdir(), key=lambda i: i.name.lower(), reverse=True):
                     if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
                         skills.append(
                             {
@@ -526,9 +524,9 @@ class DiscoveryService:
                                     resolved, self.project_aliases, project_path_str
                                 ),
                                 "main_category": "Special",
-                                "category": "Screenshots",
-                                "search_text": f"screenshot capture {img.name}",
-                                "is_screenshot": True,
+                                "category": "Snaps",
+                                "search_text": f"snap capture {img.name}",
+                                "is_snap": True,
                                 "metadata": {"category": "Capture"},
                             }
                         )
@@ -635,7 +633,7 @@ class DiscoveryService:
             "date": str(metadata.get("date_added") or metadata.get("date", "Unknown")),
             "is_package": is_package,
             "is_source": is_package,  # Compatibility
-            "is_screenshot": skill.get("is_screenshot", False),
+            "is_snap": skill.get("is_snap", False),
             "tags": metadata.get("tags") or skill.get("tags") or [],
             "metadata": metadata,
         }

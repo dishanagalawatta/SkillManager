@@ -100,7 +100,7 @@ def _make_skill(name, folder_name=None, local_path=None, **extra):
         "folder_name": folder_name or name.lower(),
         "local_path": local_path or f"/skills/{folder_name or name.lower()}",
         "is_command": extra.pop("is_command", False),
-        "is_screenshot": extra.pop("is_screenshot", False),
+        "is_snap": extra.pop("is_snap", False),
         **extra,
     }
 
@@ -141,7 +141,7 @@ class TestResolveReferencedSkills:
     def test_excludes_screenshots(self):
         from skill_manager.core.skill_references import resolve_referenced_skills
 
-        ss = _make_skill("pic", folder_name="pic", is_screenshot=True)
+        ss = _make_skill("pic", folder_name="pic", is_snap=True)
         result = resolve_referenced_skills("use /pic", [ss])
         assert result == []
 

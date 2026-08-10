@@ -27,11 +27,11 @@ class SettingsMixin:
 
     scrollSpeedMultiplierChanged = Signal()
     skillPackageAutoUpdateModeChanged = Signal()
-    autoMinimizeOnScreenshotChanged = Signal()
+    autoMinimizeOnSnapChanged = Signal()
     autoMinimizeOnQuickCopyChanged = Signal()
-    autoSelectScreenshotInQuickCopyChanged = Signal()
-    autoCopyScreenshotClientFormatChanged = Signal()
-    temporaryScreenshotsChanged = Signal()
+    autoSelectSnapInQuickCopyChanged = Signal()
+    autoCopySnapClientFormatChanged = Signal()
+    temporarySnapsChanged = Signal()
     diagnosticLoggingChanged = Signal()
 
     def _set_config_value(self, key: str, value: Any, signal: SignalInstance | None = None):
@@ -68,15 +68,17 @@ class SettingsMixin:
             "skill_package_auto_update_mode", value, self.skillPackageAutoUpdateModeChanged
         )
 
-    @Property(bool, notify=autoMinimizeOnScreenshotChanged)
-    def autoMinimizeOnScreenshot(self):  # type: ignore[reportRedeclaration]
-        return self.config.get("auto_minimize_on_screenshot", False)
-
-    @autoMinimizeOnScreenshot.setter  # type: ignore[func-attr]
-    def autoMinimizeOnScreenshot(self, value):
-        self._set_config_value(
-            "auto_minimize_on_screenshot", value, self.autoMinimizeOnScreenshotChanged
+    @Property(bool, notify=autoMinimizeOnSnapChanged)
+    def autoMinimizeOnSnap(self):  # type: ignore[reportRedeclaration]
+        # Legacy read-compat: pre-rename configs stored auto_minimize_on_screenshot
+        return self.config.get(
+            "auto_minimize_on_snap",
+            self.config.get("auto_minimize_on_screenshot", False),
         )
+
+    @autoMinimizeOnSnap.setter  # type: ignore[func-attr]
+    def autoMinimizeOnSnap(self, value):
+        self._set_config_value("auto_minimize_on_snap", value, self.autoMinimizeOnSnapChanged)
 
     @Property(bool, notify=autoMinimizeOnQuickCopyChanged)
     def autoMinimizeOnQuickCopy(self):  # type: ignore[reportRedeclaration]
@@ -88,37 +90,49 @@ class SettingsMixin:
             "auto_minimize_on_quick_copy", value, self.autoMinimizeOnQuickCopyChanged
         )
 
-    @Property(bool, notify=autoSelectScreenshotInQuickCopyChanged)
-    def autoSelectScreenshotInQuickCopy(self):  # type: ignore[reportRedeclaration]
-        return self.config.get("auto_select_screenshot_in_quick_copy", False)
-
-    @autoSelectScreenshotInQuickCopy.setter  # type: ignore[func-attr]
-    def autoSelectScreenshotInQuickCopy(self, value):
-        self._set_config_value(
-            "auto_select_screenshot_in_quick_copy",
-            value,
-            self.autoSelectScreenshotInQuickCopyChanged,
+    @Property(bool, notify=autoSelectSnapInQuickCopyChanged)
+    def autoSelectSnapInQuickCopy(self):  # type: ignore[reportRedeclaration]
+        # Legacy read-compat: pre-rename configs stored auto_select_screenshot_in_quick_copy
+        return self.config.get(
+            "auto_select_snap_in_quick_copy",
+            self.config.get("auto_select_screenshot_in_quick_copy", False),
         )
 
-    @Property(bool, notify=autoCopyScreenshotClientFormatChanged)
-    def autoCopyScreenshotClientFormat(self):  # type: ignore[reportRedeclaration]
-        return self.config.get("auto_copy_screenshot_client_format", False)
-
-    @autoCopyScreenshotClientFormat.setter  # type: ignore[func-attr]
-    def autoCopyScreenshotClientFormat(self, value):
+    @autoSelectSnapInQuickCopy.setter  # type: ignore[func-attr]
+    def autoSelectSnapInQuickCopy(self, value):
         self._set_config_value(
-            "auto_copy_screenshot_client_format",
+            "auto_select_snap_in_quick_copy",
             value,
-            self.autoCopyScreenshotClientFormatChanged,
+            self.autoSelectSnapInQuickCopyChanged,
         )
 
-    @Property(bool, notify=temporaryScreenshotsChanged)
-    def temporaryScreenshots(self):  # type: ignore[reportRedeclaration]
-        return self.config.get("temporary_screenshots", False)
+    @Property(bool, notify=autoCopySnapClientFormatChanged)
+    def autoCopySnapClientFormat(self):  # type: ignore[reportRedeclaration]
+        # Legacy read-compat: pre-rename configs stored auto_copy_screenshot_client_format
+        return self.config.get(
+            "auto_copy_snap_client_format",
+            self.config.get("auto_copy_screenshot_client_format", False),
+        )
 
-    @temporaryScreenshots.setter  # type: ignore[func-attr]
-    def temporaryScreenshots(self, value):
-        self._set_config_value("temporary_screenshots", value, self.temporaryScreenshotsChanged)
+    @autoCopySnapClientFormat.setter  # type: ignore[func-attr]
+    def autoCopySnapClientFormat(self, value):
+        self._set_config_value(
+            "auto_copy_snap_client_format",
+            value,
+            self.autoCopySnapClientFormatChanged,
+        )
+
+    @Property(bool, notify=temporarySnapsChanged)
+    def temporarySnaps(self):  # type: ignore[reportRedeclaration]
+        # Legacy read-compat: pre-rename configs stored temporary_screenshots
+        return self.config.get(
+            "temporary_snaps",
+            self.config.get("temporary_screenshots", False),
+        )
+
+    @temporarySnaps.setter  # type: ignore[func-attr]
+    def temporarySnaps(self, value):
+        self._set_config_value("temporary_snaps", value, self.temporarySnapsChanged)
 
     @Property(bool, notify=diagnosticLoggingChanged)
     def diagnosticLogging(self):  # type: ignore[reportRedeclaration]

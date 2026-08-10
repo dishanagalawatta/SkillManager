@@ -20,7 +20,7 @@ ColumnLayout {
 
     Layout.fillWidth: true
     spacing: 4
-    visible: root.selectedSkill && root.selectedSkill.local_path !== undefined && !root.selectedSkill.is_screenshot
+    visible: root.selectedSkill && root.selectedSkill.local_path !== undefined && !root.selectedSkill.is_snap
 
     // Section Header Row
     Item {

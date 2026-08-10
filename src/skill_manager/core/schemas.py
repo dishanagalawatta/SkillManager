@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_MAIN_CATEGORY = "⚙️ System & Workflow"
@@ -60,7 +60,7 @@ class SkillRecord(BaseModel):
     is_bundle: bool = False
     is_command: bool = False
     is_package: bool = False
-    is_screenshot: bool = False
+    is_snap: bool = False
     raw_content: str = ""
     body_content: str = ""
     risk: str = "Unknown"
@@ -71,6 +71,14 @@ class SkillRecord(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
     emoji: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_snap_key(cls, data: Any) -> Any:
+        """Map pre-rename ``is_screenshot`` cache entries to ``is_snap``."""
+        if isinstance(data, dict) and "is_screenshot" in data and "is_snap" not in data:
+            data = {**data, "is_snap": data["is_screenshot"]}
+        return data
 
     @field_validator("name", "category", "local_path", mode="before")
     @classmethod
@@ -124,7 +132,7 @@ class ShortcutConfig(BaseModel):
     settings_view: str = "Alt+4"
     # Tools
     theme_toggle: str = "Ctrl+T"
-    screenshot: str = "Ctrl+Shift+S"
+    snap: str = "Ctrl+Shift+S"
 
 
 class CollectionConfig(BaseModel):
@@ -145,11 +153,11 @@ class AppConfig(BaseSettings):
     shortcuts: dict[str, str] = Field(default_factory=dict)
     scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
     skill_package_auto_update_mode: str = "prompt"
-    auto_minimize_on_screenshot: bool = False
+    auto_minimize_on_snap: bool = False
     auto_minimize_on_quick_copy: bool = False
-    auto_select_screenshot_in_quick_copy: bool = False
-    auto_copy_screenshot_client_format: bool = False
-    temporary_screenshots: bool = False
+    auto_select_snap_in_quick_copy: bool = False
+    auto_copy_snap_client_format: bool = False
+    temporary_snaps: bool = False
     diagnostic_logging: bool = False
     top_bar_clients: list[str] = Field(
         default_factory=lambda: ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
@@ -361,7 +369,7 @@ class AppUpdateState(BaseModel):
     error: str | None = None
 
 
-class ScreenshotParams(BaseModel):
+class SnapParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
     crop_x: int = Field(..., ge=0)
     crop_y: int = Field(..., ge=0)

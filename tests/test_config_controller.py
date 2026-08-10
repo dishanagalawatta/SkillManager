@@ -254,14 +254,14 @@ def test_config_controller_properties_setters(config_controller, mock_app):
     config_controller.skillPackageAutoUpdateMode = "silent"
     mock_app._config.set.assert_any_call("skill_package_auto_update_mode", "silent")
 
-    config_controller.autoMinimizeOnScreenshot = True
-    mock_app._config.set.assert_any_call("auto_minimize_on_screenshot", True)
+    config_controller.autoMinimizeOnSnap = True
+    mock_app._config.set.assert_any_call("auto_minimize_on_snap", True)
 
     config_controller.autoMinimizeOnQuickCopy = True
     mock_app._config.set.assert_any_call("auto_minimize_on_quick_copy", True)
 
-    config_controller.temporaryScreenshots = True
-    mock_app._config.set.assert_any_call("temporary_screenshots", True)
+    config_controller.temporarySnaps = True
+    mock_app._config.set.assert_any_call("temporary_snaps", True)
 
 
 def test_config_controller_is_recording_shortcut(config_controller, mock_app):

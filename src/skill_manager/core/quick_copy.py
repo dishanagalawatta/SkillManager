@@ -34,7 +34,7 @@ def replace_skill_references_in_command(content: str, client_format: str, all_sk
         # Ignore commands and screenshots for this replacement
         if getattr(s, "is_command", False) or s.get("is_command", False):
             continue
-        if getattr(s, "is_screenshot", False) or s.get("is_screenshot", False):
+        if getattr(s, "is_snap", False) or s.get("is_snap", False):
             continue
 
         folder = str(getattr(s, "folder_name", "") or s.get("folder_name", "")).strip().lower()
@@ -267,11 +267,9 @@ def discover_single_project(
 
     # ── Scan for Screenshots
     project_root_path = project_root_for_project(resolved_project)
-    screenshot_dir = project_root_path / ".agents" / "screenshots"
-    if screenshot_dir.is_dir():
-        for img in sorted(
-            screenshot_dir.iterdir(), key=lambda item: item.name.lower(), reverse=True
-        ):
+    snap_dir = project_root_path / ".agents" / "screenshots"
+    if snap_dir.is_dir():
+        for img in sorted(snap_dir.iterdir(), key=lambda item: item.name.lower(), reverse=True):
             if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
                 # Map to virtual skill
                 skill_data = {
@@ -284,9 +282,9 @@ def discover_single_project(
                     "project_root": str(project_root_path),
                     "project_label": project_label(resolved_project, project_aliases, str(project)),
                     "main_category": "Special",
-                    "category": "Screenshots",
-                    "search_text": f"screenshot capture {img.name}",
-                    "is_screenshot": True,
+                    "category": "Snaps",
+                    "search_text": f"snap capture {img.name}",
+                    "is_snap": True,
                     "metadata": {"category": "Capture"},
                 }
                 skills.append(skill_data)
@@ -459,7 +457,7 @@ def format_project_skill_reference(skill, client_format, all_skills=None):
         path = skill.get("skill_md_path") or ""
         return f"[${name}]({path})"
 
-    if skill.get("is_screenshot"):
+    if skill.get("is_snap"):
         # For screenshots, the reference is just the relative path to the image
         project_root = skill.get("project_root")
         if project_root:

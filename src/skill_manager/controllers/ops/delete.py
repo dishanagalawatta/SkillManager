@@ -9,10 +9,10 @@ from skill_manager.controllers.ops._helpers import _get_item_attr
 from skill_manager.core.analytics import capture_exception
 from skill_manager.core.persistence import (
     load_temp_registry,
-    load_temp_screenshots_registry,
+    load_temp_snaps_registry,
     patch_cache_remove,
     save_temp_registry,
-    save_temp_screenshots_registry,
+    save_temp_snaps_registry,
 )
 from skill_manager.core.quick_copy import delete_project_skill_folders
 from skill_manager.core.schemas import SkillRecord
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteMixin:
-    """Skill, command, screenshot and temp-file deletion flows."""
+    """Skill, command, snap and temp-file deletion flows."""
 
     def deleteSkills(self, items: list):
         """Orchestrates deletion of skills (folders and local copies)."""
@@ -73,12 +73,10 @@ class DeleteMixin:
             paths_to_remove = []
 
             skill_items = [
-                r.model_dump()
-                for r in validated_records
-                if not r.is_command and not r.is_screenshot
+                r.model_dump() for r in validated_records if not r.is_command and not r.is_snap
             ]
             command_items = [r for r in validated_records if r.is_command]
-            screenshot_items = [r for r in validated_records if r.is_screenshot]
+            snap_items = [r for r in validated_records if r.is_snap]
 
             # ── Step 1: Delete Skill Folders (FS)
             if skill_items:
@@ -96,7 +94,7 @@ class DeleteMixin:
                         )
 
             # ── Step 2: Delete Files (Commands + Screenshots) via unlink
-            file_items = command_items + screenshot_items
+            file_items = command_items + snap_items
             for record in file_items:
                 p = Path(record.local_path)
                 try:
@@ -199,7 +197,7 @@ class DeleteMixin:
                 records.append(
                     {
                         "local_path": str(file_p),
-                        "is_screenshot": file_p.parent.name == "screenshots"
+                        "is_snap": file_p.parent.name == "screenshots"
                         or file_p.suffix in (".png", ".jpg", ".jpeg"),
                         "is_command": file_p.suffix in (".sh", ".md", ".bash")
                         and file_p.parent.name == "commands",
@@ -246,9 +244,9 @@ class DeleteMixin:
         if deleted_count > 0:
             logger.info("[TEMP_CLEANUP] Cleaned up %d temporary paths.", deleted_count)
 
-    def cleanup_temp_screenshots(self):
+    def cleanup_temp_snaps(self):
         """Deletes all temporary screenshots recorded in the registry."""
-        temp_paths = load_temp_screenshots_registry()
+        temp_paths = load_temp_snaps_registry()
         if not temp_paths:
             return
 
@@ -260,16 +258,16 @@ class DeleteMixin:
                     p.unlink()
                     deleted_count += 1
             except Exception as e:
-                logger.error("[TEMP_SCREENSHOT_CLEANUP] Failed to delete %s: %s", path_str, e)
+                logger.error("[TEMP_SNAP_CLEANUP] Failed to delete %s: %s", path_str, e)
                 capture_exception(e)
 
         if temp_paths:
             patch_cache_remove(temp_paths)
 
-        save_temp_screenshots_registry([])
+        save_temp_snaps_registry([])
         if deleted_count > 0:
             logger.info(
-                "[TEMP_SCREENSHOT_CLEANUP] Cleaned up %d temporary screenshots.",
+                "[TEMP_SNAP_CLEANUP] Cleaned up %d temporary screenshots.",
                 deleted_count,
             )
 
@@ -290,7 +288,7 @@ class DeleteMixin:
             if not target:
                 continue
             skill_folder = target / ".agents" / "skills" / folder_name
-            screenshot_file = target / ".agents" / "screenshots" / folder_name
+            snap_file = target / ".agents" / "screenshots" / folder_name
             command_file = target / ".agents" / "commands" / folder_name
 
             if skill_folder.is_dir():
@@ -301,13 +299,13 @@ class DeleteMixin:
                         "name": folder_name,
                     }
                 )
-            elif screenshot_file.is_file():
+            elif snap_file.is_file():
                 items_to_delete.append(
                     {
-                        "local_path": str(screenshot_file),
+                        "local_path": str(snap_file),
                         "project_path": str(target),
                         "name": folder_name,
-                        "is_screenshot": True,
+                        "is_snap": True,
                     }
                 )
             elif command_file.is_file():

@@ -43,7 +43,7 @@ class RolesMixin:
     IsSubCollapsedRole = Qt.ItemDataRole.UserRole + 23
     SubCategoryNameRole = Qt.ItemDataRole.UserRole + 24
     IsPackageRole = Qt.ItemDataRole.UserRole + 25
-    IsScreenshotRole = Qt.ItemDataRole.UserRole + 26
+    IsSnapRole = Qt.ItemDataRole.UserRole + 26
     EmojiRole = Qt.ItemDataRole.UserRole + 27
 
     _ALL_ROLES = [
@@ -72,7 +72,7 @@ class RolesMixin:
         IsSubCollapsedRole,
         SubCategoryNameRole,
         IsPackageRole,
-        IsScreenshotRole,
+        IsSnapRole,
         EmojiRole,
     ]
 
@@ -117,6 +117,6 @@ IsMainCollapsedRole = RolesMixin.IsMainCollapsedRole
 IsSubCollapsedRole = RolesMixin.IsSubCollapsedRole
 SubCategoryNameRole = RolesMixin.SubCategoryNameRole
 IsPackageRole = RolesMixin.IsPackageRole
-IsScreenshotRole = RolesMixin.IsScreenshotRole
+IsSnapRole = RolesMixin.IsSnapRole
 EmojiRole = RolesMixin.EmojiRole
 _ALL_ROLES = list(RolesMixin._ALL_ROLES)

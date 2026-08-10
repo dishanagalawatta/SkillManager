@@ -324,7 +324,7 @@ class TestPortalBackend:
 
         with (
             patch(
-                "skill_manager.controllers.screenshot_controller._find_portal_python",
+                "skill_manager.controllers.snap_controller._find_portal_python",
                 return_value="/usr/bin/python3",
             ),
             patch("skill_manager.core.global_hotkey.subprocess.Popen", return_value=proc) as popen,
@@ -342,7 +342,7 @@ class TestPortalBackend:
     def test_start_returns_false_when_no_portal_python(self):
         backend = PortalHotkeyBackend()
         with patch(
-            "skill_manager.controllers.screenshot_controller._find_portal_python",
+            "skill_manager.controllers.snap_controller._find_portal_python",
             return_value=None,
         ):
             assert backend.start() is False
@@ -354,7 +354,7 @@ class TestPortalBackend:
         del fake_module._find_portal_python
         with patch.dict(
             sys.modules,
-            {"skill_manager.controllers.screenshot_controller": fake_module},
+            {"skill_manager.controllers.snap_controller": fake_module},
         ):
             assert backend.start() is False
 
@@ -362,7 +362,7 @@ class TestPortalBackend:
         backend = PortalHotkeyBackend()
         with (
             patch(
-                "skill_manager.controllers.screenshot_controller._find_portal_python",
+                "skill_manager.controllers.snap_controller._find_portal_python",
                 return_value="/usr/bin/python3",
             ),
             patch(

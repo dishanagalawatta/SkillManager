@@ -205,7 +205,7 @@ def _load_qml_engine(controller, font_bridge) -> QQmlApplicationEngine:  # pragm
     """Create the QML engine, register the image provider and load Main.qml."""
     engine = QQmlApplicationEngine()
     controller._qml_engine = engine
-    engine.addImageProvider("screenshot", controller.screenshot_provider)
+    engine.addImageProvider("snap", controller.snap_provider)
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("fontDB", font_bridge)
     engine.warnings.connect(_handle_qml_warning)
