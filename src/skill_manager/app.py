@@ -25,6 +25,7 @@ from PySide6.QtCore import (  # noqa: E402
 )
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
+from PySide6.QtQuick import QQuickWindow  # noqa: E402
 
 # Phase 1 decomposition: modules extracted from app.py keep their public
 # surface alive through these re-exports (see .omo/plans/refactor-codebase.md).
@@ -106,7 +107,7 @@ class AppController(AppControllerProxyMixin, QObject):
     updatePackagesChanged = Signal()
     isPackageOnlyChanged = Signal()
 
-    # QML engine — set by main() after construction. Used by CommandChannel._capture_snap
+    # QML engine — set by main() after construction. Used by CommandChannel._capture_screenshot
     # to grab the live window via QQuickWindow::grabWindow() (works minimised, no colour cast).
     _qml_engine: QQmlApplicationEngine | None = None
 
@@ -234,7 +235,7 @@ class AppController(AppControllerProxyMixin, QObject):
         # Runtime is unaffected — these are not local re-bindings, just construction.
         self.ui = UIController(self)  # type: ignore[arg-type]
 
-        # Navigation IPC channel for the MCP sm_snap tool (file-based).
+        # Navigation IPC channel for the MCP sm_screenshot tool (file-based).
         # Guarded: degrades to None if the watcher/dirs cannot be set up
         # (headless/CI), so it never crashes AppController.
         try:
@@ -1032,9 +1033,30 @@ class AppController(AppControllerProxyMixin, QObject):
 
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
-        """Handle global hotkey press."""
+        """Handle global hotkey press.
+
+        When the main window is focused, the in-app ``WindowShortcut`` in
+        ``Main.qml`` already handles the key, so the global path is skipped to
+        avoid a double capture.
+        """
         if hotkey_id == self._hotkey_id_snap:
+            if self._main_window_is_focused():
+                logger.debug("[HOTKEY] global snap skipped: main window focused")
+                return
             self.snap.takeSnap()
+
+    def _main_window_is_focused(self) -> bool:
+        """Return whether the main QML window currently has focus."""
+        engine = getattr(self, "_qml_engine", None)
+        if engine is None:
+            return False
+        roots = engine.rootObjects()
+        if not roots:
+            return False
+        window = roots[0]
+        if not isinstance(window, QQuickWindow):
+            return False
+        return window.isActive()
 
     def _on_shortcuts_changed(self):
         """Re-register global hotkeys when shortcuts are updated."""

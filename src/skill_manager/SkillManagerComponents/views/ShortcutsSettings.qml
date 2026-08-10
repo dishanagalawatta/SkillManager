@@ -270,7 +270,12 @@ ScrollView {
                 sequenceBinding: AppController.config_controller ? AppController.config_controller.shortcutThemeToggle : ""
                 isEnabledBinding: AppController.config_controller ? AppController.config_controller.shortcutThemeToggleEnabled : false
             }
-            Separator {}
+        }
+
+        // --- Global Hotkeys ---
+        ShortcutGroup {
+            groupTitle: "Global Hotkeys"
+
             ShortcutRow {
                 titleText: "Snap"
                 actionKey: "snap"
