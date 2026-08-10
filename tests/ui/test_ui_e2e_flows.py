@@ -137,8 +137,9 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     def _fake_get_clipboard() -> str | None:
         return stored.get("content")
 
+    import sys
     with (
-        patch("sys.platform", "linux"),
+        patch.object(sys, "platform", "linux"),
         patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
         patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
     ):
