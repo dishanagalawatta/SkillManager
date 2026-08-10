@@ -122,6 +122,7 @@ def test_copy_text_no_qt_fallback_false_returns_false():
 def test_copy_text_no_qt_linux_native_fallback_delegates():
     # With no injected fallback, Linux path must delegate to utils.linux.set_clipboard.
     with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("sys.platform", "linux")
         mp.setattr("skill_manager.utils.linux.set_clipboard", lambda _t: True)
         service = ClipboardService(qt_clipboard=None, fallback=None)
         assert service.copy_text("data") is True

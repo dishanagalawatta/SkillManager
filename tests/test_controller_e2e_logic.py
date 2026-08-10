@@ -139,6 +139,7 @@ def test_controller_quick_copy_workflow(app_controller):
         return stored.get("content")
 
     with (
+        patch("sys.platform", "linux"),
         patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
         patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
     ):
