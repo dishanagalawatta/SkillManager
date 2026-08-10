@@ -144,7 +144,7 @@ The `SkillModel` and QML layer recognize several "system" sections that bypass s
 
 | Section | Header Emoji | Item Icon | Description |
 | :--- | :---: | :---: | :--- |
-| **Starred** | :star: | :star: | High-priority skills (pinned to top). Golden tinted header. |
+| **Starred** | :star: | :star: | High-priority skills (pinned to top). Header tinted with `Theme.accent`. |
 | **Collections** | :package: | :package: | Bundled skill sets (custom collections). |
 | **Custom Commands** | :zap: | :zap: | Specialized executable skills. |
 

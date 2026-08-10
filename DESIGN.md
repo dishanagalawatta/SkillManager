@@ -17,11 +17,11 @@
 
 | Group | Examples |
 |-------|----------|
-| Surface | `appBackground`, `sidebarBackground`, `glassPill`, `glassHover` |
-| Text | `textPrimary`, `textSecondary`, `textMuted`, `textOnAccent` |
+| Surface | `appBackground`, `sidebarBackground`, `glassPill`, `glassHover`, `glassActive`, `glassShadow` |
+| Text | `label`, `secondaryLabel`, `iconLabel`, `iconSecondaryLabel` |
 | Border | `glassBorder`, `glassInnerBorder`, `separator` |
-| Accent | `accentBlue`, `accentGreen`, `accentRed`, `accentYellow` |
-| State | `selectedRow`, `selectedRowHover`, `disabledControl` |
+| Accent | `accent`, `success`, `danger`, `selectedRowBorder` |
+| State | `selectedRow`, `selectedRowHover`, `disabledControl`, `dangerHover` |
 
 ### QML UI Conventions
 
@@ -32,6 +32,7 @@
 - **Toggles**: Use `IconButton` with dynamic `iconSource` (e.g., swapping between `bold-duotone` and `broken`) instead of `GlassToggleButton`.
 - **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
 - **Icon naming**: All icons use the `solar:` URI scheme (e.g., `solar:copy-bold-duotone`, `solar:trash-bin-2-broken`). Use `bold-duotone` for primary actions, `broken` for secondary/inactive state.
+- **Starred icons**: The starred (pinned) icon color comes from `Theme.accent` everywhere it renders (list rows, inspector header). Never reintroduce a hardcoded gold color for stars.
 
 **`IconButton` pattern:**
 
