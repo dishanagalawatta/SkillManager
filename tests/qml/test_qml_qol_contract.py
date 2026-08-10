@@ -618,18 +618,34 @@ def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
     )
 
 
-def test_snap_shortcut_disabled_when_global_hotkey_available():
-    """Verify the in-app snap shortcut is gated on the global hotkey.
+def test_snap_shortcut_not_gated_on_global_hotkey_availability():
+    """Verify the in-app snap shortcut is always available in-window.
 
-    When the global hotkey controller is available, the QML snap
-    shortcut must be disabled so Ctrl+Shift+S does not double-fire (the
-    global hotkey is the sole path). The QML shortcut is only a fallback
-    when the global hotkey cannot be registered (e.g. X11 X authorization
-    unavailable on Wayland without a portal backend).
+    The QML shortcut must NOT be gated on the global hotkey's availability:
+    the global hotkey only fires when the main window is NOT focused (the
+    Python-side ``_on_global_hotkey`` skips when the window is active), so
+    the in-window shortcut is the sole path while focused — no double-fire.
     """
     main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
 
-    assert "AppController.global_hotkey_controller.isAvailable" in main_qml, (
-        "Main.qml snap shortcut must be gated on "
-        "AppController.global_hotkey_controller.isAvailable to avoid double-fire"
+    # The window-scoped shortcut must exist and be gated only on recording
+    # state, the snap shortcut being enabled, and the overlay being hidden.
+    assert "AppController.global_hotkey_controller.isAvailable" not in main_qml, (
+        "Main.qml snap shortcut must NOT be gated on "
+        "AppController.global_hotkey_controller.isAvailable — the global "
+        "hotkey only fires when the main window is not focused, so the "
+        "in-window shortcut is the sole path while focused"
+    )
+    assert "shortcutSnapEnabled" in main_qml, (
+        "Main.qml must expose the snap shortcut via shortcutSnapEnabled"
+    )
+
+    # The double-fire guard now lives in Python: the global handler must
+    # skip the portal capture when the main window is focused.
+    app_py = (
+        Path(__file__).resolve().parent.parent.parent / "src" / "skill_manager" / "app.py"
+    ).read_text(encoding="utf-8")
+    assert "_main_window_is_focused()" in app_py, (
+        "app.py _on_global_hotkey must skip the global snap when the main "
+        "window is focused (double-fire guard moved from QML to Python)"
     )

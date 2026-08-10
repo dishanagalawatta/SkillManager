@@ -217,7 +217,7 @@ Window {
 
     // --- Tools ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !snapOverlay.visible && !AppController.global_hotkey_controller.isAvailable; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !snapOverlay.visible; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
 
     Instantiator {
         model: AppController.customCollections || []
