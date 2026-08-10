@@ -6,7 +6,7 @@ They run instantly and have zero side effects.
 
 import pytest
 
-from skill_manager.core.keymap import qt_sequence_to_pynput_keys
+from skill_manager.core.keymap import qt_sequence_to_gtk_accelerator, qt_sequence_to_pynput_keys
 
 
 class TestStandardModifierMappings:
@@ -95,3 +95,36 @@ class TestEdgeCases:
     def test_single_letter_passes_through(self):
         assert qt_sequence_to_pynput_keys("A") == "a"
         assert qt_sequence_to_pynput_keys("S") == "s"
+
+
+class TestGtkAcceleratorConversion:
+    """Qt key sequence → GTK accelerator format (portal GlobalShortcuts)."""
+
+    @pytest.mark.parametrize(
+        "qt_input,expected",
+        [
+            ("Ctrl+Shift+S", "<Control><Shift>S"),
+            ("Ctrl+Alt+Delete", "<Control><Alt><Delete>"),
+            ("Meta+Shift+F12", "<Super><Shift>F12"),
+            ("Ctrl+S", "<Control>S"),
+            ("F12", "F12"),
+            ("Ctrl", ""),
+            ("", ""),
+        ],
+    )
+    def test_modifier_combinations(self, qt_input, expected):
+        assert qt_sequence_to_gtk_accelerator(qt_input) == expected
+
+    def test_case_insensitive(self):
+        assert qt_sequence_to_gtk_accelerator("CTRL+SHIFT+S") == "<Control><Shift>S"
+        assert qt_sequence_to_gtk_accelerator("ctrl+shift+s") == "<Control><Shift>S"
+
+    def test_whitespace_stripped(self):
+        assert qt_sequence_to_gtk_accelerator(" Ctrl + Shift + S ") == "<Control><Shift>S"
+
+    def test_named_keys_mapped_to_gtk(self):
+        assert qt_sequence_to_gtk_accelerator("Ctrl+PageUp") == "<Control><Page_Up>"
+        assert qt_sequence_to_gtk_accelerator("Ctrl+Space") == "<Control><Space>"
+
+    def test_none_returns_empty(self):
+        assert qt_sequence_to_gtk_accelerator(None) == ""  # type: ignore[arg-type]
