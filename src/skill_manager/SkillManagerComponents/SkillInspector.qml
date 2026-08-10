@@ -150,7 +150,7 @@ Rectangle {
                             ? AppController.ui_controller.getAssetUri("ui/star-filled.svg")
                             : AppController.ui_controller.getAssetUri("ui/star-outline.svg")
                     }
-                    customIconColor: (root._sel && root._sel.is_starred) ? "#FFD700" : Theme.secondaryLabel
+                    customIconColor: (root._sel && root._sel.is_starred) ? Theme.accent : Theme.secondaryLabel
                     iconSize: 22
                     flat: true
                     Layout.preferredWidth: 32
