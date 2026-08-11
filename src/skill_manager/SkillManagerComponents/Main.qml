@@ -142,14 +142,7 @@ Window {
 
     function minimizeWindowInstantly() {
         _isHidingForSnap = true
-        // Use a REAL minimize (showMinimized) instead of opacity=0:
-        // Qt's Wayland platform plugin does not support window opacity
-        // ("This plugin does not support setting window opacity"), so the
-        // window stays fully visible — and therefore appears in its own
-        // snap. A minimized window is unmapped by the compositor on
-        // every platform (X11, Wayland, Windows, macOS), guaranteeing it is
-        // excluded from the capture.
-        window.showMinimized()
+        window.hide()
     }
 
     function restoreWindowState() {
@@ -262,7 +255,7 @@ Window {
     Connections {
         target: AppController.snap_controller
         function onMinimizeRequested() {
-            if (window.pendingSnap || (window.active && !_isHidingForSnap)) {
+            if (window.visible && !_isHidingForSnap && window.visibility !== Window.Minimized) {
                 window.saveWindowState()
                 window.pendingSnap = true
                 window.minimizeWindowInstantly()
@@ -277,9 +270,6 @@ Window {
         // activate the app (notification), and only show the overlay once
         // the app is active again.
         function onShowOverlay() {
-            if (window.pendingSnap) {
-                window.restoreWindowState()
-            }
             snapOverlay.showOverlay()
             console.log("SNAP-OVERLAY: mapped overlay directly for background/minimized snap capture")
         }
