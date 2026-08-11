@@ -64,6 +64,7 @@ sudo apt install -y libglib2.0-0 libxcb-cursor0 libxkbcommon-x11-0
 ```
 
 > On **macOS** and **Windows**, Qt plugins are bundled with PySide6 via `uv sync`. No extra step needed.
+> Packaged Linux installs (.deb / AppImage) bundle their own Qt runtime, so the apt packages above are only needed when running from source.
 
 ## Features
 
@@ -92,6 +93,8 @@ uv run skill-manager
 # or
 uv run python -m skill_manager.__main__
 ```
+
+> On Linux, prefer a packaged install (.deb or AppImage) over running from source. See [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Configuration
 
@@ -151,6 +154,9 @@ python scripts/build_app.py
 
 # Inno Setup installer (Windows)
 # See packaging/windows/installer.iss
+
+# Linux packaging (AppImage + .deb in dist/)
+uv run skill-manager-build linux
 ```
 
 See [`docs/RELEASING.md`](docs/RELEASING.md) for release workflow.
