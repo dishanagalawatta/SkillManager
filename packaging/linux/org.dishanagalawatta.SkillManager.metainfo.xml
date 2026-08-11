@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.dishanagalawatta.SkillManager</id>
+  <name>SkillManager</name>
+  <summary>A professional tool for managing reusable agent skills across repositories</summary>
+  <description>
+    <p>SkillManager is a professional desktop tool for managing reusable agent skills across repositories.</p>
+    <p>It ships a deep QML/PySide6 integration with a buttery-smooth native UI built from custom glass components, dark mode, and animated transitions.</p>
+    <p>Key features include Quick Copy for one-click deployment of skills to any configured project target, skill packages with versioning and auto-updates, a global hotkey to summon the UI from anywhere, a native MCP server for agent-driven headless skill management, and a dark-mode QML interface.</p>
+  </description>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="org.dishanagalawatta">
+    <name>Don Dishan Kanchuka Agalawatta</name>
+  </developer>
+  <url type="homepage">https://github.com/dishanagalawatta/SkillManager</url>
+  <launchable type="desktop-id">skill-manager.desktop</launchable>
+  <provides>
+    <binary>skill-manager</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">none</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+    <content_attribute id="money-advertising">none</content_attribute>
+  </content_rating>
+  <releases>
+    <release version="1.8.0" date="2026-08-11">
+      <url type="details">https://github.com/dishanagalawatta/SkillManager/releases</url>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=SkillManager
+GenericName=Skill Manager
+Comment=Manage reusable agent skills across repositories
+Exec=skill-manager
+Icon=skill-manager
+Terminal=false
+Categories=Utility;
+Keywords=skills;agents;clipboard;manager;
+StartupNotify=true
+StartupWMClass=skill-manager
