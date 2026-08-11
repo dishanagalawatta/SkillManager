@@ -144,14 +144,18 @@ class ShortcutsMixin:
     def shortcutSnapEnabled(self):
         return self.isShortcutEnabled("snap")
 
+    _is_recording_shortcut: bool = False
+
     @Property(bool, notify=isRecordingShortcutChanged)
     def isRecordingShortcut(self):  # type: ignore[reportRedeclaration]
-        return self.app._is_recording_shortcut
+        return getattr(self, "_is_recording_shortcut", False)
 
     @isRecordingShortcut.setter  # type: ignore[func-attr]
     def isRecordingShortcut(self, value):
-        if self.app._is_recording_shortcut != value:
-            self.app._is_recording_shortcut = value
+        if getattr(self, "_is_recording_shortcut", False) != value:
+            self._is_recording_shortcut = value
+            if hasattr(self, "app") and self.app is not None:
+                self.app._is_recording_shortcut = value
             self.isRecordingShortcutChanged.emit()
 
     def get_shortcut(self, key: str) -> str:

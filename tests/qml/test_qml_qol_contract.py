@@ -648,12 +648,21 @@ def test_snap_shortcut_not_gated_on_global_hotkey_availability():
     app_py = (
         Path(__file__).resolve().parent.parent.parent / "src" / "skill_manager" / "app.py"
     ).read_text(encoding="utf-8")
-    assert "_main_window_is_focused()" in app_py, (
-        "app.py _on_global_hotkey must skip the global snap when the main "
+    global_hotkey_py = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src"
+        / "skill_manager"
+        / "core"
+        / "global_hotkey.py"
+    ).read_text(encoding="utf-8")
+    assert "_main_window_is_focused" in app_py and (
+        "_is_window_active" in global_hotkey_py or "_main_window_is_focused" in global_hotkey_py
+    ), (
+        "app.py and global_hotkey.py must skip the global snap when the main "
         "window is focused (double-fire guard moved from QML to Python)"
     )
-    assert "portalBackendActive" in app_py, (
-        "app.py _on_global_hotkey must consult portalBackendActive: the "
+    assert "portalBackendActive" in global_hotkey_py or "portalBackendActive" in app_py, (
+        "global_hotkey.py _on_snap_hotkey_pressed must consult portalBackendActive: the "
         "portal backend (Wayland) consumes the key at the compositor, so "
         "the portal signal is the only path and must always snap even "
         "while the main window is focused"

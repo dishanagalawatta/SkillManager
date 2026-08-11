@@ -184,7 +184,6 @@ class AppController(AppControllerProxyMixin, QObject):
             self._clipboard,
             prefer_native=sys.platform == "linux",
         )
-        self._is_recording_shortcut = False
 
         default_client = self._config.get("default_client", "Last Selected")
         if default_client == "Last Selected":
@@ -284,7 +283,6 @@ class AppController(AppControllerProxyMixin, QObject):
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_snaps)
 
         # 6. Global Hotkey Setup (snap hotkey works when app is minimized)
-        self._hotkey_id_snap = 1
         self._setup_global_hotkeys()
 
         # 4. Initial Model Configuration
@@ -976,26 +974,25 @@ class AppController(AppControllerProxyMixin, QObject):
     def getProjectLabel(self, path):
         return self.config_mgr.getProjectLabel(path)
 
+    @property
+    def _is_recording_shortcut(self) -> bool:
+        return getattr(self.config_mgr, "_is_recording_shortcut", False)
+
+    @_is_recording_shortcut.setter
+    def _is_recording_shortcut(self, value: bool) -> None:
+        self.config_mgr._is_recording_shortcut = value
+
+    @property
+    def _hotkey_id_snap(self) -> int:
+        return self.global_hotkey._snap_hotkey_id
+
     def _setup_global_hotkeys(self):
         """Register global hotkeys and connect signals."""
-        # Connect hotkey signal to snap trigger
-        # Use QueuedConnection because the signal is emitted from a background thread
-        from PySide6.QtCore import Qt
-
-        self.global_hotkey.hotkeyPressed.connect(
-            self._on_global_hotkey, Qt.ConnectionType.QueuedConnection
+        self.global_hotkey.setup_snap_hotkey(
+            config_controller=self.config_mgr,
+            snap_controller=self.snap,
+            get_window_active=self._main_window_is_focused,
         )
-
-        # Register snap hotkey at startup (only if enabled)
-        snap_seq = self.config_mgr.get_shortcut("snap")
-        if snap_seq and self.config_mgr.isShortcutEnabled("snap"):
-            self.global_hotkey.register(self._hotkey_id_snap, snap_seq)
-
-        # Re-register when shortcuts change
-        self.config_mgr.shortcutsChanged.connect(self._on_shortcuts_changed)
-
-        # Start the listener thread
-        self.global_hotkey.start()
 
     def _validate_source_paths(self):
         """Check configured source/project paths exist at startup.
@@ -1033,23 +1030,8 @@ class AppController(AppControllerProxyMixin, QObject):
 
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
-        """Handle global hotkey press.
-
-        When the pynput backend is active (X11/XWayland), the listener
-        observes keys passively, so a focused window ALSO receives the
-        keypress and the in-app ``WindowShortcut`` in ``Main.qml`` fires —
-        the global path is skipped to avoid a double capture.
-
-        The portal backend (Wayland) is different: the compositor grabs
-        the key globally, so the focused window NEVER receives the
-        keypress.  The portal signal is the only path and must always
-        snap, focused or not.
-        """
-        if hotkey_id == self._hotkey_id_snap:
-            if not self.global_hotkey.portalBackendActive and self._main_window_is_focused():
-                logger.debug("[HOTKEY] global snap skipped: main window focused")
-                return
-            self.snap.takeSnap()
+        """Handle global hotkey press (delegates to GlobalHotkeyManager)."""
+        self.global_hotkey._on_snap_hotkey_pressed(hotkey_id)
 
     def _main_window_is_focused(self) -> bool:
         """Return whether the main QML window currently has focus."""
@@ -1065,12 +1047,8 @@ class AppController(AppControllerProxyMixin, QObject):
         return window.isActive()
 
     def _on_shortcuts_changed(self):
-        """Re-register global hotkeys when shortcuts are updated."""
-        snap_seq = self.config_mgr.get_shortcut("snap")
-        if snap_seq and self.config_mgr.isShortcutEnabled("snap"):
-            self.global_hotkey.register(self._hotkey_id_snap, snap_seq)
-        else:
-            self.global_hotkey.unregister(self._hotkey_id_snap)
+        """Re-register global hotkeys when shortcuts are updated (delegates to GlobalHotkeyManager)."""
+        self.global_hotkey._on_shortcuts_changed_snap()
 
     def on_quit(self):
         """Ensures all pending state is saved before exit.
