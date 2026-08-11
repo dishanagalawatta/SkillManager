@@ -14,6 +14,7 @@ hotkey sets that can change at runtime is ``HotKey`` + ``Listener``
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -152,15 +153,24 @@ class PortalHotkeyBackend(QObject):
         """Bind a hotkey. Returns True if the command was accepted."""
         if not self.available:
             return False
-        portal_id = f"sm_{hotkey_id}"  # must match ^[a-z_][a-z0-9_]*$
+        # Create a unique portal_id using a hash of the sequence so GNOME/KDE GlobalShortcuts
+        # portal binds the new preferred_trigger instead of falling back to cached PermissionStore bindings.
+        seq_hash = hashlib.md5(sequence.encode("utf-8")).hexdigest()[:8]
+        new_portal_id = f"sm_{hotkey_id}_{seq_hash}"
+
         with self._lock:
-            self._shortcut_ids[hotkey_id] = portal_id
+            old_portal_id = self._shortcut_ids.get(hotkey_id)
+            self._shortcut_ids[hotkey_id] = new_portal_id
+
+        if old_portal_id and old_portal_id != new_portal_id:
+            self._send({"cmd": "remove", "id": old_portal_id})
+
         trigger = qt_sequence_to_gtk_accelerator(sequence)
         self._send(
             {
                 "cmd": "bind",
-                "id": portal_id,
-                "description": "SkillManager hotkey",
+                "id": new_portal_id,
+                "description": f"SkillManager hotkey {hotkey_id}",
                 "preferred_trigger": trigger,
             }
         )
@@ -474,6 +484,11 @@ class GlobalHotkeyManager(QObject):
         """
         if not sequence:
             return False
+
+        # Clear any stale pynput binding for this hotkey_id to prevent dual-activation
+        with self._lock:
+            if self._hotkeys.pop(hotkey_id, None) is not None:
+                self._restart_listener()
 
         env_name, _, _ = detect_environment_and_display()
         if "Wayland" in env_name:

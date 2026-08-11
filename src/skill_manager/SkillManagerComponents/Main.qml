@@ -194,7 +194,7 @@ Window {
     // --- Find & Select ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSelectAllEnabled; sequence: AppController.config_controller.shortcutSelectAll; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !snapOverlay.visible && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !(snapOverlay && snapOverlay.visible) && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
 
     // --- Clipboard ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
@@ -217,7 +217,7 @@ Window {
 
     // --- Tools ---
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !snapOverlay.visible; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !(snapOverlay && snapOverlay.visible) && !AppController.global_hotkey_controller.portalBackendActive; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
 
     Instantiator {
         model: AppController.customCollections || []
@@ -262,9 +262,11 @@ Window {
     Connections {
         target: AppController.snap_controller
         function onMinimizeRequested() {
-            window.saveWindowState()
-            window.pendingSnap = true
-            window.minimizeWindowInstantly()
+            if (window.pendingSnap || (window.active && !_isHidingForSnap)) {
+                window.saveWindowState()
+                window.pendingSnap = true
+                window.minimizeWindowInstantly()
+            }
             snapDelayTimer.start()
         }
         // GNOME Wayland stacks windows of the ACTIVE app above all others
