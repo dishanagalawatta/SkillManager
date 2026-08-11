@@ -7,6 +7,7 @@ Window {
     id: overlay
     objectName: "snapOverlayWindow"
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    transientParent: null
     visibility: Window.Hidden
     color: "transparent"
 

@@ -513,6 +513,18 @@ class TestManagerPortalFallback:
         backend.hotkeyPressed.connect.assert_called_once()
         assert "portal backend" in manager._availability_reason
 
+    def test_portal_backend_active_reflects_backend_state(self):
+        manager = GlobalHotkeyManager()
+
+        assert manager.portalBackendActive is False, (
+            "portalBackendActive must be False until the portal backend starts"
+        )
+
+        manager._portal_backend = MagicMock()
+        assert manager.portalBackendActive is True, (
+            "portalBackendActive must be True while the portal backend is running"
+        )
+
     def test_ensure_portal_backend_failure_reports_reason(self):
         manager = GlobalHotkeyManager()
         backend = MagicMock()
@@ -544,6 +556,46 @@ class TestManagerPortalFallback:
 
         assert manager.register(11, "Meta+Shift+F12") is True
         backend.register.assert_called_once_with(11, "Meta+Shift+F12")
+
+    def test_wayland_register_prefers_portal_backend(self):
+        """On Wayland, register() must try portal backend first even if pynput is available."""
+        manager = GlobalHotkeyManager()
+        portal_backend = MagicMock()
+        portal_backend.register.return_value = True
+
+        with (
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=("Wayland (XWayland)", True, "active"),
+            ),
+            patch.object(manager, "_ensure_portal", return_value=True),
+            patch.object(manager, "_ensure_pynput", return_value=True) as mock_pynput,
+        ):
+            manager._portal_backend = portal_backend
+            result = manager.register(1, "Ctrl+Shift+S")
+
+        assert result is True
+        portal_backend.register.assert_called_once_with(1, "Ctrl+Shift+S")
+        mock_pynput.assert_not_called()
+
+    def test_non_wayland_register_prefers_pynput(self):
+        """On non-Wayland (X11), register() must try pynput first."""
+        manager = GlobalHotkeyManager()
+
+        with (
+            patch(
+                "skill_manager.core.global_hotkey.detect_environment_and_display",
+                return_value=("X11", True, "active"),
+            ),
+            patch.object(manager, "_ensure_pynput", return_value=True) as mock_pynput,
+            patch.object(manager, "_ensure_portal") as mock_portal,
+            patch.object(manager, "_restart_listener"),
+        ):
+            result = manager.register(1, "Ctrl+Shift+S")
+
+        assert result is True
+        mock_pynput.assert_called_once()
+        mock_portal.assert_not_called()
 
     def test_unregister_delegates_to_portal_backend(self):
         manager = GlobalHotkeyManager()

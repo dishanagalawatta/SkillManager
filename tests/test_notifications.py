@@ -1,6 +1,7 @@
 """Unit tests for the desktop notification utility."""
 
 import pytest
+from PySide6.QtDBus import QDBus
 
 from skill_manager.utils import notifications
 
@@ -76,7 +77,7 @@ def test_send_notification_sends_notify_call(fake_bus):
     assert message.arguments()[3] == "Title"
     assert message.arguments()[4] == "Body"
     assert message.arguments()[7] == 0  # no expiry
-    assert mode == 1  # QDBusConnection.NoEventLoop
+    assert mode == QDBus.CallMode.Block  # enum, not raw int (PySide6 6.11)
 
 
 def test_close_notification_closes_last_sent(fake_bus):

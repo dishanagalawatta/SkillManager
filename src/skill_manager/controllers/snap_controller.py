@@ -275,6 +275,10 @@ class SnapController(QObject):
         below).  Clicking the notification makes the app active, which lets
         the overlay map on top.
         """
+        logger.info(
+            "Capture overlay deferred: app window not active — "
+            "activation notification sent (one click/activation required)"
+        )
         send_notification("Skill Manager", "Capture is ready — click to start selecting")
 
     @Slot()
@@ -285,6 +289,7 @@ class SnapController(QObject):
         user clicked the notification or the taskbar entry, making the app
         active again).  The notification is closed so it does not linger.
         """
+        logger.info("Capture overlay activation complete — mapping overlay now")
         close_notification()
 
     # ------------------------------------------------------------------
@@ -338,7 +343,7 @@ class SnapController(QObject):
             self._snap_version += 1
             self.snapVersionChanged.emit()
         self.showOverlay.emit()
-        logger.info("Snap overlay shown.")
+        logger.info("showOverlay signal emitted — QML decides how the overlay is mapped")
 
     def _fail_capture(self, message: str):
         self.current_full_pixmap = None

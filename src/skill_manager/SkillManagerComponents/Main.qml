@@ -278,31 +278,8 @@ Window {
             if (window.pendingSnap) {
                 window.restoreWindowState()
             }
-            if (window.active) {
-                snapOverlay.showOverlay()
-                return
-            }
-            window.captureAwaitingActivation = true
-            AppController.snap_controller.notifyCapturePending()
-            captureActivationTimer.start()
-        }
-    }
-
-    Timer {
-        id: captureActivationTimer
-        interval: 100
-        repeat: true
-        onTriggered: {
-            if (!window.captureAwaitingActivation) {
-                stop()
-                return
-            }
-            if (window.active) {
-                stop()
-                window.captureAwaitingActivation = false
-                AppController.snap_controller.notifyCaptureActivation()
-                snapOverlay.showOverlay()
-            }
+            snapOverlay.showOverlay()
+            console.log("SNAP-OVERLAY: mapped overlay directly for background/minimized snap capture")
         }
     }
 
@@ -319,7 +296,6 @@ Window {
     Connections {
         target: AppController.snap_controller
         function onCaptureFinished() {
-            captureActivationTimer.stop()
             window.captureAwaitingActivation = false
             if (window.pendingSnap) {
                 window.pendingSnap = false
@@ -327,7 +303,6 @@ Window {
             }
         }
         function onCaptureCancelled() {
-            captureActivationTimer.stop()
             if (window.captureAwaitingActivation) {
                 window.captureAwaitingActivation = false
                 AppController.snap_controller.notifyCaptureActivation()
