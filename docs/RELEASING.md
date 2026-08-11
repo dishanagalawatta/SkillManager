@@ -11,7 +11,7 @@ SkillManager uses [python-semantic-release](https://python-semantic-release.read
 1. You write a commit with an opt-in token (`[patch]`, `[minor]`, `[major]`, `[dev]`)
 2. Push to `main` → CI runs → Release workflow triggers
 3. python-semantic-release bumps version, creates tag + GitHub Release
-4. CI builds Windows artifacts and attaches them to the release
+4. CI builds the Windows installer plus the Linux AppImage and .deb, and attaches them to the release
 5. Users download updates from the GitHub Releases page
 
 **Never push a version tag manually.**
@@ -43,7 +43,7 @@ After you push to `main`, the [CI workflow](../.github/workflows/ci.yml) runs:
 
 ### 3. Release Workflow Triggers
 
-When CI passes, the [Release workflow](../.github/workflows/release.yml) triggers automatically:
+When CI passes, the [Release workflow](../.github/workflows/release-build.yml) triggers automatically:
 
 1. **Semantic Release** job:
    - Analyzes commits since the last release
@@ -57,6 +57,7 @@ When CI passes, the [Release workflow](../.github/workflows/release.yml) trigger
 
 2. **Build** job:
    - PyInstaller builds `SkillManager-Setup-{version}.exe` on Windows
+   - `scripts/build_linux.py` builds the Linux AppImage and `.deb`
    - Artifacts uploaded to GitHub Release
 
 4. **GitHub Release** — Assets are attached to the release tag
@@ -86,11 +87,11 @@ Every PR triggers:
 3. **Security** — `pip-audit` (non-blocking)
 4. **CI Gate** — Aggregation job (required status check)
 
-### Release Pipeline (`release.yml`)
+### Release Pipeline (`release-build.yml`)
 
 Triggered when CI passes on `main`:
 1. **Semantic Release** — Version bump + tag + GitHub Release
-2. **Build** — PyInstaller on Windows
+2. **Build** — Windows installer + Linux AppImage + .deb
 3. **Attach** — Artifacts uploaded to GitHub Release
 
 ---
@@ -119,11 +120,11 @@ Pre-release versions:
 
 - Check that the commit subject contains `[patch]`, `[minor]`, `[major]`, or `[dev]`
 - Check that CI passed before the Release workflow triggered
-- Check the [Release workflow logs](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
+- Check the [Release workflow logs](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml)
 
 ### Build failed
 
-- Check the specific job in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml)
+- Check the specific job in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml)
 - Common issues: missing system dependencies, PyInstaller hooks, Inno Setup path
 
 ---
@@ -142,5 +143,5 @@ Pre-release versions:
 |---|---|
 | `pyproject.toml` `[tool.semantic_release]` | python-semantic-release config |
 | `src/skill_manager/commit_parser_optin.py` | Custom parser for `[patch]`/`[minor]`/`[major]`/`[dev]` tokens |
-| `.github/workflows/release.yml` | Release workflow (semantic-release + build + attach assets) |
+| `.github/workflows/release-build.yml` | Release workflow (semantic-release + build + attach assets) |
 | `.github/workflows/_build-pyinstaller.yml` | Reusable build job |

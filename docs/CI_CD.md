@@ -9,7 +9,7 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 ```
 .github/workflows/
 ├── ci.yml                    # PR + main/develop push gate
-├── release.yml               # semantic-release + build + attach assets
+├── release-build.yml         # semantic-release + build + attach assets (Windows + Linux)
 ├── _lint.yml                 # Ruff check + format (reusable)
 ├── _test-python.yml          # Test on Windows (reusable)
 ├── _build-pyinstaller.yml    # PyInstaller build for Windows (reusable)
@@ -29,7 +29,7 @@ security-scan ────────┘
 
 **Concurrency**: PR runs cancel on new push; main/develop runs queue.
 
-## Release Pipeline (`release.yml`)
+## Release Pipeline (`release-build.yml`)
 
 Uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in tokens for automated releases.
 
@@ -38,7 +38,7 @@ Push to main (with [patch]/[minor]/[major]/[dev] token)
   └─► CI workflow runs (lint, tests, security, gate)
         └─► Release workflow triggers on CI completion
               └─► Semantic Release (version bump + tag + GitHub Release)
-                    └─► Build (PyInstaller on Windows)
+                    └─► Build (Windows installer + Linux AppImage + .deb)
                           └─► Attach Assets (upload to GitHub Release)
                                 └─► Users download from GitHub Releases
 ```
@@ -126,4 +126,4 @@ Ensure commits on `main` include an opt-in token (`[patch]`, `[minor]`, `[major]
 
 ### Artifact upload fails
 
-Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml).
+Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml).

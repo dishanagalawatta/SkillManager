@@ -49,6 +49,81 @@ Get-FileHash .\SkillManager_Setup.exe -Algorithm SHA256
 Compare the output hash with the SHA256 listed on the
 [Release page](https://github.com/dishanagalawatta/SkillManager/releases).
 
+## Linux
+
+### Option A: .deb (Ubuntu/Debian)
+
+Download `skill-manager_<version>_amd64.deb` from
+[Releases](https://github.com/dishanagalawatta/SkillManager/releases), then:
+
+```bash
+sudo dpkg -i skill-manager_<version>_amd64.deb
+```
+
+If dpkg reports missing dependencies, fix them with:
+
+```bash
+sudo apt-get install -f
+```
+
+Supported on Ubuntu 22.04+ (amd64). The package installs to `/opt/SkillManager`
+with a `/usr/bin/skill-manager` symlink and a launcher entry.
+
+To uninstall:
+
+```bash
+sudo dpkg -r skill-manager
+```
+
+### Option B: AppImage (any distro)
+
+Download `SkillManager-<version>-x86_64.AppImage` from
+[Releases](https://github.com/dishanagalawatta/SkillManager/releases), then:
+
+```bash
+chmod +x SkillManager-<version>-x86_64.AppImage
+./SkillManager-<version>-x86_64.AppImage
+```
+
+You can also double-click the file in your file manager. If FUSE2 is not
+available, run with `--appimage-extract-and-run` instead:
+
+```bash
+./SkillManager-<version>-x86_64.AppImage --appimage-extract-and-run
+```
+
+Optionally, move the AppImage into a directory on your `PATH` (for example
+`~/.local/bin`) and create a desktop entry so it appears in your application
+menu.
+
+### Updates
+
+The in-app Updates view links to the GitHub Releases page; there is no in-app
+installer. To update:
+
+- **.deb users**: download the new `skill-manager_<version>_amd64.deb` and
+  reinstall it with `sudo dpkg -i`.
+- **AppImage users**: download the new `SkillManager-<version>-x86_64.AppImage`
+  and replace the old file.
+
+### Troubleshooting
+
+#### "Could not load the Qt platform plugin 'xcb'"
+
+Install the missing XCB library:
+
+```bash
+sudo apt install -y libxcb-cursor0
+```
+
+#### Global hotkey not working on Wayland
+
+Make sure `xdg-desktop-portal` is present:
+
+```bash
+sudo apt install -y xdg-desktop-portal
+```
+
 ## Developer Install
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
