@@ -283,6 +283,50 @@ def test_controller_small_branch_slots(controller):
     assert "/not-a-project" not in controller.syncingProjects
 
 
+def test_on_global_hotkey_skips_when_focused_under_pynput(controller):
+    """With the pynput backend (X11), a focused window also receives the
+    keypress, so the global path must skip to avoid a double capture."""
+    controller.global_hotkey._portal_backend = None
+    with (
+        patch.object(controller, "_main_window_is_focused", return_value=True),
+        patch.object(controller.snap, "takeSnap") as mock_take_snap,
+    ):
+        controller._on_global_hotkey(controller._hotkey_id_snap)
+    mock_take_snap.assert_not_called()
+
+
+def test_on_global_hotkey_snaps_when_unfocused_under_pynput(controller):
+    """With the pynput backend, an unfocused window needs the global path."""
+    controller.global_hotkey._portal_backend = None
+    with (
+        patch.object(controller, "_main_window_is_focused", return_value=False),
+        patch.object(controller.snap, "takeSnap") as mock_take_snap,
+    ):
+        controller._on_global_hotkey(controller._hotkey_id_snap)
+    mock_take_snap.assert_called_once()
+
+
+def test_on_global_hotkey_always_snaps_under_portal_backend(controller):
+    """With the portal backend (Wayland), the compositor consumes the key
+    so the focused window never sees it — the portal signal is the ONLY
+    path and must snap even while the window is focused."""
+    controller.global_hotkey._portal_backend = MagicMock()
+    with (
+        patch.object(controller, "_main_window_is_focused", return_value=True),
+        patch.object(controller.snap, "takeSnap") as mock_take_snap,
+    ):
+        controller._on_global_hotkey(controller._hotkey_id_snap)
+    mock_take_snap.assert_called_once()
+
+
+def test_on_global_hotkey_ignores_other_hotkey_ids(controller):
+    """Non-snap hotkey IDs must be ignored."""
+    controller.global_hotkey._portal_backend = None
+    with patch.object(controller.snap, "takeSnap") as mock_take_snap:
+        controller._on_global_hotkey(999)
+    mock_take_snap.assert_not_called()
+
+
 def test_controller_copy_selected_skills_to_clipboard(controller):
     skills = [
         {"name": "S1", "local_path": "/p1", "folder_name": "skill-one", "is_package": True},

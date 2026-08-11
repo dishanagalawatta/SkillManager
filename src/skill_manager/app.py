@@ -1035,12 +1035,18 @@ class AppController(AppControllerProxyMixin, QObject):
     def _on_global_hotkey(self, hotkey_id: int):
         """Handle global hotkey press.
 
-        When the main window is focused, the in-app ``WindowShortcut`` in
-        ``Main.qml`` already handles the key, so the global path is skipped to
-        avoid a double capture.
+        When the pynput backend is active (X11/XWayland), the listener
+        observes keys passively, so a focused window ALSO receives the
+        keypress and the in-app ``WindowShortcut`` in ``Main.qml`` fires —
+        the global path is skipped to avoid a double capture.
+
+        The portal backend (Wayland) is different: the compositor grabs
+        the key globally, so the focused window NEVER receives the
+        keypress.  The portal signal is the only path and must always
+        snap, focused or not.
         """
         if hotkey_id == self._hotkey_id_snap:
-            if self._main_window_is_focused():
+            if not self.global_hotkey.portalBackendActive and self._main_window_is_focused():
                 logger.debug("[HOTKEY] global snap skipped: main window focused")
                 return
             self.snap.takeSnap()

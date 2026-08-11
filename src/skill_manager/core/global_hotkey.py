@@ -216,6 +216,9 @@ class PortalHotkeyBackend(QObject):
         kind = event.get("event")
         if kind == "activated":
             portal_id = event.get("id")
+            token = event.get("activation_token")
+            if token:
+                os.environ["XDG_ACTIVATION_TOKEN"] = str(token)
             with self._lock:
                 hotkey_id = next(
                     (hid for hid, pid in self._shortcut_ids.items() if pid == portal_id),
@@ -270,15 +273,37 @@ class GlobalHotkeyManager(QObject):
     @Property(bool, notify=availabilityChanged)
     def isAvailable(self) -> bool:  # noqa: N802
         """Returns True if global hotkeys are supported and active in the current environment."""
+        env_name, _, _ = detect_environment_and_display()
+        if "Wayland" in env_name:
+            return self._ensure_portal() or self._ensure_pynput()
         return self._ensure_pynput() or self._ensure_portal()
 
     @Property(str, notify=availabilityChanged)
     def statusReason(self) -> str:  # noqa: N802
         """Returns a human-readable explanation of global hotkey availability."""
+        env_name, _, _ = detect_environment_and_display()
+        if "Wayland" in env_name:
+            if self._ensure_portal():
+                return self._availability_reason
+            self._ensure_pynput()
+            return self._availability_reason
         self._ensure_pynput()
         if not self._pynput_available:
             self._ensure_portal()
         return self._availability_reason
+
+    @Property(bool, notify=availabilityChanged)
+    def portalBackendActive(self) -> bool:  # noqa: N802
+        """Return True when the Wayland portal backend is the active backend.
+
+        The pynput listener (X11/XWayland) observes keys passively, so a
+        pressed hotkey ALSO reaches the focused app window and the in-app
+        QML ``Shortcut`` fires — a double-fire guard is required.  The
+        portal backend instead grabs the key at the compositor, so the
+        focused window never receives the keypress: the portal signal is
+        the ONLY path, and callers must not skip it.
+        """
+        return self._portal_backend is not None
 
     def _ensure_pynput(self) -> bool:
         """Lazy-import pynput. Returns True if usable, False if not."""
@@ -436,8 +461,8 @@ class GlobalHotkeyManager(QObject):
     def register(self, hotkey_id: int, sequence: str) -> bool:
         """Register a global hotkey from a QKeySequence string.
 
-        Prefers pynput (X11/XWayland); falls back to the portal
-        GlobalShortcuts backend on Wayland.
+        Prefers the FreeDesktop portal GlobalShortcuts backend on Wayland;
+        prefers pynput on X11, Windows, and macOS.
 
         Args:
             hotkey_id: Unique identifier for this hotkey.
@@ -449,6 +474,25 @@ class GlobalHotkeyManager(QObject):
         """
         if not sequence:
             return False
+
+        env_name, _, _ = detect_environment_and_display()
+        if "Wayland" in env_name:
+            if self._ensure_portal():
+                return self._portal_backend.register(hotkey_id, sequence)
+            if self._ensure_pynput():
+                pynput_seq = qt_sequence_to_pynput_keys(sequence)
+                with self._lock:
+                    self._hotkeys[hotkey_id] = (pynput_seq, sequence)
+                    logger.info(
+                        "Registered global hotkey id=%d: %s (mapped to %s)",
+                        hotkey_id,
+                        sequence,
+                        pynput_seq,
+                    )
+                    self._restart_listener()
+                return True
+            return False
+
         if self._ensure_pynput():
             pynput_seq = qt_sequence_to_pynput_keys(sequence)
 

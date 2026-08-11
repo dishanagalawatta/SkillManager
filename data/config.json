@@ -62,11 +62,11 @@
   "quickcopy.client_format": "Antigravity",
   "library.show_commands": false,
   "quickcopy.show_commands": true,
-  "library.is_source_only": false,
+  "library.is_source_only": true,
   "quickcopy.is_source_only": false,
   "quickcopy.show_starred": true,
   "quickcopy.is_package_only": false,
   "library.show_starred": true,
-  "library.is_package_only": false,
+  "library.is_package_only": true,
   "library.project_selections": {}
 }

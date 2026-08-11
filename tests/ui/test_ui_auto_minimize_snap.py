@@ -141,3 +141,32 @@ class TestUIAutoMinimizeSnap:
         qtbot.waitUntil(lambda: bool(overlay_fired), timeout=3000)
         assert window.property("visibility") == QWindow.Visibility.Windowed
         assert window.property("opacity") == 1.0
+
+    def test_snap_while_manually_minimized_keeps_main_window_in_background(
+        self, qml_engine, app_controller, qtbot
+    ):
+        """Snapping while the main app is in background or minimized (pendingSnap == False)
+        must show the overlay immediately without un-minimizing or raising the main window."""
+        window = _window(qml_engine)
+        window.show()
+        qtbot.wait(50)
+
+        # Simulate the user manually minimizing the app (no pendingSnap).
+        window.showMinimized()
+        qtbot.wait(50)
+        assert window.property("visibility") == QWindow.Visibility.Minimized
+        assert window.property("pendingSnap") is False
+
+        overlay_fired = []
+        app_controller.snap_controller.showOverlay.connect(lambda: overlay_fired.append(True))
+
+        # Emit directly — global hotkey path triggers showOverlay signal.
+        app_controller.snap_controller.showOverlay.emit()
+
+        overlay = _overlay_window(window)
+        assert overlay is not None, "snapOverlayWindow not found in window"
+        qtbot.waitUntil(lambda: overlay.property("visible") is True, timeout=3000)
+
+        # Main window must remain minimized in background.
+        assert window.property("visibility") == QWindow.Visibility.Minimized
+        assert bool(overlay_fired)

@@ -18,9 +18,12 @@ stdin — JSON commands (one per line):
      "preferred_trigger": "<gtk-accelerator>"}
         Register or update one shortcut. Re-binds the *full* shortcut list
         (portal semantics) and may open a system dialog for the user to assign
-        the trigger — there is deliberately NO timeout on this call.
+        the trigger — there is deliberately NO timeout on this call. The portal
+        allows only one BindShortcuts per session, so any change after the
+        first bind runs against a freshly created session.
     {"cmd": "remove", "id": "<portal-id>"}
-        Remove a shortcut; re-binds the remaining list.
+        Remove a shortcut; re-binds the remaining list on a fresh session, or
+        closes the session when the last shortcut is removed.
     {"cmd": "quit"}
         Close the portal session and exit 0.
 
@@ -63,6 +66,12 @@ PORTAL_PATH = "/org/freedesktop/portal/desktop"
 GS_IFACE = "org.freedesktop.portal.GlobalShortcuts"
 REQUEST_IFACE = "org.freedesktop.portal.Request"
 SESSION_IFACE = "org.freedesktop.portal.Session"
+REGISTRY_IFACE = "org.freedesktop.host.portal.Registry"
+
+# App id associated with this D-Bus peer via Registry.Register. Must match
+# the basename of an installed .desktop file (skill-manager.desktop) — see
+# data/org.freedesktop.host.portal.Registry.xml in xdg-desktop-portal.
+APP_ID = "skill-manager"
 
 # How long to wait for the CreateSession Response before giving up. A session
 # is created in milliseconds on a healthy portal; a >10s stall means the portal
@@ -94,7 +103,10 @@ class _PortalHelper:
         self.bind_req_path: str | None = None
         self.binding = False  # a BindShortcuts request is in flight
         self.rebind_pending = False  # shortcuts changed while a bind was in flight
+        self.session_used = False  # BindShortcuts already attempted on this session
+        self.creating = False  # a CreateSession request is in flight
         self.create_timed_out = False
+        self._create_timeout_id: int | None = None
         self._shortcuts: dict[str, dict[str, str | None]] = {}
         # id -> {"description": str|None, "preferred_trigger": str|None}
         self._requested_ids: list[str] = []
@@ -120,7 +132,27 @@ class _PortalHelper:
             bus_name=BUS_NAME,
         )
         GLib.io_add_watch(sys.stdin.fileno(), GLib.IO_IN, self._on_stdin_readable)
-        GLib.timeout_add_seconds(CREATE_TIMEOUT_SECONDS, self._on_create_timeout)
+
+    # ------------------------------------------------------ portal identity
+    def register_app_id(self) -> None:
+        """Claim this D-Bus peer's app id via the host Registry portal.
+
+        xdg-desktop-portal derives a host app's id from its systemd user
+        unit (``app-*`` scope + matching .desktop file); launched from a
+        plain terminal the helper lands in ``ptyxis-spawn-*.scope``, so
+        CreateSession is rejected with "An app id is required". Registering
+        the peer explicitly is the documented mechanism for unsandboxed apps
+        and must happen before any portal method call on this connection.
+        Best-effort: on failure we keep going — in an ``app-*`` scope the
+        portal already knows the id and CreateSession works without it.
+        """
+        try:
+            registry = dbus.Interface(self.bus.get_object(BUS_NAME, PORTAL_PATH), REGISTRY_IFACE)
+            registry.Register(APP_ID, dbus.Dictionary({}, signature="sv"))
+        except Exception as exc:  # best-effort registration, never fatal
+            print(f"   !! Registry.Register({APP_ID}) failed: {exc}", file=sys.stderr)
+        else:
+            print(f"   -> Registry.Register({APP_ID})", file=sys.stderr)
 
     # ------------------------------------------------------------ events
     def _emit(self, event: dict) -> None:
@@ -173,13 +205,93 @@ class _PortalHelper:
             "description": command.get("description"),
             "preferred_trigger": command.get("preferred_trigger"),
         }
-        self._pump_bind()
+        self._request_bind()
 
     def _on_remove_command(self, command: dict) -> None:
         shortcut_id = command.get("id")
         if shortcut_id in self._shortcuts:
             del self._shortcuts[shortcut_id]
-            self._pump_bind()
+            self._request_bind()
+
+    def _request_bind(self) -> None:
+        """Apply a shortcut-set change, recreating the session if needed.
+
+        The GlobalShortcuts portal allows only ONE BindShortcuts call per
+        session ("An application can only attempt bind shortcuts of a
+        session once"), so any change after the initial bind — new shortcut,
+        trigger edit, removal — must run against a fresh session. We close
+        the old one and start over; the CreateSession response handler
+        re-pumps the bind for the new session.
+
+        An empty shortcut set (last shortcut removed) closes the session
+        outright — the portal unbinds everything a session owns on close.
+        """
+        if not self._shortcuts:
+            self._close_session()
+            return
+        if self.session_handle is not None and self.session_used:
+            print("   -> session recreated for shortcut change", file=sys.stderr)
+            self._close_session()
+            self._start_create_session()
+            return
+        if self.session_handle is None and not self.creating:
+            # No live session (startup race, or one was closed after the
+            # last shortcut was removed) — start a fresh one now.
+            self._start_create_session()
+            return
+        self._pump_bind()
+
+    def _start_create_session(self) -> None:
+        """Issue CreateSession with fresh tokens and (re)arm the timeout."""
+        self.creating = True
+        self._arm_create_timeout()
+        print("   -> CreateSession (handle_token + session_handle_token)", file=sys.stderr)
+        self.gs_iface.CreateSession(
+            dbus.Dictionary(
+                {
+                    "handle_token": dbus.String(_token()),
+                    "session_handle_token": dbus.String(_token()),
+                },
+                signature="sv",
+            ),
+            reply_handler=self._on_create_reply,
+            error_handler=self._on_create_error,
+        )
+
+    def _arm_create_timeout(self) -> None:
+        """(Re)arm the CreateSession watchdog; replaces any pending one."""
+        self._cancel_create_timeout()
+        self._create_timeout_id = GLib.timeout_add_seconds(
+            CREATE_TIMEOUT_SECONDS, self._on_create_timeout
+        )
+
+    def _cancel_create_timeout(self) -> None:
+        if self._create_timeout_id is not None:
+            GLib.source_remove(self._create_timeout_id)
+            self._create_timeout_id = None
+
+    def _on_create_error(self, error: Exception) -> None:
+        self.creating = False
+        self._cancel_create_timeout()
+        self._emit_error(f"CreateSession: {error}")
+        self.loop.quit()
+
+    def _close_session(self) -> None:
+        """Best-effort close of the current portal session and state reset."""
+        if self.session_handle is not None:
+            try:
+                session_obj = self.bus.get_object(BUS_NAME, dbus.ObjectPath(self.session_handle))
+                dbus.Interface(session_obj, SESSION_IFACE).Close()
+            except Exception as exc:  # best-effort close
+                print(f"   !! session close failed: {exc}", file=sys.stderr)
+        self.session_handle = None
+        self.create_req_path = None
+        self.bind_req_path = None
+        self.binding = False
+        self.rebind_pending = False
+        self.session_used = False
+        self.creating = False
+        self._cancel_create_timeout()
 
     def _pump_bind(self) -> None:
         """Serialize BindShortcuts calls: the portal shows ONE dialog at a time.
@@ -195,6 +307,7 @@ class _PortalHelper:
             return
         self.rebind_pending = False
         self.binding = True
+        self.session_used = True
         shortcuts = dbus.Array(
             [
                 dbus.Struct(
@@ -238,11 +351,14 @@ class _PortalHelper:
         self.binding = False
         self._emit({"event": "bind_failed", "ids": self._requested_ids, "code": -1})
         print(f"   !! BindShortcuts error: {error}", file=sys.stderr)
-        self._pump_bind()
+        if self.rebind_pending:
+            self._pump_bind()
 
     def _on_response(self, response: int, results: dict, path: str | None = None) -> None:
         """Response signal for CreateSession / BindShortcuts requests."""
         if path == self.create_req_path:
+            self.creating = False
+            self._cancel_create_timeout()
             if response == 0 and isinstance(results, dict):
                 session = results.get("session_handle")
                 if session:
@@ -267,7 +383,8 @@ class _PortalHelper:
                     }
                 )
                 print(f"   !! bind response code={response}", file=sys.stderr)
-            self._pump_bind()
+            if self.rebind_pending:
+                self._pump_bind()
 
     def _on_bind_success(self, results: dict) -> None:
         shortcuts = results.get("shortcuts")
@@ -287,16 +404,17 @@ class _PortalHelper:
         _session_handle: object,
         shortcut_id: str,
         timestamp: int,
-        _options: dict,
+        options: dict,
     ) -> None:
         print(f"   -> Activated {shortcut_id}", file=sys.stderr)
-        self._emit(
-            {
-                "event": "activated",
-                "id": str(shortcut_id),
-                "timestamp": int(timestamp),
-            }
-        )
+        event = {
+            "event": "activated",
+            "id": str(shortcut_id),
+            "timestamp": int(timestamp),
+        }
+        if isinstance(options, dict) and "activation_token" in options:
+            event["activation_token"] = str(options["activation_token"])
+        self._emit(event)
 
     def _on_deactivated(self, _session_handle: object, shortcut_id: str, _options: dict) -> None:
         self._emit({"event": "deactivated", "id": str(shortcut_id)})
@@ -305,6 +423,7 @@ class _PortalHelper:
         if self.session_handle is not None:
             return GLib.SOURCE_REMOVE
         self.create_timed_out = True
+        self._create_timeout_id = None  # the source has already fired
         self._emit_error(
             "no CreateSession Response within "
             f"{CREATE_TIMEOUT_SECONDS}s — portal unavailable or crashed"
@@ -315,35 +434,20 @@ class _PortalHelper:
     # ------------------------------------------------------------- teardown
     def _quit(self) -> None:
         self._emit({"event": "exiting"})
-        if self.session_handle is not None:
-            try:
-                session_obj = self.bus.get_object(BUS_NAME, dbus.ObjectPath(self.session_handle))
-                dbus.Interface(session_obj, SESSION_IFACE).Close()
-            except Exception as exc:  # best-effort close
-                print(f"   !! session close failed: {exc}", file=sys.stderr)
+        self._close_session()
         self.loop.quit()
 
 
 def _main() -> None:
     helper = _PortalHelper()
+    # Unsandboxed apps must claim an app id BEFORE any portal method call,
+    # otherwise the GlobalShortcuts portal rejects CreateSession with
+    # "An app id is required" when launched from a plain terminal.
+    helper.register_app_id()
     # BOTH handle_token and session_handle_token are mandatory: without
     # session_handle_token, xdg-desktop-portal 1.21.1 aborts the whole portal
     # process (flatpak/xdg-desktop-portal#2037) instead of replying.
-    print("   -> CreateSession (handle_token + session_handle_token)", file=sys.stderr)
-    helper.gs_iface.CreateSession(
-        dbus.Dictionary(
-            {
-                "handle_token": dbus.String(_token()),
-                "session_handle_token": dbus.String(_token()),
-            },
-            signature="sv",
-        ),
-        reply_handler=helper._on_create_reply,
-        error_handler=lambda e: (
-            helper._emit_error(f"CreateSession: {e}"),
-            helper.loop.quit(),
-        ),
-    )
+    helper._start_create_session()
     helper.loop.run()
     sys.exit(1 if helper.create_timed_out else 0)
 

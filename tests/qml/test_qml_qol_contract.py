@@ -621,10 +621,12 @@ def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
 def test_snap_shortcut_not_gated_on_global_hotkey_availability():
     """Verify the in-app snap shortcut is always available in-window.
 
-    The QML shortcut must NOT be gated on the global hotkey's availability:
-    the global hotkey only fires when the main window is NOT focused (the
-    Python-side ``_on_global_hotkey`` skips when the window is active), so
-    the in-window shortcut is the sole path while focused — no double-fire.
+    The QML shortcut must NOT be gated on the global hotkey's availability.
+    The double-fire guard lives in Python (``_on_global_hotkey``) and is
+    backend-aware: with the pynput backend (X11) the focused window also
+    receives the keypress, so the global path skips while focused; with
+    the portal backend (Wayland) the compositor consumes the key, so the
+    portal signal is the only path and must always snap.
     """
     main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
 
@@ -632,20 +634,26 @@ def test_snap_shortcut_not_gated_on_global_hotkey_availability():
     # state, the snap shortcut being enabled, and the overlay being hidden.
     assert "AppController.global_hotkey_controller.isAvailable" not in main_qml, (
         "Main.qml snap shortcut must NOT be gated on "
-        "AppController.global_hotkey_controller.isAvailable — the global "
-        "hotkey only fires when the main window is not focused, so the "
-        "in-window shortcut is the sole path while focused"
+        "AppController.global_hotkey_controller.isAvailable — the in-window "
+        "shortcut is the sole path while focused under the pynput backend"
     )
     assert "shortcutSnapEnabled" in main_qml, (
         "Main.qml must expose the snap shortcut via shortcutSnapEnabled"
     )
 
     # The double-fire guard now lives in Python: the global handler must
-    # skip the portal capture when the main window is focused.
+    # skip the capture only when the pynput backend is active AND the main
+    # window is focused — the portal backend must always snap.
     app_py = (
         Path(__file__).resolve().parent.parent.parent / "src" / "skill_manager" / "app.py"
     ).read_text(encoding="utf-8")
     assert "_main_window_is_focused()" in app_py, (
         "app.py _on_global_hotkey must skip the global snap when the main "
         "window is focused (double-fire guard moved from QML to Python)"
+    )
+    assert "portalBackendActive" in app_py, (
+        "app.py _on_global_hotkey must consult portalBackendActive: the "
+        "portal backend (Wayland) consumes the key at the compositor, so "
+        "the portal signal is the only path and must always snap even "
+        "while the main window is focused"
     )
