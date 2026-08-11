@@ -1,4 +1,5 @@
 import os
+import sys
 
 block_cipher = None
 
@@ -28,6 +29,36 @@ diskcache_datas, diskcache_binaries, diskcache_hiddenimports = collect_all('disk
 added_files += apscheduler_datas + tzlocal_datas + pynput_datas + joblib_datas + diskcache_datas
 added_binaries = apscheduler_binaries + tzlocal_binaries + pynput_binaries + joblib_binaries + diskcache_binaries
 added_hidden = apscheduler_hiddenimports + tzlocal_hiddenimports + pynput_hiddenimports + joblib_hiddenimports + diskcache_hiddenimports + ["git", "psutil", "msgpack"]
+
+# Linux-only excludes: the app never imports WebEngine/Multimedia/Quick3D,
+# so dropping them shrinks the Linux bundle (no WebEngine/GStreamer/Quick3D).
+# Windows/macOS builds keep the full PySide6 set.
+_LINUX_EXCLUDES = [
+    "PySide6.QtWebEngineCore",
+    "PySide6.QtWebEngineWidgets",
+    "PySide6.QtWebEngineQuick",
+    "PySide6.QtMultimedia",
+    "PySide6.QtMultimediaWidgets",
+    "PySide6.QtQuick3D",
+    "PySide6.Qt3DCore",
+]
+
+# The app's joblib/loky pipeline needs the real POSIX runtime modules on
+# Linux (multiprocessing.resource_tracker imports _posixshmem, etc.), so the
+# Unix-module names below are only excluded on Windows/macOS, where they are
+# pure noise.
+_UNIX_ONLY_EXCLUDES = [
+    "pwd",
+    "grp",
+    "fcntl",
+    "termios",
+    "readline",
+    "_scproxy",
+    "posix",
+    "resource",
+    "_posixsubprocess",
+    "_posixshmem",
+]
 
 a = Analysis(
     [os.path.join(base_path, "src", "skill_manager", "__main__.py")],
@@ -59,17 +90,6 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Unix-only modules
-        "pwd",
-        "grp",
-        "fcntl",
-        "termios",
-        "readline",
-        "_scproxy",
-        "posix",
-        "resource",
-        "_posixsubprocess",
-        "_posixshmem",
         # Platform/Internal noise
         "vms_lib",
         "java",
@@ -87,7 +107,9 @@ a = Analysis(
         "h2",
         "socks",
         "_typeshed",
-    ],
+    ]
+    + ([] if sys.platform.startswith("linux") else _UNIX_ONLY_EXCLUDES)
+    + (_LINUX_EXCLUDES if sys.platform.startswith("linux") else []),
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
