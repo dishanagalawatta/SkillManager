@@ -47,9 +47,9 @@ class TestUIAutoMinimizeSnap:
 
         _invoke(window, "minimizeWindowInstantly")
 
-        # The window must be truly minimized (unmapped by the compositor) —
+        # The window must be truly unmapped by the compositor —
         # not just made transparent.
-        assert window.property("visibility") == QWindow.Visibility.Minimized
+        assert window.property("visibility") == QWindow.Visibility.Hidden
 
         # Regression guard: opacity must NOT be the hide mechanism.
         assert window.property("opacity") == 1.0
@@ -65,7 +65,7 @@ class TestUIAutoMinimizeSnap:
 
         _invoke(window, "saveWindowState")
         _invoke(window, "minimizeWindowInstantly")
-        assert window.property("visibility") == QWindow.Visibility.Minimized
+        assert window.property("visibility") == QWindow.Visibility.Hidden
 
         _invoke(window, "restoreWindowState")
         qtbot.wait(50)
@@ -89,17 +89,20 @@ class TestUIAutoMinimizeSnap:
 
         _invoke(_snap_button(window), "click")
 
-        # Immediately after the click the window is minimized.
-        assert window.property("visibility") == QWindow.Visibility.Minimized
+        # Immediately after the click the window is hidden.
+        assert window.property("visibility") == QWindow.Visibility.Hidden
 
-        # After the 150 ms capture delay the window is restored (windowed)
-        # and the capture overlay has been shown.
+        # After the capture delay, overlay is shown and window remains minimized during capture.
         qtbot.waitUntil(lambda: bool(overlay_fired), timeout=3000)
+        assert window.property("pendingSnap") is True
+
+        # When capture is cancelled or completed, the window is restored to windowed focus.
+        app_controller.snap_controller.cancelCapture()
         qtbot.waitUntil(
             lambda: window.property("visibility") == QWindow.Visibility.Windowed,
             timeout=3000,
         )
-        assert window.property("pendingSnap") is True
+        assert window.property("pendingSnap") is False
 
     def test_snap_click_with_auto_minimize_shows_overlay_window(
         self, qml_engine, app_controller, qtbot

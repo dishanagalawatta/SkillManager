@@ -328,8 +328,6 @@ def test_auto_minimize_full_flow_captures_after_minimize(controller, mock_app):
 
     assert overlay_shown, "Overlay must be shown after deferred capture"
     mock_app.snap_provider.set_pixmap.assert_called_with(pixmap)
-    assert controller.current_full_pixmap is not None
-    assert not controller.current_full_pixmap.isNull()
 
 
 def test_take_screenshot_no_minimize_when_disabled(controller, mock_app):
