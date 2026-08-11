@@ -19,6 +19,7 @@ from skill_manager.core.persistence import (
 )
 from skill_manager.core.schemas import SnapParams
 from skill_manager.utils.notifications import close_notification, send_notification
+from skill_manager.utils.portal_utils import find_portal_python
 
 logger = logging.getLogger(__name__)
 
@@ -91,36 +92,6 @@ def _pre_authorize_portal(bus: QDBusConnection | None = None) -> None:
         logger.info("Pre-authorized snap portal for permission_id=%r", permission_id)
 
 
-def _find_portal_python() -> str | None:
-    """Find a Python interpreter with ``dbus`` and ``gi.repository`` available.
-
-    Priority order (deduplicated):
-    1. ``/usr/bin/python3`` — system Python (has ``python3-dbus`` /
-       ``python3-gi`` on standard GNOME installs).
-    2. ``sys.executable`` — current venv Python.
-    3. Any ``python3`` on ``PATH``.
-    """
-    seen: set[str] = set()
-    for candidate in ("/usr/bin/python3", sys.executable, "python3"):
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if not os.path.isfile(candidate):
-            continue
-        try:
-            result = subprocess.run(
-                [candidate, "-c", "import dbus, gi.repository; print('ok')"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return candidate
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    return None
-
-
 def _portal_capture(output_path: str | None = None) -> str | None:
     """Capture the full screen via the FreeDesktop Portal Snap API.
 
@@ -147,7 +118,7 @@ def _portal_capture(output_path: str | None = None) -> str | None:
         logger.error("Portal capture script not found: %s", script)
         return None
 
-    python_cmd = _find_portal_python()
+    python_cmd = find_portal_python()
     if python_cmd is None:
         logger.warning("Portal capture: no Python interpreter with dbus-python found")
         return None

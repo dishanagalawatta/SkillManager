@@ -24,8 +24,10 @@ from unittest.mock import MagicMock, patch
 
 from skill_manager.core.global_hotkey import (
     LISTENER_JOIN_TIMEOUT,  # type: ignore[attr-defined]
-    PORTAL_HELPER_STOP_TIMEOUT,  # type: ignore[attr-defined]
     GlobalHotkeyManager,
+)
+from skill_manager.core.portal_hotkey_backend import (
+    PORTAL_HELPER_STOP_TIMEOUT,
     PortalHotkeyBackend,
 )
 
@@ -324,11 +326,13 @@ class TestPortalBackend:
 
         with (
             patch(
-                "skill_manager.controllers.snap_controller._find_portal_python",
+                "skill_manager.utils.portal_utils.find_portal_python",
                 return_value="/usr/bin/python3",
             ),
-            patch("skill_manager.core.global_hotkey.subprocess.Popen", return_value=proc) as popen,
-            patch("skill_manager.core.global_hotkey.threading.Thread") as thread_cls,
+            patch(
+                "skill_manager.core.portal_hotkey_backend.subprocess.Popen", return_value=proc
+            ) as popen,
+            patch("skill_manager.core.portal_hotkey_backend.threading.Thread") as thread_cls,
         ):
             assert backend.start() is True
 
@@ -342,7 +346,7 @@ class TestPortalBackend:
     def test_start_returns_false_when_no_portal_python(self):
         backend = PortalHotkeyBackend()
         with patch(
-            "skill_manager.controllers.snap_controller._find_portal_python",
+            "skill_manager.utils.portal_utils.find_portal_python",
             return_value=None,
         ):
             assert backend.start() is False
@@ -351,10 +355,10 @@ class TestPortalBackend:
     def test_start_returns_false_when_import_fails(self):
         backend = PortalHotkeyBackend()
         fake_module = MagicMock()
-        del fake_module._find_portal_python
+        del fake_module.find_portal_python
         with patch.dict(
             sys.modules,
-            {"skill_manager.controllers.snap_controller": fake_module},
+            {"skill_manager.utils.portal_utils": fake_module},
         ):
             assert backend.start() is False
 
@@ -362,11 +366,11 @@ class TestPortalBackend:
         backend = PortalHotkeyBackend()
         with (
             patch(
-                "skill_manager.controllers.snap_controller._find_portal_python",
+                "skill_manager.utils.portal_utils.find_portal_python",
                 return_value="/usr/bin/python3",
             ),
             patch(
-                "skill_manager.core.global_hotkey.subprocess.Popen",
+                "skill_manager.core.portal_hotkey_backend.subprocess.Popen",
                 side_effect=OSError("no such file"),
             ),
         ):
@@ -464,7 +468,7 @@ class TestPortalBackend:
         stream = io.StringIO("not json\n")
         backend._proc = _fake_proc()
         backend._proc.stdout = stream
-        with patch("skill_manager.core.global_hotkey.logger") as mock_logger:
+        with patch("skill_manager.core.portal_hotkey_backend.logger") as mock_logger:
             backend._read_events()
         mock_logger.warning.assert_called_once()
 

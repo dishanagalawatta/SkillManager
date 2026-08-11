@@ -455,15 +455,15 @@ def test_pre_authorize_portal_skips_if_bus_not_connected():
 
 
 def test_find_portal_python_uses_system_python():
-    """_find_portal_python prefers /usr/bin/python3 when it has dbus."""
+    """find_portal_python prefers /usr/bin/python3 when it has dbus."""
     from unittest.mock import patch
 
-    from skill_manager.controllers.snap_controller import _find_portal_python
+    from skill_manager.utils.portal_utils import find_portal_python
 
     with (
         patch("os.path.isfile", return_value=True),
         patch(
-            "skill_manager.controllers.snap_controller.subprocess.run",
+            "skill_manager.utils.portal_utils.subprocess.run",
         ) as mock_run,
     ):
         mock_proc = MagicMock()
@@ -471,7 +471,7 @@ def test_find_portal_python_uses_system_python():
         mock_proc.stdout = "ok"
         mock_run.return_value = mock_proc
 
-        result = _find_portal_python()
+        result = find_portal_python()
 
         assert result == "/usr/bin/python3"
         # Must verify the system Python has dbus
@@ -481,11 +481,11 @@ def test_find_portal_python_uses_system_python():
 
 
 def test_find_portal_python_falls_back_to_venv():
-    """_find_portal_python falls back to sys.executable when /usr/bin/python3 lacks dbus."""
+    """find_portal_python falls back to sys.executable when /usr/bin/python3 lacks dbus."""
     import sys
     from unittest.mock import MagicMock, patch
 
-    from skill_manager.controllers.snap_controller import _find_portal_python
+    from skill_manager.utils.portal_utils import find_portal_python
 
     # First call: /usr/bin/python3 fails. Second call: sys.executable succeeds.
     results = iter(
@@ -498,27 +498,27 @@ def test_find_portal_python_falls_back_to_venv():
     with (
         patch("os.path.isfile", return_value=True),
         patch(
-            "skill_manager.controllers.snap_controller.subprocess.run",
+            "skill_manager.utils.portal_utils.subprocess.run",
         ) as mock_run,
     ):
         mock_run.side_effect = lambda *a, **kw: next(results)
 
-        result = _find_portal_python()
+        result = find_portal_python()
 
         assert result == sys.executable
         assert mock_run.call_count == 2
 
 
 def test_find_portal_python_returns_none_when_no_python_has_dbus():
-    """_find_portal_python returns None when no candidate has dbus."""
+    """find_portal_python returns None when no candidate has dbus."""
     from unittest.mock import MagicMock, patch
 
-    from skill_manager.controllers.snap_controller import _find_portal_python
+    from skill_manager.utils.portal_utils import find_portal_python
 
     with (
         patch("os.path.isfile", return_value=True),
         patch(
-            "skill_manager.controllers.snap_controller.subprocess.run",
+            "skill_manager.utils.portal_utils.subprocess.run",
         ) as mock_run,
     ):
         mock_proc = MagicMock()
@@ -526,22 +526,22 @@ def test_find_portal_python_returns_none_when_no_python_has_dbus():
         mock_proc.stdout = ""
         mock_run.return_value = mock_proc
 
-        result = _find_portal_python()
+        result = find_portal_python()
 
         assert result is None
 
 
 def test_find_portal_python_skips_nonexistent_files():
-    """_find_portal_python skips candidates that don't exist on disk."""
+    """find_portal_python skips candidates that don't exist on disk."""
     import sys
     from unittest.mock import MagicMock, patch
 
-    from skill_manager.controllers.snap_controller import _find_portal_python
+    from skill_manager.utils.portal_utils import find_portal_python
 
     with (
         patch("os.path.isfile", side_effect=lambda p: p == sys.executable),
         patch(
-            "skill_manager.controllers.snap_controller.subprocess.run",
+            "skill_manager.utils.portal_utils.subprocess.run",
         ) as mock_run,
     ):
         mock_proc = MagicMock()
@@ -549,7 +549,7 @@ def test_find_portal_python_skips_nonexistent_files():
         mock_proc.stdout = "ok"
         mock_run.return_value = mock_proc
 
-        result = _find_portal_python()
+        result = find_portal_python()
 
         assert result == sys.executable
         # Only sys.executable was tested (skipped /usr/bin/python3)
@@ -557,15 +557,15 @@ def test_find_portal_python_skips_nonexistent_files():
 
 
 def test_find_portal_python_skips_duplicates():
-    """_find_portal_python does not test the same candidate twice."""
+    """find_portal_python does not test the same candidate twice."""
     from unittest.mock import MagicMock, patch
 
-    from skill_manager.controllers.snap_controller import _find_portal_python
+    from skill_manager.utils.portal_utils import find_portal_python
 
     with (
         patch("os.path.isfile", return_value=True),
         patch(
-            "skill_manager.controllers.snap_controller.subprocess.run",
+            "skill_manager.utils.portal_utils.subprocess.run",
         ) as mock_run,
     ):
         mock_proc = MagicMock()
@@ -573,7 +573,7 @@ def test_find_portal_python_skips_duplicates():
         mock_proc.stdout = ""
         mock_run.return_value = mock_proc
 
-        result = _find_portal_python()
+        result = find_portal_python()
 
         assert result is None
         # Should only test unique candidates
