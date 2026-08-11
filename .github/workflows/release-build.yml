@@ -88,8 +88,12 @@ jobs:
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
           ./appimagetool --appimage-extract
-          sudo mv squashfs-root/AppRun /usr/local/bin/appimagetool
-          rm -rf squashfs-root appimagetool
+          # Keep the whole tree and symlink AppRun into PATH: AppRun resolves
+          # the real binary via readlink -f relative to itself, so moving only
+          # AppRun to /usr/local/bin would break that resolution.
+          sudo mv squashfs-root /usr/local/appimagetool
+          sudo ln -s /usr/local/appimagetool/AppRun /usr/local/bin/appimagetool
+          rm -f appimagetool
 
       - name: Build Linux artifacts
         run: uv run python scripts/build_linux.py --all
