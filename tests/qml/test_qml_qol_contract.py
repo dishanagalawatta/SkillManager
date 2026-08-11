@@ -470,7 +470,8 @@ def test_key_sequence_capture_proper_controller_path():
     """Verify that KeySequenceCapture maps correctly to AppController.config_controller.isRecordingShortcut."""
     ksc = (QML_DIR / "KeySequenceCapture.qml").read_text(encoding="utf-8")
 
-    assert "AppController.config_controller.isRecordingShortcut = root.active" in ksc
+    assert "AppController.config_controller.isRecordingShortcut = true" in ksc
+    assert "AppController.config_controller.isRecordingShortcut = false" in ksc
     assert "AppController.isRecordingShortcut =" not in ksc
 
 

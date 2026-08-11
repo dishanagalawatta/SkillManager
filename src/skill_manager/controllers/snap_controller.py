@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
@@ -247,6 +248,7 @@ class SnapController(QObject):
         self.current_full_pixmap = None
         self._snap_version = 0
         self._wayland_deferred = False
+        self._last_snap_time = 0.0
 
     @Property(int, notify=snapVersionChanged)
     def snapVersion(self):
@@ -298,6 +300,12 @@ class SnapController(QObject):
 
     @Slot()
     def takeSnap(self):
+        now = time.time()
+        if now - self._last_snap_time < 0.5:
+            logger.info("takeSnap ignored — duplicate call within 500ms")
+            return
+        self._last_snap_time = now
+
         logger.info(
             "takeSnap called, autoMinimize=%s",
             self.app.config_controller.autoMinimizeOnSnap,

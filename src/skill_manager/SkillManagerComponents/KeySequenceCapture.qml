@@ -21,10 +21,24 @@ Rectangle {
     Accessible.name: root.active ? "Recording shortcut. Press Escape to cancel, or Backspace to clear." : (root.sequence || "Click to record shortcut")
     Accessible.description: "Press Enter or Space to start recording. When recording, press Escape to cancel or Backspace to clear."
 
+    Timer {
+        id: recordingResetTimer
+        interval: 300
+        repeat: false
+        onTriggered: {
+            AppController.config_controller.isRecordingShortcut = false
+        }
+    }
+
     focus: active
     onActiveChanged: {
-        AppController.config_controller.isRecordingShortcut = root.active
-        if (active) root.forceActiveFocus()
+        if (active) {
+            recordingResetTimer.stop()
+            AppController.config_controller.isRecordingShortcut = true
+            root.forceActiveFocus()
+        } else {
+            recordingResetTimer.start()
+        }
     }
     
     onActiveFocusChanged: {

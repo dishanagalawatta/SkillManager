@@ -385,12 +385,9 @@ class TestPortalBackend:
         import json as _json
 
         payload = _json.loads(written)
-        assert payload == {
-            "cmd": "bind",
-            "id": "sm_7",
-            "description": "SkillManager hotkey",
-            "preferred_trigger": "<Control><Shift>S",
-        }
+        assert payload["cmd"] == "bind"
+        assert payload["id"].startswith("sm_7_")
+        assert payload["preferred_trigger"] == "<Control><Shift>S"
 
     def test_register_rejected_when_not_available(self):
         backend = PortalHotkeyBackend()
@@ -617,3 +614,19 @@ class TestManagerPortalFallback:
         backend.stop.assert_called_once()
         assert manager._portal_backend is None
         assert manager._portal_available is None
+
+    def test_portal_backend_updates_shortcut_with_new_portal_id(self):
+        backend = PortalHotkeyBackend()
+        backend._proc = MagicMock()
+        backend._proc.poll.return_value = None
+        backend._proc.stdin = MagicMock()
+        backend._started = True
+
+        assert backend.register(1, "Ctrl+Shift+S") is True
+        first_id = backend._shortcut_ids[1]
+        assert first_id.startswith("sm_1_")
+
+        assert backend.register(1, "Ctrl+Shift+D") is True
+        second_id = backend._shortcut_ids[1]
+        assert second_id.startswith("sm_1_")
+        assert first_id != second_id

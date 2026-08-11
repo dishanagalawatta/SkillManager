@@ -94,7 +94,10 @@ Rectangle {
                 iconSource: AppController.ui_controller.getAssetUri("ui/snap-icon.svg")
                 showLabel: root._topPhase < 2
                 Layout.alignment: Qt.AlignVCenter
-                onClicked: (mouse) => AppController.snap_controller.takeSnap()
+                onClicked: (mouse) => {
+                    window.pendingSnap = true
+                    AppController.snap_controller.takeSnap()
+                }
             }
 
             TopBarButton {
