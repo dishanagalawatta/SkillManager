@@ -450,8 +450,14 @@ class SnapController(QObject):
                 "project_root": project_path,
                 "is_snap": True,
             }
+            from skill_manager.utils.clipboard_service import ClipboardService
+
             ref = format_project_skill_reference(temp_skill, client_format)
-            QGuiApplication.clipboard().setText(ref)
+            service = getattr(self.app, "clipboard_service", None)
+            if isinstance(service, ClipboardService):
+                service.copy_text(ref)
+            else:
+                QGuiApplication.clipboard().setText(ref)
             self.app._set_status(f"Snap saved. Path copied: {ref}")
         else:
             QGuiApplication.clipboard().setPixmap(final_image)
