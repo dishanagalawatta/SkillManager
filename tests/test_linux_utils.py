@@ -14,6 +14,7 @@ from skill_manager.utils import linux
 
 def test_set_clipboard_wl_copy_success():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=True),
         patch("skill_manager.utils.linux._has_wl_copy", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
@@ -32,9 +33,49 @@ def test_set_clipboard_wl_copy_success():
         )
 
 
+def test_set_clipboard_xclip_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0)
+        assert linux.set_clipboard("hello_xclip") is True
+        mock_run.assert_called_once_with(
+            ["xclip", "-selection", "clipboard"],
+            input="hello_xclip",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+
+
+def test_set_clipboard_xsel_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=False),
+        patch("skill_manager.utils.linux._has_xsel", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0)
+        assert linux.set_clipboard("hello_xsel") is True
+        mock_run.assert_called_once_with(
+            ["xsel", "--clipboard", "--input"],
+            input="hello_xsel",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+
+
 def test_set_clipboard_all_fail():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
         patch("skill_manager.utils.linux._has_wl_copy", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=False),
+        patch("skill_manager.utils.linux._has_xsel", return_value=False),
         patch("skill_manager.utils.linux._has_pyperclip", return_value=False),
     ):
         assert linux.set_clipboard("hello") is False
@@ -42,11 +83,22 @@ def test_set_clipboard_all_fail():
 
 def test_get_clipboard_wl_paste_success():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=True),
         patch("skill_manager.utils.linux._has_wl_paste", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0, stdout="hello")
         assert linux.get_clipboard() == "hello"
+
+
+def test_get_clipboard_xclip_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0, stdout="hello_xclip")
+        assert linux.get_clipboard() == "hello_xclip"
 
 
 def test_send_ctrl_v_ydotool():

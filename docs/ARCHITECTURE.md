@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
 > Status: **Accepted** | Last reviewed: 2026-06-30
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md)
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md)
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
@@ -110,7 +110,10 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 |------|---------|
 | `qt_threading.py` | Qt-compatible thread management |
 | `task_runner.py` | `BackgroundTaskRunner` — async operations with Future tracking |
-| `win32.py` | Windows shell and UI utilities |
+| `clipboard_service.py` | Cross-platform verified dual-write clipboard service (ADR-0024) |
+| `linux.py` | Linux shell, active Wayland/X11 clipboard (`wl-copy`/`xclip`/`xsel`), and input automation |
+| `win32.py` | Windows shell, clipboard, and UI automation utilities |
+| `input_guard.py` | Injection safety guard enforcing test/offscreen isolation |
 
 ---
 

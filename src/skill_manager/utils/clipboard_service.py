@@ -186,11 +186,11 @@ class ClipboardService:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Native clipboard read-back failed: %s", exc)
                 return False
-            # wl-paste appends a trailing newline (terminal convention);
-            # strip it so exact comparison survives.
+            # wl-paste / xclip appends a trailing newline (terminal convention);
+            # strip it from both sides so exact comparison survives.
             if current is not None and normalize_newlines(current).rstrip(
                 "\r\n"
-            ) == normalize_newlines(content):
+            ) == normalize_newlines(content).rstrip("\r\n"):
                 return True
             time.sleep(0.05)
         logger.warning(
@@ -212,8 +212,20 @@ class ClipboardService:
             for attempt in (1, 2):
                 try:
                     qt.setText(content)
+                    if sys.platform == "linux" and hasattr(qt, "setText"):
+                        try:
+                            from PySide6.QtGui import QClipboard
+
+                            qt.setText(content, QClipboard.Mode.Selection)
+                        except Exception:  # noqa: BLE001
+                            pass
                     self._flush()
-                    if normalize_newlines(qt.text()) == normalize_newlines(content):
+                    if normalize_newlines(qt.text()).rstrip("\r\n") == normalize_newlines(
+                        content
+                    ).rstrip("\r\n"):
+                        # On Linux when Qt path is taken, also sync via fallback best-effort
+                        if sys.platform == "linux":
+                            self._fallback_write(content)
                         return True
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Qt clipboard write failed (attempt %d): %s", attempt, exc)
