@@ -227,12 +227,8 @@ def test_spec_file_exclusions_and_hiddenimports():
         "_UNIX_ONLY_EXCLUDES": unix_only,
         "_LINUX_EXCLUDES": linux_only,
     }
-    excludes_expr = next(
-        kw.value for kw in analysis_call.keywords if kw.arg == "excludes"
-    )
-    referenced_names = {
-        node.id for node in ast.walk(excludes_expr) if isinstance(node, ast.Name)
-    }
+    excludes_expr = next(kw.value for kw in analysis_call.keywords if kw.arg == "excludes")
+    referenced_names = {node.id for node in ast.walk(excludes_expr) if isinstance(node, ast.Name)}
     for name, expected in expected_lists.items():
         assert name in module_lists, f"Spec should define {name}"
         assert name in referenced_names, f"Spec excludes expression should reference {name}"
