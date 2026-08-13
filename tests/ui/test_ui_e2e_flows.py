@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -137,9 +138,10 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     def _fake_get_clipboard() -> str | None:
         return stored.get("content")
 
+    module_name = "win32" if sys.platform == "win32" else "linux"
     with (
-        patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
-        patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
+        patch(f"skill_manager.utils.{module_name}.set_clipboard", side_effect=_fake_set_clipboard),
+        patch(f"skill_manager.utils.{module_name}.get_clipboard", side_effect=_fake_get_clipboard),
     ):
         copy_btn.clicked.emit()
         qapp.processEvents()
