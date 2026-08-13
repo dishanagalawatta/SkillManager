@@ -136,7 +136,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     with patch(
         "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
-        side_effect=_fake_set_clipboard
+        side_effect=_fake_set_clipboard,
     ):
         copy_btn.clicked.emit()
         qapp.processEvents()

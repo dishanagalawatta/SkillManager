@@ -137,7 +137,7 @@ def test_controller_quick_copy_workflow(app_controller):
 
     with patch(
         "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
-        side_effect=_fake_set_clipboard
+        side_effect=_fake_set_clipboard,
     ):
         # Execute copy
         app_controller.ops.copySelectedSkillsToClipboard()
