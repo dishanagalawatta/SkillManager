@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -136,13 +135,9 @@ def test_controller_quick_copy_workflow(app_controller):
         stored["content"] = text
         return True
 
-    def _fake_get_clipboard() -> str | None:
-        return stored.get("content")
-
-    module_name = "win32" if sys.platform == "win32" else "linux"
-    with (
-        patch(f"skill_manager.utils.{module_name}.set_clipboard", side_effect=_fake_set_clipboard),
-        patch(f"skill_manager.utils.{module_name}.get_clipboard", side_effect=_fake_get_clipboard),
+    with patch(
+        "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
+        side_effect=_fake_set_clipboard
     ):
         # Execute copy
         app_controller.ops.copySelectedSkillsToClipboard()
