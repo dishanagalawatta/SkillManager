@@ -138,6 +138,11 @@ def _create_qapp() -> QGuiApplication:  # pragma: no cover
     # while the main window is minimized or hidden.
     app.setQuitOnLastWindowClosed(False)
 
+    # Set desktop file name immediately after creation so Wayland and X11 compositors map to .desktop file
+    if sys.platform == "linux":
+        app.setDesktopFileName("skill-manager")
+        _ensure_linux_desktop_integration()
+
     # Set application name and version for better shell integration
     app.setApplicationName("SkillManager")
     app.setApplicationVersion(skill_manager.__version__)
@@ -146,27 +151,112 @@ def _create_qapp() -> QGuiApplication:  # pragma: no cover
     return app
 
 
+def _ensure_linux_desktop_integration() -> None:  # pragma: no cover
+    """Ensure user-level desktop entries and multi-resolution icons exist for dock/taskbar."""
+    if sys.platform != "linux":
+        return
+    try:
+        import shutil
+
+        home = os.path.expanduser("~")
+        apps_dir = os.path.join(home, ".local", "share", "applications")
+        icons_base = os.path.join(home, ".local", "share", "icons", "hicolor")
+        bin_dir = os.path.join(home, ".local", "bin")
+
+        os.makedirs(apps_dir, exist_ok=True)
+        os.makedirs(bin_dir, exist_ok=True)
+
+        # 1. Ensure a working executable shim in ~/.local/bin if not globally installed
+        local_bin = os.path.join(bin_dir, "skill-manager")
+        if not os.path.exists("/usr/bin/skill-manager") and not os.path.exists(local_bin):
+            venv_bin = os.path.join(sys.prefix, "bin", "skill-manager")
+            if os.path.exists(venv_bin):
+                with contextlib.suppress(OSError):
+                    os.symlink(venv_bin, local_bin)
+
+        # 2. Ensure icon directories exist and populate multi-resolution icons under all stems
+        stems = ("skill-manager", "SkillManager", "org.dishanagalawatta.SkillManager")
+        for size, name in (
+            ("scalable", "logo.svg"),
+            ("256x256", "logo.png"),
+            ("128x128", "logo-128.png"),
+            ("64x64", "logo-64.png"),
+            ("48x48", "logo-64.png"),
+            ("32x32", "logo-64.png"),
+        ):
+            dest_dir = os.path.join(icons_base, size, "apps")
+            os.makedirs(dest_dir, exist_ok=True)
+            src_path = resolve_resource_path(f"assets/brand/{name}")
+            ext = ".svg" if name.endswith(".svg") else ".png"
+            for stem in stems:
+                dest_file = os.path.join(dest_dir, f"{stem}{ext}")
+                if os.path.exists(src_path) and not os.path.exists(dest_file):
+                    shutil.copy2(src_path, dest_file)
+
+        # 3. Ensure single canonical desktop file exists with absolute executable path and 0755 permissions
+        desktop_src = resolve_resource_path("packaging/linux/skill-manager.desktop")
+        primary_desktop = os.path.join(apps_dir, "skill-manager.desktop")
+        exec_target = (
+            "/usr/bin/skill-manager" if os.path.exists("/usr/bin/skill-manager") else local_bin
+        )
+
+        if os.path.exists(desktop_src):
+            with open(desktop_src, encoding="utf-8") as f:
+                content = f.read()
+            # If Exec is a bare command name, replace with absolute path for systemd / GNOME Shell validation
+            if "Exec=skill-manager" in content and os.path.exists(exec_target):
+                content = content.replace("Exec=skill-manager", f"Exec={exec_target}")
+            with open(primary_desktop, "w", encoding="utf-8") as f:
+                f.write(content)
+            with contextlib.suppress(OSError):
+                os.chmod(primary_desktop, 0o755)
+
+        # 4. Clean up any stale desktop aliases to keep only the single official launcher
+        for stale_alias in ("SkillManager.desktop", "org.dishanagalawatta.SkillManager.desktop"):
+            stale_path = os.path.join(apps_dir, stale_alias)
+            if os.path.exists(stale_path) or os.path.islink(stale_path):
+                with contextlib.suppress(OSError):
+                    os.remove(stale_path)
+    except Exception as e:
+        logger.debug(f"Desktop integration check skipped: {e}")
+
+
 def load_app_icon(app: QGuiApplication) -> tuple[QIcon, str]:  # pragma: no cover
-    """Load the application icon (PNG on Linux, ICO+PNG elsewhere).
+    """Load the application icon (PNG/SVG on Linux, ICO+PNG elsewhere).
 
     Returns ``(app_icon, loaded_icon_path)``; ``loaded_icon_path`` is empty
     when no icon could be loaded.
     """
-    # Robust icon loading — use PNG on Linux (Wayland/GNOME docks need PNG)
+    from PySide6.QtGui import QPixmap
+
     app_icon = QIcon()
     loaded_icon = False
     loaded_icon_path = ""
     if sys.platform == "linux":
-        icon_64 = resolve_resource_path("assets/brand/logo-64.png")
-        icon_128 = resolve_resource_path("assets/brand/logo-128.png")
-        icon_png = resolve_resource_path("assets/brand/logo.png")
-        for candidate in (icon_64, icon_128, icon_png):
+        # Check system icon theme first
+        theme_icon = QIcon.fromTheme("skill-manager")
+        if not theme_icon.isNull():
+            app_icon = theme_icon
+            loaded_icon = True
+            loaded_icon_path = "theme:skill-manager"
+
+        # Add bundled multi-resolution pixmaps as fallback/direct icons
+        for candidate in (
+            resolve_resource_path("assets/brand/logo.svg"),
+            resolve_resource_path("assets/brand/logo.png"),
+            resolve_resource_path("assets/brand/logo-128.png"),
+            resolve_resource_path("assets/brand/logo-64.png"),
+        ):
             if os.path.exists(candidate):
-                loaded_icon = True
-                app_icon.addFile(candidate)
+                pix = QPixmap(candidate)
+                if not pix.isNull():
+                    app_icon.addPixmap(pix)
+                    loaded_icon = True
+                    if not loaded_icon_path:
+                        loaded_icon_path = candidate
         if loaded_icon:
             app.setWindowIcon(app_icon)
-            logger.info(f"Set application icon from multi-size PNGs: {icon_64}, {icon_128}")
+            logger.info(f"Set application icon from: {loaded_icon_path}")
         # Wayland/GNOME derives dock icon from .desktop file matched via
         # setDesktopFileName, not from setWindowIcon.
         app.setDesktopFileName("skill-manager")
@@ -296,6 +386,8 @@ def _show_windows(engine, controller, app_icon) -> None:  # pragma: no cover
         root_any: Any = root
         if not app_icon.isNull():
             root_any.setIcon(app_icon)
+        if hasattr(root, "setTitle") and not root_any.title():
+            root_any.setTitle("SkillManager")
         if hasattr(root, "show"):
             # Set position explicitly on native QWindow handle before/during show
             root_any.setX(controller.ui.windowX)
@@ -524,7 +616,28 @@ def run_gui() -> None:  # pragma: no cover
 
     QTimer.singleShot(5000, lambda: _check_window_visible(engine))
 
+    # Configure SIGINT (Ctrl+C) and SIGTERM handlers with a QTimer heartbeat
+    # so Python interpreter regularly processes OS signals during the Qt event loop.
+    import signal
+
+    def _sigint_handler(*_args):
+        logger.info("Received interrupt signal (Ctrl+C) — initiating clean shutdown...")
+        app.quit()
+
+    try:
+        signal.signal(signal.SIGINT, _sigint_handler)
+        signal.signal(signal.SIGTERM, _sigint_handler)
+    except (ValueError, AttributeError):
+        pass
+
+    sig_timer = QTimer()
+    sig_timer.start(250)
+    sig_timer.timeout.connect(lambda: None)
+
     ret = app.exec()
+
+    # Stop signal timer upon event loop exit
+    sig_timer.stop()
 
     _shutdown_sequence(app, engine, controller, ret)
 

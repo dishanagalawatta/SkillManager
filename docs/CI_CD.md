@@ -9,6 +9,7 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 ```
 .github/workflows/
 ├── ci.yml                    # PR + main push gate (lint + test + security)
+├── auto-release.yml          # Automated version bump and git tagging on main push
 ├── release-build.yml         # Multi-platform packaging (Windows .exe + Linux .deb & AppImage)
 ├── _lint.yml                 # Ruff check + format (reusable)
 ├── _test-python.yml          # Test suite runner (reusable)
@@ -34,23 +35,34 @@ flowchart LR
 
 ---
 
-## Release Pipeline (`release-build.yml`)
+## Automated Versioning & Release Pipeline (`auto-release.yml` & `release-build.yml`)
 
-Releases are triggered by pushing a version tag `v*` (via `scripts/release.py`):
+Releases are fully automated from Git commits and tags:
 
 ```mermaid
 flowchart TD
-    A["Maintainer: uv run python scripts/release.py [patch|minor|major]"] --> B[Local Pre-flight: ruff + pytest]
-    B --> C[Synchronize versions in pyproject, __init__, iss, metainfo, README]
-    C --> D[Update CHANGELOG.md & create git tag vX.Y.Z]
-    D --> E[git push origin main --tags]
-    E --> F[GitHub Actions: release-build.yml triggers]
-    F --> G[Build Windows installer: SkillManager_Setup.exe]
-    F --> H[Build Linux .deb & AppImage]
-    G --> I[Compute SHA256 checksums: SHA256SUMS]
-    H --> I
-    I --> J[Publish GitHub Release with all binary assets]
-    J --> K[End users install/update via 1-command installer script]
+    subgraph "1. Developer Push"
+        A["git push origin main (with [patch], [minor], [major], or feat:/fix:)"]
+    end
+
+    subgraph "2. Auto Version Bump & Tagging (auto-release.yml)"
+        A --> B["auto-release.yml triggers on main"]
+        B --> C["Scan commit subject & body for SemVer tokens"]
+        C --> D["uv run python scripts/release.py auto --only-if-triggered"]
+        D --> E["Sync version in 6 metadata files & commit [skip ci]"]
+        E --> F["Create annotated git tag: vX.Y.Z"]
+        F --> G["Push commit & tag to origin main"]
+    end
+
+    subgraph "3. Multi-Platform Build & Publish (release-build.yml)"
+        G --> H["release-build.yml triggers on tag v*"]
+        H --> I["Build Windows installer: SkillManager_Setup.exe"]
+        H --> J["Build Linux .deb & AppImage"]
+        I --> K["Compute SHA256 checksums: SHA256SUMS"]
+        J --> K
+        K --> L["Publish GitHub Release with all binary assets"]
+        L --> M["End users install/update via 1-command installer script"]
+    end
 ```
 
 The Release workflow compiles all platform binaries on native GitHub runners, signs Windows installers (when certificate secrets are present), and attaches verified artifacts to the GitHub Release.

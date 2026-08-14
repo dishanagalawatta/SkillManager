@@ -6,36 +6,41 @@ This document explains the full release and versioning lifecycle for SkillManage
 
 ## Overview
 
-SkillManager supports two unified release mechanisms: **Commit-Based Opt-in Tokens** and the **Automated Release CLI (`scripts/release.py`)**:
+SkillManager supports two unified release mechanisms: **Commit-Based Opt-in Tokens** (fully automated via GitHub Actions) and the **Local Release CLI (`scripts/release.py`)**:
 
 ```mermaid
 flowchart TD
     subgraph "1. Triggering Version Bumps"
-        A1["Commit Tokens: [patch], [minor], [major]"] --> B["uv run python scripts/release.py"]
-        A2["Explicit CLI bump: patch, minor, major, X.Y.Z"] --> B
+        A1["Commit Tokens in Subject/Body: [patch], [minor], [major]"] --> B["Push to origin main"]
+        A2["Explicit Local CLI bump: patch, minor, major, X.Y.Z"] --> C["uv run python scripts/release.py"]
     end
 
-    subgraph "2. Release Orchestration"
-        B --> C[Local Pre-flight: ruff lint + pytest suite]
-        C --> D[Synchronize versions in pyproject, __init__, iss, metainfo, README]
-        D --> E[Update CHANGELOG.md]
-        E --> F["Create git commit & tag (vX.Y.Z)"]
+    subgraph "2. Automated CI/CD (auto-release.yml)"
+        B --> D["auto-release.yml triggers on main"]
+        D --> E["scripts/release.py auto --only-if-triggered"]
+        E --> F["Sync versions across 6 files, commit [skip ci] & tag vX.Y.Z"]
         F --> G["Push to origin main --tags"]
     end
 
-    subgraph "3. CI/CD Build & Distribution"
-        G --> H["GitHub Actions: release-build.yml triggers"]
-        H --> I["Build Windows .exe, Linux .deb & AppImage"]
-        I --> J["Compute SHA256SUMS & publish GitHub Release"]
-        J --> K["End users install/update via scripts/install.sh"]
+    subgraph "3. Local Orchestration"
+        C --> H["Pre-flight checks: ruff + pytest"]
+        H --> I["Sync version across 6 files, commit & tag vX.Y.Z"]
+        I --> G
+    end
+
+    subgraph "4. Multi-Platform Build & Distribution (release-build.yml)"
+        G --> J["release-build.yml triggers on tag v*"]
+        J --> K["Build Windows .exe, Linux .deb & AppImage"]
+        K --> L["Compute SHA256SUMS & publish GitHub Release"]
+        L --> M["End users install/update via scripts/install.sh"]
     end
 ```
 
 ---
 
-## Method 1: Commit-Based Version Bumping
+## Method 1: Commit-Based Automated Version Bumping
 
-You can declare version bumps directly within your Git commit messages using opt-in tokens:
+You can declare version bumps directly within your Git commit messages using opt-in tokens in the **subject or body**:
 
 | Token / Prefix | Bump Type | Result | Example Commit |
 |---|---|---|---|
@@ -44,9 +49,13 @@ You can declare version bumps directly within your Git commit messages using opt
 | `[major]` / `feat!:` | Major | `x.y.z` → `(x+1).0.0` | `feat!: redesign configuration API [major]` |
 | `[dev]` | Pre-release | `x.y.z` → `x.y.z-dev.N` | `fix: experiment with snapshot capture [dev]` |
 
-Commits **without** a token (e.g. `docs: update README`, `chore: lint`) will not trigger a version bump.
+### How It Operates
+1. Include the token anywhere in your commit message (e.g. `feat: add quick copy button [minor]` or in a bullet point inside the commit body `* Added new filter. [minor]`).
+2. When pushed to `main`, GitHub Actions (`.github/workflows/auto-release.yml`) scans all commits since the previous release tag.
+3. If an unreleased token is detected, it runs `scripts/release.py auto`, commits the version sync across all 6 metadata files, creates the `vX.Y.Z` git tag, and pushes to GitHub.
+4. The tag push immediately triggers `.github/workflows/release-build.yml` to compile and publish the multi-platform release.
 
-When ready to cut the release, running `uv run python scripts/release.py` will automatically inspect all unreleased commits since the last tag, calculate the highest priority bump (`major` > `minor` > `patch`), and apply it across all repository files.
+Commits **without** a token (e.g. `docs: update README`, `chore: lint`) will not trigger a version bump.
 
 ---
 

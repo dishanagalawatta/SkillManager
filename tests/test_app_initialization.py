@@ -82,3 +82,26 @@ def test_boot_normalization_self_healing(tmp_path, monkeypatch):
 
     assert controller._projects[0] == str(skills_dir.resolve())
     controller._config.set.assert_called_with("projects", controller._projects)
+
+
+def test_desktop_wmclass_and_app_id_sync():
+    """
+    Ensure the desktop file StartupWMClass matches the applicationName in bootstrap.py
+    and Main.qml title for correct taskbar/dock icon grouping on Linux and Windows.
+    """
+    repo_root = Path(__file__).parent.parent
+    desktop_file = repo_root / "packaging" / "linux" / "skill-manager.desktop"
+    desktop_content = desktop_file.read_text(encoding="utf-8")
+
+    assert "StartupWMClass=SkillManager" in desktop_content
+    assert "Icon=skill-manager" in desktop_content
+    assert "Exec=skill-manager %U" in desktop_content
+
+    bootstrap_file = repo_root / "src" / "skill_manager" / "bootstrap.py"
+    bootstrap_content = bootstrap_file.read_text(encoding="utf-8")
+    assert 'app.setDesktopFileName("skill-manager")' in bootstrap_content
+    assert 'app.setApplicationName("SkillManager")' in bootstrap_content
+
+    main_qml = repo_root / "src" / "skill_manager" / "SkillManagerComponents" / "Main.qml"
+    main_qml_content = main_qml.read_text(encoding="utf-8")
+    assert 'title: "SkillManager"' in main_qml_content

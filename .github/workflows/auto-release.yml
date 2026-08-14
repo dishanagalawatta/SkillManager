@@ -1,0 +1,53 @@
+name: Auto Version & Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'assets/**'
+      - '.agents/**'
+      - 'image/**'
+      - 'conductor/**'
+      - 'LICENSE'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release-main
+  cancel-in-progress: false
+
+jobs:
+  auto-release:
+    name: Auto Detect Release & Bump Version
+    # Prevent infinite loop: do not run if commit contains [skip ci]
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history and tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --only-group dev
+
+      - name: Configure Git Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Automated Release & Version Sync
+        run: |
+          uv run python scripts/release.py auto --only-if-triggered --skip-tests --skip-lint
