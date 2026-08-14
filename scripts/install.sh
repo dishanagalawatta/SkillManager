@@ -323,6 +323,18 @@ do_install() {
             run_as_root apt-get install -f -y
         fi
 
+        # Clean up any stale user-level desktop overrides or sync them
+        mkdir -p "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/scalable/apps" "$HOME/.local/share/icons/hicolor/128x128/apps"
+        if [ -f "/usr/share/applications/skill-manager.desktop" ]; then
+            cp -f "/usr/share/applications/skill-manager.desktop" "$HOME/.local/share/applications/skill-manager.desktop" 2>/dev/null || true
+        fi
+        if [ -f "/usr/share/icons/hicolor/scalable/apps/skill-manager.svg" ]; then
+            cp -f "/usr/share/icons/hicolor/scalable/apps/skill-manager.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/" 2>/dev/null || true
+        fi
+        if [ -f "/usr/share/icons/hicolor/128x128/apps/skill-manager.png" ]; then
+            cp -f "/usr/share/icons/hicolor/128x128/apps/skill-manager.png" "$HOME/.local/share/icons/hicolor/128x128/apps/" 2>/dev/null || true
+        fi
+
     elif [ "$pkg_type" = "appimage" ]; then
         local appimage_name="SkillManager-${raw_version}-x86_64.AppImage"
         local appimage_url="https://github.com/${REPO}/releases/download/${target_tag}/${appimage_name}"
@@ -366,12 +378,18 @@ EOF
         fi
     fi
 
-    # Update desktop database & caches
+    # Update desktop database & caches for both system and user directories
     if command -v update-desktop-database &>/dev/null; then
         update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+        if [ "$pkg_type" = "deb" ]; then
+            run_as_root update-desktop-database /usr/share/applications 2>/dev/null || true
+        fi
     fi
     if command -v gtk-update-icon-cache &>/dev/null; then
         gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+        if [ "$pkg_type" = "deb" ]; then
+            run_as_root gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+        fi
     fi
 
     echo ""
