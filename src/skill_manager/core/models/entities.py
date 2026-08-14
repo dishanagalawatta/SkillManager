@@ -22,7 +22,7 @@ class Skill:
     is_bundle: bool = False
     is_command: bool = False
     is_package: bool = False
-    is_screenshot: bool = False
+    is_snap: bool = False
     raw_content: str = ""
     body_content: str = ""
     risk: str = "Unknown"
@@ -89,7 +89,7 @@ class Skill:
             is_bundle=data.get("is_bundle", False),
             is_command=data.get("is_command", False),
             is_package=is_package,
-            is_screenshot=data.get("is_screenshot", False),
+            is_snap=data.get("is_snap", data.get("is_screenshot", False)),
             raw_content=data.get("raw_content", ""),
             body_content=data.get("body_content", ""),
             risk=data.get("risk", "Unknown"),
@@ -128,7 +128,7 @@ class Skill:
             is_bundle=data.get("is_bundle", False),
             is_command=data.get("is_command", False),
             is_package=is_package,
-            is_screenshot=data.get("is_screenshot", False),
+            is_snap=data.get("is_snap", data.get("is_screenshot", False)),
             raw_content=data.get("raw_content", ""),
             body_content=data.get("body_content", ""),
             risk=data.get("risk", "Unknown"),

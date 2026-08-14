@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRect, Signal, Slot
@@ -13,11 +14,12 @@ from PySide6.QtGui import QGuiApplication, QPixmap
 from skill_manager.core import quick_copy
 from skill_manager.core.image_processing import ImageProcessor
 from skill_manager.core.persistence import (
-    load_temp_screenshots_registry,
-    save_temp_screenshots_registry,
+    load_temp_snaps_registry,
+    save_temp_snaps_registry,
 )
-from skill_manager.core.schemas import ScreenshotParams
+from skill_manager.core.schemas import SnapParams
 from skill_manager.utils.notifications import close_notification, send_notification
+from skill_manager.utils.portal_utils import find_portal_python
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 #      skips the dialog entirely (GNOME refuses the dialog for unfocused
 #      apps, so pre-authorisation is what makes minimized captures work).
 #
-#   2. gnome-screenshot CLI       — last resort fallback (needs the
+#   2. gnome-screenshot CLI — last resort fallback (needs the
 #      binary installed).
 
 
@@ -52,10 +54,10 @@ _PORTAL_PERMISSION_IDS: tuple[str, ...] = (
 
 
 def _pre_authorize_portal(bus: QDBusConnection | None = None) -> None:
-    """Pre-authorize the screenshot portal via PermissionStore.
+    """Pre-authorize the snap portal via PermissionStore.
 
     xdg-desktop-portal resolves the calling process's *permissions ID*
-    (not the desktop-file app ID) and looks it up in the ``screenshot``
+    (not the desktop-file app ID) and looks it up in the ``snap``
     permission table under the permission ID ``screenshot``.  Only when
     that key is missing does the portal show the interactive access dialog
     — which GNOME 50 refuses for unfocused apps ("Only the focused app is
@@ -87,41 +89,11 @@ def _pre_authorize_portal(bus: QDBusConnection | None = None) -> None:
             "SetPermission",
             ["screenshot", True, "screenshot", permission_id, ["yes"]],
         )
-        logger.info("Pre-authorized screenshot portal for permission_id=%r", permission_id)
-
-
-def _find_portal_python() -> str | None:
-    """Find a Python interpreter with ``dbus`` and ``gi.repository`` available.
-
-    Priority order (deduplicated):
-    1. ``/usr/bin/python3`` — system Python (has ``python3-dbus`` /
-       ``python3-gi`` on standard GNOME installs).
-    2. ``sys.executable`` — current venv Python.
-    3. Any ``python3`` on ``PATH``.
-    """
-    seen: set[str] = set()
-    for candidate in ("/usr/bin/python3", sys.executable, "python3"):
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if not os.path.isfile(candidate):
-            continue
-        try:
-            result = subprocess.run(
-                [candidate, "-c", "import dbus, gi.repository; print('ok')"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return candidate
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    return None
+        logger.info("Pre-authorized snap portal for permission_id=%r", permission_id)
 
 
 def _portal_capture(output_path: str | None = None) -> str | None:
-    """Capture the full screen via the FreeDesktop Portal Screenshot API.
+    """Capture the full screen via the FreeDesktop Portal Snap API.
 
     Spawns ``portal_capture.py`` as a subprocess so the GLib mainloop it
     requires does not conflict with PySide6's event loop.  The permission
@@ -146,7 +118,7 @@ def _portal_capture(output_path: str | None = None) -> str | None:
         logger.error("Portal capture script not found: %s", script)
         return None
 
-    python_cmd = _find_portal_python()
+    python_cmd = find_portal_python()
     if python_cmd is None:
         logger.warning("Portal capture: no Python interpreter with dbus-python found")
         return None
@@ -180,7 +152,7 @@ def _portal_capture(output_path: str | None = None) -> str | None:
     return None
 
 
-def _gnome_screenshot_capture(output_path: str | None = None) -> str | None:
+def _gnome_snap_capture(output_path: str | None = None) -> str | None:
     """Fallback: full-screen capture via the ``gnome-screenshot`` CLI.
 
     Runs ``gnome-screenshot -f <path>`` silently (no UI).
@@ -216,7 +188,7 @@ def _gnome_screenshot_capture(output_path: str | None = None) -> str | None:
 def _capture_strategies():
     """Yield ``(name, callable)`` pairs tried in order on Wayland.
 
-    1. **Portal** — xdg-desktop-portal Screenshot API (primary).
+    1. **Portal** — xdg-desktop-portal Snap API (primary).
        Pre-authorises via PermissionStore so the dialog is skipped when
        the app has a desktop-file association.
 
@@ -226,34 +198,35 @@ def _capture_strategies():
     strategy functions.
     """
     yield "Portal", _portal_capture
-    yield "gnome-screenshot", _gnome_screenshot_capture
+    yield "gnome-snap", _gnome_snap_capture
 
 
 # ---------------------------------------------------------------------------
-# ScreenshotController
+# SnapController
 # ---------------------------------------------------------------------------
 
 
-class ScreenshotController(QObject):
+class SnapController(QObject):
     showOverlay = Signal()
     captureFinished = Signal(str)
     minimizeRequested = Signal()
     captureCancelled = Signal()
-    screenshotVersionChanged = Signal()
+    snapVersionChanged = Signal()
 
     def __init__(self, app_controller):
         super().__init__()
         self.app = app_controller
         self.current_full_pixmap = None
-        self._screenshot_version = 0
+        self._snap_version = 0
         self._wayland_deferred = False
+        self._last_snap_time = 0.0
 
-    @Property(int, notify=screenshotVersionChanged)
-    def screenshotVersion(self):
-        return self._screenshot_version
+    @Property(int, notify=snapVersionChanged)
+    def snapVersion(self):
+        return self._snap_version
 
     @Property(bool, notify=showOverlay)
-    def screenshotValid(self):
+    def snapValid(self):
         return self.current_full_pixmap is not None and not self.current_full_pixmap.isNull()
 
     @Slot()
@@ -264,7 +237,7 @@ class ScreenshotController(QObject):
             logger.warning("Exception during captureCancelled signal emission", exc_info=True)
         self.current_full_pixmap = None
         self._wayland_deferred = False
-        logger.info("Screenshot capture cancelled.")
+        logger.info("Snap capture cancelled.")
 
     @Slot()
     def notifyCapturePending(self):
@@ -275,6 +248,10 @@ class ScreenshotController(QObject):
         below).  Clicking the notification makes the app active, which lets
         the overlay map on top.
         """
+        logger.info(
+            "Capture overlay deferred: app window not active — "
+            "activation notification sent (one click/activation required)"
+        )
         send_notification("Skill Manager", "Capture is ready — click to start selecting")
 
     @Slot()
@@ -285,6 +262,7 @@ class ScreenshotController(QObject):
         user clicked the notification or the taskbar entry, making the app
         active again).  The notification is closed so it does not linger.
         """
+        logger.info("Capture overlay activation complete — mapping overlay now")
         close_notification()
 
     # ------------------------------------------------------------------
@@ -292,12 +270,18 @@ class ScreenshotController(QObject):
     # ------------------------------------------------------------------
 
     @Slot()
-    def takeScreenshot(self):
+    def takeSnap(self):
+        now = time.time()
+        if now - self._last_snap_time < 0.5:
+            logger.info("takeSnap ignored — duplicate call within 500ms")
+            return
+        self._last_snap_time = now
+
         logger.info(
-            "takeScreenshot called, autoMinimize=%s",
-            self.app.config_controller.autoMinimizeOnScreenshot,
+            "takeSnap called, autoMinimize=%s",
+            self.app.config_controller.autoMinimizeOnSnap,
         )
-        if self.app.config_controller.autoMinimizeOnScreenshot:
+        if self.app.config_controller.autoMinimizeOnSnap:
             self.minimizeRequested.emit()
             logger.info("Auto-minimize enabled, requesting window minimize.")
             return
@@ -315,7 +299,7 @@ class ScreenshotController(QObject):
     def _initiate_capture(self):
         screen = QGuiApplication.primaryScreen()
         if not screen:
-            logger.error("No primary screen detected for screenshot.")
+            logger.error("No primary screen detected for snap.")
             return
 
         self._wayland_deferred = False
@@ -334,20 +318,20 @@ class ScreenshotController(QObject):
 
     def _show_captured_pixmap(self):
         if self.current_full_pixmap is not None and not self.current_full_pixmap.isNull():
-            self.app.screenshot_provider.set_pixmap(self.current_full_pixmap)
-            self._screenshot_version += 1
-            self.screenshotVersionChanged.emit()
+            self.app.snap_provider.set_pixmap(self.current_full_pixmap)
+            self._snap_version += 1
+            self.snapVersionChanged.emit()
         self.showOverlay.emit()
-        logger.info("Screenshot overlay shown.")
+        logger.info("showOverlay signal emitted — QML decides how the overlay is mapped")
 
     def _fail_capture(self, message: str):
         self.current_full_pixmap = None
         self._wayland_deferred = False
-        self.app._set_status(f"Screenshot failed: {message}")
+        self.app._set_status(f"Snap failed: {message}")
         self.captureCancelled.emit()
 
     # ------------------------------------------------------------------
-    # Wayland deferred capture (called from saveScreenshot)
+    # Wayland deferred capture (called from saveSnap)
     # ------------------------------------------------------------------
 
     def _capture_full_screen(self) -> QPixmap | None:
@@ -382,7 +366,7 @@ class ScreenshotController(QObject):
         return None
 
     # ------------------------------------------------------------------
-    # Save processed screenshot
+    # Save processed snap
     # ------------------------------------------------------------------
 
     def _resolve_save_path(self, project_label_or_path: str | None) -> tuple[str, str, str]:
@@ -431,7 +415,7 @@ class ScreenshotController(QObject):
 
         Builds the target path ``<project_path>/.agents/screenshots/Screenshot_<ts>.png``,
         saves the file, copies a reference to the clipboard, and registers
-        the screenshot as a skill entry in both library models.
+        the snap as a skill entry in both library models.
 
         Returns the absolute filepath on success, or ``None`` on failure.
         """
@@ -443,19 +427,19 @@ class ScreenshotController(QObject):
         filepath = os.path.join(save_dir, filename)
 
         if not final_image.save(filepath, "PNG"):
-            logger.error("Failed to save screenshot to %s", filepath)
-            self.app._set_status("Failed to save screenshot.")
+            logger.error("Failed to save snap to %s", filepath)
+            self.app._set_status("Failed to save snap.")
             return None
 
         # -- Temporary screenshots registry --
-        if self.app.config_controller.temporaryScreenshots:
-            existing = load_temp_screenshots_registry()
+        if self.app.config_controller.temporarySnaps:
+            existing = load_temp_snaps_registry()
             updated = list(set(existing + [filepath]))
-            save_temp_screenshots_registry(updated)
+            save_temp_snaps_registry(updated)
 
         # -- Clipboard --
         client_format = self.app.clientFormat
-        auto_copy_client_format = self.app.config_controller.autoCopyScreenshotClientFormat
+        auto_copy_client_format = self.app.config_controller.autoCopySnapClientFormat
         if auto_copy_client_format or client_format == "Gemini CLI":
             from skill_manager.core.quick_copy import format_project_skill_reference
 
@@ -464,17 +448,23 @@ class ScreenshotController(QObject):
                 "folder_name": ".agents/screenshots",
                 "local_path": filepath,
                 "project_root": project_path,
-                "is_screenshot": True,
+                "is_snap": True,
             }
+            from skill_manager.utils.clipboard_service import ClipboardService
+
             ref = format_project_skill_reference(temp_skill, client_format)
-            QGuiApplication.clipboard().setText(ref)
-            self.app._set_status(f"Screenshot saved. Path copied: {ref}")
+            service = getattr(self.app, "clipboard_service", None)
+            if isinstance(service, ClipboardService):
+                service.copy_text(ref)
+            else:
+                QGuiApplication.clipboard().setText(ref)
+            self.app._set_status(f"Snap saved. Path copied: {ref}")
         else:
             QGuiApplication.clipboard().setPixmap(final_image)
-            self.app._set_status(f"Screenshot saved to {filename} and copied to clipboard.")
+            self.app._set_status(f"Snap saved to {filename} and copied to clipboard.")
 
         # -- Library registration --
-        self._cleanup_stale_screenshot_skills()
+        self._cleanup_stale_snap_skills()
 
         skill_data = {
             "name": filename,
@@ -486,9 +476,9 @@ class ScreenshotController(QObject):
             "project_root": project_path,
             "project_label": project_label_text,
             "main_category": "Special",
-            "category": "Screenshots",
-            "search_text": f"screenshot capture {filename}",
-            "is_screenshot": True,
+            "category": "Snaps",
+            "search_text": f"snap capture {filename}",
+            "is_snap": True,
             "metadata": {"category": "Capture"},
         }
 
@@ -496,12 +486,12 @@ class ScreenshotController(QObject):
         self.app._quick_copy_model.addOrUpdateSkills([skill_data])
         self.app.ops._refresh_selected_skill(filepath)
 
-        if "Screenshots" not in set(self.app._categories):
-            self.app._categories = sorted(set(self.app._categories) | {"Screenshots"})
+        if "Snaps" not in set(self.app._categories):
+            self.app._categories = sorted(set(self.app._categories) | {"Snaps"})
             self.app.categoriesChanged.emit()
 
         # -- Auto-select in Quick Copy --
-        if self.app.config_controller.autoSelectScreenshotInQuickCopy:
+        if self.app.config_controller.autoSelectSnapInQuickCopy:
             self.app.ui_controller.currentView = "QuickCopy"
             self.app._quick_copy_model.selectByPaths([filepath])
             self.app.set_selected_skill(skill_data)
@@ -509,8 +499,8 @@ class ScreenshotController(QObject):
         return filepath
 
     @Slot(QRect, list)
-    def saveScreenshot(self, crop_rect: QRect, raw_redactions: list):
-        """Orchestrate the screenshot save flow.
+    def saveSnap(self, crop_rect: QRect, raw_redactions: list):
+        """Orchestrate the snap save flow.
 
         1. If capture was deferred on Wayland, try portal / gnome-screenshot.
         2. Validate crop + redaction parameters via Pydantic.
@@ -530,7 +520,7 @@ class ScreenshotController(QObject):
                     "Use PrtSc / Shift+PrtSc as a workaround."
                 )
                 self.app._set_status(
-                    "Screenshot unavailable on this GNOME version. "
+                    "Snap unavailable on this GNOME version. "
                     "Use PrtSc or Super+Shift+S as a workaround."
                 )
                 self.captureCancelled.emit()
@@ -545,7 +535,7 @@ class ScreenshotController(QObject):
 
         # ---- Phase 2: Validate ----
         try:
-            params = ScreenshotParams(
+            params = SnapParams(
                 crop_x=crop_rect.x(),
                 crop_y=crop_rect.y(),
                 crop_width=crop_rect.width(),
@@ -553,7 +543,7 @@ class ScreenshotController(QObject):
                 redactions=raw_redactions,
             )
         except Exception as e:
-            logger.error("Validation failed for screenshot parameters: %s", e)
+            logger.error("Validation failed for snap parameters: %s", e)
             self.app._set_status("Failed to save: invalid crop or redaction parameters.")
             self.captureCancelled.emit()
             return
@@ -585,14 +575,14 @@ class ScreenshotController(QObject):
 
         self.captureFinished.emit(filepath)
 
-    def _cleanup_stale_screenshot_skills(self):
-        """Remove skill entries whose screenshot files no longer exist on disk."""
+    def _cleanup_stale_snap_skills(self):
+        """Remove skill entries whose snap files no longer exist on disk."""
         for model in (self.app._library_model, self.app._quick_copy_model):
             stale_paths = [
                 s.local_path
                 for s in model._all_skills
-                if s.is_screenshot and s.local_path and not Path(s.local_path).exists()
+                if s.is_snap and s.local_path and not Path(s.local_path).exists()
             ]
             if stale_paths:
-                logger.info("Removing %d stale screenshot entries", len(stale_paths))
+                logger.info("Removing %d stale snap entries", len(stale_paths))
                 model.removeSkillsByPath(stale_paths)

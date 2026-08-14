@@ -29,7 +29,7 @@ PROJECT_SKILL_OWNERSHIP_FILENAME = "project_skill_ownership.json"
 PACKAGE_SKILL_INVENTORY_FILENAME = "package_skill_inventory.json"
 SKILLS_LOCK_FILENAME = "skills-lock.json"
 TEMP_COPIES_FILENAME = "temp_copies.json"
-TEMP_SCREENSHOTS_FILENAME = "temp_screenshots.json"
+TEMP_SNAPS_FILENAME = "temp_screenshots.json"
 LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME = "project_skill_clipboard.json"
 DATA_FILENAMES = (
     CONFIG_FILENAME,
@@ -129,7 +129,7 @@ PROJECT_SKILL_OWNERSHIP_FILE = resolve_data_file(PROJECT_SKILL_OWNERSHIP_FILENAM
 PACKAGE_SKILL_INVENTORY_FILE = resolve_data_file(PACKAGE_SKILL_INVENTORY_FILENAME)
 SKILLS_LOCK_FILE = resolve_data_file(SKILLS_LOCK_FILENAME)
 TEMP_COPIES_FILE = resolve_data_file(TEMP_COPIES_FILENAME)
-TEMP_SCREENSHOTS_FILE = resolve_data_file(TEMP_SCREENSHOTS_FILENAME)
+TEMP_SNAPS_FILE = resolve_data_file(TEMP_SNAPS_FILENAME)
 SKILL_LIBRARY_CACHE_VERSION = 8
 
 DEFAULT_SHORTCUTS = {
@@ -154,7 +154,7 @@ DEFAULT_SHORTCUTS = {
     "settings_view": "Alt+4",
     # Tools
     "theme_toggle": "Ctrl+T",
-    "screenshot": "Ctrl+Shift+S",
+    "snap": "Ctrl+Shift+S",
 }
 
 DEFAULT_DISABLED_SHORTCUTS: list[str] = []
@@ -249,6 +249,11 @@ class ConfigManager:
                     self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
                     self.save()
                 else:
+                    # Migrate pre-rename "screenshot" key to "snap"
+                    shortcuts = self.data["shortcuts"]
+                    if "screenshot" in shortcuts and "snap" not in shortcuts:
+                        shortcuts["snap"] = shortcuts.pop("screenshot")
+                        self.save()
                     # Merge defaults for new shortcuts if any added in future versions
                     changed = False
                     for key, val in DEFAULT_SHORTCUTS.items():
@@ -257,6 +262,17 @@ class ConfigManager:
                             changed = True
                     if changed:
                         self.save()
+
+                # Migrate pre-rename "screenshot" entry in disabled_shortcuts
+                if (
+                    "disabled_shortcuts" in self.data
+                    and "screenshot" in self.data["disabled_shortcuts"]
+                ):
+                    self.data["disabled_shortcuts"] = [
+                        "snap" if item == "screenshot" else item
+                        for item in self.data["disabled_shortcuts"]
+                    ]
+                    self.save()
 
                 # Ensure disabled_shortcuts list is present
                 if "disabled_shortcuts" not in self.data:

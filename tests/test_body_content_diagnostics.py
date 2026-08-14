@@ -30,7 +30,7 @@ def test_set_selected_skill_preserves_body_content(app_controller):
             "name": "TestSkill",
             "local_path": "/test/path/skill.md",
             "is_command": False,
-            "is_screenshot": False,
+            "is_snap": False,
             "body_content": body_text,
         }
     )
@@ -103,7 +103,7 @@ def test_overlay_sees_body_content(app_controller, qapp):
             "name": "OverlayTest",
             "local_path": "/overlay/test/skill.md",
             "is_command": False,
-            "is_screenshot": False,
+            "is_snap": False,
             "body_content": body_text,
         }
     )
@@ -170,7 +170,7 @@ def test_structure_mutation_updates_body_content(app_controller, qapp):
         local_path="/test/path/skill.md",
         body_content="",  # EMPTY — as loaded from cache
         is_command=False,
-        is_screenshot=False,
+        is_snap=False,
     )
     preview_state = PreparedModelState(
         all_skills=[skill_no_body],
@@ -207,7 +207,7 @@ def test_structure_mutation_updates_body_content(app_controller, qapp):
         local_path="/test/path/skill.md",
         body_content=body_text,
         is_command=False,
-        is_screenshot=False,
+        is_snap=False,
     )
     full_state = PreparedModelState(
         all_skills=[skill_with_body],

@@ -23,6 +23,7 @@ os.environ["SKILL_MANAGER_DATA_DIR"] = str(Path.cwd() / "data")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import sentry_sdk
+
 import skill_manager
 
 sentry_sdk.init(

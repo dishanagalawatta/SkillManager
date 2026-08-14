@@ -18,6 +18,8 @@
 | [ADR-0021](docs/adr/ADR-0021-frozen-joblib-threads.md) | Frozen-build joblib backend override | Accepted | 2026-07-01 | @DIKKA |
 | [ADR-0022](docs/adr/ADR-0022-workspace-cleanup-standardization.md) | Workspace Cleanup & Gitignore Standardization | Accepted | 2026-07-29 | @DIKKA |
 | [ADR-0023](docs/adr/ADR-0023-workspace-docs-environment-standardization.md) | Workspace Documentation & Environment Standardization | Accepted | 2026-08-04 | @DIKKA |
+| [ADR-0024](docs/adr/ADR-0024-dual-write-clipboard-verification.md) | Verified Dual-Write Clipboard Handling | Accepted | 2026-08-12 | @DIKKA |
+| [ADR-0025](docs/adr/ADR-0025-selection-persistence-shutdown-sync.md) | Selection State Synchronization and Shutdown Persistence | Accepted | 2026-08-13 | @DIKKA |
 
 ## Template
 

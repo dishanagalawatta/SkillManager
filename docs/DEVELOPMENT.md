@@ -64,17 +64,17 @@ uv run ruff format src
 
 ### 2. Testing
 ```bash
-# Run all tests in parallel with clean progress (Recommended)
-python run_tests.py
-
-# Run with coverage
-uv run pytest --cov=skill_manager --cov-report=term-missing
+# Run all checks (lint + format check + parallel tests)
+python scripts/dev_test.py
 
 # Run parallel tests with xdist
 uv run pytest -n auto --dist loadfile
 
+# Run with coverage
+uv run pytest --cov=skill_manager --cov-report=term-missing
+
 # Run specific test file
-uv run pytest tests/test_parsing.py
+uv run pytest tests/test_version_sync.py
 ```
 
 ### 3. Manual Smoke Checklist
@@ -99,58 +99,42 @@ SkillManager maintains a strict parity between the Python categorization logic a
 ## Building Executables
 
 ### Automated Builds
-The GitHub Action `release.yml` automatically builds installers for Windows on version bumps.
+The GitHub Action `release-build.yml` automatically builds installers for Windows and Linux on version tag push (`v*`).
 
 ### Manual Builds
 To build locally for testing:
 
-1. **Run the Packaging Script**:
+1. **PyInstaller Application Build**:
    ```bash
    uv run skill-manager-build
-   ```
-   Or directly (auto-relaunches under venv if needed):
-   ```bash
+   # Or directly
    python scripts/build_app.py
    ```
-   *This script handles icon conversion (png -> ico) and invokes PyInstaller using the spec file.*
 
-2. **Dry-Run**:
+2. **Linux Packaging (`.deb` + `AppImage`)**:
    ```bash
-   uv run python scripts/build_app.py --dry-run
+   uv run skill-manager-build linux
+   # Or directly
+   uv run python scripts/build_linux.py --all
    ```
 
-3. **Windows Installer**:
-   Compile `packaging/windows/installer.iss` using Inno Setup to generate `SkillManager_Setup.exe`.
+3. **Windows Installer (`SkillManager_Setup.exe`)**:
+   ```powershell
+   .\packaging\windows\build.ps1 -SkipSign
+   ```
 
 ---
 
-## Release & CI/CD Strategy
+## Release Strategy
 
-SkillManager uses [release-please](https://github.com/googleapis/release-please-action) for automated releases from Conventional Commits. See `docs/CI_CD.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
+SkillManager uses `scripts/release.py` and GitHub Actions for automated releases. See `docs/RELEASING.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
 
-### 1. How Releases Work
-
-1. Push commits to `main` or `develop` following [Conventional Commits](https://www.conventionalcommits.org/)
-2. Release-please automatically opens/updates a Release PR
-3. Reviewer merges the Release PR → creates a git tag + GitHub Release
-4. CI builds artifacts and attaches them to the release
-
-### 2. Branch Strategy
-
-- **`develop` branch**: Development pre-releases (e.g., `v1.5.1-dev.1`)
-- **`main` branch**: Stable releases (e.g., `v1.5.0`)
-
-### 3. Commit Convention (Strict)
-
-All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-| Prefix | Type | Release Bump |
-|---|---|---|
-| `feat:` | New feature | Minor |
-| `fix:` | Bug fix | Patch |
-| `perf:` | Performance improvement | Patch |
-| `feat!:` | Breaking change | Major |
-| `chore:`, `docs:`, `test:`, `ci:` | Maintenance | None |
+```bash
+# Automated SemVer bump and release
+uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
+uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
+uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
+```
 
 ---
 
@@ -158,11 +142,14 @@ All commits MUST follow [Conventional Commits](https://www.conventionalcommits.o
 
 | Command | Description |
 |---|---|
-| `uv run skill-manager` | Launch the application |
-| `python run_tests.py` | Run unified linting and parallel tests |
+| `uv run skill-manager` | Launch the desktop application |
+| `python scripts/dev_test.py` | Run unified linting, formatting check, and test suite |
 | `uv run ruff check src tests` | Run linter only |
-| `uv run ruff format src` | Format code |
-| `uv run pytest` | Run unit tests |
-| `uv run skill-manager-build` | Build executable locally |
-| `python scripts/build_app.py` | Build executable (auto-relaunches under venv) |
+| `uv run ruff format src tests` | Format Python code |
+| `uv run pytest -n auto` | Run parallel unit tests |
+| `uv run skill-manager-build` | Build PyInstaller bundle |
+| `uv run skill-manager-build linux` | Build Linux `.deb` and `AppImage` |
+| `uv run python scripts/release.py [bump]` | Synchronize version across repo, tag, and release |
+| `bash scripts/install.sh` | 1-command installer/updater for Linux/Ubuntu |
+
 

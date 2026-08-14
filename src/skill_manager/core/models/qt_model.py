@@ -32,8 +32,8 @@ from skill_manager.core.models.roles import (
     IsFirstInSubcategoryRole,
     IsMainCollapsedRole,
     IsPackageRole,
-    IsScreenshotRole,
     IsSelectedRole,
+    IsSnapRole,
     IsStarredRole,
     IsSubCollapsedRole,
     MainCategoryNameRole,
@@ -144,8 +144,10 @@ class SkillModel(
             raw = self._config.get("project_selections", {})
             if raw:
                 self._selections_by_project = {k: list(v) for k, v in raw.items()}
-            initial_project = self.state.project_filter
-            if initial_project and initial_project in self._selections_by_project:
+            initial_project = (
+                self.state.project_filter if isinstance(self.state.project_filter, str) else ""
+            )
+            if initial_project in self._selections_by_project:
                 self._selected_ids = dict.fromkeys(self._selections_by_project[initial_project])
 
     def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # noqa: ARG002
@@ -210,8 +212,8 @@ class SkillModel(
             return skill.sub_category_name or self._engine.get_sub_category(skill)
         if role == self.IsPackageRole:
             return skill.is_package
-        if role == self.IsScreenshotRole:
-            return skill.is_screenshot
+        if role == self.IsSnapRole:
+            return skill.is_snap
         if role == self.EmojiRole:
             if not skill.is_command:
                 return None
@@ -248,7 +250,7 @@ class SkillModel(
             IsSubCollapsedRole: QByteArray(b"isSubCollapsed"),
             SubCategoryNameRole: QByteArray(b"subCategoryName"),
             IsPackageRole: QByteArray(b"isPackage"),
-            IsScreenshotRole: QByteArray(b"isScreenshot"),
+            IsSnapRole: QByteArray(b"isSnap"),
             EmojiRole: QByteArray(b"emoji"),
         }
 

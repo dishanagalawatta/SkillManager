@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
-> Status: **Accepted** | Last reviewed: 2026-06-30
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md)
+> Status: **Accepted** | Last reviewed: 2026-08-13
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md)
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
@@ -34,6 +34,7 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | Controller | Module | Purpose |
 |------------|--------|---------|
 | `UIController` | `ui_controller.py` | Application-wide UI state, window geometry, asset URI resolution |
+| `SelectedSkillController` | `selected_skill_controller.py` | Live-bound QObject managing currently and last selected skill properties |
 | `ConfigController` | `config_controller.py` (facade over `config/` mixins) | `ConfigManager` instance, skill sources, projects, shortcuts |
 | `OpsController` | `ops_controller.py` (facade over `ops/` mixins) | Copy, delete, archive, restore, starred state, custom commands |
 | `UpdateController` | `update_controller.py` | Background sync, Git source updates, progress reporting |
@@ -110,7 +111,10 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 |------|---------|
 | `qt_threading.py` | Qt-compatible thread management |
 | `task_runner.py` | `BackgroundTaskRunner` — async operations with Future tracking |
-| `win32.py` | Windows shell and UI utilities |
+| `clipboard_service.py` | Cross-platform verified dual-write clipboard service (ADR-0024) |
+| `linux.py` | Linux shell, active Wayland/X11 clipboard (`wl-copy`/`xclip`/`xsel`), and input automation |
+| `win32.py` | Windows shell, clipboard, and UI automation utilities |
+| `input_guard.py` | Injection safety guard enforcing test/offscreen isolation |
 
 ---
 
@@ -278,6 +282,38 @@ Three-part protocol to prevent "Object destroyed during incubation":
 
 ---
 
+## 12. Distribution & Release Architecture
+
+SkillManager uses a dual-track delivery pipeline: a zero-dependency, 1-command installer/updater for end users on Linux and Windows, and an automated SemVer release pipeline for maintainers:
+
+```mermaid
+flowchart TD
+    subgraph "End-User 1-Command Workflow (Zero Repo Cloning)"
+        A["curl -fsSL .../install.sh | bash"] --> B{Detect Linux Distro}
+        B -->|Ubuntu / Debian| C[Query GitHub API for latest .deb]
+        B -->|Other Linux / --appimage| D[Query GitHub API for latest AppImage]
+        C --> E[Download .deb to /tmp]
+        E --> F[sudo apt install -y /tmp/skill-manager_*.deb]
+        D --> G[Download to ~/.local/bin/skill-manager]
+        G --> H[Install desktop file & icons to ~/.local/share]
+        F --> I[Update desktop database & verify install]
+        H --> I
+    end
+
+    subgraph "Maintainer Release Flow"
+        M["uv run python scripts/release.py [bump]"] --> N[Pre-flight: Lint & Test]
+        N --> O[Sync versions across pyproject, __init__, iss, metainfo, README]
+        O --> P[Update CHANGELOG.md]
+        P --> Q["Git Commit & Tag vX.Y.Z"]
+        Q --> R["Git Push origin main --tags"]
+        R --> S["GitHub Actions: release-build.yml"]
+        S --> T["Publish GitHub Release (.deb, .AppImage, .exe, SHA256SUMS)"]
+        T --> A
+    end
+```
+
+---
+
 ## Cross-references
 
 | Document | Description |
@@ -289,3 +325,4 @@ Three-part protocol to prevent "Object destroyed during incubation":
 | [`docs/RELEASING.md`](RELEASING.md) | Release workflow |
 | [`docs/HOUSEKEEPING.md`](HOUSEKEEPING.md) | Cleanup rules |
 | [`ADR_INDEX.md`](../ADR_INDEX.md) | Architecture decisions |
+

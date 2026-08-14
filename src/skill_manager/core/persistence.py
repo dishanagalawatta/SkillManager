@@ -19,7 +19,7 @@ from skill_manager.core.config import (
     SKILL_LIBRARY_CACHE_FILE,
     SKILL_LIBRARY_STARRED_FILE,
     TEMP_COPIES_FILE,
-    TEMP_SCREENSHOTS_FILE,
+    TEMP_SNAPS_FILE,
 )
 from skill_manager.core.schemas import CacheState
 from skill_manager.utils.cooperative_lock import FileLock, LockTimeout
@@ -363,17 +363,17 @@ def load_temp_registry() -> list[str]:
         return []
 
 
-def save_temp_screenshots_registry(paths: list[str]) -> None:
-    """Saves the list of temporary screenshot paths to the registry."""
-    _atomic_write_json(TEMP_SCREENSHOTS_FILE, {"temp_paths": paths})
+def save_temp_snaps_registry(paths: list[str]) -> None:
+    """Saves the list of temporary snap paths to the registry."""
+    _atomic_write_json(TEMP_SNAPS_FILE, {"temp_paths": paths})
 
 
-def load_temp_screenshots_registry() -> list[str]:
-    """Loads the list of temporary screenshot paths from the registry."""
-    if not os.path.exists(TEMP_SCREENSHOTS_FILE):
+def load_temp_snaps_registry() -> list[str]:
+    """Loads the list of temporary snap paths from the registry."""
+    if not os.path.exists(TEMP_SNAPS_FILE):
         return []
     try:
-        with open(TEMP_SCREENSHOTS_FILE, "rb") as f:
+        with open(TEMP_SNAPS_FILE, "rb") as f:
             data = orjson.loads(f.read())
             return data.get("temp_paths", [])
     except Exception as e:

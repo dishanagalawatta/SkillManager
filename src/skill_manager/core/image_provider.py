@@ -7,8 +7,8 @@ from PySide6.QtQuick import QQuickImageProvider
 logger = logging.getLogger(__name__)
 
 
-class ScreenshotImageProvider(QQuickImageProvider):
-    """Provides the captured screenshot to QML via image://screenshot/current."""
+class SnapImageProvider(QQuickImageProvider):
+    """Provides the captured snap to QML via image://snap/current."""
 
     def __init__(self):
         super().__init__(QQuickImageProvider.ImageType.Pixmap)  # type: ignore[attr-defined]

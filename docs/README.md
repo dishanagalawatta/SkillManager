@@ -1,6 +1,6 @@
 # SkillManager Documentation
 
-> Complete documentation hub for SkillManager v1.8.0.
+> Complete documentation hub for SkillManager v1.9.0.
 > For the project overview, quickstart, and architecture summary, see the [root README](../README.md).
 
 ---
@@ -9,7 +9,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [INSTALL.md](INSTALL.md) | Installation instructions for all platforms |
+| [INSTALL.md](INSTALL.md) | 1-command install, update, and uninstall instructions for all platforms |
 | [USER_GUIDE.md](USER_GUIDE.md) | End-user manual: Library, QuickCopy, Settings, Screenshot |
 | [ENVIRONMENT.md](ENVIRONMENT.md) | Full environment variable reference |
 | [../environments/README.md](../environments/README.md) | Tier-specific env setup (dev / staging / prod) |

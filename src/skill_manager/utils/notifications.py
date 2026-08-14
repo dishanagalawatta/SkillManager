@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtDBus import QDBusConnection, QDBusMessage
+from PySide6.QtDBus import QDBus, QDBusConnection, QDBusMessage
 
 _SERVICE = "org.freedesktop.Notifications"
 _PATH = "/org/freedesktop/Notifications"
@@ -60,8 +60,8 @@ def send_notification(title: str, body: str) -> int:
         return 0
     message = QDBusMessage.createMethodCall(_SERVICE, _PATH, _INTERFACE, _METHOD_NOTIFY)
     message.setArguments([_APP_ID, 0, "", title, body, [], {}, 0])
-    # PySide6 exposes the CallMode enum as plain ints: WithBlock=0, NoEventLoop=1.
-    reply = session_bus.call(message, 1, 500)
+    # QDBus.CallMode enum required — a raw int raises TypeError on PySide6 6.11.
+    reply = session_bus.call(message, QDBus.CallMode.Block, 500)
     try:
         notification_id = int(reply.arguments()[0])
     except (IndexError, TypeError, ValueError):
@@ -81,5 +81,5 @@ def close_notification() -> None:
         return
     message = QDBusMessage.createMethodCall(_SERVICE, _PATH, _INTERFACE, _METHOD_CLOSE)
     message.setArguments([_last_notification_id])
-    session_bus.call(message, 1, 500)
+    session_bus.call(message, QDBus.CallMode.Block, 500)
     _last_notification_id = 0

@@ -63,7 +63,7 @@ Rectangle {
 
     // --- State ---
     property string imagePath: {
-        if (!root._sel || !root._sel.is_screenshot || !root._sel.local_path) return "";
+        if (!root._sel || !root._sel.is_snap || !root._sel.local_path) return "";
         let p = root._sel.local_path.replace(/\\/g, "/");
         if (p.startsWith("/")) return "file://" + p;
         return "file:///" + p;
@@ -599,9 +599,9 @@ Rectangle {
                     }
                 }
 
-                // Placeholder shown when screenshot file is missing
+                // Placeholder shown when snap file is missing
                 Rectangle {
-                    visible: root.imageLoadFailed && root._sel && root._sel.is_screenshot
+                    visible: root.imageLoadFailed && root._sel && root._sel.is_snap
                     anchors.centerIn: parent
                     width: 320
                     height: 120
@@ -616,7 +616,7 @@ Rectangle {
 
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: "Screenshot file not found"
+                            text: "Snap file not found"
                             color: "#AAFFFFFF"
                             font.pixelSize: 14
                             font.bold: true
@@ -1785,7 +1785,6 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Z"
-        context: Qt.ApplicationShortcut
         onActivated: {
             if (root.annotations.length > 0) {
                 if (root.selectedIndex >= 0) {
@@ -1805,7 +1804,6 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Escape"
-        context: Qt.ApplicationShortcut
         onActivated: {
             if (root.isTextInputActive) {
                 root.isTextInputActive = false
@@ -1822,28 +1820,24 @@ Rectangle {
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+0"
-        context: Qt.ApplicationShortcut
         onActivated: zoomToFit()
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+1"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = 1.0
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Plus"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = Math.min(root.maxZoom, root.zoomLevel + 0.25)
     }
 
     Shortcut {
         enabled: root.visible
         sequence: "Ctrl+Minus"
-        context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = Math.max(root.minZoom, root.zoomLevel - 0.25)
     }
 

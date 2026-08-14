@@ -270,12 +270,17 @@ ScrollView {
                 sequenceBinding: AppController.config_controller ? AppController.config_controller.shortcutThemeToggle : ""
                 isEnabledBinding: AppController.config_controller ? AppController.config_controller.shortcutThemeToggleEnabled : false
             }
-            Separator {}
+        }
+
+        // --- Global Hotkeys ---
+        ShortcutGroup {
+            groupTitle: "Global Hotkeys"
+
             ShortcutRow {
-                titleText: "Screenshot"
-                actionKey: "screenshot"
-                sequenceBinding: AppController.config_controller ? AppController.config_controller.shortcutScreenshot : ""
-                isEnabledBinding: AppController.config_controller ? AppController.config_controller.shortcutScreenshotEnabled : false
+                titleText: "Snap"
+                actionKey: "snap"
+                sequenceBinding: AppController.config_controller ? AppController.config_controller.shortcutSnap : ""
+                isEnabledBinding: AppController.config_controller ? AppController.config_controller.shortcutSnapEnabled : false
             }
         }
 

@@ -52,6 +52,7 @@ a property on `AppController` and is independently testable.
 | `ui` | `UiController` | `controllers/ui_controller.py` | View selection, modal state. |
 | `screenshot` | `ScreenshotController` | `controllers/screenshot_controller.py` | Capture + annotate. |
 | `image_inspector` | `ImageInspectorController` | `controllers/image_inspector_controller.py` | Image inspection. |
+| `selected_skill` | `SelectedSkillController` | `controllers/selected_skill_controller.py` | Live-bound selection state management & persistence. |
 | `app_update` | `AppUpdateController` | `controllers/app_update_controller.py` | Self-update pipeline. |
 
 ## 3. Q_PROPERTY Surface (selected)
@@ -89,6 +90,11 @@ a property on `AppController` and is independently testable.
 | `deleteCustomCommand(command_name: str, project_labels: QStringList)` | `None` | Removes command from all listed projects. |
 | `setCurrentProject(label: str)` | `None` | Set the active project; the prior project is recorded as `lastProject`. |
 | `cycleProject()` | `None` | Swap `currentProject` and `lastProject`. No-op when no previous project exists. |
+| `ops.copyTextToClipboard(content)` | `None` | Copy raw text to system clipboard via verified dual-write (`ClipboardService`). |
+| `ops.copySelectedSkillsToClipboard()` | `None` | Copy references of all selected skills for current project to clipboard. |
+| `ops.copySkillReference(skill, arg)` | `None` | Format and copy a skill reference to system clipboard. |
+| `ops.copyCollectionToClipboard(name)` | `None` | Copy skill references of a collection to clipboard and trigger auto-paste. |
+| `ops.copyCurrentSelectionOrFocusedSkill()` | `None` | Copy current selection or focused skill reference to system clipboard. |
 
 **Side effect.** `updateCustomCommandFull` and `createCustomCommand` may
 emit `selectedSkillChanged` as a side effect of refreshing the

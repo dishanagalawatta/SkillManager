@@ -2,67 +2,58 @@
 
 ## Overview
 
-SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, and python-semantic-release with opt-in tokens for automated releases.
+SkillManager uses GitHub Actions with industry-standard practices: pinned action SHAs, reusable workflows, and automated release builds triggering on tag pushes.
 
 ## Workflows
 
 ```
 .github/workflows/
-├── ci.yml                    # PR + main/develop push gate
-├── release.yml               # semantic-release + build + attach assets
+├── ci.yml                    # PR + main push gate (lint + test + security)
+├── release-build.yml         # Multi-platform packaging (Windows .exe + Linux .deb & AppImage)
 ├── _lint.yml                 # Ruff check + format (reusable)
-├── _test-python.yml          # Test on Windows (reusable)
+├── _test-python.yml          # Test suite runner (reusable)
 ├── _build-pyinstaller.yml    # PyInstaller build for Windows (reusable)
 └── _security-scan.yml        # pip-audit (reusable)
 ```
 
 ## CI Pipeline (`ci.yml`)
 
-Triggers: push to `main`/`develop`, pull requests, manual dispatch.
+Triggers: push to `main`, pull requests, manual dispatch.
 
-```
-lint ──────────────────┐
-test-py312 (Windows) ──┤
-test-py313 (Windows) ──┼──► ci-gate (must all pass)
-security-scan ────────┘
-```
-
-**Concurrency**: PR runs cancel on new push; main/develop runs queue.
-
-## Release Pipeline (`release.yml`)
-
-Uses [python-semantic-release](https://python-semantic-release.readthedocs.io/) with opt-in tokens for automated releases.
-
-```
-Push to main (with [patch]/[minor]/[major]/[dev] token)
-  └─► CI workflow runs (lint, tests, security, gate)
-        └─► Release workflow triggers on CI completion
-              └─► Semantic Release (version bump + tag + GitHub Release)
-                    └─► Build (PyInstaller on Windows)
-                          └─► Attach Assets (upload to GitHub Release)
-                                └─► Users download from GitHub Releases
+```mermaid
+flowchart LR
+    A[PR / Push to main] --> B[Lint: ruff]
+    A --> C["Test: Python 3.12 (Ubuntu)"]
+    A --> D["Test: Python 3.13 (Ubuntu)"]
+    B --> E[CI Gate: all checks pass]
+    C --> E
+    D --> E
 ```
 
-The Release workflow is gated on CI success via `workflow_run` trigger.
+**Concurrency**: PR runs cancel on new push; main runs queue.
 
-### Opt-In Release Tokens
+---
 
-| Token | Version Bump | Example |
-|---|---|---|
-| `[patch]` | Patch (`x.y.z` → `x.y.(z+1)`) | `fix: ui alignment [patch]` |
-| `[minor]` | Minor (`x.y.z` → `x.(y+1).0`) | `feat: add new view [minor]` |
-| `[major]` | Major (`x.y.z` → `(x+1).0.0`) | `feat!: redesign API [major]` |
-| `[dev]` | Pre-release (`x.y.z-dev.N`) | `fix: experiment [dev]` |
+## Release Pipeline (`release-build.yml`)
 
-Commits without a token are ignored by the release system.
+Releases are triggered by pushing a version tag `v*` (via `scripts/release.py`):
 
-### Branch Strategy
+```mermaid
+flowchart TD
+    A["Maintainer: uv run python scripts/release.py [patch|minor|major]"] --> B[Local Pre-flight: ruff + pytest]
+    B --> C[Synchronize versions in pyproject, __init__, iss, metainfo, README]
+    C --> D[Update CHANGELOG.md & create git tag vX.Y.Z]
+    D --> E[git push origin main --tags]
+    E --> F[GitHub Actions: release-build.yml triggers]
+    F --> G[Build Windows installer: SkillManager_Setup.exe]
+    F --> H[Build Linux .deb & AppImage]
+    G --> I[Compute SHA256 checksums: SHA256SUMS]
+    H --> I
+    I --> J[Publish GitHub Release with all binary assets]
+    J --> K[End users install/update via 1-command installer script]
+```
 
-- **`main`**: Stable releases (`vX.Y.Z`) or pre-releases with `[dev]` token
-
-### Breaking Changes
-
-Use the `[major]` token: `feat!: redesign API [major]`
+The Release workflow compiles all platform binaries on native GitHub runners, signs Windows installers (when certificate secrets are present), and attaches verified artifacts to the GitHub Release.
 
 ## Action Pinning
 
@@ -126,4 +117,4 @@ Ensure commits on `main` include an opt-in token (`[patch]`, `[minor]`, `[major]
 
 ### Artifact upload fails
 
-Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release.yml).
+Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml).

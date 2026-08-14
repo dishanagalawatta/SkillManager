@@ -44,15 +44,48 @@ class ClipboardMixin:
         logger.error("No clipboard backend available on AppController")
         return False
 
+    def _flush_incubation_if_needed(self):
+        """Ensure incubation is ended and pending model signals are replayed before clipboard operations."""
+        model = getattr(self.app, "skillModel", None)
+        if model is not None and getattr(model, "_incubating", False):
+            if hasattr(model, "_force_end_incubation"):
+                model._force_end_incubation()
+            if hasattr(model, "onIncubationReady"):
+                model.onIncubationReady()
+
+    def _find_skill_by_path(self, path: str):
+        """Locate skill entity across all_filtered_skills, all_skills, or discovery state."""
+        self._flush_incubation_if_needed()
+        model = getattr(self.app, "skillModel", None)
+        if model is not None:
+            filtered = getattr(model, "_all_filtered_skills", [])
+            for s in filtered:
+                if _get_item_attr(s, "local_path") == path:
+                    return s
+            all_skills = getattr(model, "_all_skills", [])
+            for s in all_skills:
+                if _get_item_attr(s, "local_path") == path:
+                    return s
+
+        dc = getattr(self.app, "discovery_controller", None)
+        if dc is not None:
+            state = getattr(dc, "_last_prepared_state", None)
+            if state is not None:
+                for s in getattr(state, "all_skills", []):
+                    if _get_item_attr(s, "local_path") == path:
+                        return s
+        return None
+
     def _safe_format_reference(self, skill, fallback: str) -> str:
         """Format a skill reference; a malformed skill must never abort the copy."""
+        self._flush_incubation_if_needed()
         from skill_manager.core.quick_copy import format_project_skill_reference
 
         try:
             return format_project_skill_reference(
                 skill,
                 self.app._client_format,
-                all_skills=self.app.skillModel._all_skills,
+                all_skills=getattr(self.app.skillModel, "_all_skills", []),
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to format skill reference for %r: %s", fallback, exc)
@@ -66,10 +99,7 @@ class ClipboardMixin:
     @Slot(str)
     def copySkillToClipboard(self, path: str):
         """Finds skill by path and copies its reference to clipboard."""
-        skill = next(
-            (s for s in self.app.skillModel._all_skills if _get_item_attr(s, "local_path") == path),
-            None,
-        )
+        skill = self._find_skill_by_path(path)
         if skill:
             self.copySkillReference(skill)  # type: ignore[arg-type]
         else:
@@ -78,6 +108,7 @@ class ClipboardMixin:
     @Slot()
     def copyCurrentSelectionOrFocusedSkill(self):
         """Orchestrates copying based on selection or focus."""
+        self._flush_incubation_if_needed()
         if self.app.skillModel.selectedCount > 0:
             self.copySelectedSkillsToClipboard()
             return
@@ -92,7 +123,7 @@ class ClipboardMixin:
                 "body_content": selected.body_content,
                 "description": selected.description,
                 "is_command": selected.is_command,
-                "is_screenshot": selected.is_screenshot,
+                "is_snap": selected.is_snap,
             }
             self.copySkillReference(data)
             return
@@ -105,6 +136,7 @@ class ClipboardMixin:
     @Slot()
     def copySelectedSkillsToClipboard(self):
         """Copies selected skill references for the current project to clipboard."""
+        self._flush_incubation_if_needed()
         paths = self.app.skillModel.getFilteredSelectedPaths()
         if not paths:
             self.app._set_status("No skills selected")
@@ -112,9 +144,7 @@ class ClipboardMixin:
 
         references = []
         for path in paths:
-            skill = next(
-                (s for s in self.app.skillModel._all_filtered_skills if s.local_path == path), None
-            )
+            skill = self._find_skill_by_path(path)
             if skill:
                 references.append(self._safe_format_reference(skill, path))
             else:
@@ -130,6 +160,7 @@ class ClipboardMixin:
     @Slot(str)
     def copyTextToClipboard(self, content: str):
         """Copies raw text to system clipboard."""
+        self._flush_incubation_if_needed()
         if self._write_clipboard(str(content)):
             self.app._set_status("Copied to clipboard")
             self._maybeMinimizeOnCopy()
@@ -139,6 +170,7 @@ class ClipboardMixin:
     @Slot(dict, str)
     def copySkillReference(self, skill: dict, arg: str = ""):
         """Copies a formatted skill reference to clipboard."""
+        self._flush_incubation_if_needed()
         ref = self._safe_format_reference(skill, _get_item_attr(skill, "local_path"))
         if arg:
             ref += f"({arg})"
@@ -151,6 +183,7 @@ class ClipboardMixin:
     @Slot(str)
     def copyCollectionToClipboard(self, name: str):
         """Copies a collection's skill references to clipboard and auto-pastes."""
+        self._flush_incubation_if_needed()
         entry = self.app._custom_collections.get(name, {})
         if not isinstance(entry, dict):
             return
@@ -162,7 +195,7 @@ class ClipboardMixin:
 
         references = []
         for path in paths:
-            skill = next((s for s in self.app.skillModel._all_skills if s.local_path == path), None)
+            skill = self._find_skill_by_path(path)
             if skill:
                 references.append(self._safe_format_reference(skill, path))
             else:
@@ -191,7 +224,24 @@ class ClipboardMixin:
         if _sys.platform == "win32":
             from skill_manager.utils.win32 import send_paste_to_focused_window as _paste
         else:
-            from skill_manager.utils.linux import send_paste_to_focused_window as _paste
+            from skill_manager.utils.linux import (
+                send_paste_to_focused_window as _paste,
+                ydotool_daemon_health,
+            )
 
-        if not _paste():
-            self.app._set_status("Copied, but could not paste automatically")
+        if _paste():
+            return
+        if _sys.platform != "win32":
+            health = ydotool_daemon_health()
+            if health == "not-installed":
+                self.app._set_status(
+                    "Copied, but could not paste automatically — ydotool is not installed"
+                )
+                return
+            if health == "daemon-down":
+                self.app._set_status(
+                    "Copied, but could not paste automatically — ydotool daemon "
+                    "(ydotoold) is not running"
+                )
+                return
+        self.app._set_status("Copied, but could not paste automatically")

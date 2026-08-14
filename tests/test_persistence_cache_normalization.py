@@ -98,7 +98,7 @@ def test_load_cache_normalizes_project_paths(tmp_path):
                 "is_bundle": False,
                 "is_command": False,
                 "is_package": False,
-                "is_screenshot": False,
+                "is_snap": False,
                 "category": "General",
                 "description": "",
                 "risk": "Unknown",

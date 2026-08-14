@@ -14,6 +14,7 @@ from skill_manager.utils import linux
 
 def test_set_clipboard_wl_copy_success():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=True),
         patch("skill_manager.utils.linux._has_wl_copy", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
@@ -32,9 +33,49 @@ def test_set_clipboard_wl_copy_success():
         )
 
 
+def test_set_clipboard_xclip_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0)
+        assert linux.set_clipboard("hello_xclip") is True
+        mock_run.assert_called_once_with(
+            ["xclip", "-selection", "clipboard"],
+            input="hello_xclip",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+
+
+def test_set_clipboard_xsel_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=False),
+        patch("skill_manager.utils.linux._has_xsel", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0)
+        assert linux.set_clipboard("hello_xsel") is True
+        mock_run.assert_called_once_with(
+            ["xsel", "--clipboard", "--input"],
+            input="hello_xsel",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+
+
 def test_set_clipboard_all_fail():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
         patch("skill_manager.utils.linux._has_wl_copy", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=False),
+        patch("skill_manager.utils.linux._has_xsel", return_value=False),
         patch("skill_manager.utils.linux._has_pyperclip", return_value=False),
     ):
         assert linux.set_clipboard("hello") is False
@@ -42,6 +83,7 @@ def test_set_clipboard_all_fail():
 
 def test_get_clipboard_wl_paste_success():
     with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=True),
         patch("skill_manager.utils.linux._has_wl_paste", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
@@ -49,14 +91,44 @@ def test_get_clipboard_wl_paste_success():
         assert linux.get_clipboard() == "hello"
 
 
+def test_get_clipboard_xclip_success():
+    with (
+        patch("skill_manager.utils.linux.is_wayland_active", return_value=False),
+        patch("skill_manager.utils.linux._has_xclip", return_value=True),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0, stdout="hello_xclip")
+        assert linux.get_clipboard() == "hello_xclip"
+
+
 def test_send_ctrl_v_ydotool():
     with (
         patch("skill_manager.utils.linux.injection_allowed", return_value=True),
         patch("skill_manager.utils.linux._has_ydotool", return_value=True),
+        patch("skill_manager.utils.linux._ydotool_daemon_alive", return_value=True),
         patch("skill_manager.utils.linux.subprocess.run") as mock_run,
     ):
+        mock_run.return_value = MagicMock(returncode=0)
         assert linux.send_ctrl_v() is True
-        mock_run.assert_called_once()
+        mock_run.assert_called_once_with(
+            ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+
+def test_send_ctrl_v_daemon_down():
+    """Daemon down: ydotool path must be skipped, no subprocess call."""
+    with (
+        patch("skill_manager.utils.linux.injection_allowed", return_value=True),
+        patch("skill_manager.utils.linux._has_ydotool", return_value=True),
+        patch("skill_manager.utils.linux._ydotool_daemon_alive", return_value=False),
+        patch("skill_manager.utils.linux.subprocess.run") as mock_run,
+        patch("skill_manager.utils.linux.os.environ.get", return_value="wayland"),
+    ):
+        assert linux.send_ctrl_v() is False
+        mock_run.assert_not_called()
 
 
 def test_send_ctrl_v_all_fail():
@@ -159,11 +231,11 @@ def test_input_injection_blocked_offscreen():
 def test_capture_screen_all_strategies_fail():
     with (
         patch(
-            "skill_manager.controllers.screenshot_controller._portal_capture",
+            "skill_manager.controllers.snap_controller._portal_capture",
             return_value=None,
         ),
         patch(
-            "skill_manager.controllers.screenshot_controller._gnome_screenshot_capture",
+            "skill_manager.controllers.snap_controller._gnome_snap_capture",
             return_value=None,
         ),
     ):
@@ -173,7 +245,7 @@ def test_capture_screen_all_strategies_fail():
 
 def test_capture_screen_portal_succeeds():
     with patch(
-        "skill_manager.controllers.screenshot_controller._portal_capture",
+        "skill_manager.controllers.snap_controller._portal_capture",
         return_value="/tmp/portal_test.png",
     ):
         result = linux.capture_screen()

@@ -8,9 +8,13 @@ a class-level callable lets the conftest's pattern type-check.
 """
 
 from collections.abc import Callable
+from enum import IntEnum
 from typing import Any, ClassVar
 
 from PySide6.QtCore import QObject, SignalInstance
+
+class HotkeyId(IntEnum):
+    SNAP: int
 
 class GlobalHotkeyManager(QObject):
     # Signals
@@ -33,9 +37,24 @@ class GlobalHotkeyManager(QObject):
     _lock: Any
     _stop_lock: Any
     _pynput_available: bool | None
+    _portal_backend: Any
+    _portal_available: bool | None
+    _snap_hotkey_id: int
 
     def __init__(self, parent: Any = ...) -> None: ...
     def __del__(self) -> None: ...
+    def isAvailable(self) -> bool: ...
+    def statusReason(self) -> str: ...
+    def portalBackendActive(self) -> bool: ...
+    def setup_snap_hotkey(
+        self,
+        config_controller: Any,
+        snap_controller: Any,
+        get_window_active: Callable[[], bool],
+        hotkey_id: int = ...,
+    ) -> None: ...
+    def _on_snap_hotkey_pressed(self, hotkey_id: int) -> None: ...
+    def _on_shortcuts_changed_snap(self) -> None: ...
     def _restart_listener(self) -> None: ...
     def _stop_active_listener(self) -> None: ...
     def stop(self) -> None: ...

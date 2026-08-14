@@ -11,8 +11,8 @@ Available tool probes:
 - ``pyperclip`` for X11 / cross-platform clipboard fallback
 - ``ydotool`` for Wayland keyboard/mouse injection (if installed)
 - ``pyautogui`` for X11 keyboard/mouse injection (if display available)
-- ``gdbus`` / ``dbus-send`` for FreeDesktop Portal screenshot (Wayland)
-- ``gnome-screenshot`` for GNOME Screenshot CLI fallback
+- ``gdbus`` / ``dbus-send`` for FreeDesktop Portal snap (Wayland)
+- ``gnome-screenshot`` for GNOME screenshot CLI fallback
 """
 
 from __future__ import annotations
@@ -34,6 +34,21 @@ _WL_COPY: bool | None = None
 _WL_PASTE: bool | None = None
 _YDOTOOL: bool | None = None
 _HAS_PYPERCLIP: bool | None = None
+_XCLIP: bool | None = None
+_XSEL: bool | None = None
+
+
+def is_wayland_active() -> bool:
+    """Return True if running under an active Wayland session."""
+    wayland_display = os.environ.get("WAYLAND_DISPLAY")
+    if not wayland_display:
+        return False
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        socket_path = os.path.join(runtime_dir, wayland_display)
+        if os.path.exists(socket_path):
+            return True
+    return os.environ.get("XDG_SESSION_TYPE") == "wayland"
 
 
 def _has_wl_copy() -> bool:
@@ -48,6 +63,20 @@ def _has_wl_paste() -> bool:
     if _WL_PASTE is None:
         _WL_PASTE = shutil.which("wl-paste") is not None
     return _WL_PASTE
+
+
+def _has_xclip() -> bool:
+    global _XCLIP
+    if _XCLIP is None:
+        _XCLIP = shutil.which("xclip") is not None
+    return _XCLIP
+
+
+def _has_xsel() -> bool:
+    global _XSEL
+    if _XSEL is None:
+        _XSEL = shutil.which("xsel") is not None
+    return _XSEL
 
 
 def _has_ydotool() -> bool:
@@ -77,15 +106,15 @@ def _has_pyperclip() -> bool:
 def set_clipboard(text: str) -> bool:
     """Copy *text* to the system clipboard.
 
-    Tries ``wl-copy`` first (Wayland), then ``pyperclip`` (X11 fallback).
-    Returns ``True`` on success.
+    Tries ``wl-copy`` first if Wayland is active, then ``xclip``, ``xsel``,
+    and ``pyperclip`` (X11 fallbacks). Returns ``True`` on success.
 
     ``wl-copy`` forks a child that owns the Wayland selection and inherits
     any open pipes; capturing stdout/stderr would make ``subprocess.run``
     block on the inherited pipe FDs until the child exits (i.e. when the
     selection is lost).  Both streams are therefore redirected to DEVNULL.
     """
-    if _has_wl_copy():
+    if is_wayland_active() and _has_wl_copy():
         try:
             proc = subprocess.run(
                 ["wl-copy"],
@@ -95,9 +124,40 @@ def set_clipboard(text: str) -> bool:
                 text=True,
                 timeout=5,
             )
-            return proc.returncode == 0
+            if proc.returncode == 0:
+                return True
         except Exception as exc:  # noqa: BLE001
             logger.debug("wl-copy failed: %s", exc)
+
+    if _has_xclip():
+        try:
+            proc = subprocess.run(
+                ["xclip", "-selection", "clipboard"],
+                input=text,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("xclip failed: %s", exc)
+
+    if _has_xsel():
+        try:
+            proc = subprocess.run(
+                ["xsel", "--clipboard", "--input"],
+                input=text,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("xsel failed: %s", exc)
 
     if _has_pyperclip():
         try:
@@ -113,7 +173,7 @@ def set_clipboard(text: str) -> bool:
 
 def get_clipboard() -> str | None:
     """Return the current clipboard content, or ``None`` on failure."""
-    if _has_wl_paste():
+    if is_wayland_active() and _has_wl_paste():
         try:
             proc = subprocess.run(
                 ["wl-paste"],
@@ -125,6 +185,32 @@ def get_clipboard() -> str | None:
                 return proc.stdout
         except Exception as exc:  # noqa: BLE001
             logger.debug("wl-paste failed: %s", exc)
+
+    if _has_xclip():
+        try:
+            proc = subprocess.run(
+                ["xclip", "-selection", "clipboard", "-o"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                return proc.stdout
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("xclip -o failed: %s", exc)
+
+    if _has_xsel():
+        try:
+            proc = subprocess.run(
+                ["xsel", "--clipboard", "--output"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                return proc.stdout
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("xsel --output failed: %s", exc)
 
     if _has_pyperclip():
         try:
@@ -144,34 +230,89 @@ def get_clipboard() -> str | None:
 _KEY_CTRL = 29  # ydotool KEY_LEFTCTRL
 _KEY_V = 47  # ydotool KEY_V
 
+# ydotool's "+" combos (e.g. "29+47") can leave modifiers stuck; use an
+# explicit press/release sequence instead.
+_CTRL_V_SEQUENCE = (
+    f"{_KEY_CTRL}:1",
+    f"{_KEY_V}:1",
+    f"{_KEY_V}:0",
+    f"{_KEY_CTRL}:0",
+)
+
+
+def _ydotool_daemon_socket() -> str:
+    """Return the ydotool daemon socket path (matches ydotool's lookup)."""
+    socket_path = os.environ.get("YDOTOOL_SOCKET")
+    if socket_path:
+        return socket_path
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        return os.path.join(runtime_dir, ".ydotool_socket")
+    return "/tmp/.ydotool_socket"
+
+
+def _ydotool_daemon_alive() -> bool:
+    """Return True when the ydotool daemon socket exists on disk."""
+    return os.path.exists(_ydotool_daemon_socket())
+
+
+def ydotool_daemon_health() -> str:
+    """Describe ydotool daemon state for actionable error messages.
+
+    Returns ``"not-installed"`` when the binary is missing, ``"daemon-down"``
+    when the binary exists but ``ydotoold`` is unreachable, else ``"ok"``.
+    """
+    if not _has_ydotool():
+        return "not-installed"
+    try:
+        proc = subprocess.run(
+            ["ydotool", "debug"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return "ok" if proc.returncode == 0 else "daemon-down"
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("ydotool debug probe failed: %s", exc)
+        return "daemon-down"
+
 
 def send_ctrl_v() -> bool:
     """Send Ctrl+V (paste) keystroke to the focused window.
 
-    Tries ``ydotool`` first (Wayland uinput), then falls back gracefully.
+    Tries ``ydotool`` first (Wayland uinput) with an explicit
+    press/release sequence, then ``pyautogui`` on X11 only.
     Returns ``True`` on success.
     """
     if not injection_allowed():
         return False
-    if _has_ydotool():
+    if _has_ydotool() and _ydotool_daemon_alive():
         try:
-            subprocess.run(
-                ["ydotool", "key", f"{_KEY_CTRL}+{_KEY_V}"],
+            proc = subprocess.run(
+                ["ydotool", "key", *_CTRL_V_SEQUENCE],
                 capture_output=True,
+                text=True,
                 timeout=5,
             )
-            return True
+            if proc.returncode == 0:
+                return True
+            logger.warning(
+                "ydotool Ctrl+V failed (rc=%d): %s",
+                proc.returncode,
+                proc.stderr.strip(),
+            )
         except Exception as exc:  # noqa: BLE001
             logger.debug("ydotool Ctrl+V failed: %s", exc)
 
-    # Try pyautogui hotkey as X11 fallback (fails silently on pure Wayland)
-    try:
-        import pyautogui  # type: ignore[import-not-found]
+    # pyautogui is an X11-only fallback (fails silently on pure Wayland)
+    if os.environ.get("XDG_SESSION_TYPE") == "x11":
+        try:
+            import pyautogui  # type: ignore[import-not-found]
 
-        pyautogui.hotkey("ctrl", "v")
-        return True
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("pyautogui.hotkey('ctrl', 'v') failed: %s", exc)
+            pyautogui.hotkey("ctrl", "v")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("pyautogui.hotkey('ctrl', 'v') failed: %s", exc)
 
     return False
 
@@ -241,7 +382,7 @@ def capture_screen(output_path: str | None = None) -> str | None:
 
     Returns the path to the saved PNG or ``None`` on failure.
     """
-    from skill_manager.controllers.screenshot_controller import _portal_capture
+    from skill_manager.controllers.snap_controller import _portal_capture
 
     return _portal_capture(output_path)
 

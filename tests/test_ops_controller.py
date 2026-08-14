@@ -142,17 +142,17 @@ def test_ops_controller_delete_skills(mock_timer, mock_del, ops_controller, mock
 
 
 def test_ops_controller_delete_screenshots(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    screenshot.write_text("fake-image-data")
+    snap = tmp_path / "Screenshot_test.png"
+    snap.write_text("fake-image-data")
 
-    items = [{"name": "Screenshot", "local_path": str(screenshot), "is_screenshot": True}]
+    items = [{"name": "Snap", "local_path": str(snap), "is_snap": True}]
     with (
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_patch,
         patch("skill_manager.controllers.ops._helpers.QTimer.singleShot"),
     ):
         ops_controller.deleteSkills(items)
-        assert not screenshot.exists()
-        mock_patch.assert_called_with([str(screenshot)])
+        assert not snap.exists()
+        mock_patch.assert_called_with([str(snap)])
 
 
 def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
@@ -175,48 +175,48 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
         mock_save.assert_called_with([])
 
 
-def test_ops_controller_cleanup_temp_screenshots(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    screenshot.write_text("fake-image-data")
-    cache_entry_path = str(screenshot)
+def test_ops_controller_cleanup_temp_snaps(ops_controller, tmp_path):
+    snap = tmp_path / "Screenshot_test.png"
+    snap.write_text("fake-image-data")
+    cache_entry_path = str(snap)
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
+        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
-        assert not screenshot.exists()
+        assert not snap.exists()
         mock_cache_remove.assert_called_with([cache_entry_path])
         mock_save.assert_called_with([])
 
 
-def test_ops_controller_cleanup_temp_screenshots_empty(ops_controller):
+def test_ops_controller_cleanup_temp_snaps_empty(ops_controller):
     with patch(
-        "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+        "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
         return_value=[],
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
 
-def test_ops_controller_cleanup_temp_screenshots_crash_recovery(ops_controller, tmp_path):
-    screenshot = tmp_path / "Screenshot_test.png"
-    cache_entry_path = str(screenshot)
-    assert not screenshot.exists()
+def test_ops_controller_cleanup_temp_snaps_crash_recovery(ops_controller, tmp_path):
+    snap = tmp_path / "Screenshot_test.png"
+    cache_entry_path = str(snap)
+    assert not snap.exists()
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_screenshots_registry",
+            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_screenshots_registry") as mock_save,
+        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
-        ops_controller.cleanup_temp_screenshots()
+        ops_controller.cleanup_temp_snaps()
 
         mock_cache_remove.assert_called_with([cache_entry_path])
         mock_save.assert_called_with([])
@@ -911,12 +911,32 @@ def test_copy_collection_to_clipboard_auto_minimize(mock_timer, ops_controller, 
 
 
 _PASTE_MODULE = "win32" if sys.platform == "win32" else "linux"
+_PASTE_HEALTH = "skill_manager.utils.linux.ydotool_daemon_health"
 
 
 @patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
 def test_send_paste_to_focused_window_failure_sets_status(mock_paste, ops_controller, mock_app):
-    ops_controller._send_paste_to_focused_window()
-    mock_app._set_status.assert_called_with("Copied, but could not paste automatically")
+    with patch(_PASTE_HEALTH, return_value="ok"):
+        ops_controller._send_paste_to_focused_window()
+        mock_app._set_status.assert_called_with("Copied, but could not paste automatically")
+
+
+@patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
+def test_send_paste_failure_reports_ydotool_not_installed(mock_paste, ops_controller, mock_app):
+    with patch(_PASTE_HEALTH, return_value="not-installed"):
+        ops_controller._send_paste_to_focused_window()
+        mock_app._set_status.assert_called_with(
+            "Copied, but could not paste automatically — ydotool is not installed"
+        )
+
+
+@patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
+def test_send_paste_failure_reports_daemon_down(mock_paste, ops_controller, mock_app):
+    with patch(_PASTE_HEALTH, return_value="daemon-down"):
+        ops_controller._send_paste_to_focused_window()
+        mock_app._set_status.assert_called_with(
+            "Copied, but could not paste automatically — ydotool daemon (ydotoold) is not running"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1517,3 +1537,38 @@ def test_update_models_property_no_match(ops_controller, mock_app):
     ops_controller._updateModelsProperty("/non/existent", "is_starred", True)
 
     mock_app._library_model.updateSkillProperty.assert_called()
+
+
+def test_copy_skills_flushes_incubation(ops_controller, mock_app):
+    mock_model = MagicMock()
+    mock_model._incubating = True
+    mock_model.getFilteredSelectedPaths.return_value = ["/path/skill1"]
+    mock_model._all_filtered_skills = []
+    mock_model._all_skills = []
+    mock_app.skillModel = mock_model
+    mock_app._client_format = "Antigravity"
+
+    ops_controller.copySelectedSkillsToClipboard()
+
+    assert mock_model._force_end_incubation.called
+    assert mock_model.onIncubationReady.called
+
+
+def test_format_project_skill_reference_with_skill_object():
+    from skill_manager.core.models.entities import Skill
+    from skill_manager.core.quick_copy import format_project_skill_reference
+
+    s = Skill(
+        name="test-skill",
+        folder_name="test-skill",
+        local_path="/home/dikka/skills/test-skill",
+        skill_md_path="/home/dikka/skills/test-skill/SKILL.md",
+        project_root="/home/dikka",
+        project_label="TestProject",
+    )
+
+    ref = format_project_skill_reference(s, "Antigravity")
+    assert ref == "/test-skill"
+
+    ref_gemini = format_project_skill_reference(s, "Gemini CLI")
+    assert ref_gemini == "@test-skill/SKILL.md"

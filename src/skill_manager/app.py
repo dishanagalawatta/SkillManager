@@ -25,6 +25,7 @@ from PySide6.QtCore import (  # noqa: E402
 )
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
+from PySide6.QtQuick import QQuickWindow  # noqa: E402
 
 # Phase 1 decomposition: modules extracted from app.py keep their public
 # surface alive through these re-exports (see .omo/plans/refactor-codebase.md).
@@ -46,10 +47,10 @@ from skill_manager.controllers.image_inspector_controller import (  # noqa: E402
     ImageInspectorController,
 )
 from skill_manager.controllers.ops_controller import OpsController  # noqa: E402
-from skill_manager.controllers.screenshot_controller import ScreenshotController  # noqa: E402
 from skill_manager.controllers.selected_skill_controller import (  # noqa: E402
     SelectedSkillController,
 )
+from skill_manager.controllers.snap_controller import SnapController  # noqa: E402
 from skill_manager.controllers.ui_controller import UIController  # noqa: E402
 from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
 from skill_manager.core.analytics import shutdown as posthog_shutdown  # noqa: E402
@@ -65,7 +66,7 @@ from skill_manager.core.diagnostics import (  # noqa: E402
 )
 from skill_manager.core.file_watch import SkillFolderWatcher  # noqa: E402
 from skill_manager.core.global_hotkey import GlobalHotkeyManager  # noqa: E402
-from skill_manager.core.image_provider import ScreenshotImageProvider  # noqa: E402
+from skill_manager.core.image_provider import SnapImageProvider  # noqa: E402
 from skill_manager.core.models import SkillModel  # noqa: E402
 from skill_manager.core.persistence import (  # noqa: E402
     load_archive,
@@ -183,7 +184,6 @@ class AppController(AppControllerProxyMixin, QObject):
             self._clipboard,
             prefer_native=sys.platform == "linux",
         )
-        self._is_recording_shortcut = False
 
         default_client = self._config.get("default_client", "Last Selected")
         if default_client == "Last Selected":
@@ -244,8 +244,8 @@ class AppController(AppControllerProxyMixin, QObject):
             self.command_channel = None
         self.config_mgr = ConfigController(self)  # type: ignore[arg-type]
         self.ops = OpsController(self)  # type: ignore[arg-type]
-        self.screenshot_provider = ScreenshotImageProvider()
-        self.screenshot = ScreenshotController(self)  # type: ignore[arg-type]
+        self.snap_provider = SnapImageProvider()
+        self.snap = SnapController(self)  # type: ignore[arg-type]
         self.image_inspector = ImageInspectorController(self)  # type: ignore[arg-type]
         self.updates = UpdateController(self)  # type: ignore[arg-type]
         self.discovery = DiscoveryController(self)  # type: ignore[arg-type]
@@ -276,14 +276,13 @@ class AppController(AppControllerProxyMixin, QObject):
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
-        self.ops.cleanup_temp_screenshots()  # Crash recovery
+        self.ops.cleanup_temp_snaps()  # Crash recovery
         app_inst = QGuiApplication.instance()
         if app_inst:
             app_inst.aboutToQuit.connect(self.ops.cleanup_temp_copies)
-            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_screenshots)
+            app_inst.aboutToQuit.connect(self.ops.cleanup_temp_snaps)
 
-        # 6. Global Hotkey Setup (screenshot hotkey works when app is minimized)
-        self._hotkey_id_screenshot = 1
+        # 6. Global Hotkey Setup (snap hotkey works when app is minimized)
         self._setup_global_hotkeys()
 
         # 4. Initial Model Configuration
@@ -473,8 +472,8 @@ class AppController(AppControllerProxyMixin, QObject):
         return self.app_updater
 
     @Property(QObject, constant=True)
-    def screenshot_controller(self):
-        return self.screenshot
+    def snap_controller(self):
+        return self.snap
 
     @Property(QObject, constant=True)
     def image_inspector_controller(self):
@@ -803,8 +802,8 @@ class AppController(AppControllerProxyMixin, QObject):
         return self.config_mgr.shortcutThemeToggle
 
     @Property(str, notify=shortcutsChanged)
-    def shortcutScreenshot(self):
-        return self.config_mgr.shortcutScreenshot
+    def shortcutSnap(self):
+        return self.config_mgr.shortcutSnap
 
     @Property(str, notify=currentViewChanged)
     def logoSource(self):
@@ -975,26 +974,25 @@ class AppController(AppControllerProxyMixin, QObject):
     def getProjectLabel(self, path):
         return self.config_mgr.getProjectLabel(path)
 
+    @property
+    def _is_recording_shortcut(self) -> bool:
+        return getattr(self.config_mgr, "_is_recording_shortcut", False)
+
+    @_is_recording_shortcut.setter
+    def _is_recording_shortcut(self, value: bool) -> None:
+        self.config_mgr._is_recording_shortcut = value
+
+    @property
+    def _hotkey_id_snap(self) -> int:
+        return self.global_hotkey._snap_hotkey_id
+
     def _setup_global_hotkeys(self):
         """Register global hotkeys and connect signals."""
-        # Connect hotkey signal to screenshot trigger
-        # Use QueuedConnection because the signal is emitted from a background thread
-        from PySide6.QtCore import Qt
-
-        self.global_hotkey.hotkeyPressed.connect(
-            self._on_global_hotkey, Qt.ConnectionType.QueuedConnection
+        self.global_hotkey.setup_snap_hotkey(
+            config_controller=self.config_mgr,
+            snap_controller=self.snap,
+            get_window_active=self._main_window_is_focused,
         )
-
-        # Register screenshot hotkey at startup (only if enabled)
-        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
-            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
-
-        # Re-register when shortcuts change
-        self.config_mgr.shortcutsChanged.connect(self._on_shortcuts_changed)
-
-        # Start the listener thread
-        self.global_hotkey.start()
 
     def _validate_source_paths(self):
         """Check configured source/project paths exist at startup.
@@ -1032,17 +1030,25 @@ class AppController(AppControllerProxyMixin, QObject):
 
     @Slot(int)
     def _on_global_hotkey(self, hotkey_id: int):
-        """Handle global hotkey press."""
-        if hotkey_id == self._hotkey_id_screenshot:
-            self.screenshot.takeScreenshot()
+        """Handle global hotkey press (delegates to GlobalHotkeyManager)."""
+        self.global_hotkey._on_snap_hotkey_pressed(hotkey_id)
+
+    def _main_window_is_focused(self) -> bool:
+        """Return whether the main QML window currently has focus."""
+        engine = getattr(self, "_qml_engine", None)
+        if engine is None:
+            return False
+        roots = engine.rootObjects()
+        if not roots:
+            return False
+        window = roots[0]
+        if not isinstance(window, QQuickWindow):
+            return False
+        return window.isActive()
 
     def _on_shortcuts_changed(self):
-        """Re-register global hotkeys when shortcuts are updated."""
-        screenshot_seq = self.config_mgr.get_shortcut("screenshot")
-        if screenshot_seq and self.config_mgr.isShortcutEnabled("screenshot"):
-            self.global_hotkey.register(self._hotkey_id_screenshot, screenshot_seq)
-        else:
-            self.global_hotkey.unregister(self._hotkey_id_screenshot)
+        """Re-register global hotkeys when shortcuts are updated (delegates to GlobalHotkeyManager)."""
+        self.global_hotkey._on_shortcuts_changed_snap()
 
     def on_quit(self):
         """Ensures all pending state is saved before exit.
@@ -1080,6 +1086,28 @@ class AppController(AppControllerProxyMixin, QObject):
         ):
             self.ui._save_timer.stop()
             self.ui.saveUiState()
+
+        # Flush pending model selections and collapsed category states to disk
+        for model in (
+            getattr(self, "_library_model", None),
+            getattr(self, "_quick_copy_model", None),
+        ):
+            if model is not None:
+                if (
+                    getattr(model, "_project_selections_save_timer", None)
+                    and model._project_selections_save_timer.isActive()
+                ):
+                    model._project_selections_save_timer.stop()
+                    model._do_save_project_selections()
+                elif hasattr(model, "_do_save_project_selections"):
+                    model._do_save_project_selections()
+
+                if (
+                    getattr(model, "_collapse_save_timer", None)
+                    and model._collapse_save_timer.isActive()
+                ):
+                    model._collapse_save_timer.stop()
+                    model._do_save_collapsed()
 
         # Release the single-instance mutex / lock so another instance can start
         release_lock()

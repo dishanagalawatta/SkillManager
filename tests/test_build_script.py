@@ -5,6 +5,7 @@ Tests the build script functionality.
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -145,6 +146,16 @@ def test_spec_file_exclusions_and_hiddenimports():
                 constants.append(child.value)
         return constants
 
+    # Resolve module-level list variables the excludes expression references
+    # (e.g. _UNIX_ONLY_EXCLUDES, _LINUX_EXCLUDES) so conditionally included
+    # entries can be asserted too.
+    module_lists: dict[str, list] = {}
+    for node in ast.walk(parsed):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    module_lists[target.id] = extract_constants(node.value)
+
     for keyword in analysis_call.keywords:
         if keyword.arg == "hiddenimports":
             hiddenimports = extract_constants(keyword.value)
@@ -161,18 +172,7 @@ def test_spec_file_exclusions_and_hiddenimports():
     )
 
     # Check for PyInstaller exclusions
-    expected_excludes = [
-        # Unix-only modules
-        "pwd",
-        "grp",
-        "fcntl",
-        "termios",
-        "readline",
-        "_scproxy",
-        "posix",
-        "resource",
-        "_posixsubprocess",
-        "_posixshmem",
+    always_excluded = [
         # Platform/Internal noise
         "vms_lib",
         "java",
@@ -191,8 +191,56 @@ def test_spec_file_exclusions_and_hiddenimports():
         "socks",
         "_typeshed",
     ]
-    for ex in expected_excludes:
+    unix_only = [
+        "pwd",
+        "grp",
+        "fcntl",
+        "termios",
+        "readline",
+        "_scproxy",
+        "posix",
+        "resource",
+        "_posixsubprocess",
+        "_posixshmem",
+    ]
+    linux_only = [
+        "PySide6.QtWebEngineCore",
+        "PySide6.QtWebEngineWidgets",
+        "PySide6.QtWebEngineQuick",
+        "PySide6.QtMultimedia",
+        "PySide6.QtMultimediaWidgets",
+        "PySide6.QtQuick3D",
+        "PySide6.Qt3DCore",
+    ]
+
+    is_linux = sys.platform.startswith("linux")
+
+    # The literal part of the excludes expression must always carry the
+    # unconditional entries.
+    for ex in always_excluded:
         assert ex in excludes, f"Module {ex} should be excluded in spec file excludes list"
+
+    # The conditional module-level lists must exist with the expected
+    # contents and be referenced by name from the excludes expression
+    # (the literal walk above cannot see variable references).
+    expected_lists = {
+        "_UNIX_ONLY_EXCLUDES": unix_only,
+        "_LINUX_EXCLUDES": linux_only,
+    }
+    excludes_expr = next(kw.value for kw in analysis_call.keywords if kw.arg == "excludes")
+    referenced_names = {node.id for node in ast.walk(excludes_expr) if isinstance(node, ast.Name)}
+    for name, expected in expected_lists.items():
+        assert name in module_lists, f"Spec should define {name}"
+        assert name in referenced_names, f"Spec excludes expression should reference {name}"
+        assert module_lists[name] == expected, f"Spec {name} contents drifted from expectation"
+
+    # On this platform the applicable conditional list's entries must end up
+    # in the effective excludes set (either literal or via the variable).
+    effective = set(excludes) | set(module_lists.get("_UNIX_ONLY_EXCLUDES", []))
+    effective |= set(module_lists.get("_LINUX_EXCLUDES", []))
+    applicable = linux_only if is_linux else unix_only
+    for ex in applicable:
+        assert ex in effective, f"Module {ex} should be excluded on this platform"
 
 
 def test_diskcache_collect_all_in_spec():

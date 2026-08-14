@@ -134,6 +134,9 @@ def _create_qapp() -> QGuiApplication:  # pragma: no cover
     fmt.setAlphaBufferSize(8)
     QSurfaceFormat.setDefaultFormat(fmt)
     app = QGuiApplication(sys.argv)
+    # Prevent Qt from shutting down when secondary overlay windows (e.g., SnapOverlay) close
+    # while the main window is minimized or hidden.
+    app.setQuitOnLastWindowClosed(False)
 
     # Set application name and version for better shell integration
     app.setApplicationName("SkillManager")
@@ -205,7 +208,7 @@ def _load_qml_engine(controller, font_bridge) -> QQmlApplicationEngine:  # pragm
     """Create the QML engine, register the image provider and load Main.qml."""
     engine = QQmlApplicationEngine()
     controller._qml_engine = engine
-    engine.addImageProvider("screenshot", controller.screenshot_provider)
+    engine.addImageProvider("snap", controller.snap_provider)
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("fontDB", font_bridge)
     engine.warnings.connect(_handle_qml_warning)

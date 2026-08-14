@@ -85,7 +85,7 @@ def resolve_referenced_skills(
     by_folder: dict[str, dict] = {}
     by_name: dict[str, dict] = {}
     for s in all_skills:
-        if s.get("is_command") or s.get("is_screenshot"):
+        if s.get("is_command") or s.get("is_snap"):
             continue
         folder = str(s.get("folder_name") or "").strip().lower()
         name = str(s.get("name") or "").strip().lower()

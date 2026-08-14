@@ -43,17 +43,15 @@ def test_skill_rows_are_selection_first_in_main_views():
     assert "showInlineDelete: false" in library
 
 
-def test_screenshot_hover_tooltip_exists_in_skill_item():
+def test_snap_hover_tooltip_exists_in_skill_item():
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
 
     assert "ToolTip {" in skill_item
-    assert "id: screenshotTooltip" in skill_item
-    assert (
-        "active: mouseArea.containsMouse && model && model.isScreenshot && model.path" in skill_item
-    )
+    assert "id: snapTooltip" in skill_item
+    assert "active: mouseArea.containsMouse && model && model.isSnap && model.path" in skill_item
     assert "delay: 450" in skill_item
     assert (
-        'source: (model && model.isScreenshot && model.path) ? root.formatFileUrl(model.path) : ""'
+        'source: (model && model.isSnap && model.path) ? root.formatFileUrl(model.path) : ""'
         in skill_item
     )
     assert "fillMode: Image.PreserveAspectFit" in skill_item
@@ -472,13 +470,14 @@ def test_key_sequence_capture_proper_controller_path():
     """Verify that KeySequenceCapture maps correctly to AppController.config_controller.isRecordingShortcut."""
     ksc = (QML_DIR / "KeySequenceCapture.qml").read_text(encoding="utf-8")
 
-    assert "AppController.config_controller.isRecordingShortcut = root.active" in ksc
+    assert "AppController.config_controller.isRecordingShortcut = true" in ksc
+    assert "AppController.config_controller.isRecordingShortcut = false" in ksc
     assert "AppController.isRecordingShortcut =" not in ksc
 
 
 def test_popup_shortcuts_are_gated_by_visibility():
     """Verify that all shortcuts in auxiliary popup windows are disabled when the window is hidden to prevent ambiguous shortcut drops."""
-    screenshot = (QML_DIR / "ScreenshotOverlay.qml").read_text(encoding="utf-8")
+    snap = (QML_DIR / "SnapOverlay.qml").read_text(encoding="utf-8")
     inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
 
     def count_shortcuts(content: str) -> int:
@@ -487,8 +486,8 @@ def test_popup_shortcuts_are_gated_by_visibility():
     def count_enabled_shortcuts(content: str, visibility_var: str) -> int:
         return len(re.findall(rf"enabled:\s*{visibility_var}\.visible", content))
 
-    assert count_shortcuts(screenshot) == count_enabled_shortcuts(screenshot, "overlay"), (
-        "Not all shortcuts in ScreenshotOverlay are gated by overlay.visible"
+    assert count_shortcuts(snap) == count_enabled_shortcuts(snap, "overlay"), (
+        "Not all shortcuts in SnapOverlay are gated by overlay.visible"
     )
     assert count_shortcuts(inspector) == count_enabled_shortcuts(inspector, "root"), (
         "Not all shortcuts in ImageInspector are gated by root.visible"
@@ -586,3 +585,85 @@ def test_updates_view_responsive_layout_contract():
     )
     assert "iconOnlyMode: uv_packagesHeader.width < 340" in updates_qml
     assert "iconOnlyMode: uv_projectsHeader.width < 320" in updates_qml
+
+
+def test_main_window_shortcuts_are_window_scoped_not_application_scoped():
+    """Verify main-window shortcuts use the default WindowShortcut context.
+
+    Esc and per-collection shortcuts must NOT use Qt.ApplicationShortcut,
+    otherwise they fire while SkillManager is in the background and hijack
+    other applications. Only SnapOverlay (its own window, gated by
+    overlay.visible) may keep ApplicationShortcut so Esc cancels an active
+    capture even when the main window is minimized.
+    """
+    main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+    inspector = (QML_DIR / "ImageInspector.qml").read_text(encoding="utf-8")
+    overlay = (QML_DIR / "SnapOverlay.qml").read_text(encoding="utf-8")
+
+    # Main window and inspector are hosted in the main window: all shortcuts
+    # must be window-scoped (the QML default), never app-scoped.
+    assert "Qt.ApplicationShortcut" not in main_qml, (
+        "Main.qml shortcuts must use the default WindowShortcut context "
+        "(no Qt.ApplicationShortcut) so Esc passes through in the background"
+    )
+    assert "Qt.ApplicationShortcut" not in inspector, (
+        "ImageInspector.qml shortcuts must be window-scoped, not application-scoped"
+    )
+
+    # SnapOverlay is a separate Window: its shortcuts keep
+    # ApplicationShortcut (gated by overlay.visible) so Esc cancels a capture
+    # even when the main window is minimized/snapped away.
+    assert overlay.count("Qt.ApplicationShortcut") == 3, (
+        "SnapOverlay.qml must keep exactly 3 ApplicationShortcut contexts "
+        "(Return/Enter confirm + Esc cancel) for the minimized-snap edge case"
+    )
+
+
+def test_snap_shortcut_not_gated_on_global_hotkey_availability():
+    """Verify the in-app snap shortcut is always available in-window.
+
+    The QML shortcut must NOT be gated on the global hotkey's availability.
+    The double-fire guard lives in Python (``_on_global_hotkey``) and is
+    backend-aware: with the pynput backend (X11) the focused window also
+    receives the keypress, so the global path skips while focused; with
+    the portal backend (Wayland) the compositor consumes the key, so the
+    portal signal is the only path and must always snap.
+    """
+    main_qml = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+
+    # The window-scoped shortcut must exist and be gated only on recording
+    # state, the snap shortcut being enabled, and the overlay being hidden.
+    assert "AppController.global_hotkey_controller.isAvailable" not in main_qml, (
+        "Main.qml snap shortcut must NOT be gated on "
+        "AppController.global_hotkey_controller.isAvailable — the in-window "
+        "shortcut is the sole path while focused under the pynput backend"
+    )
+    assert "shortcutSnapEnabled" in main_qml, (
+        "Main.qml must expose the snap shortcut via shortcutSnapEnabled"
+    )
+
+    # The double-fire guard now lives in Python: the global handler must
+    # skip the capture only when the pynput backend is active AND the main
+    # window is focused — the portal backend must always snap.
+    app_py = (
+        Path(__file__).resolve().parent.parent.parent / "src" / "skill_manager" / "app.py"
+    ).read_text(encoding="utf-8")
+    global_hotkey_py = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src"
+        / "skill_manager"
+        / "core"
+        / "global_hotkey.py"
+    ).read_text(encoding="utf-8")
+    assert "_main_window_is_focused" in app_py and (
+        "_is_window_active" in global_hotkey_py or "_main_window_is_focused" in global_hotkey_py
+    ), (
+        "app.py and global_hotkey.py must skip the global snap when the main "
+        "window is focused (double-fire guard moved from QML to Python)"
+    )
+    assert "portalBackendActive" in global_hotkey_py or "portalBackendActive" in app_py, (
+        "global_hotkey.py _on_snap_hotkey_pressed must consult portalBackendActive: the "
+        "portal backend (Wayland) consumes the key at the compositor, so "
+        "the portal signal is the only path and must always snap even "
+        "while the main window is focused"
+    )

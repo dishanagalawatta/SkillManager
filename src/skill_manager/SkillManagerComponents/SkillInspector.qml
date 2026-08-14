@@ -268,7 +268,7 @@ Rectangle {
             ColumnLayout {
                 id: docSection
                 Layout.fillWidth: true
-                visible: (root._sel && root._sel.commands && !root._sel.is_screenshot) ? root._sel.commands.length > 0 : false
+                visible: (root._sel && root._sel.commands && !root._sel.is_snap) ? root._sel.commands.length > 0 : false
                 spacing: 4
                 property bool isExpanded: true
 
@@ -348,14 +348,14 @@ Rectangle {
                 }
             }
 
-            // Screenshot Preview
+            // Snap Preview
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: root._sel && root._sel.is_screenshot === true
+                visible: root._sel && root._sel.is_snap === true
                 spacing: 8
                 
                 Text {
-                    text: "Screenshot Preview"
+                    text: "Snap Preview"
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
                     font.weight: Font.Bold
@@ -364,17 +364,17 @@ Rectangle {
                 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(600, width * (screenshotPreview.implicitHeight / Math.max(1, screenshotPreview.implicitWidth)))
+                    Layout.preferredHeight: Math.min(600, width * (snapPreview.implicitHeight / Math.max(1, snapPreview.implicitWidth)))
                     color: Qt.rgba(0,0,0,0.2)
                     radius: Theme.radiusSmall
                     clip: true
 
                     Image {
-                        id: screenshotPreview
+                        id: snapPreview
                         anchors.fill: parent
                         anchors.margins: 4
                         fillMode: Image.PreserveAspectFit
-                        source: (root._sel && root._sel.is_screenshot && root._sel.local_path) ? root.formatFileUrl(root._sel.local_path) : ""
+                        source: (root._sel && root._sel.is_snap && root._sel.local_path) ? root.formatFileUrl(root._sel.local_path) : ""
                         asynchronous: true
                     }
                     
@@ -394,7 +394,7 @@ Rectangle {
                 Layout.fillHeight: true
                 Layout.minimumHeight: 150
                 visible: root._sel && root._sel.local_path !== undefined
-                    && !root._sel.is_screenshot
+                    && !root._sel.is_snap
                 spacing: 8
                 
                 Rectangle {
@@ -447,10 +447,10 @@ Rectangle {
                 }
             }
 
-            // Flexible spacer for screenshot mode to prevent vertical stretching
+            // Flexible spacer for snap mode to prevent vertical stretching
             Item {
                 Layout.fillHeight: true
-                visible: root._sel && root._sel.is_screenshot === true
+                visible: root._sel && root._sel.is_snap === true
             }
         }
     }
