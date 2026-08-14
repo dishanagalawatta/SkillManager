@@ -77,5 +77,5 @@ TextField {
     }
 
     Accessible.role: Accessible.EditableText
-    Accessible.name: "Search skills"
+    Accessible.name: placeholderText
 }
