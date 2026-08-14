@@ -1087,6 +1087,28 @@ class AppController(AppControllerProxyMixin, QObject):
             self.ui._save_timer.stop()
             self.ui.saveUiState()
 
+        # Flush pending model selections and collapsed category states to disk
+        for model in (
+            getattr(self, "_library_model", None),
+            getattr(self, "_quick_copy_model", None),
+        ):
+            if model is not None:
+                if (
+                    getattr(model, "_project_selections_save_timer", None)
+                    and model._project_selections_save_timer.isActive()
+                ):
+                    model._project_selections_save_timer.stop()
+                    model._do_save_project_selections()
+                elif hasattr(model, "_do_save_project_selections"):
+                    model._do_save_project_selections()
+
+                if (
+                    getattr(model, "_collapse_save_timer", None)
+                    and model._collapse_save_timer.isActive()
+                ):
+                    model._collapse_save_timer.stop()
+                    model._do_save_collapsed()
+
         # Release the single-instance mutex / lock so another instance can start
         release_lock()
 

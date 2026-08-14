@@ -46,13 +46,14 @@ Window {
             viewLoader.item.cleanup()
         }
         
-        // Clear the viewLoader upon application shutdown.
+        // Clear the viewLoader upon application shutdown and quit Qt loop.
         // Delay context destruction to next event loop tick so incubators cleanly abort.
         Qt.callLater(() => {
             if (viewLoader) {
                 viewLoader.sourceComponent = null
                 viewLoader.source = ""
             }
+            Qt.quit()
         })
     }
     minimumWidth: 400

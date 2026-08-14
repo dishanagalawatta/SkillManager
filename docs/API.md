@@ -52,6 +52,7 @@ a property on `AppController` and is independently testable.
 | `ui` | `UiController` | `controllers/ui_controller.py` | View selection, modal state. |
 | `screenshot` | `ScreenshotController` | `controllers/screenshot_controller.py` | Capture + annotate. |
 | `image_inspector` | `ImageInspectorController` | `controllers/image_inspector_controller.py` | Image inspection. |
+| `selected_skill` | `SelectedSkillController` | `controllers/selected_skill_controller.py` | Live-bound selection state management & persistence. |
 | `app_update` | `AppUpdateController` | `controllers/app_update_controller.py` | Self-update pipeline. |
 
 ## 3. Q_PROPERTY Surface (selected)

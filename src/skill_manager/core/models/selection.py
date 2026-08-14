@@ -49,6 +49,17 @@ class SelectionMixin:
         )
         self._cached_total_selectable = len(self._all_filtered_skills)
 
+    def _sync_current_project_selection(self) -> None:
+        """Keep ``_selections_by_project[current_project]`` in sync with ``_selected_ids``."""
+        proj = (
+            self.state.project_filter
+            if hasattr(self, "state")
+            and self.state
+            and isinstance(getattr(self.state, "project_filter", None), str)
+            else ""
+        )
+        self._selections_by_project[proj] = list(self._selected_ids)
+
     @Slot(int)
     def toggleSelection(self, row):
         if 0 <= row < len(self._filtered_skills):
@@ -64,6 +75,7 @@ class SelectionMixin:
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()
             self.selectionStateChanged.emit()
+            self._sync_current_project_selection()
             self._save_project_selections()
 
     @Slot()
@@ -72,6 +84,7 @@ class SelectionMixin:
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._sync_current_project_selection()
         self._save_project_selections()
 
     @Slot()
@@ -82,6 +95,7 @@ class SelectionMixin:
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._sync_current_project_selection()
         self._save_project_selections()
 
     @Slot(result=list)
@@ -107,6 +121,7 @@ class SelectionMixin:
         self._emit_selection_data_changed()
         self._update_selection_counts()
         self.selectionStateChanged.emit()
+        self._sync_current_project_selection()
         self._save_project_selections()
 
     @Slot(int, bool)
@@ -123,6 +138,7 @@ class SelectionMixin:
             self.dataChanged.emit(idx, idx, [self.IsSelectedRole])
             self._update_selection_counts()
             self.selectionStateChanged.emit()
+            self._sync_current_project_selection()
             self._save_project_selections()
 
     def _emit_selection_data_changed(self):
@@ -140,7 +156,7 @@ class SelectionMixin:
         Extracted from the ``projectFilter`` setter on the facade so the
         per-project selection bookkeeping lives with the selection subsystem.
         """
-        if old_project:
+        if old_project is not None:
             self._selections_by_project[old_project] = list(self._selected_ids)
         if new_project in self._selections_by_project:
             self._selected_ids = dict.fromkeys(self._selections_by_project[new_project])
@@ -161,4 +177,5 @@ class SelectionMixin:
 
     def _do_save_project_selections(self):
         if self._config is not None:
+            self._sync_current_project_selection()
             self._config.set("project_selections", self._selections_by_project)
