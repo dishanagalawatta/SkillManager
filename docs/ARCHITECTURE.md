@@ -43,7 +43,7 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | `ImageInspectorController` | `image_inspector_controller.py` | Color isolation, pixel inspection |
 | `AppUpdateController` | `app_update_controller.py` | App self-update via GitHub Releases API |
 
-### Registration
+### Registration & Meta-Object Signal Inheritance
 
 ```python
 qmlRegisterSingletonInstance(AppController, "App", 1, 0, "AppController", controller)
@@ -51,6 +51,8 @@ engine.rootContext().setContextProperty("appController", controller)
 ```
 
 QML consumers reach it via `import App 1.0` or the `appController` context property.
+
+**Mixin Signal Inheritance Pattern**: Facade controllers (such as `ConfigController`) inherit from specialized domain mixins (`SettingsMixin`, `ShortcutsMixin`, `ProjectsMixin`, `CollectionsMixin`). Class-level `Signal` instances associated with `@Property(..., notify=...)` decorators are declared on the respective mixins. The composing facade inherits these class attributes without re-declaring them as class-level attributes, guaranteeing PySide6's Qt Meta-Object registration accurately routes property change notifications to QML bindings.
 
 ---
 
@@ -260,6 +262,7 @@ Three-part protocol to prevent "Object destroyed during incubation":
 | **Hub & Spoke** | `AppController` stays thin; logic in sub-controllers |
 | **Optimistic UI** | Filesystem ops update model immediately, then run in background |
 | **Signal Best Practices** | Formal parameter arrow functions in QML handlers |
+| **Smooth Scrolling** | `WheelHandler` pointer integration with dynamic `scrollSpeedMultiplier` scaling for both wheel notches (`angleDelta`) and trackpads (`pixelDelta`) |
 | **Subprocess Patching** | `CREATE_NO_WINDOW` flag prevents console windows |
 | **Lifecycle Management** | `on_quit()` ensures clean shutdown |
 

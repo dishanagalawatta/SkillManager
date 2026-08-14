@@ -9,16 +9,33 @@ ScrollView {
         interactive: true
     }
 
-    // ScrollView in QtQuick.Controls 2 uses a Flickable as its contentItem
-    // if it contains a single Item.
-    //
-    // Note: a custom WheelHandler for smooth scroll + custom speed
-    // multiplier was removed because in Qt 6.11.1 ANY QQuickItem child
-    // of a control (Item, WheelHandler, NumberAnimation, Timer, etc.)
-    // hits the
-    //   "Cannot assign object of type X to list property 'data'; expected 'QObject'"
-    // strict-type-check bug, and the SmoothScrollView is used by enough
-    // views (Settings, QuickCopy, Library, etc.) that the breakage was
-    // cascading. The native ScrollView wheel handling is now used; the
-    // `scrollSpeedMultiplier` config key is currently a no-op.
+    WheelHandler {
+        target: root.contentItem
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (event) => {
+            let config = AppController.config_controller
+            let multiplier = (config && typeof config.scrollSpeedMultiplier !== "undefined") ? config.scrollSpeedMultiplier : 1.0
+
+            if (Math.abs(multiplier - 1.0) < 0.01 || !root.contentItem) {
+                event.accepted = false
+                return
+            }
+
+            event.accepted = true
+
+            let flick = root.contentItem
+            if (event.pixelDelta.y !== 0) {
+                let scrollAmount = event.pixelDelta.y * multiplier
+                flick.contentY = Math.max(flick.originY,
+                                          Math.min(flick.contentY - scrollAmount,
+                                                   flick.originY + Math.max(0, flick.contentHeight - flick.height)))
+                return
+            }
+
+            let scrollAmount = event.angleDelta.y * (multiplier * 0.5)
+            flick.contentY = Math.max(flick.originY,
+                                      Math.min(flick.contentY - scrollAmount,
+                                               flick.originY + Math.max(0, flick.contentHeight - flick.height)))
+        }
+    }
 }
