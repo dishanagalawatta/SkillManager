@@ -10,7 +10,7 @@ Button {
     property string labelText: text
     property string role: "secondary" // primary, secondary, destructive, danger
     property string tooltipText: ""
-    property string accessibleName: labelText
+    property string accessibleName: labelText !== "" ? labelText : tooltipText
     property int buttonHeight: 36
     property bool iconOnlyMode: false
     readonly property bool effectiveIconOnly: iconOnlyMode && (iconSource !== "" || iconText !== "")
@@ -126,7 +126,6 @@ Button {
     }
     Accessible.role: Accessible.Button
     Accessible.name: accessibleName
-    Accessible.description: tooltipText
 
     HoverHandler {
         cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor

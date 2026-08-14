@@ -135,12 +135,9 @@ def test_controller_quick_copy_workflow(app_controller):
         stored["content"] = text
         return True
 
-    def _fake_get_clipboard() -> str | None:
-        return stored.get("content")
-
-    with (
-        patch("skill_manager.utils.linux.set_clipboard", side_effect=_fake_set_clipboard),
-        patch("skill_manager.utils.linux.get_clipboard", side_effect=_fake_get_clipboard),
+    with patch(
+        "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
+        side_effect=_fake_set_clipboard,
     ):
         # Execute copy
         app_controller.ops.copySelectedSkillsToClipboard()
