@@ -68,8 +68,7 @@ After any cleanup, run the quality gates:
 export QML_DISABLE_DISK_CACHE=1
 uv run ruff check src tests
 uv run ruff format --check src tests
-uv run pytest
-python run_tests.py
+python scripts/dev_test.py
 ```
 
 All gates must pass before committing. Also verify `git status` shows

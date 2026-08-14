@@ -4,12 +4,10 @@ populates mock packages and projects, resizes to test both normal and narrow wid
 captures screenshots to data/mcp/captures/.
 """
 
-import json
 import os
 import signal
 import sys
 import time
-import uuid
 from pathlib import Path
 
 START_TIME = time.monotonic()

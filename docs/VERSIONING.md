@@ -10,15 +10,26 @@ Versions are only bumped when a commit message contains exactly one of the trigg
 
 ## 1. Release Automation
 
-Releases are driven by **[python-semantic-release](https://python-semantic-release.readthedocs.io/)** using opt-in release tokens.
+Releases are driven by the automated release pipeline via `scripts/release.py` and GitHub Actions:
+
+```bash
+# Auto-detect bump from commit tokens ([patch], [minor], [major])
+uv run python scripts/release.py
+
+# Or specify an explicit SemVer bump
+uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
+uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
+uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
+```
 
 ### How It Works
 
-1. Push commits to `main` with an opt-in token in the subject
-2. CI runs and passes
-3. python-semantic-release automatically bumps version, creates tag + GitHub Release
-4. CI builds artifacts and attaches them to the release
-5. Users download updates from the GitHub Releases page
+1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, or `[major]`.
+2. **Release Execution**: Running `uv run python scripts/release.py` scans unreleased commits, detects the required SemVer bump, and synchronizes all metadata files (`pyproject.toml`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
+3. **Quality Gates**: Pre-flight tests and linter execute to ensure zero regressions.
+4. **Git Tag & Push**: Git commit and annotated tag (`vX.Y.Z`) are created and pushed to `origin main --tags`.
+5. **Multi-Platform Build**: GitHub Actions builds the multi-platform installer assets (`.deb`, `AppImage`, `.exe`, `SHA256SUMS`) and attaches them to the release.
+6. **End-User Distribution**: End users can install or update in one command via `scripts/install.sh`.
 
 ---
 
