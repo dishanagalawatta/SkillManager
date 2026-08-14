@@ -84,6 +84,10 @@
 - Keep subject line ≤ 50 characters
 - Body only when "why" isn't obvious from subject
 
+### Documentation & Architecture Diagrams
+
+- **Visual Diagrams Required**: Any major feature, architecture change, distribution/installer lifecycle, or user workflow MUST include clear Mermaid diagrams (`flowchart`, `sequenceDiagram`, etc.) in relevant docs (`docs/ARCHITECTURE.md`, `docs/INSTALL.md`, `docs/RELEASING.md`) to ensure immediate visual clarity for end users and maintainers.
+
 ## Workflow
 
 ### Before Any Edit

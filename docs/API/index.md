@@ -21,6 +21,7 @@
 | `AppUpdateController` | `AppController.app_update` | Self-update pipeline |
 | `ScreenshotController` | `AppController.screenshot` | Screen capture and annotation |
 | `ImageInspectorController` | `AppController.image_inspector` | Image analysis and color isolation |
+| `SelectedSkillController` | `AppController.selected_skill` | Live-bound selection state management & persistence |
 
 ### MCP Tool APIs (agent-facing)
 

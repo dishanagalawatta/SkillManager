@@ -585,6 +585,15 @@ class DiscoveryController(BaseController):
 
         self.app._set_status(library_prepared.status)
 
+        # ---- Restore last selected skill if not currently selected ----
+        last_path = self.app._config.get("last_selected_skill_path", "")
+        if last_path and not getattr(self.app._selected_skill, "local_path", ""):
+            skill_obj = self.app.skillModel.find_by_path(last_path)
+            if skill_obj is not None:
+                import dataclasses
+
+                self.app.set_selected_skill(dataclasses.asdict(skill_obj))
+
         diag.log_event(
             "INFO",
             CATEGORY_REFRESH_COMMITTED,

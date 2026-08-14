@@ -134,6 +134,9 @@ def _create_qapp() -> QGuiApplication:  # pragma: no cover
     fmt.setAlphaBufferSize(8)
     QSurfaceFormat.setDefaultFormat(fmt)
     app = QGuiApplication(sys.argv)
+    # Prevent Qt from shutting down when secondary overlay windows (e.g., SnapOverlay) close
+    # while the main window is minimized or hidden.
+    app.setQuitOnLastWindowClosed(False)
 
     # Set application name and version for better shell integration
     app.setApplicationName("SkillManager")
