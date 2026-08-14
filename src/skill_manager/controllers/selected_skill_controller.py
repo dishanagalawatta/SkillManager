@@ -275,6 +275,9 @@ class SelectedSkillController(QObject):
         self._update_from_dict(skill_dict)
         self.selectedSkillChanged.emit()
 
+        if hasattr(self._app, "_config") and self._app._config is not None:
+            self._app._config.set("last_selected_skill_path", self._path)
+
         bc = skill_dict.get("body_content", "")
         bc_preview = bc[:80] if bc else "(empty)"
         logger.info(
@@ -289,6 +292,9 @@ class SelectedSkillController(QObject):
         self._path = ""
         self._update_from_dict({})
         self.selectedSkillChanged.emit()
+
+        if hasattr(self._app, "_config") and self._app._config is not None:
+            self._app._config.set("last_selected_skill_path", "")
 
     # ── Internal helpers ──────────────────────────────────────────
 

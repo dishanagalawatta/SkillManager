@@ -440,12 +440,32 @@ def project_label(project_path, project_aliases=None, original_project=None):
     return f"{root.name} ({base})"
 
 
+def _get_val(obj, key: str, default: Any = "") -> Any:
+    """Safely retrieve an attribute or key from dicts, dataclasses, or objects."""
+    if hasattr(obj, key):
+        val = getattr(obj, key)
+        if val is not None:
+            return val
+    if isinstance(obj, dict):
+        val = obj.get(key, default)
+        if val is not None:
+            return val
+    if hasattr(obj, "get"):
+        try:
+            val = obj.get(key, default)
+            if val is not None:
+                return val
+        except Exception:  # noqa: BLE001
+            pass
+    return default
+
+
 def format_project_skill_reference(skill, client_format, all_skills=None):
-    is_command = skill.get("is_command", False)
-    local_path = Path(skill.get("local_path", ""))
+    is_command = _get_val(skill, "is_command", False)
+    local_path = Path(_get_val(skill, "local_path", ""))
 
     if is_command:
-        content = skill.get("body_content", "") or skill.get("raw_content", "")
+        content = _get_val(skill, "body_content", "") or _get_val(skill, "raw_content", "")
         if not content:
             return ""
         if all_skills is not None:
@@ -453,13 +473,13 @@ def format_project_skill_reference(skill, client_format, all_skills=None):
         return content
 
     if client_format == "Codex":
-        name = skill.get("name") or local_path.name
-        path = skill.get("skill_md_path") or ""
+        name = _get_val(skill, "name") or local_path.name
+        path = _get_val(skill, "skill_md_path", "")
         return f"[${name}]({path})"
 
-    if skill.get("is_snap"):
+    if _get_val(skill, "is_snap", False):
         # For screenshots, the reference is just the relative path to the image
-        project_root = skill.get("project_root")
+        project_root = _get_val(skill, "project_root", "")
         if project_root:
             try:
                 relative_path = local_path.relative_to(project_root).as_posix()
@@ -474,7 +494,7 @@ def format_project_skill_reference(skill, client_format, all_skills=None):
 
     relative_path = project_skill_relative_path(skill)
     if client_format in ("Antigravity", "OpenCode"):
-        name = skill.get("name") or local_path.name
+        name = _get_val(skill, "name") or local_path.name
         return f"/{name}"
     if client_format == "Gemini CLI":
         return f"@{relative_path}"
@@ -530,9 +550,9 @@ def looks_like_explicit_reference(reference):
 
 
 def project_skill_relative_path(skill):
-    base = str(skill.get("skill_base_relative") or "").replace("\\", "/").strip("/")
+    base = str(_get_val(skill, "skill_base_relative", "") or "").replace("\\", "/").strip("/")
     folder = (
-        str(skill.get("folder_name") or Path(skill.get("local_path", "")).name)
+        str(_get_val(skill, "folder_name", "") or Path(_get_val(skill, "local_path", "")).name)
         .replace("\\", "/")
         .strip("/")
     )

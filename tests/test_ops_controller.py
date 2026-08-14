@@ -1539,3 +1539,38 @@ def test_update_models_property_no_match(ops_controller, mock_app):
     ops_controller._updateModelsProperty("/non/existent", "is_starred", True)
 
     mock_app._library_model.updateSkillProperty.assert_called()
+
+
+def test_copy_skills_flushes_incubation(ops_controller, mock_app):
+    mock_model = MagicMock()
+    mock_model._incubating = True
+    mock_model.getFilteredSelectedPaths.return_value = ["/path/skill1"]
+    mock_model._all_filtered_skills = []
+    mock_model._all_skills = []
+    mock_app.skillModel = mock_model
+    mock_app._client_format = "Antigravity"
+
+    ops_controller.copySelectedSkillsToClipboard()
+
+    assert mock_model._force_end_incubation.called
+    assert mock_model.onIncubationReady.called
+
+
+def test_format_project_skill_reference_with_skill_object():
+    from skill_manager.core.models.entities import Skill
+    from skill_manager.core.quick_copy import format_project_skill_reference
+
+    s = Skill(
+        name="test-skill",
+        folder_name="test-skill",
+        local_path="/home/dikka/skills/test-skill",
+        skill_md_path="/home/dikka/skills/test-skill/SKILL.md",
+        project_root="/home/dikka",
+        project_label="TestProject",
+    )
+
+    ref = format_project_skill_reference(s, "Antigravity")
+    assert ref == "/test-skill"
+
+    ref_gemini = format_project_skill_reference(s, "Gemini CLI")
+    assert ref_gemini == "@test-skill/SKILL.md"
