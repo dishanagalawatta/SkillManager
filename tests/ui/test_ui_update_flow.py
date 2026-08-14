@@ -178,15 +178,15 @@ class TestCheckForUpdates:
         controller = AppUpdateController(mock_app_sync_runner)
         with patch(
             "skill_manager.controllers.app_update_controller.check_latest_release",
-            return_value=("2.0.0", None),
+            return_value=("9.9.9", None),
         ):
             controller.checkForUpdates(manual=True)
 
         assert controller.updateAvailable is True
-        assert controller.latestVersion == "2.0.0"
+        assert controller.latestVersion == "9.9.9"
         assert controller.hasCheckedForUpdates is True
         mock_app_sync_runner._set_status.assert_any_call("Checking for app updates...")
-        mock_app_sync_runner._set_status.assert_any_call("Update available: v2.0.0")
+        mock_app_sync_runner._set_status.assert_any_call("Update available: v9.9.9")
 
 
 # --- on_updates_checked callback branches ---
@@ -213,13 +213,13 @@ class TestOnUpdatesChecked:
     def test_update_available_sets_version(self, mock_app_mock_runner):
         """Update available branch: sets latest_version and update_available=True."""
         controller = AppUpdateController(mock_app_mock_runner)
-        controller.on_updates_checked(new_version="2.0.0", manual=True, error=None)
+        controller.on_updates_checked(new_version="9.9.9", manual=True, error=None)
 
         assert controller.updateAvailable is True
-        assert controller.latestVersion == "2.0.0"
+        assert controller.latestVersion == "9.9.9"
         assert controller.hasCheckedForUpdates is True
         assert controller.state.error is None
-        mock_app_mock_runner._set_status.assert_called_with("Update available: v2.0.0")
+        mock_app_mock_runner._set_status.assert_called_with("Update available: v9.9.9")
 
     def test_update_available_non_manual_no_status(self, mock_app_mock_runner):
         """Update available branch (non-manual): does not call _set_status."""

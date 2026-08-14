@@ -219,14 +219,19 @@ Item {
                                 Separator {}
                                 SettingsRow {
                                     titleText: "Scroll Speed"
-                                    descriptionText: "Multiplier: " + (AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier.toFixed(1) : "1.0") + "x"
+                                    descriptionText: "Multiplier: " + (scrollSpeedSlider.value ? scrollSpeedSlider.value.toFixed(1) : "1.0") + "x"
                                     GlassSlider {
+                                        id: scrollSpeedSlider
                                         width: 150
                                         from: 0.5
                                         to: 5.0
                                         stepSize: 0.1
                                         value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
                                         onMoved: if (AppController.config_controller) AppController.config_controller.scrollSpeedMultiplier = value
+                                        Binding on value {
+                                            value: AppController.config_controller ? AppController.config_controller.scrollSpeedMultiplier : 1.0
+                                            restoreMode: Binding.RestoreBinding
+                                        }
                                     }
                                 }
                             }

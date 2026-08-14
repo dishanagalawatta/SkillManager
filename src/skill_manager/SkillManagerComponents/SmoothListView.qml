@@ -26,5 +26,32 @@ ListView {
         isScrollingFast = false
     }
 
-    // Ensure initial scroll position is top if desired, handled by caller
+    WheelHandler {
+        target: root
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (event) => {
+            let config = AppController.config_controller
+            let multiplier = (config && typeof config.scrollSpeedMultiplier !== "undefined") ? config.scrollSpeedMultiplier : 1.0
+
+            if (Math.abs(multiplier - 1.0) < 0.01) {
+                event.accepted = false
+                return
+            }
+
+            event.accepted = true
+
+            if (event.pixelDelta.y !== 0) {
+                let scrollAmount = event.pixelDelta.y * multiplier
+                root.contentY = Math.max(root.originY,
+                                         Math.min(root.contentY - scrollAmount,
+                                                  root.originY + Math.max(0, root.contentHeight - root.height)))
+                return
+            }
+
+            let scrollAmount = event.angleDelta.y * (multiplier * 0.5)
+            root.contentY = Math.max(root.originY,
+                                     Math.min(root.contentY - scrollAmount,
+                                              root.originY + Math.max(0, root.contentHeight - root.height)))
+        }
+    }
 }
