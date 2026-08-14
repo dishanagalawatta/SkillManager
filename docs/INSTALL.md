@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 | `--purge` | With `--uninstall`: removes `~/.config/SkillManager` and user data |
 | `--deb` | Force installation via Debian package (`.deb`) |
 | `--appimage` | Force installation via portable `AppImage` |
-| `-v`, `--version <VER>` | Install a specific version (e.g. `1.9.0`) |
+| `-v`, `--version <VER>` | Install a specific version (e.g. `2.0.0` or `v2.0.0`) |
 | `--dry-run` | Print actions without making filesystem modifications |
 | `-y`, `--yes` | Run non-interactively, accepting all prompts |
 

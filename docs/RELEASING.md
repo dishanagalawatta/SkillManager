@@ -68,12 +68,12 @@ Run the release script directly from the repository root:
 uv run python scripts/release.py
 
 # Or force an explicit bump:
-uv run python scripts/release.py patch   # 1.9.0 -> 1.9.1
-uv run python scripts/release.py minor   # 1.9.0 -> 1.10.0
-uv run python scripts/release.py major   # 1.9.0 -> 2.0.0
+uv run python scripts/release.py patch   # 2.0.0 -> 2.0.1
+uv run python scripts/release.py minor   # 2.0.0 -> 2.1.0
+uv run python scripts/release.py major   # 2.0.0 -> 3.0.0
 
 # Or set an explicit version:
-uv run python scripts/release.py 1.9.5
+uv run python scripts/release.py 2.0.1
 ```
 
 ### CLI Flags
