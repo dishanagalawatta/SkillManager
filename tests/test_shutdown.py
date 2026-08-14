@@ -235,3 +235,18 @@ class TestMainExitStrategy:
         source = inspect.getsource(AppController.cleanup)
         assert "daemon=True" in source, "posthog thread should be daemon"
         assert "posthog_shutdown" in source, "cleanup should call posthog_shutdown"
+
+
+def test_sigint_handler_and_heartbeat_configured():
+    """Ensure run_gui configures SIGINT/SIGTERM handlers and a QTimer heartbeat for clean exit."""
+    import inspect
+
+    from skill_manager.bootstrap import run_gui
+
+    source = inspect.getsource(run_gui)
+    assert "signal.SIGINT" in source, "Must register signal.SIGINT handler"
+    assert "signal.SIGTERM" in source, "Must register signal.SIGTERM handler"
+    assert "app.quit()" in source, "Signal handler must call app.quit()"
+    assert "sig_timer = QTimer()" in source or "sig_timer" in source, (
+        "Must configure QTimer heartbeat for signal processing"
+    )

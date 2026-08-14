@@ -97,14 +97,19 @@ def stage_share_files(project_root: str, usr_prefix: str) -> None:
     applications = os.path.join(share, "applications")
     metainfo = os.path.join(share, "metainfo")
     icon_svg = os.path.join(share, "icons", "hicolor", "scalable", "apps")
-    icon_png = os.path.join(share, "icons", "hicolor", "128x128", "apps")
-    for dir_path in (applications, metainfo, icon_svg, icon_png):
+    icon_256 = os.path.join(share, "icons", "hicolor", "256x256", "apps")
+    icon_128 = os.path.join(share, "icons", "hicolor", "128x128", "apps")
+    icon_64 = os.path.join(share, "icons", "hicolor", "64x64", "apps")
+    for dir_path in (applications, metainfo, icon_svg, icon_256, icon_128, icon_64):
         os.makedirs(dir_path, exist_ok=True)
 
+    # Copy single canonical desktop entry
+    primary_desktop = os.path.join(applications, "skill-manager.desktop")
     shutil.copy2(
         os.path.join(project_root, "packaging", "linux", "skill-manager.desktop"),
-        os.path.join(applications, "skill-manager.desktop"),
+        primary_desktop,
     )
+
     shutil.copy2(
         os.path.join(
             project_root,
@@ -114,14 +119,18 @@ def stage_share_files(project_root: str, usr_prefix: str) -> None:
         ),
         os.path.join(metainfo, "org.dishanagalawatta.SkillManager.metainfo.xml"),
     )
-    shutil.copy2(
-        os.path.join(project_root, "assets", "brand", "logo.svg"),
-        os.path.join(icon_svg, "skill-manager.svg"),
+
+    # Copy multi-resolution icons under all naming conventions
+    icon_mappings = (
+        (icon_svg, "logo.svg", ".svg"),
+        (icon_256, "logo.png", ".png"),
+        (icon_128, "logo-128.png", ".png"),
+        (icon_64, "logo-64.png", ".png"),
     )
-    shutil.copy2(
-        os.path.join(project_root, "assets", "brand", "logo-128.png"),
-        os.path.join(icon_png, "skill-manager.png"),
-    )
+    for target_dir, src_filename, ext in icon_mappings:
+        src_file = os.path.join(project_root, "assets", "brand", src_filename)
+        for stem in ("skill-manager", "SkillManager", "org.dishanagalawatta.SkillManager"):
+            shutil.copy2(src_file, os.path.join(target_dir, f"{stem}{ext}"))
 
 
 def stage_appdir(project_root: str, onedir: str) -> str:

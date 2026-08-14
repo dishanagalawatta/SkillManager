@@ -44,7 +44,7 @@ def parse_semver(version_str: str) -> tuple[int, int, int]:
 
 
 def detect_bump_from_commits(project_root: str) -> str | None:
-    """Scan commits since the latest git tag for [major], [minor], [patch], or Conventional Commits."""
+    """Scan commits since the latest git tag for [major], [minor], [patch], [dev], or Conventional Commits across subject and body."""
     # Find latest tag
     tag_res = subprocess.run(
         ["git", "describe", "--tags", "--abbrev=0"],
@@ -57,13 +57,14 @@ def detect_bump_from_commits(project_root: str) -> str | None:
     rev_range = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
 
     log_res = subprocess.run(
-        ["git", "log", rev_range, "--pretty=format:%s"],
+        ["git", "log", rev_range, "--pretty=format:%B---COMMIT-DELIMITER---"],
         cwd=project_root,
         capture_output=True,
         text=True,
         check=False,
     )
-    commits = [c.strip() for c in log_res.stdout.strip().split("\n") if c.strip()]
+    raw_output = log_res.stdout.strip()
+    commits = [c.strip() for c in raw_output.split("---COMMIT-DELIMITER---") if c.strip()]
     if not commits:
         return None
 
@@ -73,22 +74,28 @@ def detect_bump_from_commits(project_root: str) -> str | None:
         msg_lower = msg.lower()
         if (
             "[major]" in msg_lower
-            or msg_lower.startswith("feat!:")
+            or "feat!:" in msg_lower
             or "breaking change" in msg_lower
+            or "breaking-change" in msg_lower
         ):
             return "major"
         if (
             "[minor]" in msg_lower
             or msg_lower.startswith("feat:")
+            or "\nfeat:" in msg_lower
             or msg_lower.startswith("feat(")
+            or "\nfeat(" in msg_lower
         ):
             bump = "minor"
         elif bump != "minor" and (
             "[patch]" in msg_lower
             or "[dev]" in msg_lower
             or msg_lower.startswith("fix:")
+            or "\nfix:" in msg_lower
             or msg_lower.startswith("fix(")
+            or "\nfix(" in msg_lower
             or msg_lower.startswith("perf:")
+            or "\nperf:" in msg_lower
         ):
             bump = "patch"
     return bump
@@ -286,24 +293,27 @@ def run_preflight_checks(project_root: str, skip_tests: bool, skip_lint: bool) -
 
 
 def git_commit_and_tag(
-    project_root: str, new_ver: str, message: str | None, push: bool, dry_run: bool
+    project_root: str,
+    next_version: str,
+    custom_msg: str | None = None,
+    push: bool = True,
+    dry_run: bool = False,
 ) -> None:
-    """Commit synced files, create git tag, and optionally push to remote."""
-    commit_msg = message or f"chore(release): bump version to v{new_ver}"
-    tag_name = f"v{new_ver}"
+    """Commit synchronized files and create an annotated git tag."""
+    tag_name = f"v{next_version}"
+    if not custom_msg:
+        commit_msg = f"chore(release): bump version to v{next_version} [skip ci]"
+    else:
+        commit_msg = f"{custom_msg} [skip ci]" if "[skip ci]" not in custom_msg else custom_msg
 
     if dry_run:
-        print("\n[DRY RUN] Would execute:")
-        print(
-            "  git add pyproject.toml src/skill_manager/__init__.py packaging/ README.md CHANGELOG.md"
-        )
-        print(f'  git commit -m "{commit_msg}"')
-        print(f'  git tag -a "{tag_name}" -m "Release {tag_name}"')
+        print(f"\n[DRY RUN] Would commit synchronized files with message: '{commit_msg}'")
+        print(f"[DRY RUN] Would create git tag: '{tag_name}'")
         if push:
-            print("  git push origin main --tags")
+            print("[DRY RUN] Would push commit and tag to origin main --tags")
         return
 
-    print("\nStaging files and creating git commit...")
+    print("\nStaging synchronized files in git...")
     subprocess.run(
         [
             "git",
@@ -340,7 +350,6 @@ def git_commit_and_tag(
             cwd=project_root,
             check=True,
         )
-        print("  [OK] Pushed to origin main --tags.")
         print(f"\nGitHub Actions release workflow will now build and publish release {tag_name}!")
     else:
         print("\nSkipped git push (--no-push). To push manually:")
@@ -356,6 +365,11 @@ def main() -> None:
         nargs="?",
         default="auto",
         help="Bump type ('patch', 'minor', 'major', 'auto') or explicit version (e.g. '1.9.1'). Default: auto",
+    )
+    parser.add_argument(
+        "--only-if-triggered",
+        action="store_true",
+        help="In 'auto' mode, only perform a release if an explicit release tag or conventional commit trigger is detected; otherwise exit 0.",
     )
     parser.add_argument(
         "--dry-run",
@@ -394,9 +408,15 @@ def main() -> None:
         if detected:
             print(f"Auto-detected version bump from git commits: {detected.upper()}")
             target_bump = detected
+        elif args.only_if_triggered:
+            print(
+                "No release tokens ([patch], [minor], [major], [dev]) or conventional commit triggers found in recent commits."
+            )
+            print("Skipping version bump (--only-if-triggered).")
+            return
         else:
             print(
-                "No release tokens ([patch], [minor], [major]) or conventional commit triggers found in recent commits."
+                "No release tokens ([patch], [minor], [major], [dev]) or conventional commit triggers found in recent commits."
             )
             print("Defaulting to 'patch' bump. To specify otherwise, pass 'minor', 'major', or 'X.Y.Z'.")
             target_bump = "patch"

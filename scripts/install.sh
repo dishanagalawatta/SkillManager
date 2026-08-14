@@ -324,16 +324,20 @@ do_install() {
         fi
 
         # Clean up any stale user-level desktop overrides or sync them
-        mkdir -p "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/scalable/apps" "$HOME/.local/share/icons/hicolor/128x128/apps"
+        local icons_base="$HOME/.local/share/icons/hicolor"
+        mkdir -p "$HOME/.local/share/applications" "${icons_base}/scalable/apps" "${icons_base}/256x256/apps" "${icons_base}/128x128/apps" "${icons_base}/64x64/apps"
         if [ -f "/usr/share/applications/skill-manager.desktop" ]; then
             cp -f "/usr/share/applications/skill-manager.desktop" "$HOME/.local/share/applications/skill-manager.desktop" 2>/dev/null || true
+            chmod 0755 "$HOME/.local/share/applications/skill-manager.desktop" 2>/dev/null || true
         fi
-        if [ -f "/usr/share/icons/hicolor/scalable/apps/skill-manager.svg" ]; then
-            cp -f "/usr/share/icons/hicolor/scalable/apps/skill-manager.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/" 2>/dev/null || true
-        fi
-        if [ -f "/usr/share/icons/hicolor/128x128/apps/skill-manager.png" ]; then
-            cp -f "/usr/share/icons/hicolor/128x128/apps/skill-manager.png" "$HOME/.local/share/icons/hicolor/128x128/apps/" 2>/dev/null || true
-        fi
+        # Remove any legacy aliases to maintain single official launcher
+        rm -f "$HOME/.local/share/applications/SkillManager.desktop" "$HOME/.local/share/applications/org.dishanagalawatta.SkillManager.desktop" 2>/dev/null || true
+
+        for sz in scalable 256x256 128x128 64x64; do
+            if [ -d "/usr/share/icons/hicolor/${sz}/apps" ]; then
+                cp -f /usr/share/icons/hicolor/${sz}/apps/skill-manager.* "${icons_base}/${sz}/apps/" 2>/dev/null || true
+            fi
+        done
 
     elif [ "$pkg_type" = "appimage" ]; then
         local appimage_name="SkillManager-${raw_version}-x86_64.AppImage"
@@ -351,12 +355,16 @@ do_install() {
 
         # Desktop entry setup
         local apps_dir="$HOME/.local/share/applications"
-        local icons_dir="$HOME/.local/share/icons/hicolor/scalable/apps"
-        mkdir -p "$apps_dir" "$icons_dir"
+        local icons_base="$HOME/.local/share/icons/hicolor"
+        mkdir -p "$apps_dir" "${icons_base}/scalable/apps" "${icons_base}/256x256/apps" "${icons_base}/128x128/apps" "${icons_base}/64x64/apps"
 
-        log_info "Configuring desktop launcher and application icons..."
-        download_file "https://raw.githubusercontent.com/${REPO}/main/assets/brand/logo.svg" "${icons_dir}/skill-manager.svg" || true
+        log_info "Configuring desktop launcher and multi-resolution application icons..."
+        download_file "https://raw.githubusercontent.com/${REPO}/main/assets/brand/logo.svg" "${icons_base}/scalable/apps/skill-manager.svg" || true
+        download_file "https://raw.githubusercontent.com/${REPO}/main/assets/brand/logo.png" "${icons_base}/256x256/apps/skill-manager.png" || true
+        download_file "https://raw.githubusercontent.com/${REPO}/main/assets/brand/logo-128.png" "${icons_base}/128x128/apps/skill-manager.png" || true
+        download_file "https://raw.githubusercontent.com/${REPO}/main/assets/brand/logo-64.png" "${icons_base}/64x64/apps/skill-manager.png" || true
 
+        # Write single canonical desktop file
         cat > "${apps_dir}/skill-manager.desktop" <<EOF
 [Desktop Entry]
 Name=SkillManager
@@ -368,7 +376,10 @@ Type=Application
 Categories=Utility;Development;
 StartupWMClass=SkillManager
 EOF
-        chmod +x "${apps_dir}/skill-manager.desktop"
+        chmod 0755 "${apps_dir}/skill-manager.desktop"
+
+        # Remove any legacy aliases to maintain single official launcher
+        rm -f "${apps_dir}/SkillManager.desktop" "${apps_dir}/org.dishanagalawatta.SkillManager.desktop" 2>/dev/null || true
 
         # Check if ~/.local/bin is on PATH
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -454,8 +465,7 @@ do_uninstall() {
 
     # 2. AppImage & User-level Installation Clean up
     local appimage_bin="$HOME/.local/bin/skill-manager"
-    local desktop_entry="$HOME/.local/share/applications/skill-manager.desktop"
-    local icon_entry="$HOME/.local/share/icons/hicolor/scalable/apps/skill-manager.svg"
+    local apps_dir="$HOME/.local/share/applications"
 
     if [ -f "$appimage_bin" ]; then
         log_info "Removing AppImage binary from ${appimage_bin}..."
@@ -463,15 +473,20 @@ do_uninstall() {
         removed=true
     fi
 
-    if [ -f "$desktop_entry" ]; then
-        log_info "Removing desktop entry from ${desktop_entry}..."
-        rm -f "$desktop_entry"
-        removed=true
-    fi
+    # Remove canonical launcher and any legacy aliases (leaves com.skillmanager.opencode intact)
+    for desk in "skill-manager.desktop" "SkillManager.desktop" "org.dishanagalawatta.SkillManager.desktop"; do
+        if [ -f "${apps_dir}/${desk}" ]; then
+            log_info "Removing desktop entry: ${apps_dir}/${desk}..."
+            rm -f "${apps_dir}/${desk}"
+            removed=true
+        fi
+    done
 
-    if [ -f "$icon_entry" ]; then
-        rm -f "$icon_entry"
-    fi
+    # Remove user-level application icons
+    local icons_base="$HOME/.local/share/icons/hicolor"
+    for sz in scalable 256x256 128x128 64x64 48x48 32x32; do
+        rm -f "${icons_base}/${sz}/apps/skill-manager."* "${icons_base}/${sz}/apps/SkillManager."* "${icons_base}/${sz}/apps/org.dishanagalawatta.SkillManager."* 2>/dev/null || true
+    done
 
     # System-level AppImage cleanup if present
     if [ -f "/usr/local/bin/skill-manager" ]; then
@@ -490,9 +505,12 @@ do_uninstall() {
         log_success "User data directories purged."
     fi
 
-    # Update desktop database
+    # Update desktop database and icon theme caches
     if command -v update-desktop-database &>/dev/null; then
         update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+    fi
+    if command -v gtk-update-icon-cache &>/dev/null; then
+        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
     fi
 
     if [ "$removed" = true ]; then

@@ -79,3 +79,53 @@ def test_version_consistency_across_metadata():
         assert f'<release version="{expected_version}"' in xml_content, (
             f"Metainfo XML does not contain current release version {expected_version}"
         )
+
+
+def test_detect_bump_from_commits(monkeypatch):
+    """Test commit log parsing for release triggers across subject and body."""
+    from release import detect_bump_from_commits
+
+    class MockCompletedProcess:
+        def __init__(self, stdout: str):
+            self.stdout = stdout
+
+    # Case 1: [minor] in body
+    def mock_run_minor(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v1.9.0\n")
+        return MockCompletedProcess(
+            "feat: update docs\n\nSome body text with [minor] tag inside.\n---COMMIT-DELIMITER---\n"
+        )
+
+    monkeypatch.setattr("subprocess.run", mock_run_minor)
+    assert detect_bump_from_commits("/dummy") == "minor"
+
+    # Case 2: [patch] in subject
+    def mock_run_patch(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v1.9.0\n")
+        return MockCompletedProcess("fix: resolve minor crash [patch]\n---COMMIT-DELIMITER---\n")
+
+    monkeypatch.setattr("subprocess.run", mock_run_patch)
+    assert detect_bump_from_commits("/dummy") == "patch"
+
+    # Case 3: [major] in body
+    def mock_run_major(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v1.9.0\n")
+        return MockCompletedProcess(
+            "chore: database overhaul\n\nbreaking change: schema changed [major]\n---COMMIT-DELIMITER---\n"
+        )
+
+    monkeypatch.setattr("subprocess.run", mock_run_major)
+    assert detect_bump_from_commits("/dummy") == "major"
+
+    # Case 4: No trigger tokens
+    def mock_run_none(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v1.9.0\n")
+        return MockCompletedProcess("chore: update internal comments\n---COMMIT-DELIMITER---\n")
+
+    monkeypatch.setattr("subprocess.run", mock_run_none)
+    assert detect_bump_from_commits("/dummy") is None
+

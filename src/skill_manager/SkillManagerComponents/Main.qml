@@ -61,7 +61,7 @@ Window {
 
     Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }
     visible: false
-    title: "Skill Manager"
+    title: "SkillManager"
     flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
     color: "transparent" // Let Mica/Acrylic show through
 

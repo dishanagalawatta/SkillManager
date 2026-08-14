@@ -4,13 +4,13 @@ This document outlines the versioning scheme and release process under the Seman
 
 ## Core Principle
 
-Versions are only bumped when a commit message contains exactly one of the trigger tokens `[patch]`, `[minor]`, `[major]`, or `[dev]`. Commits without a token are ignored by the release system.
+Versions are automatically bumped when pushed to `main` if any commit since the last release tag contains a trigger token (`[patch]`, `[minor]`, `[major]`, `[dev]`) or Conventional Commit prefix (`feat!:`, `feat:`, `fix:`, `perf:`) anywhere in the **commit subject or body**. Commits without a token or prefix are ignored by the release system.
 
 ---
 
 ## 1. Release Automation
 
-Releases are driven by the automated release pipeline via `scripts/release.py` and GitHub Actions:
+Releases are fully automated via GitHub Actions (`.github/workflows/auto-release.yml`) and can also be run locally via `scripts/release.py`:
 
 ```bash
 # Auto-detect bump from commit tokens ([patch], [minor], [major])
@@ -24,10 +24,10 @@ uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
 
 ### How It Works
 
-1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, or `[major]`.
-2. **Release Execution**: Running `uv run python scripts/release.py` scans unreleased commits, detects the required SemVer bump, and synchronizes all metadata files (`pyproject.toml`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
-3. **Quality Gates**: Pre-flight tests and linter execute to ensure zero regressions.
-4. **Git Tag & Push**: Git commit and annotated tag (`vX.Y.Z`) are created and pushed to `origin main --tags`.
+1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, or `[major]` (in subject or body).
+2. **Automated CI/CD**: On push to `main`, GitHub Actions scans commits since the last tag.
+3. **Metadata Synchronization**: `scripts/release.py` automatically synchronizes all 6 metadata files (`pyproject.toml`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
+4. **Git Tag & Push**: An annotated git tag (`vX.Y.Z`) and release commit (`[skip ci]`) are created and pushed to GitHub.
 5. **Multi-Platform Build**: GitHub Actions builds the multi-platform installer assets (`.deb`, `AppImage`, `.exe`, `SHA256SUMS`) and attaches them to the release.
 6. **End-User Distribution**: End users can install or update in one command via `scripts/install.sh`.
 
@@ -35,13 +35,13 @@ uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
 
 ## 2. Release Tokens
 
-All commits MUST include exactly one release token in the subject:
+Commits can include release tokens in the subject or body:
 
 | Token | Version Bump | Example |
 |---|---|---|
-| `[patch]` | `x.y.z` → `x.y.(z+1)` | `fix: ui alignment [patch]` |
-| `[minor]` | `x.y.z` → `x.(y+1).0` | `feat: add new view [minor]` |
-| `[major]` | `x.y.z` → `(x+1).0.0` | `feat!: redesign API [major]` |
+| `[patch]` / `fix:` | `x.y.z` → `x.y.(z+1)` | `fix: ui alignment [patch]` |
+| `[minor]` / `feat:` | `x.y.z` → `x.(y+1).0` | `feat: add new view [minor]` |
+| `[major]` / `feat!:` | `x.y.z` → `(x+1).0.0` | `feat!: redesign API [major]` |
 | `[dev]` | `x.y.z` → `x.y.z-dev.N` | `fix: experiment [dev]` |
 
 ---
