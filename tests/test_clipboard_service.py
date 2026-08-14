@@ -124,9 +124,8 @@ def test_copy_text_no_qt_fallback_false_returns_false():
 @pytest.mark.skipif(sys.platform == "win32", reason="Linux specific fallback logic")
 def test_copy_text_no_qt_linux_native_fallback_delegates():
     # With no injected fallback, Linux path must delegate to utils.linux.set_clipboard.
-    import sys
-    from unittest.mock import patch
-    with patch.object(sys, "platform", "linux"), patch("skill_manager.utils.linux.set_clipboard", return_value=True):
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("skill_manager.utils.linux.set_clipboard", lambda _t: True)
         service = ClipboardService(qt_clipboard=None, fallback=None)
         assert service.copy_text("data") is True
 
