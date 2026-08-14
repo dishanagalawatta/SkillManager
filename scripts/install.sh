@@ -74,7 +74,7 @@ show_help() {
     echo "      --purge           Remove all configuration, cache, and user data during uninstall"
     echo "      --deb             Force installation via Debian package (.deb)"
     echo "      --appimage        Force installation via portable AppImage"
-    echo "  -v, --version <VER>   Install a specific version (e.g. 1.9.0 or v1.9.0)"
+    echo "  -v, --version <VER>   Install a specific version (e.g. 2.0.0 or v2.0.0)"
     echo "      --dry-run         Print the actions without executing modifications"
     echo "  -y, --yes             Run non-interactively, accepting all prompts"
     echo ""
