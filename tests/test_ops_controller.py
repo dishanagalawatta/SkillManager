@@ -921,6 +921,7 @@ def test_send_paste_to_focused_window_failure_sets_status(mock_paste, ops_contro
         mock_app._set_status.assert_called_with("Copied, but could not paste automatically")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Linux specific daemon logic")
 @patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
 def test_send_paste_failure_reports_ydotool_not_installed(mock_paste, ops_controller, mock_app):
     with patch(_PASTE_HEALTH, return_value="not-installed"):
@@ -930,6 +931,7 @@ def test_send_paste_failure_reports_ydotool_not_installed(mock_paste, ops_contro
         )
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Linux specific daemon logic")
 @patch(f"skill_manager.utils.{_PASTE_MODULE}.send_paste_to_focused_window", return_value=False)
 def test_send_paste_failure_reports_daemon_down(mock_paste, ops_controller, mock_app):
     with patch(_PASTE_HEALTH, return_value="daemon-down"):
