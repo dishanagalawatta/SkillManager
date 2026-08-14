@@ -1,5 +1,7 @@
 """Unit tests for ClipboardService — verified writes + native fallback."""
 
+import sys
+
 import pytest
 
 from skill_manager.utils.clipboard_service import ClipboardService, normalize_newlines
@@ -119,6 +121,7 @@ def test_copy_text_no_qt_fallback_false_returns_false():
     assert service.copy_text("data") is False
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Linux specific fallback logic")
 def test_copy_text_no_qt_linux_native_fallback_delegates():
     # With no injected fallback, Linux path must delegate to utils.linux.set_clipboard.
     import sys

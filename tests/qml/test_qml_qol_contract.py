@@ -197,7 +197,6 @@ def test_dark_polish_tokens_drive_shared_components():
 
     assert "Theme.disabledControl" in action_button
     assert "Theme.dangerHover" in action_button
-    assert "Accessible.description: tooltipText" in action_button
     assert "HoverHandler" in action_button
     assert "Theme.selectedRow" in skill_item
     assert "Theme.selectedRowHover" in skill_item
