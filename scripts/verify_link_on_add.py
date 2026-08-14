@@ -38,6 +38,7 @@ if "--real-platform" not in sys.argv:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import sentry_sdk
+
 import skill_manager
 
 sentry_sdk.init(

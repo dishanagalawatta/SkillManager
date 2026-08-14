@@ -6,11 +6,11 @@
    and `metadata.json`. See [conductor/workflow.md](../conductor/workflow.md).
 2. **Branch from `develop`** named `track/<slug>`. One track = one branch.
 3. **TDD** — red → green → refactor for every change. A track is not
-   done until `python run_tests.py` is green and ruff is clean.
-4. **Open a PR to `develop`** with the track's spec linked in the
+   done until `python scripts/dev_test.py` is green and ruff is clean.
+4. **Open a PR to `main`** with the track's spec linked in the
    description. CI must be green before review.
-5. **Merge** — release-please detects Conventional Commits and
-   automatically opens/updates a Release PR. See
+5. **Release** — `uv run python scripts/release.py [bump]` bumps the version,
+   creates the release tag, and triggers the CI build. See
    [VERSIONING.md](VERSIONING.md) and [RELEASING.md](RELEASING.md).
 
 ## Commit Style
@@ -46,12 +46,11 @@ perf(search): optimize fuzzy matching
 
 ## Pull Request Checklist
 
-- [ ] `python run_tests.py` is green locally
-- [ ] `uv run ruff check .` and `uv run ruff format --check .` are clean
-- [ ] `uv run pytest tests/test_qml_comprehensive_diagnostic.py` is green
+- [ ] `python scripts/dev_test.py` (or `uv run pytest -n auto`) is green locally
+- [ ] `uv run ruff check src tests` and `uv run ruff format --check src tests` are clean
 - [ ] New `AppController` surface is documented in `docs/API.md`
 - [ ] New environment variables are documented in `docs/ENVIRONMENT.md`
-- [ ] Architectural changes are reflected in `ADR_INDEX.md`
+- [ ] Architectural changes are reflected in `ADR_INDEX.md` and include Mermaid diagrams
 - [ ] No secrets in the diff (`.env` is git-ignored — never commit it)
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 
@@ -61,13 +60,13 @@ perf(search): optimize fuzzy matching
 |-------|---------------------|
 | `core/` (business logic) | 100% line + branch |
 | `controllers/` | 100% line + branch |
-| QML components | Loading smoke test in `tests/test_qml_comprehensive_diagnostic.py` |
+| QML components | Loading smoke tests in `tests/qml/` |
 | UI flows | One `pytest-qt` test per user-visible flow |
 
 ## Release Process
 
-Releases are automated via [release-please](https://github.com/googleapis/release-please-action).
-See [RELEASING.md](RELEASING.md) for the full process. Never push a version tag manually.
+Releases are orchestrated using `uv run python scripts/release.py [patch|minor|major]`.
+See [RELEASING.md](RELEASING.md) for the full process.
 
 ## Security
 

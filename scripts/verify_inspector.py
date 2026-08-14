@@ -4,7 +4,6 @@ selects a skill, takes a screenshot, and exits.
 Must be run from the project root via: uv run python scripts/verify_inspector.py
 """
 
-import json
 import os
 import signal
 import sys

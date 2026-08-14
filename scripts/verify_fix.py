@@ -3,7 +3,6 @@ Helper: inject a skill with LONG description, select it, screenshot.
 Run via: uv run python scripts/verify_fix.py
 """
 
-import json
 import os
 import signal
 import sys

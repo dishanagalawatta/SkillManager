@@ -4,7 +4,6 @@ screenshot, verify no clipping.
 Run via: uv run python scripts/verify_narrow.py
 """
 
-import json
 import os
 import signal
 import sys

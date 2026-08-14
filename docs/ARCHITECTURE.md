@@ -282,6 +282,38 @@ Three-part protocol to prevent "Object destroyed during incubation":
 
 ---
 
+## 12. Distribution & Release Architecture
+
+SkillManager uses a dual-track delivery pipeline: a zero-dependency, 1-command installer/updater for end users on Linux and Windows, and an automated SemVer release pipeline for maintainers:
+
+```mermaid
+flowchart TD
+    subgraph "End-User 1-Command Workflow (Zero Repo Cloning)"
+        A["curl -fsSL .../install.sh | bash"] --> B{Detect Linux Distro}
+        B -->|Ubuntu / Debian| C[Query GitHub API for latest .deb]
+        B -->|Other Linux / --appimage| D[Query GitHub API for latest AppImage]
+        C --> E[Download .deb to /tmp]
+        E --> F[sudo apt install -y /tmp/skill-manager_*.deb]
+        D --> G[Download to ~/.local/bin/skill-manager]
+        G --> H[Install desktop file & icons to ~/.local/share]
+        F --> I[Update desktop database & verify install]
+        H --> I
+    end
+
+    subgraph "Maintainer Release Flow"
+        M["uv run python scripts/release.py [bump]"] --> N[Pre-flight: Lint & Test]
+        N --> O[Sync versions across pyproject, __init__, iss, metainfo, README]
+        O --> P[Update CHANGELOG.md]
+        P --> Q["Git Commit & Tag vX.Y.Z"]
+        Q --> R["Git Push origin main --tags"]
+        R --> S["GitHub Actions: release-build.yml"]
+        S --> T["Publish GitHub Release (.deb, .AppImage, .exe, SHA256SUMS)"]
+        T --> A
+    end
+```
+
+---
+
 ## Cross-references
 
 | Document | Description |
@@ -293,3 +325,4 @@ Three-part protocol to prevent "Object destroyed during incubation":
 | [`docs/RELEASING.md`](RELEASING.md) | Release workflow |
 | [`docs/HOUSEKEEPING.md`](HOUSEKEEPING.md) | Cleanup rules |
 | [`ADR_INDEX.md`](../ADR_INDEX.md) | Architecture decisions |
+

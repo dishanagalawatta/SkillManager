@@ -4,7 +4,6 @@ check inspector renders content correctly.
 Run: uv run python scripts/verify_qc.py
 """
 
-import json
 import os
 import signal
 import sys
