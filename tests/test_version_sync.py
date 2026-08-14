@@ -100,19 +100,32 @@ def test_detect_bump_from_commits(monkeypatch):
     monkeypatch.setattr("subprocess.run", mock_run_minor)
     assert detect_bump_from_commits("/dummy") == "minor"
 
-    # Case 2: [patch] in subject
-    def mock_run_patch(cmd, **kwargs):
+    # Case 2: [patch] in subject with feat: prefix (explicit [patch] overrides feat: prefix)
+    def mock_run_patch_override(cmd, **kwargs):
         if "describe" in cmd:
-            return MockCompletedProcess("v1.9.0\n")
-        return MockCompletedProcess("fix: resolve minor crash [patch]\n---COMMIT-DELIMITER---\n")
+            return MockCompletedProcess("v2.0.0\n")
+        return MockCompletedProcess(
+            "feat: enhance installer script to manage desktop entries [patch]\n---COMMIT-DELIMITER---\n"
+        )
 
-    monkeypatch.setattr("subprocess.run", mock_run_patch)
+    monkeypatch.setattr("subprocess.run", mock_run_patch_override)
     assert detect_bump_from_commits("/dummy") == "patch"
 
-    # Case 3: [major] in body
+    # Case 3: [minor] overriding fix: prefix
+    def mock_run_minor_override(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v2.0.0\n")
+        return MockCompletedProcess(
+            "fix: resolve bug and expand subsystem [minor]\n---COMMIT-DELIMITER---\n"
+        )
+
+    monkeypatch.setattr("subprocess.run", mock_run_minor_override)
+    assert detect_bump_from_commits("/dummy") == "minor"
+
+    # Case 4: [major] in body
     def mock_run_major(cmd, **kwargs):
         if "describe" in cmd:
-            return MockCompletedProcess("v1.9.0\n")
+            return MockCompletedProcess("v2.0.0\n")
         return MockCompletedProcess(
             "chore: database overhaul\n\nbreaking change: schema changed [major]\n---COMMIT-DELIMITER---\n"
         )
@@ -120,10 +133,28 @@ def test_detect_bump_from_commits(monkeypatch):
     monkeypatch.setattr("subprocess.run", mock_run_major)
     assert detect_bump_from_commits("/dummy") == "major"
 
-    # Case 4: No trigger tokens
+    # Case 5: Conventional commit fallback (feat: without token -> minor)
+    def mock_run_feat_fallback(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v2.0.0\n")
+        return MockCompletedProcess("feat: add new search filter\n---COMMIT-DELIMITER---\n")
+
+    monkeypatch.setattr("subprocess.run", mock_run_feat_fallback)
+    assert detect_bump_from_commits("/dummy") == "minor"
+
+    # Case 6: Conventional commit fallback (fix: without token -> patch)
+    def mock_run_fix_fallback(cmd, **kwargs):
+        if "describe" in cmd:
+            return MockCompletedProcess("v2.0.0\n")
+        return MockCompletedProcess("fix: resolve crash on shutdown\n---COMMIT-DELIMITER---\n")
+
+    monkeypatch.setattr("subprocess.run", mock_run_fix_fallback)
+    assert detect_bump_from_commits("/dummy") == "patch"
+
+    # Case 7: No trigger tokens or prefixes
     def mock_run_none(cmd, **kwargs):
         if "describe" in cmd:
-            return MockCompletedProcess("v1.9.0\n")
+            return MockCompletedProcess("v2.0.0\n")
         return MockCompletedProcess("chore: update internal comments\n---COMMIT-DELIMITER---\n")
 
     monkeypatch.setattr("subprocess.run", mock_run_none)
