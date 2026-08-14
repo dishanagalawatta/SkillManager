@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: auto-release-main
@@ -49,5 +50,23 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Run Automated Release & Version Sync
+        id: release
         run: |
+          OLD_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           uv run python scripts/release.py auto --only-if-triggered --skip-tests --skip-lint
+          NEW_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$NEW_TAG" ] && [ "$NEW_TAG" != "$OLD_TAG" ]; then
+            echo "NEW_TAG=$NEW_TAG" >> $GITHUB_OUTPUT
+            echo "RELEASED=true" >> $GITHUB_OUTPUT
+          else
+            echo "RELEASED=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Release Build Workflow
+        if: steps.release.outputs.RELEASED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release.outputs.NEW_TAG }}"
+          echo "Triggering release-build.yml for tag: $TAG"
+          gh workflow run release-build.yml --ref "$TAG" || true

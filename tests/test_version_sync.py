@@ -128,4 +128,3 @@ def test_detect_bump_from_commits(monkeypatch):
 
     monkeypatch.setattr("subprocess.run", mock_run_none)
     assert detect_bump_from_commits("/dummy") is None
-
