@@ -565,6 +565,8 @@ def run_gui() -> None:  # pragma: no cover
         from skill_manager.mcp.launcher import _run_mcp_mode
 
         _run_mcp_mode()
+    if "--version" in sys.argv or "-v" in sys.argv:
+        print(f"SkillManager {skill_manager.__version__}")
         return
 
     _setup_sentry()
