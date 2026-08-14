@@ -63,6 +63,7 @@ All UI-to-business logic flows through **singleton controllers** registered via 
 | `AppUpdateController` | `controllers/app_update_controller.py` | App-level update (TUF bundles) |
 | `ScreenshotController` | `controllers/screenshot_controller.py` | Screen capture & annotation |
 | `ImageInspectorController` | `controllers/image_inspector_controller.py` | Image analysis & color isolation |
+| `SelectedSkillController` | `controllers/selected_skill_controller.py` | Live-bound selection state & persistence |
 
 Each controller inherits from `controllers/base.py` (`SingletonMixin`) and exposes `@Slot` / `@Property` to QML.
 
@@ -239,3 +240,6 @@ Error occurs
 | ADR-0020 | Command skill pills | Skill dependency UI |
 | ADR-0021 | Frozen-build joblib override | `threading` backend in PyInstaller builds |
 | ADR-0022 | Workspace cleanup standardization | Gitignore hardening + conductor archival batch |
+| ADR-0023 | Workspace docs & environment standardization | Tiered environment configs and docs layout |
+| ADR-0024 | Verified dual-write clipboard handling | Safe clipboard writes with fallback |
+| ADR-0025 | Selection state synchronization & shutdown persistence | Atomic shutdown sync and selection persistence |

@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
-> Status: **Accepted** | Last reviewed: 2026-06-30
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md)
+> Status: **Accepted** | Last reviewed: 2026-08-13
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md)
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
@@ -34,6 +34,7 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | Controller | Module | Purpose |
 |------------|--------|---------|
 | `UIController` | `ui_controller.py` | Application-wide UI state, window geometry, asset URI resolution |
+| `SelectedSkillController` | `selected_skill_controller.py` | Live-bound QObject managing currently and last selected skill properties |
 | `ConfigController` | `config_controller.py` (facade over `config/` mixins) | `ConfigManager` instance, skill sources, projects, shortcuts |
 | `OpsController` | `ops_controller.py` (facade over `ops/` mixins) | Copy, delete, archive, restore, starred state, custom commands |
 | `UpdateController` | `update_controller.py` | Background sync, Git source updates, progress reporting |

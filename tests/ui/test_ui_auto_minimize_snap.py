@@ -173,3 +173,33 @@ class TestUIAutoMinimizeSnap:
         # Main window must remain minimized in background.
         assert window.property("visibility") == QWindow.Visibility.Minimized
         assert bool(overlay_fired)
+
+    def test_closing_snap_overlay_does_not_trigger_app_quit(
+        self, qml_engine, app_controller, qtbot, monkeypatch
+    ):
+        """Regression guard: closing SnapOverlay while main window is minimized must NOT
+        trigger QGuiApplication shutdown or controller.on_quit()."""
+        quit_called = []
+        monkeypatch.setattr(app_controller, "on_quit", lambda: quit_called.append(True))
+
+        window = _window(qml_engine)
+        window.show()
+        qtbot.wait(50)
+        app_controller.config_controller.autoMinimizeOnSnap = True
+
+        overlay_fired = []
+        app_controller.snap_controller.showOverlay.connect(lambda: overlay_fired.append(True))
+
+        _invoke(_snap_button(window), "click")
+        qtbot.waitUntil(lambda: bool(overlay_fired), timeout=3000)
+
+        overlay = _overlay_window(window)
+        assert overlay is not None, "snapOverlayWindow not found"
+        qtbot.waitUntil(lambda: overlay.property("visible") is True, timeout=3000)
+
+        # Close the overlay (simulating user canceling/finishing snap)
+        overlay.close()
+        qtbot.wait(100)
+
+        # AppController.on_quit MUST NOT have been called
+        assert not quit_called, "Closing overlay triggered on_quit shutdown!"

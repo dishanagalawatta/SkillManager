@@ -39,6 +39,7 @@ def _run_mcp_mode() -> None:  # pragma: no cover
     from PySide6.QtGui import QGuiApplication
 
     app = QGuiApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("SkillManagerMCP")
 
     from skill_manager.app import AppController
