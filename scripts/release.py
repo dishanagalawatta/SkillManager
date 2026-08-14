@@ -68,37 +68,44 @@ def detect_bump_from_commits(project_root: str) -> str | None:
     if not commits:
         return None
 
-    # Priority: major > minor > patch
-    bump = None
+    highest_bump = None
     for msg in commits:
         msg_lower = msg.lower()
-        if (
-            "[major]" in msg_lower
-            or "feat!:" in msg_lower
-            or "breaking change" in msg_lower
-            or "breaking-change" in msg_lower
+
+        # Step 1: Explicit bracket token overrides take highest priority
+        commit_bump = None
+        if "[major]" in msg_lower:
+            commit_bump = "major"
+        elif "[minor]" in msg_lower:
+            commit_bump = "minor"
+        elif "[patch]" in msg_lower or "[dev]" in msg_lower:
+            commit_bump = "patch"
+        # Step 2: Conventional Commits heuristic fallback when no explicit bracket token is set
+        elif (
+            msg_lower.startswith("feat!:")
+            or "breaking change:" in msg_lower
+            or "breaking-change:" in msg_lower
         ):
-            return "major"
-        if (
-            "[minor]" in msg_lower
-            or msg_lower.startswith("feat:")
-            or "\nfeat:" in msg_lower
-            or msg_lower.startswith("feat(")
-            or "\nfeat(" in msg_lower
-        ):
-            bump = "minor"
-        elif bump != "minor" and (
-            "[patch]" in msg_lower
-            or "[dev]" in msg_lower
-            or msg_lower.startswith("fix:")
-            or "\nfix:" in msg_lower
+            commit_bump = "major"
+        elif msg_lower.startswith("feat:") or msg_lower.startswith("feat("):
+            commit_bump = "minor"
+        elif (
+            msg_lower.startswith("fix:")
             or msg_lower.startswith("fix(")
-            or "\nfix(" in msg_lower
             or msg_lower.startswith("perf:")
-            or "\nperf:" in msg_lower
+            or msg_lower.startswith("perf(")
         ):
-            bump = "patch"
-    return bump
+            commit_bump = "patch"
+
+        # Step 3: Aggregate across commits (major > minor > patch)
+        if commit_bump == "major":
+            return "major"
+        if commit_bump == "minor":
+            highest_bump = "minor"
+        elif commit_bump == "patch" and highest_bump != "minor":
+            highest_bump = "patch"
+
+    return highest_bump
 
 
 def calculate_next_version(current_ver: str, bump_type_or_ver: str) -> str:
