@@ -5,6 +5,7 @@ ordering, environment sanitization) without actually calling system tools.
 All external subprocess calls are mocked.
 """
 
+import os
 import subprocess
 import sys
 from unittest.mock import ANY, MagicMock, patch
@@ -37,15 +38,18 @@ def test_find_system_binary_via_which():
 
 
 def test_find_system_binary_via_fallback_dir():
+    expected = os.path.normpath("/usr/bin/wl-copy")
     with (
         patch("skill_manager.utils.linux.shutil.which", return_value=None),
         patch(
             "skill_manager.utils.linux.os.path.isfile",
-            side_effect=lambda p: p == "/usr/bin/wl-copy",
+            side_effect=lambda p: os.path.normpath(p) == expected,
         ),
         patch("skill_manager.utils.linux.os.access", return_value=True),
     ):
-        assert linux.find_system_binary("wl-copy") == "/usr/bin/wl-copy"
+        result = linux.find_system_binary("wl-copy")
+        assert result is not None
+        assert os.path.normpath(result) == expected
 
 
 def test_is_wayland_active_session_type():

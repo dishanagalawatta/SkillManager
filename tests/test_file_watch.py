@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 from watchdog.events import FileModifiedEvent
 
@@ -39,19 +39,41 @@ def test_skill_folder_watcher(tmp_path: Path):
     test_dir = tmp_path / "skills"
     test_dir.mkdir()
 
-    watcher = SkillFolderWatcher([str(test_dir)], mock_callback)
+    mock_observer_instance = MagicMock()
+    with patch("watchdog.observers.Observer", return_value=mock_observer_instance):
+        watcher = SkillFolderWatcher([str(test_dir)], mock_callback)
 
-    assert not watcher.started
-    watcher.start()
-    assert watcher.started
+        assert not watcher.started
+        watcher.start()
+        assert watcher.started
+        assert mock_observer_instance.schedule.call_count == 1
+        assert mock_observer_instance.start.call_count == 1
 
-    # Start again should be a no-op
-    watcher.start()
-    assert watcher.started
+        # Start again should be a no-op
+        watcher.start()
+        assert watcher.started
+        assert mock_observer_instance.start.call_count == 1
 
-    watcher.stop()
-    assert not watcher.started
+        watcher.stop()
+        assert not watcher.started
+        assert mock_observer_instance.stop.call_count == 1
 
-    # Stop again should be a no-op
-    watcher.stop()
-    assert not watcher.started
+        # Stop again should be a no-op
+        watcher.stop()
+        assert not watcher.started
+        assert mock_observer_instance.stop.call_count == 1
+
+
+def test_skill_folder_watcher_oserror_handled(tmp_path: Path):
+    """Test that OS inotify limits are caught gracefully."""
+    mock_callback = Mock()
+    test_dir = tmp_path / "skills"
+    test_dir.mkdir()
+
+    mock_observer_instance = MagicMock()
+    mock_observer_instance.start.side_effect = OSError(24, "inotify instance limit reached")
+
+    with patch("watchdog.observers.Observer", return_value=mock_observer_instance):
+        watcher = SkillFolderWatcher([str(test_dir)], mock_callback)
+        watcher.start()
+        assert not watcher.started
