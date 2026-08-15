@@ -278,3 +278,27 @@ def test_copy_text_default_prefer_native_off_skips_native(qt_clipboard):
     service = ClipboardService(qt_clipboard=qt_clipboard, native_writer=_writer)
     assert service.copy_text("data") is True
     assert qt_clipboard.set_calls == ["data"]
+
+
+def test_read_text_prefer_native_uses_native_reader(qt_clipboard):
+    qt_clipboard.setText("qt-value")
+    service = ClipboardService(
+        qt_clipboard=qt_clipboard,
+        native_reader=lambda: "system-native-value",
+        prefer_native=True,
+    )
+    assert service.read_text() == "system-native-value"
+
+
+def test_read_text_prefer_native_native_fails_falls_back_to_qt(qt_clipboard):
+    qt_clipboard.setText("qt-fallback-value")
+
+    def _boom():
+        raise RuntimeError("native read failed")
+
+    service = ClipboardService(
+        qt_clipboard=qt_clipboard,
+        native_reader=_boom,
+        prefer_native=True,
+    )
+    assert service.read_text() == "qt-fallback-value"

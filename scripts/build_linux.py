@@ -230,7 +230,7 @@ def build_deb(project_root: str, version: str) -> str:
 Version: {version}
 Architecture: amd64
 Maintainer: Don Dishan Kanchuka Agalawatta
-Depends: libglib2.0-0, libxcb-cursor0, libxkbcommon-x11-0, libxcb-xinerama0, libxcb-icccm4, libxcb-keysyms1, xdg-desktop-portal
+Depends: libglib2.0-0, libxcb-cursor0, libxkbcommon-x11-0, libxcb-xinerama0, libxcb-icccm4, libxcb-keysyms1, xdg-desktop-portal, wl-clipboard | xclip | xsel
 Section: utils
 Priority: optional
 Homepage: https://github.com/dishanagalawatta/SkillManager
