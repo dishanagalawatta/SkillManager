@@ -76,7 +76,10 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
         skill_dirs = []
         with os.scandir(dir_path) as entries:
             for entry in entries:
-                if entry.is_dir(follow_symlinks=False) and (dir_path / entry.name / "SKILL.md").is_file():
+                if (
+                    entry.is_dir(follow_symlinks=False)
+                    and (dir_path / entry.name / "SKILL.md").is_file()
+                ):
                     skill_dirs.append(entry)
         skill_count = len(skill_dirs)
 
@@ -301,14 +304,16 @@ class DiscoveryService:
                 ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
                     entries = list(os.scandir(resolved_source))
-                    if os.name == 'nt':
+                    if os.name == "nt":
                         entries.sort(key=lambda e: e.name.lower())
                     else:
                         entries.sort(key=lambda e: e.name.lower())
 
                     for entry in entries:
                         child = Path(entry.path)
-                        if not entry.is_dir(follow_symlinks=False) or is_ignored(child, resolved_source, ignore_spec):
+                        if not entry.is_dir(follow_symlinks=False) or is_ignored(
+                            child, resolved_source, ignore_spec
+                        ):
                             continue
 
                         skill_md_path = child / "SKILL.md"
@@ -477,14 +482,16 @@ class DiscoveryService:
 
         try:
             entries = list(os.scandir(resolved))
-            if os.name == 'nt':
+            if os.name == "nt":
                 entries.sort(key=lambda e: e.name.lower())
             else:
                 entries.sort(key=lambda e: e.name.lower())
 
             for entry in entries:
                 child = Path(entry.path)
-                if not entry.is_dir(follow_symlinks=False) or is_ignored(child, resolved, ignore_spec):
+                if not entry.is_dir(follow_symlinks=False) or is_ignored(
+                    child, resolved, ignore_spec
+                ):
                     continue
 
                 skill_md_path = child / "SKILL.md"
@@ -525,13 +532,17 @@ class DiscoveryService:
             snap_dir = project_root_path / ".agents" / "screenshots"
             if snap_dir.is_dir():
                 entries = list(os.scandir(snap_dir))
-                if os.name == 'nt':
+                if os.name == "nt":
                     entries.sort(key=lambda e: e.name.lower(), reverse=True)
                 else:
                     entries.sort(key=lambda e: e.name.lower(), reverse=True)
                 for entry in entries:
                     img = Path(entry.path)
-                    if entry.is_file(follow_symlinks=True) and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                    if entry.is_file(follow_symlinks=True) and img.suffix.lower() in (
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                    ):
                         skills.append(
                             {
                                 "name": img.name,
