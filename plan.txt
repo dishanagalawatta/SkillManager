@@ -1,0 +1,59 @@
+1. **Modify `_hash_child_names`:** Use `replace_with_git_merge_diff` to replace the `names` generator in `src/skill_manager/core/discovery.py` with:
+   ```python
+        with os.scandir(dir_path) as entries:
+            names = sorted(e.name for e in entries if e.is_dir(follow_symlinks=False))
+   ```
+2. **Modify `compute_dir_fingerprint`:** Use `replace_with_git_merge_diff` to replace `skill_dirs` generation in `src/skill_manager/core/discovery.py` with:
+   ```python
+        skill_dirs = []
+        with os.scandir(dir_path) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    if (dir_path / entry.name / "SKILL.md").is_file():
+                        skill_dirs.append(entry)
+        skill_count = len(skill_dirs)
+
+        # Max mtime of subdirs to help detect changes within them
+        max_sub_mtime = 0.0
+        if skill_dirs:
+            max_sub_mtime = max(d.stat(follow_symlinks=False).st_mtime for d in skill_dirs)
+   ```
+3. **Modify `_scan_one`:** Use `replace_with_git_merge_diff` to replace `for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):` in `src/skill_manager/core/discovery.py` with:
+   ```python
+                    entries = list(os.scandir(resolved_source))
+                    if os.name == 'nt':
+                        entries.sort(key=lambda e: e.name.lower())
+                    else:
+                        entries.sort(key=lambda e: e.name.lower())
+
+                    for entry in entries:
+                        child = Path(entry.path)
+                        if not entry.is_dir(follow_symlinks=False) or is_ignored(child, resolved_source, ignore_spec):
+   ```
+4. **Modify `_scan_single_project`:** Use `replace_with_git_merge_diff` to replace `for child in sorted(resolved.iterdir(), key=lambda i: i.name.lower()):` in `src/skill_manager/core/discovery.py` with:
+   ```python
+            entries = list(os.scandir(resolved))
+            if os.name == 'nt':
+                entries.sort(key=lambda e: e.name.lower())
+            else:
+                entries.sort(key=lambda e: e.name.lower())
+
+            for entry in entries:
+                child = Path(entry.path)
+                if not entry.is_dir(follow_symlinks=False) or is_ignored(child, resolved, ignore_spec):
+   ```
+5. **Modify screenshots discovery:** Use `replace_with_git_merge_diff` to replace `for img in sorted(snap_dir.iterdir(), key=lambda i: i.name.lower(), reverse=True):` in `src/skill_manager/core/discovery.py` with:
+   ```python
+                entries = list(os.scandir(snap_dir))
+                if os.name == 'nt':
+                    entries.sort(key=lambda e: e.name.lower(), reverse=True)
+                else:
+                    entries.sort(key=lambda e: e.name.lower(), reverse=True)
+                for entry in entries:
+                    img = Path(entry.path)
+                    if entry.is_file(follow_symlinks=True) and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+   ```
+6. **Verify changes:** Use `read_file` to confirm `src/skill_manager/core/discovery.py` has been updated correctly. Run `uv run pytest tests/core/test_discovery.py -x` in a bash session to confirm tests pass.
+7. **Run all tests:** Run `python scripts/dev_test.py` to ensure complete project verification.
+8. **Complete pre-commit steps:** Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
+9. **Submit:** Call `submit` with title `⚡ Bolt: Optimize directory discovery with os.scandir`.
