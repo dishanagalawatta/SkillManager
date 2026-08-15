@@ -140,11 +140,15 @@ class SkillFolderWatcher:
     def start(self) -> None:
         if self.started or self._observer is None:
             return
-        for path in self._paths:
-            if path.is_dir():
-                self._observer.schedule(self._handler, str(path), recursive=False)
-        self._observer.start()
-        self.started = True
+        try:
+            for path in self._paths:
+                if path.is_dir():
+                    self._observer.schedule(self._handler, str(path), recursive=False)
+            self._observer.start()
+            self.started = True
+        except OSError as e:
+            logger.warning("Failed to start file watcher: %s. Folder watching disabled.", e)
+            self.started = False
 
     def add_path(self, path: str) -> None:
         """Register a directory for watching (non-recursive).
@@ -171,7 +175,11 @@ class SkillFolderWatcher:
     def stop(self) -> None:
         if not self.started or self._observer is None:
             return
-        self._handler.cancel()
-        self._observer.stop()
-        self._observer.join(timeout=2)
-        self.started = False
+        try:
+            self._handler.cancel()
+            self._observer.stop()
+            self._observer.join(timeout=2)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("Error stopping file watcher: %s", e)
+        finally:
+            self.started = False
