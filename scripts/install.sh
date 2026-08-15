@@ -401,6 +401,8 @@ EOF
         if [ "$pkg_type" = "deb" ]; then
             run_as_root gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
         fi
+    fi
+
     # Check for system clipboard tools on Linux
     if ! command -v wl-copy &>/dev/null && ! command -v xclip &>/dev/null && ! command -v xsel &>/dev/null; then
         if [ "$pkg_type" != "deb" ] && command -v apt-get &>/dev/null; then

@@ -158,3 +158,10 @@ Ensure `xdg-desktop-portal` is installed and active on your desktop:
 ```bash
 sudo apt install -y xdg-desktop-portal
 ```
+
+### Native Clipboard Integration on Linux (Wayland / X11)
+SkillManager features direct dual-write clipboard operations. For reliable native clipboard support:
+- On **Wayland**: `sudo apt install -y wl-clipboard`
+- On **X11**: `sudo apt install -y xclip` (or `xsel`)
+
+The 1-command installer script and `.deb` packages configure this dependency automatically.
