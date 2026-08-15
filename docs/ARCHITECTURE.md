@@ -118,6 +118,59 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | `win32.py` | Windows shell, clipboard, and UI automation utilities |
 | `input_guard.py` | Injection safety guard enforcing test/offscreen isolation |
 
+### Verified Dual-Write Clipboard Architecture
+
+On Linux (Wayland and X11), Qt's `QClipboard` selection data source can be destroyed or disconnected when the application window minimizes (such as during QuickCopy auto-minimize). To ensure clipboard persistence across window minimization and reliable cross-app paste operations:
+
+1. **Subprocess Environment Sanitization (`get_clean_env()`)**: When running in frozen binary bundles (PyInstaller onedir/onefile) or AppImages, `LD_LIBRARY_PATH` points to bundled runtime libraries (`_internal`). System binaries (`wl-copy`, `wl-paste`, `xclip`, `ydotool`) dynamically link against the host system's libraries. `get_clean_env()` restores `LD_LIBRARY_PATH` to `LD_LIBRARY_PATH_ORIG` or removes it to prevent shared library version mismatch crashes.
+2. **Multi-Directory Binary Discovery (`find_system_binary()`)**: Probes standard system installation paths (`/usr/bin`, `/usr/local/bin`, `/snap/bin`, `~/.local/bin`) in addition to `PATH` to guarantee discovery in minimal desktop environments.
+3. **Session Probing**: `is_wayland_active()` inspects `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, and runtime directory sockets (`/run/user/<uid>/wayland-*`).
+4. **System-Truth Verification**: Verifies written content by reading directly from the native compositor/X11 selection buffer before reporting operation success.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as QML View (QuickCopy / Library)
+    participant Ops as OpsController / ClipboardMixin
+    participant Svc as ClipboardService
+    participant Linux as Linux Native Helper (linux.py)
+    participant Sys as System Compositor (wl-copy / xclip)
+    participant Qt as Qt QClipboard
+
+    UI->>Ops: copySelectedSkillsToClipboard()
+    Ops->>Svc: copy_text(content)
+    
+    alt prefer_native = True (Linux)
+        Svc->>Linux: set_clipboard(content)
+        Linux->>Linux: get_clean_env() & find_system_binary()
+        Linux->>Sys: Run wl-copy / xclip (DEVNULL pipes, clean env)
+        Sys-->>Linux: Return code 0 (Success)
+        Linux-->>Svc: True
+        
+        Note over Svc,Sys: System-Truth Verification
+        Svc->>Linux: get_clipboard()
+        Linux->>Sys: Run wl-paste / xclip -o
+        Sys-->>Linux: Current clipboard text
+        Linux-->>Svc: Verify content match (stripped)
+        
+        alt Verification Passed
+            Svc->>Qt: Set in-memory cache / QClipboard
+            Svc-->>Ops: Return True (Verified)
+        else Native Failed / Unverified
+            Svc->>Qt: Fallback to QClipboard.setText()
+            Svc-->>Ops: Return Status
+        end
+    else Windows / macOS
+        Svc->>Qt: QClipboard.setText(content)
+        Svc-->>Ops: Return Status
+    end
+
+    Ops-->>UI: Status Notification ("Copied N skills")
+    opt Auto-Minimize Enabled
+        Ops->>UI: _maybeMinimizeOnCopy() (Window minimizes safely)
+    end
+```
+
 ---
 
 ## 5. UI Design & "Solid Matte" Aesthetic

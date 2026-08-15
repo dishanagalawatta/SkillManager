@@ -318,6 +318,21 @@ You can also trigger screenshots directly via the camera icon in the SkillManage
 </details>
 
 <details>
+<summary><strong>Q: Clipboard copy on Linux (Wayland / X11)</strong></summary>
+
+SkillManager uses verified native clipboard writes to ensure text persists across auto-minimize and window focus loss.
+- On **Wayland**: `wl-clipboard` (`wl-copy` / `wl-paste`)
+- On **X11**: `xclip` or `xsel`
+
+The 1-command installer script and `.deb` packages configure this dependency automatically. If installing manually on custom setups:
+```bash
+sudo apt install -y wl-clipboard # Ubuntu / Debian (Wayland)
+sudo apt install -y xclip        # Ubuntu / Debian (X11)
+```
+
+</details>
+
+<details>
 <summary><strong>Q: How do I backup my custom collections and project links?</strong></summary>
 
 All configuration is stored locally as standard JSON under your user data directory (`~/.config/SkillManager` on Linux or `%APPDATA%\SkillManager` on Windows). You can back up or migrate this directory at any time.

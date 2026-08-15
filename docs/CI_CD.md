@@ -24,8 +24,8 @@ Triggers: push to `main`, pull requests, manual dispatch.
 ```mermaid
 flowchart LR
     A[PR / Push to main] --> B[Lint: ruff]
-    A --> C["Test: Python 3.12 (Ubuntu)"]
-    A --> D["Test: Python 3.13 (Ubuntu)"]
+    A --> C["Test: Python 3.12 (windows-latest)"]
+    A --> D["Test: Python 3.13 (windows-latest)"]
     B --> E[CI Gate: all checks pass]
     C --> E
     D --> E

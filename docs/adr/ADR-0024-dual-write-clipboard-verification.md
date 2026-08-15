@@ -11,21 +11,25 @@ Qt's `QClipboard` can silently fail or drop selection ownership when a window is
 2. Writing strictly via `wl-copy` set the Wayland compositor selection, but left Qt's internal `QGuiApplication.clipboard()` unpopulated and out of sync for in-process or Xwayland components.
 3. Probing for `wl-copy` relied solely on executable binary presence rather than active Wayland display connection validation, causing non-zero exit failures on X11 sessions.
 4. CLI fallback tools for X11 (`xclip` / `xsel`) were missing from native helper routines.
+5. In frozen binaries and AppImages, `LD_LIBRARY_PATH` points to bundled runtime libraries (`_internal`), causing external host CLI tools (`wl-copy`, `xclip`, `ydotool`) to fail due to dynamic linker symbol version mismatches.
 
 ## Decision
 
 We adopt a **Verified Dual-Write Clipboard Strategy** via `ClipboardService` and platform helpers:
 
-1. **Active Session Probing**: `linux.is_wayland_active()` verifies `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR` sockets before attempting `wl-copy` / `wl-paste`.
-2. **Dual-Write Execution**: Whenever text is copied, `ClipboardService` populates both the native system selection daemon (`wl-copy` on Wayland, `xclip`/`xsel`/`pyperclip` on X11) **and** Qt's `QGuiApplication.clipboard()` (populating both `Clipboard` and `Selection` modes on Linux).
-3. **Verified Readback**: Readback verification tests against the real system clipboard using native readers (`wl-paste`, `xclip`, `xsel`, `pyperclip`), using symmetric trailing-newline normalization (`.rstrip("\r\n")`).
-4. **Service Unification**: All clipboard writes (including screen capture reference text in `SnapController`) route through `app.clipboard_service.copy_text()`.
+1. **Subprocess Environment Sanitization**: `linux.get_clean_env()` strips bundled `LD_LIBRARY_PATH` (or restores `LD_LIBRARY_PATH_ORIG`) when executing external host CLI binaries (`wl-copy`, `wl-paste`, `xclip`, `xsel`, `ydotool`, `wmctrl`, `xdotool`).
+2. **Multi-Tier Binary Discovery**: `linux.find_system_binary()` probes standard Linux directories (`/usr/bin`, `/usr/local/bin`, `/snap/bin`, `~/.local/bin`) in addition to `PATH`.
+3. **Active Session Probing**: `linux.is_wayland_active()` verifies `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, and runtime directory sockets (`/run/user/<uid>/wayland-*`) before attempting `wl-copy` / `wl-paste`.
+4. **Dual-Write Execution**: Whenever text is copied, `ClipboardService` populates both the native system selection daemon (`wl-copy` on Wayland, `xclip`/`xsel`/`pyperclip` on X11) **and** Qt's `QGuiApplication.clipboard()` (populating both `Clipboard` and `Selection` modes on Linux).
+5. **Verified Readback**: Readback verification tests against the real system clipboard using native readers (`wl-paste`, `xclip`, `xsel`, `pyperclip`), using symmetric trailing-newline normalization (`.rstrip("\r\n")`).
+6. **Service Unification**: All clipboard writes (including screen capture reference text in `SnapController`) route through `app.clipboard_service.copy_text()`.
 
 ## Consequences
 
 ### Positive
 
 - **Persistence across minimize**: Native CLI tools (`wl-copy`, `xclip`, `xsel`, `pyperclip`) hold persistent selection ownership after `_maybeMinimizeOnCopy()` minimizes the window.
+- **Packaged App Stability**: System tools execute cleanly in PyInstaller and AppImage environments without library conflict crashes.
 - **In-process consistency**: Qt `QClipboard` remains in sync for internal UI views and QML components.
 - **Robust X11 & Wayland support**: Seamless fallback across Wayland, X11, Windows, and headless testing environments.
 
