@@ -27,7 +27,7 @@ from skill_manager.utils.input_guard import injection_allowed
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Tool probes (cached booleans)
+# Tool probes & Environment Sanitization
 # ---------------------------------------------------------------------------
 
 _WL_COPY: bool | None = None
@@ -37,52 +37,102 @@ _HAS_PYPERCLIP: bool | None = None
 _XCLIP: bool | None = None
 _XSEL: bool | None = None
 
+_FALLBACK_BIN_DIRS = (
+    "/usr/bin",
+    "/usr/local/bin",
+    "/bin",
+    "/snap/bin",
+    os.path.expanduser("~/.local/bin"),
+)
+
+
+def get_clean_env() -> dict[str, str]:
+    """Return an os.environ dictionary suitable for invoking host system binaries.
+
+    When running in a PyInstaller frozen binary or AppImage on Linux, the process
+    inherits an altered LD_LIBRARY_PATH (pointing to _internal or $APPDIR/usr/lib).
+    System binaries (such as wl-copy, wl-paste, xclip, xsel, ydotool, xdotool,
+    wmctrl, gdbus, xdg-open) compiled against host system libraries can crash or
+    fail to resolve symbols when executed under the bundled LD_LIBRARY_PATH.
+
+    This helper restores LD_LIBRARY_PATH to LD_LIBRARY_PATH_ORIG (if present) or
+    removes it, ensuring system binaries load their expected system libraries.
+    """
+    env = dict(os.environ)
+    if "LD_LIBRARY_PATH_ORIG" in env:
+        env["LD_LIBRARY_PATH"] = env["LD_LIBRARY_PATH_ORIG"]
+    else:
+        env.pop("LD_LIBRARY_PATH", None)
+    return env
+
+
+def find_system_binary(name: str) -> str | None:
+    """Locate a system executable, checking PATH and common Linux binary locations."""
+    found = shutil.which(name)
+    if found:
+        return found
+
+    for prefix in _FALLBACK_BIN_DIRS:
+        candidate = os.path.join(prefix, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+    return None
+
 
 def is_wayland_active() -> bool:
     """Return True if running under an active Wayland session."""
+    if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+        return True
     wayland_display = os.environ.get("WAYLAND_DISPLAY")
-    if not wayland_display:
-        return False
-    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
-    if runtime_dir:
-        socket_path = os.path.join(runtime_dir, wayland_display)
-        if os.path.exists(socket_path):
+    if wayland_display:
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+        if runtime_dir and os.path.exists(os.path.join(runtime_dir, wayland_display)):
             return True
-    return os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        return True
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir and os.path.isdir(runtime_dir):
+        try:
+            for item in os.listdir(runtime_dir):
+                if item.startswith("wayland-"):
+                    return True
+        except OSError:
+            pass
+    return False
 
 
 def _has_wl_copy() -> bool:
     global _WL_COPY
     if _WL_COPY is None:
-        _WL_COPY = shutil.which("wl-copy") is not None
+        _WL_COPY = find_system_binary("wl-copy") is not None
     return _WL_COPY
 
 
 def _has_wl_paste() -> bool:
     global _WL_PASTE
     if _WL_PASTE is None:
-        _WL_PASTE = shutil.which("wl-paste") is not None
+        _WL_PASTE = find_system_binary("wl-paste") is not None
     return _WL_PASTE
 
 
 def _has_xclip() -> bool:
     global _XCLIP
     if _XCLIP is None:
-        _XCLIP = shutil.which("xclip") is not None
+        _XCLIP = find_system_binary("xclip") is not None
     return _XCLIP
 
 
 def _has_xsel() -> bool:
     global _XSEL
     if _XSEL is None:
-        _XSEL = shutil.which("xsel") is not None
+        _XSEL = find_system_binary("xsel") is not None
     return _XSEL
 
 
 def _has_ydotool() -> bool:
     global _YDOTOOL
     if _YDOTOOL is None:
-        _YDOTOOL = shutil.which("ydotool") is not None
+        _YDOTOOL = find_system_binary("ydotool") is not None
     return _YDOTOOL
 
 
@@ -106,59 +156,71 @@ def _has_pyperclip() -> bool:
 def set_clipboard(text: str) -> bool:
     """Copy *text* to the system clipboard.
 
-    Tries ``wl-copy`` first if Wayland is active, then ``xclip``, ``xsel``,
-    and ``pyperclip`` (X11 fallbacks). Returns ``True`` on success.
+    Tries ``wl-copy`` first if Wayland is active or wl-copy is present, then
+    ``xclip``, ``xsel``, and ``pyperclip`` (X11 fallbacks). Returns ``True`` on success.
 
     ``wl-copy`` forks a child that owns the Wayland selection and inherits
     any open pipes; capturing stdout/stderr would make ``subprocess.run``
     block on the inherited pipe FDs until the child exits (i.e. when the
     selection is lost).  Both streams are therefore redirected to DEVNULL.
     """
-    if is_wayland_active() and _has_wl_copy():
+    clean_env = get_clean_env()
+
+    # 1. Wayland / wl-copy
+    wl_copy_bin = find_system_binary("wl-copy")
+    if wl_copy_bin and (_has_wl_copy() or is_wayland_active()):
         try:
             proc = subprocess.run(
-                ["wl-copy"],
+                [wl_copy_bin],
                 input=text,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return True
         except Exception as exc:  # noqa: BLE001
             logger.debug("wl-copy failed: %s", exc)
 
-    if _has_xclip():
+    # 2. X11 xclip
+    xclip_bin = find_system_binary("xclip")
+    if xclip_bin:
         try:
             proc = subprocess.run(
-                ["xclip", "-selection", "clipboard"],
+                [xclip_bin, "-selection", "clipboard"],
                 input=text,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return True
         except Exception as exc:  # noqa: BLE001
             logger.debug("xclip failed: %s", exc)
 
-    if _has_xsel():
+    # 3. X11 xsel
+    xsel_bin = find_system_binary("xsel")
+    if xsel_bin:
         try:
             proc = subprocess.run(
-                ["xsel", "--clipboard", "--input"],
+                [xsel_bin, "--clipboard", "--input"],
                 input=text,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return True
         except Exception as exc:  # noqa: BLE001
             logger.debug("xsel failed: %s", exc)
 
+    # 4. pyperclip
     if _has_pyperclip():
         try:
             import pyperclip  # type: ignore[import-not-found]
@@ -173,45 +235,57 @@ def set_clipboard(text: str) -> bool:
 
 def get_clipboard() -> str | None:
     """Return the current clipboard content, or ``None`` on failure."""
-    if is_wayland_active() and _has_wl_paste():
+    clean_env = get_clean_env()
+
+    # 1. Wayland / wl-paste
+    wl_paste_bin = find_system_binary("wl-paste")
+    if wl_paste_bin and (_has_wl_paste() or is_wayland_active()):
         try:
             proc = subprocess.run(
-                ["wl-paste"],
+                [wl_paste_bin],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return proc.stdout
         except Exception as exc:  # noqa: BLE001
             logger.debug("wl-paste failed: %s", exc)
 
-    if _has_xclip():
+    # 2. X11 xclip
+    xclip_bin = find_system_binary("xclip")
+    if xclip_bin:
         try:
             proc = subprocess.run(
-                ["xclip", "-selection", "clipboard", "-o"],
+                [xclip_bin, "-selection", "clipboard", "-o"],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return proc.stdout
         except Exception as exc:  # noqa: BLE001
             logger.debug("xclip -o failed: %s", exc)
 
-    if _has_xsel():
+    # 3. X11 xsel
+    xsel_bin = find_system_binary("xsel")
+    if xsel_bin:
         try:
             proc = subprocess.run(
-                ["xsel", "--clipboard", "--output"],
+                [xsel_bin, "--clipboard", "--output"],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 return proc.stdout
         except Exception as exc:  # noqa: BLE001
             logger.debug("xsel --output failed: %s", exc)
 
+    # 4. pyperclip
     if _has_pyperclip():
         try:
             import pyperclip  # type: ignore[import-not-found]
@@ -221,6 +295,50 @@ def get_clipboard() -> str | None:
             logger.debug("pyperclip.paste failed: %s", exc)
 
     return None
+
+
+def set_clipboard_image(image_path: str) -> bool:
+    """Copy an image file at *image_path* to the system clipboard (PNG format)."""
+    if not os.path.isfile(image_path):
+        return False
+
+    clean_env = get_clean_env()
+
+    wl_copy_bin = find_system_binary("wl-copy")
+    if wl_copy_bin and (_has_wl_copy() or is_wayland_active()):
+        try:
+            with open(image_path, "rb") as f:
+                proc = subprocess.run(
+                    [wl_copy_bin, "--type", "image/png"],
+                    stdin=f,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                    env=clean_env,
+                )
+            if proc.returncode == 0:
+                return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("wl-copy image failed: %s", exc)
+
+    xclip_bin = find_system_binary("xclip")
+    if xclip_bin:
+        try:
+            with open(image_path, "rb") as f:
+                proc = subprocess.run(
+                    [xclip_bin, "-selection", "clipboard", "-t", "image/png"],
+                    stdin=f,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                    env=clean_env,
+                )
+            if proc.returncode == 0:
+                return True
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("xclip image failed: %s", exc)
+
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -262,14 +380,16 @@ def ydotool_daemon_health() -> str:
     Returns ``"not-installed"`` when the binary is missing, ``"daemon-down"``
     when the binary exists but ``ydotoold`` is unreachable, else ``"ok"``.
     """
-    if not _has_ydotool():
+    ydotool_bin = find_system_binary("ydotool")
+    if not ydotool_bin:
         return "not-installed"
     try:
         proc = subprocess.run(
-            ["ydotool", "debug"],
+            [ydotool_bin, "debug"],
             capture_output=True,
             text=True,
             timeout=5,
+            env=get_clean_env(),
         )
         return "ok" if proc.returncode == 0 else "daemon-down"
     except Exception as exc:  # noqa: BLE001
@@ -286,13 +406,15 @@ def send_ctrl_v() -> bool:
     """
     if not injection_allowed():
         return False
-    if _has_ydotool() and _ydotool_daemon_alive():
+    ydotool_bin = find_system_binary("ydotool")
+    if ydotool_bin and _ydotool_daemon_alive():
         try:
             proc = subprocess.run(
-                ["ydotool", "key", *_CTRL_V_SEQUENCE],
+                [ydotool_bin, "key", *_CTRL_V_SEQUENCE],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=get_clean_env(),
             )
             if proc.returncode == 0:
                 return True
@@ -334,28 +456,31 @@ def find_window_by_title(title_fragment: str) -> int | None:
     should treat any non-``None`` value as "found").  On X11 returns the
     actual window ID.
     """
-    xdotool = shutil.which("xdotool")
-    if xdotool:
+    clean_env = get_clean_env()
+    xdotool_bin = find_system_binary("xdotool")
+    if xdotool_bin:
         try:
             proc = subprocess.run(
-                [xdotool, "search", "--name", title_fragment],
+                [xdotool_bin, "search", "--name", title_fragment],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0 and proc.stdout.strip():
                 return int(proc.stdout.strip().split("\n")[0])
         except Exception as exc:  # noqa: BLE001
             logger.debug("xdotool search failed: %s", exc)
 
-    wmctrl = shutil.which("wmctrl")
-    if wmctrl:
+    wmctrl_bin = find_system_binary("wmctrl")
+    if wmctrl_bin:
         try:
             proc = subprocess.run(
-                [wmctrl, "-l"],
+                [wmctrl_bin, "-l"],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             for line in proc.stdout.splitlines():
                 if title_fragment.lower() in line.lower():
@@ -393,14 +518,16 @@ def get_window_geometry(_window_id: int) -> dict | None:
     Uses ``xdotool`` or ``wmctrl``.  Not supported on pure Wayland
     without helper tools.
     """
-    xdotool = shutil.which("xdotool")
-    if xdotool:
+    clean_env = get_clean_env()
+    xdotool_bin = find_system_binary("xdotool")
+    if xdotool_bin:
         try:
             proc = subprocess.run(
-                [xdotool, "getwindowgeometry", str(_window_id)],
+                [xdotool_bin, "getwindowgeometry", str(_window_id)],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             if proc.returncode == 0:
                 result: dict[str, int] = {}
@@ -420,14 +547,15 @@ def get_window_geometry(_window_id: int) -> dict | None:
         except Exception as exc:  # noqa: BLE001
             logger.debug("xdotool getwindowgeometry failed: %s", exc)
 
-    wmctrl = shutil.which("wmctrl")
-    if wmctrl:
+    wmctrl_bin = find_system_binary("wmctrl")
+    if wmctrl_bin:
         try:
             proc = subprocess.run(
-                ["wmctrl", "-lG"],
+                [wmctrl_bin, "-lG"],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                env=clean_env,
             )
             for line in proc.stdout.splitlines():
                 parts = line.split(None, 5)
@@ -456,13 +584,14 @@ def move_mouse(x: int, y: int) -> bool:
     if not injection_allowed():
         return False
     # ydotool (Wayland uinput)
-    ydotool = shutil.which("ydotool")
-    if ydotool:
+    ydotool_bin = find_system_binary("ydotool")
+    if ydotool_bin:
         try:
             subprocess.run(
-                [ydotool, "mousemove", "--x", str(x), "--y", str(y)],
+                [ydotool_bin, "mousemove", "--x", str(x), "--y", str(y)],
                 capture_output=True,
                 timeout=5,
+                env=get_clean_env(),
             )
             return True
         except Exception as exc:  # noqa: BLE001
@@ -492,8 +621,8 @@ def click_mouse(
         return False
 
     # ydotool
-    ydotool = shutil.which("ydotool")
-    if ydotool:
+    ydotool_bin = find_system_binary("ydotool")
+    if ydotool_bin:
         btn = {  # ydotool button codes
             "left": 0x110,
             "right": 0x111,
@@ -501,9 +630,10 @@ def click_mouse(
         }.get(button, 0x110)
         try:
             subprocess.run(
-                [ydotool, "click", str(btn)],
+                [ydotool_bin, "click", str(btn)],
                 capture_output=True,
                 timeout=5,
+                env=get_clean_env(),
             )
             return True
         except Exception as exc:  # noqa: BLE001
@@ -526,13 +656,14 @@ def type_text(text: str) -> int:
     if not injection_allowed():
         return 0
     # ydotool type
-    ydotool = shutil.which("ydotool")
-    if ydotool:
+    ydotool_bin = find_system_binary("ydotool")
+    if ydotool_bin:
         try:
             subprocess.run(
-                [ydotool, "type", text],
+                [ydotool_bin, "type", text],
                 capture_output=True,
                 timeout=15,
+                env=get_clean_env(),
             )
             return len(text)
         except Exception as exc:  # noqa: BLE001

@@ -141,6 +141,15 @@ class ClipboardService:
 
     def read_text(self) -> str | None:
         """Return the current clipboard content, or ``None`` on failure."""
+        if self._prefer_native:
+            reader = self._native_reader or _resolve_native_reader()
+            if reader is not None:
+                try:
+                    res = reader()
+                    if res is not None:
+                        return res
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Native clipboard read failed: %s", exc)
         qt = self._qt()
         if qt is not None:
             try:
