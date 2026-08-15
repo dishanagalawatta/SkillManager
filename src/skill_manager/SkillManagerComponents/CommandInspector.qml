@@ -419,6 +419,9 @@ Rectangle {
             }
         }
 
+        Accessible.role: Accessible.Button
+        Accessible.name: "Expand Inspector"
+
         Text {
             anchors.centerIn: parent
             text: "›"
@@ -439,9 +442,6 @@ Rectangle {
                 text: "Expand Inspector"
                 visible: collapseMouseArea.containsMouse || collapseHandleRect.activeFocus
             }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Expand Inspector"
         }
     }
 
