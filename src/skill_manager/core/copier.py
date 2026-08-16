@@ -255,15 +255,18 @@ def _normalize_skill_package(skill):
 
 
 def repair_malformed_path(raw_path: str) -> str:
-    """Repair paths that have had current working directory or leading path prepended to an absolute path."""
+    """Repair paths that have missing leading slashes or duplicated root prefixes."""
     if not raw_path:
         return ""
-    p_str = str(raw_path)
-    if Path(p_str).exists():
-        return p_str
+    p_str = str(raw_path).strip()
 
-    # Search for nested absolute path roots (e.g. /home/, /tmp/, /Users/, /private/)
-    patterns = ["/home/", "/tmp/", "/Users/", "/private/"]
+    # 1. Missing leading slash on root paths (e.g. "home/user/..." -> "/home/user/...")
+    root_prefixes = ("home/", "tmp/", "Users/", "private/", "var/", "usr/", "etc/")
+    if p_str.startswith(root_prefixes):
+        p_str = "/" + p_str
+
+    # 2. Search for nested absolute path roots (e.g. /home/user/home/user/...)
+    patterns = ["/home/", "/tmp/", "/Users/", "/private/", "/var/"]
     for pat in patterns:
         pos = p_str.find(pat, 1)
         if pos != -1:
@@ -274,7 +277,7 @@ def repair_malformed_path(raw_path: str) -> str:
             ):
                 return candidate
 
-    # Windows drive letter pattern e.g. /cwd/C:/... or C:\cwd\D:\...
+    # 3. Windows drive letter pattern e.g. /cwd/C:/... or C:\cwd\D:\...
     m = re.search(r"[a-zA-Z]:[/\\]", p_str[1:])
     if m:
         candidate = p_str[m.start() + 1 :]

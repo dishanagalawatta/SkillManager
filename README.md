@@ -275,6 +275,26 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [DESIGN.md](DESIGN.md) for 
 
 ---
 
+## 📚 Documentation
+
+The full documentation hub lives in [`docs/`](docs/README.md). Quick navigation:
+
+| Area | Document |
+|------|----------|
+| Installation & Updates | [docs/INSTALL.md](docs/INSTALL.md) |
+| User Guide | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
+| Development | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Design System | [DESIGN.md](DESIGN.md) |
+| API Reference | [docs/API/index.md](docs/API/index.md) |
+| Environment Variables | [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) |
+| MCP Server | [docs/MCP_SERVER.md](docs/MCP_SERVER.md) |
+| CI/CD | [docs/CI_CD.md](docs/CI_CD.md) |
+| Releases & Versioning | [docs/RELEASING.md](docs/RELEASING.md) |
+| Architecture Decisions | [ADR_INDEX.md](ADR_INDEX.md) |
+
+---
+
 ## ⚙️ Configuration & Environment
 
 SkillManager works out of the box with sensible defaults. Optional settings can be configured via `.env`:

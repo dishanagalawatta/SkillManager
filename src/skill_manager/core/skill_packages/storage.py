@@ -40,7 +40,9 @@ def resolve_package_storage(
             or item.get("local_path")
             or ""
         )
-        configured = str(configured).strip()
+        from skill_manager.core.copier import repair_malformed_path
+
+        configured = repair_malformed_path(configured)
         item["configured_package_path"] = configured
 
         if not configured:
@@ -51,6 +53,8 @@ def resolve_package_storage(
         package_id = item.get("package_id")
         prior = inventory.get(package_id, {}) if package_id else {}
         old_resolved = item.get("resolved_package_path") or item.get("package_path")
+        if old_resolved:
+            old_resolved = repair_malformed_path(str(old_resolved))
 
         child_name = safe_package_folder_name(item)
 

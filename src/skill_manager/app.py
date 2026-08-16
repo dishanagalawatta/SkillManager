@@ -195,11 +195,6 @@ class AppController(AppControllerProxyMixin, QObject):
         self._projects = self._config.get("projects", [])
         self._project_aliases = self._config.get("project_aliases", {})
 
-        # Boot-normalize: rewrite any stored project paths that don't point
-        # to a .agents/skills (or intended .agents/skills) directory so that
-        # ``project_label`` and ``getProjectLabel`` always agree.
-        self._normalize_project_paths_on_startup()
-
         self._update_packages = []
         raw_skills = self._config.get("skills", [])
         for s in raw_skills:
@@ -212,6 +207,10 @@ class AppController(AppControllerProxyMixin, QObject):
             except Exception as e:
                 logger.warning("Invalid skill package config found: %s. Error: %s", s, e)
         self._custom_collections = self._config.get("custom_collections", {})
+
+        # Boot-normalize: rewrite any stored project, source, and package paths
+        # so that paths are healthy, canonical, and self-healed on startup.
+        self._normalize_paths_on_startup()
 
         # Shared project state (syncs across all project selectors)
         self._current_project_label = ""
@@ -368,68 +367,120 @@ class AppController(AppControllerProxyMixin, QObject):
                 self._update_package_scheduler
             )
 
-    def _normalize_project_paths_on_startup(self):
-        """Rewrite stored project paths to their canonical .agents/skills form and auto-repair malformed paths.
+    def _normalize_paths_on_startup(self):
+        """Rewrite stored project, source, and skill package paths to their canonical form and auto-repair malformed paths.
 
-        If a project path contains duplicated prefix artifacts or points to a non-existent path
-        where an inner path segment exists, auto-repairs it so that the user's config stays healthy.
+        If a stored path contains duplicated prefix artifacts or missing leading slashes,
+        auto-repairs it so that the user's config stays healthy.
         """
         from skill_manager.core.copier import (
             get_skills_dir,
             repair_malformed_path,
             url_to_local_path,
         )
-
-        if not self._projects:
-            return
+        from skill_manager.core.skill_packages import (
+            resolve_package_storage,
+        )
 
         if os.environ.get("SKILL_MANAGER_SKIP_INITIAL_LOAD") == "1":
             return
 
-        changed = False
-        normalized = []
-        for project_path in self._projects:
+        # 1. Projects normalization
+        projects = getattr(self, "_projects", None)
+        if projects:
+            changed_projects = False
+            normalized_projects = []
+            for project_path in projects:
+                try:
+                    clean_path = url_to_local_path(project_path)
+                    repaired = repair_malformed_path(clean_path)
+                    if repaired != clean_path:
+                        logger.info(
+                            "Boot self-healing: repaired malformed project path %r -> %r",
+                            project_path,
+                            repaired,
+                        )
+                        clean_path = repaired
+                        changed_projects = True
+
+                    canonical = get_skills_dir(clean_path)
+                    canonical_str = str(canonical)
+
+                    cand_p = Path(canonical_str)
+                    if not cand_p.exists() and not any(
+                        p.is_dir() for p in cand_p.parents if len(p.parts) > 1
+                    ):
+                        logger.warning(
+                            "Boot self-healing: removing non-existent stale project path %r",
+                            project_path,
+                        )
+                        changed_projects = True
+                        continue
+
+                    if canonical_str != project_path:
+                        logger.info("Boot normalization: %r -> %r", project_path, canonical_str)
+                        normalized_projects.append(canonical_str)
+                        changed_projects = True
+                    else:
+                        normalized_projects.append(project_path)
+                except Exception as exc:
+                    logger.warning("Boot normalization failed for %r: %s", project_path, exc)
+                    normalized_projects.append(project_path)
+
+            if changed_projects:
+                self._projects = normalized_projects
+                self._config.set("projects", self._projects)
+
+        # 2. Sources normalization
+        sources = getattr(self, "_sources", None)
+        if sources:
+            changed_sources = False
+            normalized_sources = []
+            for source_path in sources:
+                try:
+                    clean_path = url_to_local_path(source_path)
+                    repaired = repair_malformed_path(clean_path)
+                    if repaired != source_path:
+                        logger.info(
+                            "Boot self-healing: repaired malformed source path %r -> %r",
+                            source_path,
+                            repaired,
+                        )
+                        normalized_sources.append(repaired)
+                        changed_sources = True
+                    else:
+                        normalized_sources.append(source_path)
+                except Exception as exc:
+                    logger.warning("Boot normalization failed for source %r: %s", source_path, exc)
+                    normalized_sources.append(source_path)
+
+            if changed_sources:
+                self._sources = normalized_sources
+                self._config.set("sources", self._sources)
+
+        # 3. Skill Packages normalization
+        update_packages = getattr(self, "_update_packages", None)
+        if update_packages:
             try:
-                # 1. Clean up file:// or raw formatting
-                clean_path = url_to_local_path(project_path)
-                repaired = repair_malformed_path(clean_path)
-                if repaired != clean_path:
-                    logger.info(
-                        "Boot self-healing: repaired malformed path %r -> %r",
-                        project_path,
-                        repaired,
-                    )
-                    clean_path = repaired
-                    changed = True
-
-                canonical = get_skills_dir(clean_path)
-                canonical_str = str(canonical)
-
-                # Check if the target project path or any ancestor exists on disk
-                cand_p = Path(canonical_str)
-                if not cand_p.exists() and not any(
-                    p.is_dir() for p in cand_p.parents if len(p.parts) > 1
-                ):
-                    logger.warning(
-                        "Boot self-healing: removing non-existent stale project path %r",
-                        project_path,
-                    )
-                    changed = True
-                    continue
-
-                if canonical_str != project_path:
-                    logger.info("Boot normalization: %r -> %r", project_path, canonical_str)
-                    normalized.append(canonical_str)
-                    changed = True
-                else:
-                    normalized.append(project_path)
+                refreshed = resolve_package_storage(update_packages)
+                changed_packages = False
+                for i, item in enumerate(refreshed):
+                    if i < len(self._update_packages):
+                        if self._update_packages[i] != item:
+                            changed_packages = True
+                        self._update_packages[i].clear()
+                        self._update_packages[i].update(item)
+                    else:
+                        self._update_packages.append(item)
+                        changed_packages = True
+                if changed_packages:
+                    logger.info("Boot self-healing: normalized skill package storage paths")
+                    self._config.set("skills", self._update_packages)
             except Exception as exc:
-                logger.warning("Boot normalization failed for %r: %s", project_path, exc)
-                normalized.append(project_path)
+                logger.warning("Boot normalization failed for skill packages: %s", exc)
 
-        if changed:
-            self._projects = normalized
-            self._config.set("projects", self._projects)
+    # Backward compatibility alias
+    _normalize_project_paths_on_startup = _normalize_paths_on_startup
 
     def _run_startup_package_scan(self):
         """Runs the initial scan for skill package updates."""

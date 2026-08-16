@@ -139,7 +139,11 @@ Item {
         var m = AppController.libraryModel
         if (m) {
             lv_listView.model = m
-            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+            if (!m.incubating) {
+                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+            } else {
+                lv_listView.cacheBuffer = 0
+            }
         }
         Qt.callLater(dumpLayoutChain)
     }
@@ -154,7 +158,9 @@ Item {
             } else {
                 lv_listView.cacheBuffer = 0
                 lv_listView.model = newModel
-                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                if (!newModel.incubating) {
+                    lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                }
             }
         }
     }
@@ -539,6 +545,26 @@ Item {
                             lv_listView._restoreScroll()
                         }
                     }
+                    function onRowsAboutToBeRemoved() {
+                        lv_listView.savedScrollPos = lv_listView.contentY
+                        lv_listView.cacheBuffer = 0
+                    }
+                    function onRowsRemoved() {
+                        if (lv_listView.model && !AppController.libraryModel.incubating) {
+                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                            lv_listView._restoreScroll()
+                        }
+                    }
+                    function onRowsAboutToBeInserted() {
+                        lv_listView.savedScrollPos = lv_listView.contentY
+                        lv_listView.cacheBuffer = 0
+                    }
+                    function onRowsInserted() {
+                        if (lv_listView.model && !AppController.libraryModel.incubating) {
+                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+                            lv_listView._restoreScroll()
+                        }
+                    }
                     function onAboutToMutateStructure() {
                         lv_listView.savedScrollPos = lv_listView.contentY
                         lv_listView.cacheBuffer = 0
@@ -564,6 +590,8 @@ Item {
                                 lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
                                 lv_listView._restoreScroll()
                             }
+                        } else {
+                            lv_listView.cacheBuffer = 0
                         }
                     }
                 }

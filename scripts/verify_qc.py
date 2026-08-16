@@ -31,7 +31,6 @@ with open("/tmp/test-qc-injected/skill.md", "w") as f:
 
 os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 os.environ["SKILL_MANAGER_DEV_MODE"] = "1"
-os.environ["SKILL_MANAGER_TESTING"] = "1"
 
 import sentry_sdk
 

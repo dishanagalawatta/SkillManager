@@ -143,6 +143,18 @@ For tiered environment configurations (dev, staging, prod), see
 
 ---
 
+## Command-Line Options
+
+When launching from the terminal or scripts:
+
+| Option | Description |
+|---|---|
+| `-v`, `--version` | Print application version and exit |
+| `--mcp` | Start headless Model Context Protocol (MCP) server |
+| `--mcp-allow-write` | Enable write/mutation tools in MCP server |
+
+---
+
 ## Tips & Tricks
 
 - **Drag & Drop**: Drag source and project directories directly into the Updates view to add them.

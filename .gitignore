@@ -19,6 +19,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
+pip-wheel-metadata/
 build/
 dist/
 .mypy_cache/
@@ -28,6 +29,11 @@ dist/
 .venv/
 venv/
 node_modules/
+# Static analysis tool caches
+.pyre/
+.dmypy.json
+*.py,cover
+cython_debug/
 
 # ─── Testing / Linting ──────────────────────────────────────────
 .pytest_cache/

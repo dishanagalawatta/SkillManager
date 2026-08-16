@@ -52,6 +52,9 @@
    # Quick token check
    python -c "from dotenv import load_dotenv; load_dotenv(); import os; assert os.getenv('POSTHOG_PROJECT_TOKEN'), 'Missing POSTHOG_PROJECT_TOKEN'"
 
+   # Sanity check: confirm the chosen tier's overrides loaded
+   uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; [print(f'{k} = {os.getenv(k)!r}') for k in ('SKILL_MANAGER_LOG_LEVEL', 'SKILL_MANAGER_TESTING', 'QT_QPA_PLATFORM', 'QML_DISABLE_DISK_CACHE')]"
+
    # Full quality gate (lint + format + tests)
    python scripts/dev_test.py
    ```

@@ -12,7 +12,7 @@ Welcome to the SkillManager development engine room. This guide covers environme
 - **Linting & Formatting**: `ruff`
 - **Packaging**: PyInstaller & Inno Setup
 - **Testing**: `pytest` with `pytest-xdist` for parallel execution
-- **CI/CD**: GitHub Actions with `release-please`
+- **CI/CD**: GitHub Actions with automated SemVer release pipeline (`scripts/release.py`)
 - **Error Tracking**: Sentry
 - **Analytics**: PostHog
 
@@ -143,6 +143,7 @@ uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
 | Command | Description |
 |---|---|
 | `uv run skill-manager` | Launch the desktop application |
+| `uv run skill-manager --version` / `-v` | Display application version and exit |
 | `python scripts/dev_test.py` | Run unified linting, formatting check, and test suite |
 | `uv run ruff check src tests` | Run linter only |
 | `uv run ruff format src tests` | Format Python code |

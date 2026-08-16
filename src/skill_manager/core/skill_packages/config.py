@@ -132,17 +132,22 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
+    from skill_manager.core.copier import repair_malformed_path
+
     detected = detect_package_config(data)
-    configured_pkg_path = str(
-        detected.get("configured_package_path")
-        or detected.get("package_path")
-        or detected.get("local_path")
-        or ""
-    ).strip()
-    resolved_pkg_path = str(
-        detected.get("resolved_package_path") or detected.get("package_path") or ""
-    ).strip()
+    configured_pkg_path = repair_malformed_path(
+        str(
+            detected.get("configured_package_path")
+            or detected.get("package_path")
+            or detected.get("local_path")
+            or ""
+        ).strip()
+    )
+    resolved_pkg_path = repair_malformed_path(
+        str(detected.get("resolved_package_path") or detected.get("package_path") or "").strip()
+    )
     pkg_args = str(detected.get("package_args") or detected.get("install_args") or "").strip()
+    clone_path = repair_malformed_path(str(detected.get("clone_path") or "").strip())
 
     source = {
         "package_id": str(detected.get("package_id") or "").strip(),
@@ -153,7 +158,7 @@ def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
         "configured_package_path": configured_pkg_path,
         "resolved_package_path": resolved_pkg_path,
         "package_path": resolved_pkg_path or configured_pkg_path,
-        "clone_path": str(detected.get("clone_path") or "").strip(),
+        "clone_path": clone_path,
         "package_name": str(detected.get("package_name") or "").strip(),
         "package_args": pkg_args,
         "update_command": str(detected.get("update_command") or "").strip(),
