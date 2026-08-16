@@ -43,7 +43,8 @@ def _hash_child_names(dir_path: Path) -> str:
     parent directory's mtime and size are unchanged.
     """
     try:
-        names = sorted(p.name for p in dir_path.iterdir() if p.is_dir())
+        with os.scandir(dir_path) as entries:
+            names = sorted(e.name for e in entries if e.is_dir(follow_symlinks=False))
         return hashlib.sha1("\n".join(names).encode()).hexdigest()[:16]
     except OSError:
         return ""
@@ -72,17 +73,20 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
     """
     try:
         stat = dir_path.stat()
-        skill_dirs = [
-            child
-            for child in dir_path.iterdir()
-            if child.is_dir() and (child / "SKILL.md").is_file()
-        ]
+        skill_dirs = []
+        with os.scandir(dir_path) as entries:
+            for entry in entries:
+                if (
+                    entry.is_dir(follow_symlinks=False)
+                    and (dir_path / entry.name / "SKILL.md").is_file()
+                ):
+                    skill_dirs.append(entry)
         skill_count = len(skill_dirs)
 
         # Max mtime of subdirs to help detect changes within them
         max_sub_mtime = 0.0
         if skill_dirs:
-            max_sub_mtime = max(d.stat().st_mtime for d in skill_dirs)
+            max_sub_mtime = max(d.stat(follow_symlinks=False).st_mtime for d in skill_dirs)
 
         prefix_tuple = (stat.st_mtime, stat.st_size, skill_count, max_sub_mtime)
         key = os.path.normcase(str(dir_path))
@@ -299,8 +303,14 @@ class DiscoveryService:
 
                 ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
-                    for child in sorted(resolved_source.iterdir(), key=lambda i: i.name.lower()):
-                        if not child.is_dir() or is_ignored(child, resolved_source, ignore_spec):
+                    with os.scandir(resolved_source) as it:
+                        entries = sorted(it, key=lambda e: e.name.lower())
+
+                    for entry in entries:
+                        child = Path(entry.path)
+                        if not entry.is_dir(follow_symlinks=False) or is_ignored(
+                            child, resolved_source, ignore_spec
+                        ):
                             continue
 
                         skill_md_path = child / "SKILL.md"
@@ -468,8 +478,14 @@ class DiscoveryService:
         ignore_spec = load_ignore_spec(resolved)
 
         try:
-            for child in sorted(resolved.iterdir(), key=lambda i: i.name.lower()):
-                if not child.is_dir() or is_ignored(child, resolved, ignore_spec):
+            with os.scandir(resolved) as it:
+                entries = sorted(it, key=lambda e: e.name.lower())
+
+            for entry in entries:
+                child = Path(entry.path)
+                if not entry.is_dir(follow_symlinks=False) or is_ignored(
+                    child, resolved, ignore_spec
+                ):
                     continue
 
                 skill_md_path = child / "SKILL.md"
@@ -509,8 +525,15 @@ class DiscoveryService:
             project_root_path = project_root_for_project(resolved)
             snap_dir = project_root_path / ".agents" / "screenshots"
             if snap_dir.is_dir():
-                for img in sorted(snap_dir.iterdir(), key=lambda i: i.name.lower(), reverse=True):
-                    if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                with os.scandir(snap_dir) as it:
+                    entries = sorted(it, key=lambda e: e.name.lower(), reverse=True)
+                for entry in entries:
+                    img = Path(entry.path)
+                    if entry.is_file(follow_symlinks=True) and img.suffix.lower() in (
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                    ):
                         skills.append(
                             {
                                 "name": img.name,
