@@ -64,9 +64,10 @@ class IngestMixin:
 
     @Slot(list)
     def setSkills(self, skills: list[dict[str, Any]]):
+        was_empty = len(self._all_skills) == 0
         self._all_skills = [Skill.from_dict_fast(s) for s in skills]
         self._search_engine = SearchEngine(skills)
-        self._apply_filter(reset=True)
+        self._apply_filter(reset=was_empty)
 
     @Slot(result=list)
     def get_known_paths(self) -> list[str]:

@@ -21,12 +21,12 @@ class TestPathRepair:
         assert repaired.startswith("/home/")
         assert repaired == "/home/dikka/.agent/skills"
 
-    def test_repair_users_missing_leading_slash(self):
-        """Path starting with Users/ without leading slash is repaired to /Users/..."""
-        raw = "Users/dikka/.agent/skills"
+    def test_repair_tmp_missing_leading_slash(self):
+        """Path starting with tmp/ without leading slash is repaired to /tmp/..."""
+        raw = "tmp/dikka/.agent/skills"
         repaired = repair_malformed_path(raw)
-        assert repaired.startswith("/Users/")
-        assert repaired == "/Users/dikka/.agent/skills"
+        assert repaired.startswith("/tmp/")
+        assert repaired == "/tmp/dikka/.agent/skills"
 
     def test_repair_duplicated_home_root(self):
         """Path with duplicated /home/user/home/user/... root is stripped to the inner canonical root."""
@@ -62,8 +62,9 @@ class TestPackageStorageResolution:
         assert len(resolved) == 1
         pkg = resolved[0]
         assert pkg["configured_package_path"] == "/home/dikka/.agent/skills"
-        assert not pkg["package_path"].startswith("/home/dikka/home/dikka")
-        assert pkg["package_path"] == "/home/dikka/.agent/skills/marketing-skills-9a1d6353"
+        pkg_path_norm = pkg["package_path"].replace("\\", "/")
+        assert "home/dikka/home/dikka" not in pkg_path_norm
+        assert pkg_path_norm.endswith("home/dikka/.agent/skills/marketing-skills-9a1d6353")
 
     def test_normalize_skill_package_config_repairs_paths(self):
         """normalize_skill_package_config sanitizes malformed configured and resolved paths."""

@@ -260,32 +260,22 @@ def repair_malformed_path(raw_path: str) -> str:
         return ""
     p_str = str(raw_path).strip()
 
-    # 1. Missing leading slash on root paths (e.g. "home/user/..." -> "/home/user/...")
-    root_prefixes = ("home/", "tmp/", "Users/", "private/", "var/", "usr/", "etc/")
+    # 1. Windows drive letter pattern e.g. /cwd/C:/... or C:\cwd\D:\...
+    m = re.search(r"[a-zA-Z]:[/\\]", p_str[1:])
+    if m:
+        return p_str[m.start() + 1 :]
+
+    # 2. Missing leading slash on Unix root paths (e.g. "home/user/..." -> "/home/user/...")
+    root_prefixes = ("home/", "tmp/", "private/", "var/", "usr/", "etc/")
     if p_str.startswith(root_prefixes):
         p_str = "/" + p_str
 
-    # 2. Search for nested absolute path roots (e.g. /home/user/home/user/...)
-    patterns = ["/home/", "/tmp/", "/Users/", "/private/", "/var/"]
+    # 3. Search for nested absolute path roots (e.g. /home/user/home/user/...)
+    patterns = ["/home/", "/tmp/", "/private/", "/var/"]
     for pat in patterns:
         pos = p_str.find(pat, 1)
         if pos != -1:
-            candidate = p_str[pos:]
-            cand_p = Path(candidate)
-            if cand_p.exists() or any(
-                parent.is_dir() for parent in cand_p.parents if len(parent.parts) > 1
-            ):
-                return candidate
-
-    # 3. Windows drive letter pattern e.g. /cwd/C:/... or C:\cwd\D:\...
-    m = re.search(r"[a-zA-Z]:[/\\]", p_str[1:])
-    if m:
-        candidate = p_str[m.start() + 1 :]
-        cand_p = Path(candidate)
-        if cand_p.exists() or any(
-            parent.is_dir() for parent in cand_p.parents if len(parent.parts) > 1
-        ):
-            return candidate
+            return p_str[pos:]
 
     return p_str
 
