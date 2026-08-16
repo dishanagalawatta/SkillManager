@@ -303,11 +303,8 @@ class DiscoveryService:
 
                 ignore_spec = load_ignore_spec(project_root_for_project(resolved_source))
                 try:
-                    entries = list(os.scandir(resolved_source))
-                    if os.name == "nt":
-                        entries.sort(key=lambda e: e.name.lower())
-                    else:
-                        entries.sort(key=lambda e: e.name.lower())
+                    with os.scandir(resolved_source) as it:
+                        entries = sorted(it, key=lambda e: e.name.lower())
 
                     for entry in entries:
                         child = Path(entry.path)
@@ -481,11 +478,8 @@ class DiscoveryService:
         ignore_spec = load_ignore_spec(resolved)
 
         try:
-            entries = list(os.scandir(resolved))
-            if os.name == "nt":
-                entries.sort(key=lambda e: e.name.lower())
-            else:
-                entries.sort(key=lambda e: e.name.lower())
+            with os.scandir(resolved) as it:
+                entries = sorted(it, key=lambda e: e.name.lower())
 
             for entry in entries:
                 child = Path(entry.path)
@@ -531,11 +525,8 @@ class DiscoveryService:
             project_root_path = project_root_for_project(resolved)
             snap_dir = project_root_path / ".agents" / "screenshots"
             if snap_dir.is_dir():
-                entries = list(os.scandir(snap_dir))
-                if os.name == "nt":
-                    entries.sort(key=lambda e: e.name.lower(), reverse=True)
-                else:
-                    entries.sort(key=lambda e: e.name.lower(), reverse=True)
+                with os.scandir(snap_dir) as it:
+                    entries = sorted(it, key=lambda e: e.name.lower(), reverse=True)
                 for entry in entries:
                     img = Path(entry.path)
                     if entry.is_file(follow_symlinks=True) and img.suffix.lower() in (
