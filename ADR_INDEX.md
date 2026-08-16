@@ -21,6 +21,7 @@
 | [ADR-0024](docs/adr/ADR-0024-dual-write-clipboard-verification.md) | Verified Dual-Write Clipboard Handling | Accepted | 2026-08-12 | @DIKKA |
 | [ADR-0025](docs/adr/ADR-0025-selection-persistence-shutdown-sync.md) | Selection State Synchronization and Shutdown Persistence | Accepted | 2026-08-13 | @DIKKA |
 | [ADR-0026](docs/adr/ADR-0026-workspace-2026-08-standardization.md) | Workspace Standardization — 2026-08 Round | Accepted | 2026-08-16 | @DIKKA |
+| [ADR-0027](docs/adr/ADR-0027-path-self-healing-and-two-phase-incubation.md) | Storage Path Self-Healing Normalization & Two-Phase Model Incubation | Accepted | 2026-08-17 | @DIKKA |
 
 ## Template
 

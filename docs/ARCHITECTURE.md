@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
-> Status: **Accepted** | Last reviewed: 2026-08-13
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md)
+> Status: **Accepted** | Last reviewed: 2026-08-17
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md)
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
@@ -262,22 +262,39 @@ Uses `core/diagnostics.py` instead of standard `logging`. Events are categorized
 
 ---
 
-## 9. Prepared-State Pipeline & Silent Background Refresh
+## 9. Prepared-State Pipeline, Self-Healing Storage, & Silent Background Refresh
 
-All cache-refresh paths share a single architecture:
+All cache-refresh paths and storage configurations share a unified self-healing lifecycle:
 
-### Pipeline
+### Boot & Storage Normalization Sequence (ADR-0027)
+
+```mermaid
+flowchart TD
+    Boot["AppController Boot"] --> Norm["_normalize_paths_on_startup()"]
+    Norm --> FixProj["repair_malformed_path(projects)"]
+    Norm --> FixSrc["repair_malformed_path(sources)"]
+    Norm --> FixPkg["resolve_package_storage(_update_packages)"]
+    FixPkg --> StripDup["Strip nested roots & prepend leading /"]
+    FixProj --> SaveConfig["config.json self-healed & saved"]
+    FixSrc --> SaveConfig
+    StripDup --> SaveConfig
+    SaveConfig --> Watchers["Initialize SkillFolderWatcher"]
+    Watchers --> Pipeline["Start Background Prepared-State Pipeline"]
+```
+
+### Pipeline Execution
 
 1. **Main thread** — caller invokes `DiscoveryController.refreshSkills()`
 2. **Background thread** — `_run_pipeline()` executes: scan → parse → filter → search → row prep → visibility
 3. **Cross-thread commit** — result emitted as `PreparedModelState` via `_discoveryPrepared` signal
-4. **Main thread commit** — `SkillModel.replacePreparedState()` + deferred `beginResetModel`/`endResetModel`
+4. **Main thread commit** — `SkillModel.replacePreparedState()` executes two-phase deferred reset
 
 ### Key Features
 
 - **Silent UI**: No `isLoading` flag; diagnostic events only
 - **Cancellation**: Generation counter (`_refresh_generation`) for cooperative cancellation
 - **Debounce**: 400 ms `QTimer` trailing-edge debounce for filesystem events
+- **Self-Healing Storage**: Automatically cleans missing leading slashes (`home/...` -> `/home/...`) and nested duplicated roots before watcher registration.
 
 ### Add-Time Hooks
 
@@ -298,13 +315,39 @@ the refresh pipeline without a restart:
 
 ---
 
-## 10. QML Incubation Coordination
+## 10. QML Incubation Coordination & Two-Phase Reset (ADR-0027)
 
-Three-part protocol to prevent "Object destroyed during incubation":
+To prevent `Object or context destroyed during incubation` warnings when the QML engine is actively creating delegates during model resets or row mutations:
 
-1. **`cacheBuffer` lifecycle**: Set to 0 before reset, restored after
-2. **Deferred model reset**: `QTimer.singleShot(0, _do_reset)` — one event-loop tick
-3. **`incubating` flag**: Safety timer; incoming states queued and replayed
+```mermaid
+sequenceDiagram
+    autonumber
+    participant DC as DiscoveryController
+    participant Model as SkillModel
+    participant QML as QuickCopy / Library QML View
+    participant QtEngine as Qt Quick Delegate Incubator
+
+    DC->>Model: replacePreparedState(prepared)
+    Model->>QML: emit aboutToMutateStructure
+    QML->>QML: set cacheBuffer = 0 (abort/pause new incubations)
+    
+    Note over Model,QtEngine: 1-Tick Deferred Reset (QTimer.singleShot(0))
+    Model->>Model: QTimer.singleShot(0, _do_reset)
+    QtEngine-->>QML: In-flight incubators finish or abort cleanly
+    
+    Model->>Model: beginResetModel()
+    Model->>Model: Swap _skills and active filter state
+    Model->>Model: endResetModel()
+    
+    Model->>QML: emit structureMutated
+    QML->>QML: Restore cacheBuffer (Theme.viewCacheBuffer)
+```
+
+### Three-Part Protocol
+
+1. **`cacheBuffer` lifecycle**: Set to 0 before reset and during granular row removals/insertions (`onRowsAboutToBeRemoved` / `onRowsAboutToBeInserted`), restored after mutation completes.
+2. **Deferred model reset**: `QTimer.singleShot(0, _do_reset)` allows in-flight incubators to complete or abort across event-loop ticks before `beginResetModel()` is executed.
+3. **Incubation Guard**: `cacheBuffer` initialization in QML components is guarded against `incubating` state to prevent race conditions during tab navigation.
 
 ---
 
