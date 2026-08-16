@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4] - 2026-08-17
+
+### Fixes
+- Fix malformed package path resolution and self-heal missing leading slashes and duplicated root prefixes.
+- Eliminate model incubation deadlock and delegate destruction warnings during discovery and tab transitions.
+- Fix cross-platform Windows CI test regressions.
+
 ## [2.1.3] - 2026-08-16
 
 ### Changes
