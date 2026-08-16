@@ -80,7 +80,40 @@ All third-party actions are pinned to full commit SHAs (not floating tags). Depe
 | `actions/download-artifact` | `d3f86a10...` | v4.3.0 |
 | `softprops/action-gh-release` | `da05d552...` | v2.2.2 |
 | `peaceiris/actions-gh-pages` | `4f9cc660...` | v4.0.0 |
-| `python-semantic-release/python-semantic-release` | — | v10.5.3 |
+
+---
+
+## Dual-Workflow Architecture on `main` Push
+
+When a push to `main` occurs, GitHub Actions triggers two distinct workflows in parallel:
+
+```mermaid
+flowchart TD
+    A["git push origin main"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• Quality Gate"]
+    A --> C["Auto Version & Release (auto-release.yml)\n• Write permissions\n• Scans commits for SemVer tokens\n• Tags vX.Y.Z & triggers release-build.yml\n• Exits in ~5s if no bump needed"]
+```
+
+### Why They Are Decoupled
+1. **Security Isolation (Least Privilege)**: `CI` runs on untrusted Pull Requests with strictly read-only repository permissions (`contents: read`). `Auto Version & Release` requires write permissions (`contents: write`, `actions: write`) to push tags and dispatch workflows, and is locked to `main`.
+2. **Speed & Efficiency**: `auto-release.yml` performs an instantaneous pre-flight check via `scripts/release.py auto --only-if-triggered`. If no SemVer tokens are found, it terminates in ~5 seconds without consuming heavy runner minutes.
+3. **Pull Request Support**: `ci.yml` validates PRs to prevent broken code from landing on `main`, while release automation only acts once changes are merged to `main`.
+
+### `paths-ignore` & Lockfile Behavior
+Both `ci.yml` and `auto-release.yml` ignore changes restricted strictly to documentation and reference directories:
+```yaml
+paths-ignore:
+  - 'docs/**'
+  - '*.md'
+  - 'assets/**'
+  - '.agents/**'
+  - 'image/**'
+  - 'conductor/**'
+  - 'LICENSE'
+```
+- **Doc-only commits** (`docs/`, `README.md`, etc.) are skipped automatically by GitHub Actions.
+- **Dependency & lockfile updates** ([`uv.lock`](file:///home/dikka/Documents/01-Projects/27-SkillManager/skill-manager/uv.lock)) or code changes are **not** ignored, triggering both workflows to ensure all tests pass and any release tokens are processed.
+
+---
 
 ## Branch Protection (Recommended)
 
@@ -93,6 +126,8 @@ Apply via GitHub UI or `gh api`:
 | Secret | Purpose | Required |
 |---|---|---|
 | `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
+| `WIN_PFX_B64` | Base64-encoded Windows code signing certificate | Optional |
+| `WIN_PFX_PASS` | Password for Windows code signing certificate | Optional |
 
 ### Suppressed CVEs
 
@@ -107,7 +142,7 @@ Run the same checks locally:
 export QML_DISABLE_DISK_CACHE=1  # ADR-0001 — prevents stale QML bytecode
 uv run ruff check src tests
 uv run ruff format --check src tests
-uv run pytest --cov=skill_manager --cov-fail-under=90
+uv run pytest --cov=skill_manager --cov-fail-under=80
 ```
 
 ## Required Repo Settings
@@ -119,14 +154,11 @@ The Release workflow depends on the following repo-level setting (Settings → A
 
 ## Troubleshooting
 
-### Coverage below 90%
-
+### Coverage below threshold
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
 
-### Semantic Release not creating release
-
-Ensure commits on `main` include an opt-in token (`[patch]`, `[minor]`, `[major]`, or `[dev]`) in the subject line.
+### Auto Release not creating release
+Ensure commits on `main` include an opt-in SemVer token (`[patch]`, `[minor]`, `[major]`, or `[dev]`) or Conventional Commit prefix (`feat!:`, `feat:`, `fix:`, `perf:`) in the commit subject or body.
 
 ### Artifact upload fails
-
 Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml).

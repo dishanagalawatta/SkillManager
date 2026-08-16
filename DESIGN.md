@@ -23,6 +23,34 @@
 | Accent | `accent`, `success`, `danger`, `selectedRowBorder` |
 | State | `selectedRow`, `selectedRowHover`, `disabledControl`, `dangerHover` |
 
+### Color Palette & Roles
+
+Semantic token → hex mapping from `Theme.qml` (source of truth). Values are
+paired per mode: **Dark** (Matte Graphite) / **Light** (Warm Stone).
+
+| Semantic Role | Dark | Light | Purpose |
+|---------------|------|-------|---------|
+| `appBackground` | `#121214` | `#FAFAF9` | App-wide canvas; near-black graphite vs. warm off-white |
+| `sidebarBackground` | `#0F0F11` | `#F8FAFC` | Navigation sidebar; deepest surface for contrast |
+| `glassPill` | `#1E1E22` | `#FFFFFF` | Ribbon/pill surfaces (`GlassPill`); pure white in light mode |
+| `glassHover` | `#2D2D34` | `#F1F5F9` | Pill hover state; one step lighter than `glassPill` |
+| `glassActive` | `#3C3C46` | `#E2E8F0` | Pill active/pressed state; highest pill emphasis |
+| `glassBorder` | `#2A2A30` | `#E2E8F0` | Pill outer border; subtle definition against background |
+| `separator` | `#26262B` | `#E2E8F0` | Hairline dividers between rows/sections |
+| `accent` | `#3B82F6` (Modern Blue) | `#059669` (Sage) | Primary actions, active states, starred/pinned icons |
+| `success` | `#10B981` | `#10B981` | Success indicators; emerald in both modes |
+| `danger` | `#EF4444` | `#DC2626` | Destructive actions and error states |
+| `dangerHover` | `#3F1A1A` | `#FEF2F2` | Destructive hover tint; deep red vs. rose wash |
+| `selectedRow` | `#1E293B` | `#ECFDF5` | Selected list row fill; slate vs. mint |
+| `selectedRowHover` | `#2A3B56` | `#D1FAE5` | Selected row hover; brightened row fill |
+| `selectedRowBorder` | `#3B82F6` | `accent` | Selection outline; blue in dark, sage in light |
+| `label` | `#F3F4F6` | `#000000` | Primary text; near-white vs. true black |
+| `secondaryLabel` | `#9CA3AF` | `#3F3F46` | Secondary/muted text |
+| `disabledControl` | `#1D1D21` | `#F1F5F9` | Disabled control fill |
+
+> Rule: QML must reference these tokens only — never hardcode hex values
+> (enforced by the "No hardcoded values" convention above).
+
 ### QML UI Conventions
 
 - **Ribbons (`GlassPill`)**: Must use `Layout.preferredHeight: 48` and `radius: 24` to form a perfect pill. Do not apply external left/right margins directly to `GlassPill`.

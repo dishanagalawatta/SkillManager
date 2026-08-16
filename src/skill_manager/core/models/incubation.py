@@ -121,18 +121,8 @@ class IncubationMixin:
         all the heavy lifting: Skill construction, FilterEngine pass,
         SearchEngine build, row preparation, and visibility calculation.
 
-        The internal data is set immediately, but the actual
-        ``beginResetModel``/``endResetModel`` is deferred via
-        ``Qt.callLater`` so that QML can process the
-        ``aboutToMutateStructure`` signal (which zeros ``cacheBuffer``)
-        before delegates are destroyed.  This prevents the "Object
-        destroyed during incubation" warning.
-
         If the model is currently incubating, the reset is queued behind
         the existing pending-signal queue instead.
-
-        Cancellation is handled by the caller (DiscoveryController) before
-        emitting the signal.
         """
         if self._incubating and self._all_skills:
             diag = get_diagnostic_logger()
@@ -145,26 +135,28 @@ class IncubationMixin:
             self._pending_signals.append(lambda s=state: self._apply_prepared_state_now(s))
             return True
 
-        if not self._all_skills:
-            # If the model is completely empty (e.g., at startup), there are no existing
-            # delegates to protect. Apply synchronously to ensure initial population and
-            # subsequent startup filters happen in the same tick, avoiding split-tick race conditions.
-            self._apply_prepared_state_now(state)
-            return True
+        self._apply_prepared_state_now(state)
+        return True
 
-        # Phase 1: set internal data and signal QML to abort incubators.
+    def _apply_prepared_state_now(self, state: PreparedModelState) -> None:
+        """Apply a pre-computed model state via a reset.
+
+        If the model is completely empty (e.g. startup) or in tests, applies
+        synchronously. If delegates exist, emits ``aboutToMutateStructure`` and
+        defers the actual ``beginResetModel``/``endResetModel`` by 1 tick via
+        ``QTimer.singleShot(0)`` so that QML can zero ``cacheBuffer`` before
+        delegates are destroyed.
+        """
+        had_skills = bool(self._all_skills)
+
         self._all_skills = state.all_skills
         self._search_engine = state.search_engine
         self._all_filtered_skills = state.all_filtered_skills
         self._filtered_skills = state.visible_rows
 
         self.aboutToMutateStructure.emit()
-        self._reset_pending = True
 
-        # Phase 2: defer the actual model reset so QML can process
-        # aboutToMutateStructure (zero cacheBuffer) before delegates
-        # are destroyed by beginResetModel.
-        def _deferred_reset():
+        def _do_reset():
             self._reset_pending = False
             self.beginResetModel()
             self.endResetModel()
@@ -173,27 +165,10 @@ class IncubationMixin:
             self.selectionStateChanged.emit()
             self.totalSelectableCountChanged.emit()
 
-        from PySide6.QtCore import QTimer
+        if not had_skills or os.environ.get("SKILL_MANAGER_TESTING") == "1":
+            _do_reset()
+        else:
+            self._reset_pending = True
+            from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(0, _deferred_reset)
-
-        return True
-
-    def _apply_prepared_state_now(self, state: PreparedModelState) -> None:
-        """Apply a pre-computed model state immediately via a single reset.
-
-        Extracted from ``replacePreparedState`` so it can be called either
-        directly (when not incubating) or replayed from the deferred queue.
-        """
-        self._all_skills = state.all_skills
-        self._search_engine = state.search_engine
-        self._all_filtered_skills = state.all_filtered_skills
-        self._filtered_skills = state.visible_rows
-
-        self.aboutToMutateStructure.emit()
-        self.beginResetModel()
-        self.endResetModel()
-        self.structureMutated.emit()
-        self._update_selection_counts()
-        self.selectionStateChanged.emit()
-        self.totalSelectableCountChanged.emit()
+            QTimer.singleShot(0, _do_reset)

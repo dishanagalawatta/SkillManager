@@ -176,7 +176,11 @@ Item {
         var m = AppController.quickCopyModel
         if (m) {
             qcv_skillList.model = m
-            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+            if (!m.incubating) {
+                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+            } else {
+                qcv_skillList.cacheBuffer = 0
+            }
         }
     }
 
@@ -190,7 +194,9 @@ Item {
             } else {
                 qcv_skillList.cacheBuffer = 0
                 qcv_skillList.model = newModel
-                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                if (!newModel.incubating) {
+                    qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                }
             }
         }
     }
@@ -853,6 +859,26 @@ Item {
                             qcv_skillList._restoreScroll()
                         }
                     }
+                    function onRowsAboutToBeRemoved() {
+                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        qcv_skillList.cacheBuffer = 0
+                    }
+                    function onRowsRemoved() {
+                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
+                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                            qcv_skillList._restoreScroll()
+                        }
+                    }
+                    function onRowsAboutToBeInserted() {
+                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
+                        qcv_skillList.cacheBuffer = 0
+                    }
+                    function onRowsInserted() {
+                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
+                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+                            qcv_skillList._restoreScroll()
+                        }
+                    }
                     function onAboutToMutateStructure() {
                         qcv_skillList.savedScrollPos = qcv_skillList.contentY
                         qcv_skillList.cacheBuffer = 0
@@ -878,6 +904,8 @@ Item {
                                 qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
                                 qcv_skillList._restoreScroll()
                             }
+                        } else {
+                            qcv_skillList.cacheBuffer = 0
                         }
                     }
                 }

@@ -1,0 +1,11 @@
+{
+  "slug": "command_skill_carry_20260623",
+  "title": "Command–skill carry on copy",
+  "status": "completed",
+  "owner": "DIKKA",
+  "created": "2026-06-23",
+  "completed": "2026-08-16",
+  "related_adrs": ["ADR-0020"],
+  "description": "Formalize the in-flight command-skill carry feature. Shipped as the command-inspector skill-dependency carry flow.",
+  "notes": "Archived 2026-08-16 per stale-track policy (workflow.md). Original related_adrs pointed to non-existent ADR-0017; corrected to ADR-0020, the accepted decision record for this feature."
+}

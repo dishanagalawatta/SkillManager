@@ -22,3 +22,9 @@
 ## Open Questions
 
 - None — design locked by ADR-0017.
+
+## Completion
+
+- Steps 5–6 (validation, commit/push) shipped with the feature's merge;
+  the decision record is ADR-0020 (Command Inspector Skill-Dependency Pills).
+- Archived 2026-08-16 per stale-track policy.

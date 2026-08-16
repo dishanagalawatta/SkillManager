@@ -531,23 +531,8 @@ class DiscoveryController(BaseController):
             )
             return
 
-        # ---- Apply prepared state to both models ----
-        # Set incubating based on whether the new prepared state has skills.
-        # This protects both initial startup populations and subsequent refreshes from
-        # race conditions caused by subsequent synchronous filter operations.
-        lib_incubating = bool(library_prepared.all_skills)
-        qc_incubating = bool(quick_copy_prepared.all_skills)
-        if lib_incubating:
-            self.app._library_model.incubating = True
-        if qc_incubating:
-            self.app._quick_copy_model.incubating = True
-
-        # Check cancellation one last time before committing
+        # ---- Check cancellation before committing ----
         if self._is_cancelled(library_prepared.generation):
-            if lib_incubating:
-                self.app._library_model.incubating = False
-            if qc_incubating:
-                self.app._quick_copy_model.incubating = False
             diag.log_event(
                 "INFO",
                 CATEGORY_REFRESH_CANCELLED,
@@ -556,6 +541,7 @@ class DiscoveryController(BaseController):
             )
             return
 
+        # ---- Apply prepared state to both models ----
         self.app._library_model.replacePreparedState(library_prepared)
         self.app._quick_copy_model.replacePreparedState(quick_copy_prepared)
 
@@ -564,21 +550,10 @@ class DiscoveryController(BaseController):
                 self._final_committed_generation = library_prepared.generation
 
         # ---- Update client/project filters ----
-        # These trigger _apply_filter which, while incubating, queues
-        # the filter work onto _pending_signals.  The queue is drained
-        # by QML's onIncubationReady() or the 5s safety timer, so both
-        # the prepared state and the filter results are applied in one
-        # coordinated batch.
         self.app._library_model.clientFilter = self.app._client_format
         self.app._quick_copy_model.clientFilter = self.app._client_format
         if self.app._current_project_label:
             self.app._quick_copy_model.projectFilter = self.app._current_project_label
-
-        # Do NOT set incubating = False here.  The flag must remain True
-        # until QML calls onIncubationReady() (or the 5s safety timer
-        # fires).  Setting it to False would start replaying deferred
-        # signals before QML has finished creating delegates, which is
-        # exactly the race condition we're fixing.
 
         # ---- Snapshot current state for next diff ----
         self._previous_skills = new_skills_map
