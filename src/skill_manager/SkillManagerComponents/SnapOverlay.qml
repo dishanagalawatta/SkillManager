@@ -48,24 +48,24 @@ Window {
         // Top
         Rectangle {
             x: 0; y: 0; width: parent.width; height: selectionRect.y
-            color: "#80000000"
+            color: Theme.alpha(Theme.appBackground, 0.5)
         }
         // Bottom
         Rectangle {
             x: 0; y: selectionRect.y + selectionRect.height
             width: parent.width; height: parent.height - (selectionRect.y + selectionRect.height)
-            color: "#80000000"
+            color: Theme.alpha(Theme.appBackground, 0.5)
         }
         // Left
         Rectangle {
             x: 0; y: selectionRect.y; width: selectionRect.x; height: selectionRect.height
-            color: "#80000000"
+            color: Theme.alpha(Theme.appBackground, 0.5)
         }
         // Right
         Rectangle {
             x: selectionRect.x + selectionRect.width; y: selectionRect.y
             width: parent.width - (selectionRect.x + selectionRect.width); height: selectionRect.height
-            color: "#80000000"
+            color: Theme.alpha(Theme.appBackground, 0.5)
         }
     }
 
@@ -74,7 +74,7 @@ Window {
         x: selectionRect.x - 1; y: selectionRect.y - 1
         width: selectionRect.width + 2; height: selectionRect.height + 2
         color: "transparent"
-        border.color: "#0078D7"
+        border.color: Theme.accent
         border.width: 1
         visible: selectionRect.width > 0
     }
@@ -184,9 +184,9 @@ Window {
 
         width: toolboxRow.implicitWidth + 24
         height: 40
-        color: "#2D2D2D"
+        color: Theme.glassPill
         radius: height / 2
-        border.color: "#444"
+        border.color: Theme.glassBorder
 
         Row {
             id: toolboxRow
@@ -212,7 +212,7 @@ Window {
             // Separator
             Rectangle {
                 width: 1; height: 24
-                color: "#555"
+                color: Theme.separator
                 anchors.verticalCenter: parent.verticalCenter
             }
 
