@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import App 1.0
 
 // Custom toggle switch. Built on a bare Item + MouseArea instead of
@@ -59,7 +58,7 @@ Item {
         text: ""
         color: Theme.label
         font.family: Theme.fontFamily
-        font.pixelSize: 12
+        font.pixelSize: Theme.sizeMetadata
     }
 
     MouseArea {
