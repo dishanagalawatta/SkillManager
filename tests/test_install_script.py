@@ -62,6 +62,22 @@ def test_sourcing_does_not_run_entrypoint() -> None:
     assert proc.stdout.strip() == ""
 
 
+def test_piped_execution_runs_entrypoint() -> None:
+    # Simulates curl -fsSL https://.../install.sh | bash -s -- --help
+    with open(INSTALL_SH) as f:
+        script_text = f.read()
+    proc = subprocess.run(
+        ["bash", "-s", "--", "--help"],
+        input=script_text,
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "SkillManager Linux Setup & Package Manager" in proc.stdout
+    assert "Usage:" in proc.stdout
+
+
 def make_stub_dpkg(bindir: Path, version: str) -> None:
     bindir.mkdir(parents=True, exist_ok=True)
     dpkg = bindir / "dpkg"
