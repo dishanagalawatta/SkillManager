@@ -85,6 +85,18 @@ class TestSyncUvlock:
             release.sync_uvlock(str(project_root), "2.2.1")
         assert exc_info.value.code == 1
 
+    def test_accepts_canonical_pep440_dev_form(self, project_root: Path) -> None:
+        """uv canonicalizes pre-releases in the lockfile: 2.2.5-dev.1 -> 2.2.5.dev1."""
+
+        def fake_uv_lock(*args, **kwargs):  # noqa: ARG001
+            updated = LOCKFILE_HEADER.replace('version = "2.2.0"', 'version = "2.2.5.dev1"')
+            (project_root / "uv.lock").write_text(updated, encoding="utf-8")
+            return type("R", (), {"returncode": 0, "stderr": ""})
+
+        with patch.object(release.subprocess, "run", side_effect=fake_uv_lock):
+            release.sync_uvlock(str(project_root), "2.2.5-dev.1")
+        assert 'version = "2.2.5.dev1"' in (project_root / "uv.lock").read_text(encoding="utf-8")
+
 
 class TestReleaseModuleSanity:
     """Lightweight guards that the release pipeline wiring stays intact."""
