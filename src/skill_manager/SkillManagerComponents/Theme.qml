@@ -25,6 +25,12 @@ QtObject {
     
     readonly property color glassShadow: darkMode ? Qt.rgba(0.0, 0.0, 0.0, 0.5) : Qt.rgba(0.0, 0.0, 0.0, 0.04)
     readonly property color separator: darkMode ? "#26262B" : "#E2E8F0"
+    
+    // Overlay System — scrims stay black in both modes: they cover arbitrary
+    // desktop/UI content that is not theme-aware, so a dark scrim guarantees
+    // the selection/highlight always recedes regardless of theme or content.
+    readonly property color scrim: Qt.rgba(0.0, 0.0, 0.0, 0.5)
+    
     readonly property color disabledControl: darkMode ? "#1D1D21" : "#F1F5F9"
     readonly property color selectedRow: darkMode ? "#1E293B" : "#ECFDF5"
     readonly property color selectedRowHover: darkMode ? "#2A3B56" : "#D1FAE5"

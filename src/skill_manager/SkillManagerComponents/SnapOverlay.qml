@@ -48,24 +48,24 @@ Window {
         // Top
         Rectangle {
             x: 0; y: 0; width: parent.width; height: selectionRect.y
-            color: Theme.alpha(Theme.appBackground, 0.5)
+            color: Theme.scrim
         }
         // Bottom
         Rectangle {
             x: 0; y: selectionRect.y + selectionRect.height
             width: parent.width; height: parent.height - (selectionRect.y + selectionRect.height)
-            color: Theme.alpha(Theme.appBackground, 0.5)
+            color: Theme.scrim
         }
         // Left
         Rectangle {
             x: 0; y: selectionRect.y; width: selectionRect.x; height: selectionRect.height
-            color: Theme.alpha(Theme.appBackground, 0.5)
+            color: Theme.scrim
         }
         // Right
         Rectangle {
             x: selectionRect.x + selectionRect.width; y: selectionRect.y
             width: parent.width - (selectionRect.x + selectionRect.width); height: selectionRect.height
-            color: Theme.alpha(Theme.appBackground, 0.5)
+            color: Theme.scrim
         }
     }
 
