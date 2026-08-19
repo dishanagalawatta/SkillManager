@@ -1,0 +1,482 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQml
+import App 1.0
+
+Window {
+    id: window
+    property bool _isInitialized: false
+    property bool isClosing: false
+
+    x: AppController.ui_controller.windowX
+    y: AppController.ui_controller.windowY
+    width: AppController.ui_controller.windowWidth
+    height: AppController.ui_controller.windowHeight
+
+    // Delay tracking until after initial window map/show events settle
+    Timer {
+        id: _enableTrackingTimer
+        interval: 500
+        repeat: false
+        onTriggered: {
+            window._isInitialized = true
+            AppController.logDiagnostic("INFO", "window_state",
+                "Geometry tracking enabled at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height)
+        }
+    }
+
+    Component.onCompleted: {
+        _enableTrackingTimer.start()
+        AppController.logDiagnostic("INFO", "window_state",
+            "Component.onCompleted: window configured at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height)
+    }
+
+    onWidthChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowWidth = width
+    onHeightChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowHeight = height
+    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowX = x
+    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowY = y
+
+    onClosing: (close) => {
+        isClosing = true
+        if (typeof AppController !== "undefined" && AppController && AppController.ui_controller) {
+            AppController.ui_controller.saveUiState()
+        }
+        // Clean up the active view to ensure models are detached BEFORE context tear down
+        if (viewLoader && viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+            viewLoader.item.cleanup()
+        }
+        
+        // Clear the viewLoader upon application shutdown and quit Qt loop.
+        // Delay context destruction to next event loop tick so incubators cleanly abort.
+        Qt.callLater(() => {
+            if (viewLoader) {
+                viewLoader.sourceComponent = null
+                viewLoader.source = ""
+            }
+            Qt.quit()
+        })
+    }
+    minimumWidth: 400
+    minimumHeight: 520
+
+    Binding { target: Theme; property: "darkMode"; value: AppController.ui_controller.darkMode }
+    visible: false
+    title: "SkillManager"
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
+    color: "transparent" // Let Mica/Acrylic show through
+
+    // --- Window Resizing Handles (Frameless Support) ---
+    // Only enabled when not maximized
+    Item {
+        id: resizers
+        anchors.fill: parent
+        visible: window.visibility !== Window.Maximized
+        z: 1000 // Ensure handles are on top
+
+        // Edges
+        MouseArea { 
+            height: 6; anchors { top: parent.top; left: parent.left; right: parent.right } 
+            cursorShape: Qt.SizeVerCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge)
+        }
+        MouseArea { 
+            height: 6; anchors { bottom: parent.bottom; left: parent.left; right: parent.right } 
+            cursorShape: Qt.SizeVerCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge)
+        }
+        MouseArea { 
+            width: 6; anchors { left: parent.left; top: parent.top; bottom: parent.bottom } 
+            cursorShape: Qt.SizeHorCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.LeftEdge)
+        }
+        MouseArea { 
+            width: 6; anchors { right: parent.right; top: parent.top; bottom: parent.bottom } 
+            cursorShape: Qt.SizeHorCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.RightEdge)
+        }
+        
+        // Corners
+        MouseArea { 
+            width: 12; height: 12; anchors.top: parent.top; anchors.left: parent.left 
+            cursorShape: Qt.SizeFDiagCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
+        }
+        MouseArea { 
+            width: 12; height: 12; anchors.top: parent.top; anchors.right: parent.right 
+            cursorShape: Qt.SizeBDiagCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
+        }
+        MouseArea { 
+            width: 12; height: 12; anchors.bottom: parent.bottom; anchors.left: parent.left 
+            cursorShape: Qt.SizeBDiagCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
+        }
+        MouseArea { 
+            width: 12; height: 12; anchors.bottom: parent.bottom; anchors.right: parent.right 
+            cursorShape: Qt.SizeFDiagCursor
+            onPressed: (mouse) => window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
+        }
+    }
+
+    property string currentView: AppController.ui_controller.currentView
+    onCurrentViewChanged: AppController.ui_controller.currentView = currentView
+
+    // Window state for auto-minimize on snap
+    property bool wasMaximized: false
+    property real savedX: 0
+    property real savedY: 0
+    property real savedWidth: 0
+    property real savedHeight: 0
+    property bool pendingSnap: false
+    property bool _isHidingForSnap: false
+    // True while the capture overlay is waiting for the app to become active
+    // again (see captureActivationTimer + onShowOverlay below).
+    property bool captureAwaitingActivation: false
+
+    function saveWindowState() {
+        wasMaximized = (window.visibility === Window.Maximized)
+        savedX = window.x
+        savedY = window.y
+        savedWidth = window.width
+        savedHeight = window.height
+    }
+
+    function minimizeWindowInstantly() {
+        _isHidingForSnap = true
+        window.hide()
+    }
+
+    function restoreWindowState() {
+        _isHidingForSnap = false
+        if (wasMaximized) {
+            window.showMaximized()
+        } else {
+            window.x = savedX
+            window.y = savedY
+            window.width = savedWidth
+            window.height = savedHeight
+            window.showNormal()
+        }
+        window.raise()
+        window.requestActivate()
+    }
+
+    onVisibilityChanged: (visibility) => {
+        AppController.logDiagnostic("INFO", "window_state",
+            "Visibility changed: " + visibility + " at (" + window.x + ", " + window.y + "), opacity=" + window.opacity)
+    }
+
+    function navigateTo(view) {
+        let source = "views/" + view.replace(" ", "") + "View.qml"
+        if (viewLoader.source.toString().indexOf(source) === -1) {
+            if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+                viewLoader.item.cleanup()
+            }
+            AppController.ui_controller.currentView = view
+            viewTransitionTimer.pendingSource = ""
+            viewTransitionTimer.pendingView = view
+            viewTransitionTimer.start()
+        }
+    }
+
+    function focusCurrentSearch() {
+        if (viewLoader.item && viewLoader.item.focusSearch) {
+            viewLoader.item.focusSearch()
+        }
+    }
+
+    // --- Find & Select ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSearchEnabled; sequence: AppController.config_controller.shortcutSearch; onActivated: window.focusCurrentSearch() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSelectAllEnabled; sequence: AppController.config_controller.shortcutSelectAll; onActivated: AppController.ui_controller.selectAllVisibleSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutClearSelectionEnabled && !(snapOverlay && snapOverlay.visible) && !window.captureAwaitingActivation; sequence: AppController.config_controller.shortcutClearSelection; onActivated: AppController.ui_controller.clearVisibleSelection() }
+
+    // --- Clipboard ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
+
+    // --- Skill Ops ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills("keyboard-shortcut", false) }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutArchiveEnabled; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutDeleteEnabled; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
+
+    // --- Tree View ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutExpandAllEnabled; sequence: AppController.config_controller.shortcutExpandAll; onActivated: AppController.skillModel.expandAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCollapseAllEnabled; sequence: AppController.config_controller.shortcutCollapseAll; onActivated: AppController.skillModel.collapseAll() }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutTopOfListEnabled; sequence: AppController.config_controller.shortcutTopOfList; onActivated: { if (viewLoader.item && viewLoader.item.scrollToTop) viewLoader.item.scrollToTop() } }
+
+    // --- Navigate ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutQuickCopyViewEnabled; sequence: AppController.config_controller.shortcutQuickCopyView; onActivated: window.navigateTo("QuickCopy") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutLibraryViewEnabled; sequence: AppController.config_controller.shortcutLibraryView; onActivated: window.navigateTo("Library") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutUpdatesViewEnabled; sequence: AppController.config_controller.shortcutUpdatesView; onActivated: window.navigateTo("Updates") }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSettingsViewEnabled; sequence: AppController.config_controller.shortcutSettingsView; onActivated: window.navigateTo("Settings") }
+
+    // --- Tools ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !(snapOverlay && snapOverlay.visible) && !AppController.global_hotkey_controller.portalBackendActive; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
+
+    Instantiator {
+        model: AppController.customCollections || []
+        delegate: Shortcut {
+            enabled: !AppController.config_controller.isRecordingShortcut
+                  && AppController.config_controller.getCollectionShortcutEnabled(modelData)
+                  && AppController.config_controller.getCollectionShortcut(modelData) !== ""
+            sequence: AppController.config_controller.getCollectionShortcut(modelData)
+            onActivated: AppController.copyCollectionToClipboard(modelData)
+        }
+    }
+
+    SnapOverlay {
+        id: snapOverlay
+    }
+
+    Timer {
+        id: viewTransitionTimer
+        interval: 50
+        repeat: false
+        property string pendingView: ""
+        property string pendingSource: ""
+        onTriggered: {
+            if (pendingView !== "") {
+                window.currentView = pendingView
+                pendingView = ""
+            } else if (pendingSource !== "") {
+                viewLoader.source = pendingSource
+                pendingSource = ""
+            }
+        }
+    }
+
+    Timer {
+        id: snapDelayTimer
+        interval: 150
+        onTriggered: {
+            AppController.snap_controller.captureScreen()
+        }
+    }
+
+    Connections {
+        target: AppController.snap_controller
+        function onMinimizeRequested() {
+            if (window.visible && !_isHidingForSnap && window.visibility !== Window.Minimized) {
+                window.saveWindowState()
+                window.pendingSnap = true
+                window.minimizeWindowInstantly()
+            }
+            snapDelayTimer.start()
+        }
+        // GNOME Wayland stacks windows of the ACTIVE app above all others
+        // (focus-stealing prevention).  A global hotkey carries no
+        // xdg-activation token, so an overlay shown while the app is
+        // minimized/inactive maps BELOW the active window — the crosshair
+        // cursor never appears.  Restore the window, invite the user to
+        // activate the app (notification), and only show the overlay once
+        // the app is active again.
+        function onShowOverlay() {
+            snapOverlay.showOverlay()
+            console.log("SNAP-OVERLAY: mapped overlay directly for background/minimized snap capture")
+        }
+    }
+
+    // Lets the user cancel a pending capture activation (before the overlay
+    // is shown).  The default clear_selection shortcut is also "Esc" but it
+    // is disabled while captureAwaitingActivation is true (see above), so
+    // these two do not conflict.
+    Shortcut {
+        enabled: window.captureAwaitingActivation
+        sequence: "Esc"
+        onActivated: AppController.snap_controller.cancelCapture()
+    }
+
+    Connections {
+        target: AppController.snap_controller
+        function onCaptureFinished() {
+            window.captureAwaitingActivation = false
+            if (window.pendingSnap) {
+                window.pendingSnap = false
+                window.restoreWindowState()
+            }
+        }
+        function onCaptureCancelled() {
+            if (window.captureAwaitingActivation) {
+                window.captureAwaitingActivation = false
+                AppController.snap_controller.notifyCaptureActivation()
+            }
+            if (window.pendingSnap) {
+                window.pendingSnap = false
+                window.restoreWindowState()
+            }
+        }
+    }
+
+    Connections {
+        target: AppController.ops_controller
+        function onMinimizeAppRequested() {
+            window.showMinimized()
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.appBackground
+        radius: window.visibility === Window.Maximized ? 0 : Theme.radiusCard
+        clip: true
+        border.width: window.visibility === Window.Maximized ? 0 : 1
+        border.color: Theme.glassBorder
+        
+        // Ensure child components are clipped to the radius
+        layer.enabled: window.visibility !== Window.Maximized && !AppController.isTesting
+        
+        Loader {
+            active: !AppController.isTesting
+            anchors.fill: parent
+            source: "FrostOverlay.qml"
+            onLoaded: if (item) item.radius = window.visibility === Window.Maximized ? 0 : Theme.radiusCard
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
+
+            Loader {
+                active: !AppController.isTesting
+                Layout.fillWidth: true
+                Layout.preferredHeight: 32
+                source: "CustomTitleBar.qml"
+            }
+
+            TopBar {
+                id: topBar
+                currentView: window.currentView
+                onNavigationChanged: (view) => {
+                    if (!view.startsWith("Category:")) {
+                        window.navigateTo(view)
+                    } else if (viewLoader.source.toString().indexOf("QuickCopyView.qml") === -1 && 
+                               viewLoader.source.toString().indexOf("LibraryView.qml") === -1) {
+                        if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+                            viewLoader.item.cleanup()
+                        }
+                        viewTransitionTimer.pendingView = ""
+                        viewTransitionTimer.pendingSource = "views/QuickCopyView.qml"
+                        viewTransitionTimer.start()
+                    }
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                Loader {
+                    id: viewLoader
+                    objectName: "viewLoader"
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    source: "views/" + window.currentView.replace(" ", "") + "View.qml"
+                }
+            }
+        }
+
+        Rectangle {
+            id: statusToast
+            objectName: "topStatusPill"
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 16
+            width: Math.min(window.width - 32, statusTextRow.implicitWidth + 32)
+            height: 34
+            radius: Theme.radiusPill
+            color: Theme.alpha(Theme.glassPill, 0.95)
+            border.color: Theme.glassBorder
+            border.width: 1
+            opacity: AppController.statusMessage !== "" ? 1 : 0
+            z: 100
+
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+            Behavior on color { ColorAnimation { duration: 150 } }
+
+            RowLayout {
+                id: statusTextRow
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    width: 7
+                    height: 7
+                    radius: 4
+                    color: AppController.isLoading ? Theme.selectedRowBorder : Theme.secondaryLabel
+                    opacity: AppController.isLoading ? 1 : 0.75
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Text {
+                    id: statusText
+                    objectName: "topStatusText"
+                    text: AppController.statusMessage
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.label
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideMiddle
+                    Layout.fillWidth: true
+                }
+            }
+
+            Connections {
+                target: AppController
+                function onStatusMessageChanged() {
+                    statusToast.opacity = 1
+                    statusTimer.restart()
+                }
+            }
+
+            Timer {
+                id: statusTimer
+                interval: 5000
+                onTriggered: statusToast.opacity = 0
+            }
+        }
+
+        // Shown while the capture overlay is waiting for the app to become
+        // active again (captureAwaitingActivation).  The user must click the
+        // desktop notification (or the taskbar entry) so the overlay can map
+        // on top of the ACTIVE window on GNOME Wayland.
+        Rectangle {
+            id: captureAwaitingPill
+            objectName: "captureAwaitingPill"
+            visible: window.captureAwaitingActivation
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            width: captureAwaitingPillText.implicitWidth + 40
+            height: 36
+            radius: Theme.radiusPill
+            color: Theme.alpha(Theme.glassPill, 0.95)
+            border.color: Theme.glassBorder
+            border.width: 1
+            z: 100
+
+            RowLayout {
+                id: captureAwaitingPillRow
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 8
+
+                Text {
+                    id: captureAwaitingPillText
+                    objectName: "captureAwaitingPillText"
+                    text: "Click the notification to start the capture (Esc to cancel)"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeMetadata
+                    color: Theme.label
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideMiddle
+                }
+            }
+        }
+    }
+}

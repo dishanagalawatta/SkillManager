@@ -1,0 +1,11 @@
+{
+  "slug": "mcp_server_20260720",
+  "title": "MCP server for agent-driven build/analyze/monitor/debug",
+  "status": "completed",
+  "owner": "@dishanagalawatta",
+  "created": "2026-07-20",
+  "completed": "2026-08-04",
+  "description": "Agent-native MCP server exposing build, analyze, monitor, and debug capabilities plus GUI input tooling.",
+  "related_adrs": [],
+  "notes": "All waves complete: foundation (models/bridge), tool modules (build/analyze/monitor/debug/write/gui), integration fix (decorator dispatch + allow_write closure), tests (45 passing, headless) + docs (README/AGENTS.md/.mcp.json). ruff clean; full suite 1522 passed @ 85% coverage."
+}

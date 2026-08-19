@@ -1,0 +1,19 @@
+{
+  "id": "skill_pkg_updates_20260603",
+  "title": "Robust Skill Package Auto Updates",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-06-03T00:00:00Z",
+  "updated": "2026-06-03T00:00:00Z",
+  "current_phase": 4,
+  "current_task": "4.2",
+  "phases": {
+    "total": 4,
+    "completed": 4
+  },
+  "tasks": {
+    "total": 10,
+    "completed": 10
+  },
+  "commits": []
+}

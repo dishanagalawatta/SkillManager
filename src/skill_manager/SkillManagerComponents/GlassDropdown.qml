@@ -1,0 +1,187 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import App 1.0
+
+ComboBox {
+    id: control
+    property bool keyboardNavigated: false
+    
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+            return
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+            return
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            keyboardNavigated = true
+        }
+        event.accepted = false
+    }
+    
+    model: ["All Categories"]
+    
+    delegate: ItemDelegate {
+        width: dropdownList.width
+        height: 32 // FIX: Fixed height prevents list implicitHeight jitter which causes Flickable out-of-bounds jump
+        padding: 0 // FIX: Remove default Qt padding which clips contentItem in fixed-height delegates
+        hoverEnabled: true
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered) {
+                    control.keyboardNavigated = false
+                }
+            }
+        }
+
+        contentItem: Text {
+            leftPadding: 10
+            rightPadding: 10
+            text: modelData !== undefined ? modelData : ""
+            color: Theme.label
+            font.family: Theme.fontFamily
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: 6
+            color: (hovered || (control.keyboardNavigated && control.highlightedIndex === index)) ? Theme.glassHover : "transparent"
+        }
+    }
+
+    indicator: Image {
+        x: control.width - width - control.rightPadding - 2
+        y: control.topPadding + ((control.height - control.topPadding - control.bottomPadding) - height) / 2
+        width: 16
+        height: 16
+        source: AppController.ui_controller.getAssetUri("ui/dropdown-arrow-icon.svg")
+        sourceSize.width: 32
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: !control.iconOnlyMode
+    }
+
+    property string iconSource: ""
+    property bool iconOnlyMode: false
+
+    contentItem: RowLayout {
+        spacing: 6
+        Item {
+            width: control.iconSource !== "" ? 14 : 0
+            visible: control.iconSource !== ""
+            Layout.leftMargin: control.iconOnlyMode ? (control.width - 14) / 2 : 12
+            Layout.fillHeight: true
+            Image {
+                id: iconImage
+                source: control.iconSource !== "" ? AppController.ui_controller.getAssetUri(control.iconSource) : ""
+                width: 14
+                height: 14
+                sourceSize.width: 14
+                sourceSize.height: 14
+                anchors.verticalCenter: parent.verticalCenter
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.8
+                visible: false
+            }
+            ColorOverlay {
+                anchors.fill: iconImage
+                source: iconImage
+                color: Theme.accent
+                opacity: 0.8
+                visible: control.iconSource !== ""
+            }
+        }
+        Text {
+            visible: !control.iconOnlyMode
+            Layout.fillWidth: true
+            Layout.rightMargin: control.indicator.width + control.spacing
+            Layout.leftMargin: control.iconSource !== "" ? 0 : 12
+            text: control.displayText
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            color: Theme.label
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+    }
+
+    background: Rectangle {
+        implicitWidth: control.iconOnlyMode ? 36 : 160
+        implicitHeight: 36
+        radius: Theme.radiusPill
+        color: control.hovered ? Theme.glassHover : Theme.glassPill
+        border.color: control.visualFocus ? Theme.accent : Theme.glassBorder
+        border.width: control.visualFocus ? 2 : 1
+
+        Behavior on color { ColorAnimation { duration: 200 } }
+        Behavior on border.color { ColorAnimation { duration: 200 } }
+    }
+
+    popup: Popup {
+        y: control.height + 4
+        width: control.width
+        padding: 6
+        
+        implicitHeight: Math.min(dropdownList.implicitHeight + topPadding + bottomPadding, 250)
+
+        contentItem: SmoothListView {
+            id: dropdownList
+            clip: true
+            implicitHeight: contentHeight
+            model: control.delegateModel
+            boundsBehavior: Flickable.StopAtBounds
+            highlightRangeMode: ListView.NoHighlightRange
+            highlightFollowsCurrentItem: false
+            ScrollBar.vertical: AppScrollBar { }
+
+            onContentYChanged: {
+                if (typeof AppController !== "undefined" && AppController) AppController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentY: " + contentY + " (height=" + height + ", contentHeight=" + contentHeight + ")")
+            }
+            onContentHeightChanged: {
+                if (typeof AppController !== "undefined" && AppController) AppController.logDiagnosticEvent("DEBUG", "status_message", "GlassDropdown contentHeight changed: " + contentHeight)
+            }
+            
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                    control.keyboardNavigated = true
+                }
+                event.accepted = false
+            }
+
+            Connections {
+                target: control
+                function onHighlightedIndexChanged() {
+                    if (control.popup.opened && control.keyboardNavigated) {
+                        dropdownList.positionViewAtIndex(control.highlightedIndex, ListView.Contain)
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusCard
+            color: Theme.glassPill
+            border.color: Theme.glassBorder
+            border.width: 1
+            opacity: 0.95
+        }
+    }
+
+    activeFocusOnTab: true
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: control.displayText
+}

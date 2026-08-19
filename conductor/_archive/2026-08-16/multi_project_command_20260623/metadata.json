@@ -1,0 +1,10 @@
+{
+  "slug": "multi_project_command_20260623",
+  "title": "Multi-project command selection",
+  "status": "completed",
+  "owner": "DIKKA",
+  "created": "2026-06-23",
+  "completed": "2026-08-16",
+  "description": "Multi-project command deployment and selection. Shipped as the custom project commands multi-project deployment flow.",
+  "notes": "Archived 2026-08-16 per stale-track policy (workflow.md). Branch track/multi_project_command_20260623 deleted; deprecated 'branch' field removed (canonical schema)."
+}

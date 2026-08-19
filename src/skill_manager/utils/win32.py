@@ -1,0 +1,120 @@
+import contextlib
+import ctypes
+import logging
+import os
+from ctypes import wintypes
+
+from skill_manager.utils.input_guard import injection_allowed
+
+pywinstyles = None
+with contextlib.suppress(ImportError):
+    import pywinstyles  # type: ignore[no-redef, used-before-def]
+
+logger = logging.getLogger(__name__)
+
+
+class POINT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", wintypes.LONG),
+        ("top", wintypes.LONG),
+        ("right", wintypes.LONG),
+        ("bottom", wintypes.LONG),
+    ]
+
+
+class WINDOWPLACEMENT(ctypes.Structure):
+    _fields_ = [
+        ("length", wintypes.UINT),
+        ("flags", wintypes.UINT),
+        ("showCmd", wintypes.UINT),
+        ("ptMinPosition", POINT),
+        ("ptMaxPosition", POINT),
+        ("rcNormalPosition", RECT),
+    ]
+
+
+def apply_native_style(window, style_name: str) -> None:
+    """
+    Applies a native Windows style (mica, acrylic, aero, transparent, win7, inverse,
+    popup, dark, light) to a tkinter window.
+
+    Args:
+        window: The tkinter window object (Tk or Toplevel).
+        style_name: The name of the style to apply.
+    """
+    if pywinstyles is None:
+        return
+    try:
+        # Update the window to ensure HWND is available
+        window.update()
+
+        # Apply the style using pywinstyles
+        # This handles version checks and DwmSetWindowAttribute internally.
+        pywinstyles.apply_style(window, style_name)
+    except Exception as e:
+        logger.error("Failed to apply native style %s: %s", style_name, e)
+
+
+def get_window_placement(hwnd: int) -> tuple | None:
+    """Returns the placement of the window identified by hwnd."""
+    placement = WINDOWPLACEMENT()
+    placement.length = ctypes.sizeof(WINDOWPLACEMENT)
+    if ctypes.windll.user32.GetWindowPlacement(hwnd, ctypes.byref(placement)):
+        return (
+            placement.flags,
+            placement.showCmd,
+            (placement.ptMinPosition.x, placement.ptMinPosition.y),
+            (placement.ptMaxPosition.x, placement.ptMaxPosition.y),
+            (
+                placement.rcNormalPosition.left,
+                placement.rcNormalPosition.top,
+                placement.rcNormalPosition.right,
+                placement.rcNormalPosition.bottom,
+            ),
+        )
+    return None
+
+
+def set_window_placement(hwnd: int, placement_data: tuple) -> bool:
+    """Sets the placement of the window identified by hwnd."""
+    placement = WINDOWPLACEMENT()
+    placement.length = ctypes.sizeof(WINDOWPLACEMENT)
+    placement.flags = placement_data[0]
+    placement.showCmd = placement_data[1]
+    placement.ptMinPosition.x, placement.ptMinPosition.y = placement_data[2]
+    placement.ptMaxPosition.x, placement.ptMaxPosition.y = placement_data[3]
+    (
+        placement.rcNormalPosition.left,
+        placement.rcNormalPosition.top,
+        placement.rcNormalPosition.right,
+        placement.rcNormalPosition.bottom,
+    ) = placement_data[4]
+
+    return bool(ctypes.windll.user32.SetWindowPlacement(hwnd, ctypes.byref(placement)))
+
+
+def send_paste_to_focused_window() -> bool:
+    """Simulate Ctrl+V keystroke via Win32 keybd_event.
+
+    Returns True on success, False on failure (non-Windows or permission error).
+    """
+    if not injection_allowed():
+        return False
+    try:
+        user32 = ctypes.windll.user32
+        VK_CONTROL = 0x11
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+        return True
+    except Exception:
+        logger.error("Failed to send paste keystroke", exc_info=True)
+        return False

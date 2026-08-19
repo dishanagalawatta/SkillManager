@@ -1,0 +1,133 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill-manager"
+version = "2.2.5"
+description = "A professional tool for managing reusable agent skills across repositories."
+authors = [
+    { name = "Don Dishan Kanchuka Agalawatta" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6",
+    "httpx",
+    "markdown-it-py",
+    "pyyaml",
+    "pathspec",
+    "platformdirs",
+    "posthog>=7.14.2",
+    "pydantic>=2",
+    "pydantic-settings>=2.14.2",
+    "python-frontmatter",
+    "python-dotenv>=1.2.2",
+    "rapidfuzz",
+    "packaging",
+    "cryptography>=48.0.1",
+    "tenacity",
+    "watchdog",
+    "orjson",
+    "diskcache",
+    "sentry-sdk",
+    "gitpython>=3.1.50",
+    "apscheduler>=3.11.2",
+    "pynput>=1.8.2",
+    "msgpack>=1.2.1",
+    "joblib>=1.5.3",
+    "psutil",
+    "mcp>=1.2.0",
+    "pyautogui>=0.9.54",
+]
+
+[project.optional-dependencies]
+win32 = [
+    "pywinstyles",
+]
+test = [
+    "pytest",
+    "pytest-qt",
+    "pytest-cov",
+    "pytest-asyncio",
+]
+dev = [
+    "ruff",
+    "pyinstaller",
+    "pillow",
+]
+
+[project.scripts]
+skill-manager = "skill_manager.__main__:main"
+skill-manager-build = "skill_manager._build:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["skill_manager*"]
+
+[tool.setuptools.package-data]
+skill_manager = ["assets/brand/*", "assets/ui/*", "assets/clients/*"]
+
+[tool.coverage.run]
+source = ["skill_manager"]
+omit = ["src/skill_manager/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "pytest-qt>=4.5.0",
+    "ruff>=0.8.0",
+    "pyinstaller>=6.0.0",
+    "pillow>=10.0.0",
+    "pytest-xdist",
+    "pytest-sugar",
+    "pip-audit",
+    "python-semantic-release>=10.5.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+markers = [
+    "integration: marks tests that load real QML files and require a display (deselect with '-m \"not integration\"')",
+]
+filterwarnings = [
+    "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
+]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/skill_manager/__init__.py:__version__"]
+branch = "main"
+upload_to_pypi = false
+build_command = ""
+changelog_file = "CHANGELOG.md"
+
+commit_parser = "src/skill_manager/commit_parser_optin.py:OptInCommitParser"
+
+changelog.exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''Initial [Cc]ommit.*''',
+]
+
+tag_format = "v{version}"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]
+

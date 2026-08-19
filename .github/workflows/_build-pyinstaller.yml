@@ -1,0 +1,47 @@
+name: Build PyInstaller
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to checkout
+        type: string
+        default: ${{ github.ref }}
+      python-version:
+        description: Python version for the build
+        type: string
+        default: "3.12"
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build with PyInstaller and Package
+        run: uv run skill-manager-build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-windows
+          path: dist/
+          retention-days: 30

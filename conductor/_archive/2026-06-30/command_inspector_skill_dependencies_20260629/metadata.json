@@ -1,0 +1,14 @@
+{
+  "id": "command_inspector_skill_dependencies_20260629",
+  "title": "Command Inspector: Skill Dependencies pills",
+  "status": "completed",
+  "created": "2026-06-29",
+  "files_changed": [
+    "src/skill_manager/controllers/ops_controller.py",
+    "src/skill_manager/core/diagnostics.py",
+    "src/skill_manager/SkillManagerComponents/SkillReferenceOverlay.qml",
+    "src/skill_manager/SkillManagerComponents/CommandInspector.qml",
+    "src/skill_manager/SkillManagerComponents/qmldir",
+    "tests/test_command_referenced_skills_pills.py"
+  ]
+}

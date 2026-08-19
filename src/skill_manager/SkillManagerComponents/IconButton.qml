@@ -1,0 +1,109 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+Button {
+    id: control
+
+    property string iconText: text
+    property string iconSource: ""
+    property string role: "secondary" // secondary, primary, destructive, ghost
+    property string tooltipText: ""
+    property string accessibleName: tooltipText !== "" ? tooltipText : iconText
+    property int buttonSize: 32
+    property int iconSize: 15
+    property color customIconColor: "transparent"
+
+    Layout.preferredWidth: buttonSize
+    Layout.preferredHeight: buttonSize
+    Layout.minimumWidth: buttonSize
+    Layout.minimumHeight: buttonSize
+    implicitWidth: buttonSize
+    implicitHeight: buttonSize
+    padding: 0
+    flat: true
+
+    contentItem: Item {
+        implicitWidth: control.buttonSize
+        implicitHeight: control.buttonSize
+
+        Text {
+            anchors.centerIn: parent
+            visible: control.iconSource === "" && control.iconText !== ""
+            text: control.iconText
+            font.family: Theme.fontFamily
+            font.pixelSize: control.iconSize
+            font.weight: control.role === "primary" ? Font.Bold : Font.DemiBold
+            color: {
+                if (!control.enabled) return Theme.secondaryLabel
+                if (control.role === "primary") return "white"
+                if (control.role === "primary-outline") return Theme.accent
+                if (control.role === "destructive") return Theme.danger
+                return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
+            }
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        Image {
+            id: iconImg
+            anchors.centerIn: parent
+            width: control.iconSize
+            height: control.iconSize
+            visible: control.iconSource !== ""
+            source: control.iconSource
+            sourceSize.width: control.iconSize
+            sourceSize.height: control.iconSize
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+
+        DuotoneColorOverlay {
+            sourceItem: iconImg
+            primaryColor: {
+                if (control.customIconColor.a > 0) return control.customIconColor
+                if (!control.enabled) return Theme.secondaryLabel
+                if (control.role === "primary") return "white"
+                if (control.role === "destructive") return Theme.danger
+                return control.hovered || control.down ? Theme.iconLabel : Theme.iconSecondaryLabel
+            }
+            secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : (control.hovered ? "#CBD5E1" : "#E2E8F0")
+            visible: control.iconSource !== ""
+        }
+    }
+
+    background: Rectangle {
+        radius: Math.max(Theme.radiusSmall, control.buttonSize / 2)
+        color: {
+            if (!control.enabled) return Theme.disabledControl
+            if (control.role === "primary") return control.down ? Theme.glassActive : Theme.accent
+            if (control.role === "primary-outline") return control.down ? Theme.alpha(Theme.accent, 0.2) : (control.hovered ? Theme.alpha(Theme.accent, 0.1) : "transparent")
+            if (control.role === "destructive") return control.hovered || control.down ? Theme.dangerHover : "transparent"
+            if (control.role === "ghost") return control.hovered || control.down ? Theme.glassHover : "transparent"
+            return control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
+        }
+        border.color: {
+            if (control.visualFocus) return Theme.accent
+            if (!control.enabled) return Theme.glassBorder
+            if (control.role === "primary") return "transparent"
+            if (control.role === "primary-outline") return Theme.accent
+            if (control.role === "destructive") return control.hovered || control.down ? Theme.danger : Theme.glassBorder
+            if (control.role === "ghost") return control.hovered || control.down ? Theme.glassBorder : "transparent"
+            return control.hovered || control.down ? Theme.separator : Theme.glassBorder
+        }
+        border.width: control.visualFocus ? 2 : (control.role === "primary" || control.role === "ghost" ? 0 : 1)
+        opacity: control.enabled ? 1.0 : 0.65
+    }
+
+    SleekToolTip {
+        id: btnToolTip
+        visible: (control.hovered || control.visualFocus) && control.tooltipText !== ""
+        text: control.tooltipText
+    }
+    Accessible.role: Accessible.Button
+    Accessible.name: accessibleName
+
+    HoverHandler {
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+    }
+}

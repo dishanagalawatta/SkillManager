@@ -1,0 +1,457 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import App 1.0
+
+Rectangle {
+    id: root
+
+    readonly property var _sel: AppController.selectedSkill
+    property var skill: _sel
+    property bool isCollapsed: false
+    // Controlled externally (e.g. from LibraryView overlay) to gate visibility.
+    // Also gates internal ColumnLayout content. The overlay directly sets
+    // `visible` on this root to bypass QML's visible binding staleness issue.
+    property bool overlayVisible: true
+    property var editDialog: null
+    property var dependencyList: []
+    property var referenceRanges: []
+    property string _prevLocalPath: ""
+
+    readonly property int targetWidth: {
+        if (!root._sel || root._sel.local_path === undefined) return 0;
+        if (isCollapsed) return 32;
+
+        let dynamicWidth = parent ? parent.width * 0.5 : 400;
+        return Math.min(800, Math.max(400, dynamicWidth));
+    }
+
+    signal closed()
+    signal deleteRequested(string name, string path, bool isCommand)
+
+    GlassMenu {
+        id: inspectorContextMenu
+        property var targetControl: null
+
+        GlassMenuItem {
+            text: "Copy"
+            iconSource: AppController.ui_controller.getAssetUri("ui/copy-icon.svg")
+            enabled: inspectorContextMenu.targetControl && inspectorContextMenu.targetControl.selectedText !== undefined && inspectorContextMenu.targetControl.selectedText.length > 0
+            onTriggered: {
+                if (inspectorContextMenu.targetControl) inspectorContextMenu.targetControl.copy()
+            }
+        }
+        GlassMenuItem {
+            text: "Select All"
+            onTriggered: {
+                if (inspectorContextMenu.targetControl) inspectorContextMenu.targetControl.selectAll()
+            }
+        }
+    }
+
+    radius: Theme.radiusCard
+    color: Theme.glassPill
+    border.color: Theme.glassBorder
+    clip: true
+
+    function _refreshDependencies() {
+        var s = root._sel
+        if (s && s.is_command && s.local_path && typeof AppController !== "undefined" && AppController) {
+            root.dependencyList = AppController.ops_controller.getReferencedSkillsForCommand(s.local_path)
+            root.referenceRanges = AppController.ops_controller.getSkillReferenceRanges(s.local_path)
+        } else {
+            root.dependencyList = []
+            root.referenceRanges = []
+        }
+        if (bodyArea) {
+            bodyArea._lastHighlightedText = ""
+        }
+        _applyHighlights(-1)
+    }
+
+    Connections {
+        target: AppController.selectedSkill
+        function onLocalPathChanged() {
+            root._prevLocalPath = AppController.selectedSkill.local_path
+            root._refreshDependencies()
+        }
+        function onIsCommandChanged() {
+            root._refreshDependencies()
+        }
+        function onBodyContentChanged() {
+            if (bodyArea) {
+                bodyArea._lastHighlightedText = ""
+            }
+            _applyHighlights(-1)
+        }
+    }
+
+    Connections {
+        target: AppController
+        function onSelectedSkillChanged() {
+            root._refreshDependencies()
+        }
+    }
+
+    function _applyHighlights(focusedIndex) {
+        if (typeof AppController === "undefined" || !AppController || !AppController.ops_controller) return
+        if (root.referenceRanges && root.referenceRanges.length > 0) {
+            AppController.ops_controller.applySkillHighlights(
+                bodyArea,
+                JSON.stringify(root.referenceRanges),
+                focusedIndex
+            )
+        } else {
+            AppController.ops_controller.clearSkillHighlights(bodyArea)
+        }
+    }
+
+    function _scrollToFocused(index) {
+        if (!bodyArea || index < 0 || index >= root.referenceRanges.length) return
+        var range = root.referenceRanges[index]
+        bodyArea.cursorPosition = range.start
+        bodyArea.forceActiveFocus()
+    }
+
+    SmoothScrollView {
+        id: mainScroll
+        anchors.fill: parent
+        anchors.margins: 4
+        clip: true
+        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+        ColumnLayout {
+            width: mainScroll.width - 24
+            height: Math.max(implicitHeight, mainScroll.height - 24)
+            x: 12
+            y: 12
+            spacing: 16
+            visible: root.overlayVisible && !root.isCollapsed && root._sel && root._sel.local_path !== undefined
+            opacity: visible ? 1.0 : 0.0
+
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+
+            // Header
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                TextField {
+                    id: nameField
+                    ContextMenu.menu: null
+                    text: (root._sel && root._sel.name) || ""
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeSectionTitle
+                    font.weight: Font.Bold
+                    color: Theme.label
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        radius: Theme.radiusField
+                        color: nameField.activeFocus ? Theme.glassHover : "transparent"
+                        border.color: nameField.activeFocus ? Theme.glassBorder : "transparent"
+                    }
+                    leftPadding: 0
+                    selectByMouse: true
+                    readOnly: true
+
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+                        onClicked: (mouse) => {
+                            inspectorContextMenu.targetControl = nameField
+                            inspectorContextMenu.popup()
+                        }
+                    }
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/edit-icon.svg")
+                    flat: true
+                    onClicked: (mouse) => {
+                        if (root.editDialog) {
+                            root.editDialog.openForEdit(root._sel)
+                        }
+                    }
+                    visible: root._sel && root._sel.local_path !== undefined
+                    tooltipText: "Edit settings"
+                }
+
+                IconButton {
+                    iconSource: AppController.ui_controller.getAssetUri("ui/delete-icon.svg")
+                    role: "destructive"
+                    flat: true
+                    onClicked: (mouse) => {
+                        root.deleteRequested((root._sel && root._sel.name) || "", (root._sel && root._sel.local_path) || "", true)
+                    }
+                    visible: root._sel && root._sel.local_path !== undefined
+                    tooltipText: "Delete command"
+                }
+
+                IconButton {
+                    text: "✕"
+                    flat: true
+                    onClicked: (mouse) => root.closed()
+                    visible: root._sel && root._sel.local_path !== undefined
+                    tooltipText: "Close Inspector"
+                }
+            }
+
+            // Metadata Section
+            InspectorMetadataRow {
+                id: metaFlow
+                selectedSkill: root._sel
+                contextMenu: inspectorContextMenu
+            }
+
+            // Skill Dependencies Section
+            ColumnLayout {
+                id: depSection
+                Layout.fillWidth: true
+                spacing: 4
+                visible: root.dependencyList.length > 0
+                property bool isExpanded: true
+
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: depHeaderRow.implicitHeight
+
+                    RowLayout {
+                        id: depHeaderRow
+                        anchors.fill: parent
+                        spacing: 4
+
+                        Text {
+                            text: "Skill Dependencies"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Theme.secondaryLabel
+                            opacity: 0.8
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        IconButton {
+                            buttonSize: 18
+                            iconSize: 12
+                            role: "ghost"
+                            tooltipText: depSection.isExpanded ? "Collapse Skill Dependencies" : "Expand Skill Dependencies"
+                            iconSource: depSection.isExpanded ?
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
+                                AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: depSection.isExpanded = !depSection.isExpanded
+                    }
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: depSection.isExpanded
+
+                    Repeater {
+                        model: root.dependencyList
+
+                        Rectangle {
+                            id: depPill
+                            height: 22
+                            // Cap width so long dependency names don't overflow
+                            width: Math.min(depRow.implicitWidth + 12, (parent ? parent.width : 400) - 8)
+                            radius: Theme.radiusSmall
+                            color: Theme.glassHover
+                            border.color: Theme.glassBorder
+                            border.width: 1
+                            clip: true
+
+                            onWidthChanged: {
+                                if (width > 0 && parent && parent.width > 0)
+                                    console.log("DEP_PILL name=" + modelData.name
+                                        + " pillW=" + width + " flowW=" + parent.width
+                                        + " iw=" + depRow.implicitWidth)
+                            }
+
+                            RowLayout {
+                                id: depRow
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                spacing: 4
+
+                                Text {
+                                    text: modelData.name
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.label
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+
+                                Text {
+                                    text: modelData.occurrences > 1 ? ("× " + modelData.occurrences) : ""
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 9
+                                    color: Theme.secondaryLabel
+                                    visible: modelData.occurrences > 1
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: (mouse) => {
+                                    // Find the first range index for this skill name
+                                    for (var i = 0; i < root.referenceRanges.length; i++) {
+                                        if (root.referenceRanges[i].name === modelData.name) {
+                                            _applyHighlights(i)
+                                            _scrollToFocused(i)
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+
+                            Accessible.role: Accessible.Link
+                            Accessible.name: "Skill dependency: " + modelData.name + (modelData.occurrences > 1 ? " (" + modelData.occurrences + " occurrences)" : "")
+                        }
+                    }
+                }
+            }
+
+            // Command Details Section (editable)
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 100
+                    radius: Theme.radiusSmall
+                    color: Qt.rgba(0,0,0,0.2)
+                    border.color: Theme.glassBorder
+                    border.width: 1
+                    clip: true
+
+                    SmoothScrollView {
+                        id: bodyScroll
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                        TextArea {
+                            id: bodyArea
+                            ContextMenu.menu: null
+                            objectName: "commandBodyTextArea"
+                            // Use the ScrollView's availableWidth (viewport minus padding)
+                            // to ensure the content text width matches the visible area.
+                            width: bodyScroll.availableWidth
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: "Command Details"
+                            property string _lastHighlightedText: ""
+                            text: (root._sel && root._sel.body_content) || ""
+                            onTextChanged: {
+                                if (text !== _lastHighlightedText) {
+                                    _lastHighlightedText = text
+                                    _applyHighlights(-1)
+                                }
+                            }
+                            font.family: "Consolas", "Monaco", "Courier New", "monospace"
+                            font.pixelSize: 12
+                            color: Theme.label
+                            // WrapAnywhere breaks at any character — required for long
+                            // unbroken strings (URLs, paths, code) that Word-wrap cannot split.
+                            wrapMode: TextEdit.WrapAnywhere
+                            selectByMouse: true
+                            readOnly: true
+                            background: null
+                            padding: 12
+                            verticalAlignment: TextArea.AlignTop
+
+                            // Debug: log actual rendered dimensions for diagnosing clipping
+                            onWidthChanged: {
+                                if (width > 0)
+                                    console.log("BODY_TXT width=" + width + " iw=" + implicitWidth + " cw=" + contentWidth + " x=" + x + " aw=" + bodyScroll.availableWidth)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.RightButton
+                                onClicked: (mouse) => {
+                                    inspectorContextMenu.targetControl = bodyArea
+                                    inspectorContextMenu.popup()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Collapse handle
+    Rectangle {
+        id: collapseHandleRect
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 32
+        visible: root.isCollapsed
+        color: "transparent"
+
+        activeFocusOnTab: true
+        border.color: activeFocus ? Theme.accent : "transparent"
+        border.width: activeFocus ? 2 : 0
+
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.isCollapsed = false
+                event.accepted = true
+            } else {
+                event.accepted = false
+            }
+        }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: "Expand Inspector"
+
+        Text {
+            anchors.centerIn: parent
+            text: "›"
+            rotation: 180
+            font.pixelSize: 24
+            color: Theme.secondaryLabel
+        }
+
+        MouseArea {
+            id: collapseMouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: (mouse) => root.isCollapsed = false
+            cursorShape: Qt.PointingHandCursor
+
+            SleekToolTip {
+                id: expCmdToolTip
+                text: "Expand Inspector"
+                visible: collapseMouseArea.containsMouse || collapseHandleRect.activeFocus
+            }
+        }
+    }
+
+    Behavior on width {
+        NumberAnimation { duration: 300; easing.type: Easing.OutQuart }
+    }
+
+    Behavior on anchors.leftMargin {
+        NumberAnimation { duration: 250; easing.type: Easing.OutQuad }
+    }
+
+
+}

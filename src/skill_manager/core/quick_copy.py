@@ -1,0 +1,647 @@
+import logging
+import os
+import shutil
+from collections.abc import Callable
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import pathspec
+from joblib import Parallel, delayed
+
+logger = logging.getLogger(__name__)
+
+from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers  # noqa: E402
+
+CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
+
+# Re-exported for convenience; canonical impl lives in skill_references.
+from skill_manager.core.skill_references import (  # noqa: E402, F401
+    extract_skill_names,
+    resolve_referenced_skills,
+)
+
+
+def replace_skill_references_in_command(content: str, client_format: str, all_skills: list) -> str:
+    if not content or not all_skills:
+        return content
+
+    import re
+
+    # Pre-build lookup maps for folder name and skill name
+    skill_map = {}
+    for s in all_skills:
+        # Ignore commands and screenshots for this replacement
+        if getattr(s, "is_command", False) or s.get("is_command", False):
+            continue
+        if getattr(s, "is_snap", False) or s.get("is_snap", False):
+            continue
+
+        folder = str(getattr(s, "folder_name", "") or s.get("folder_name", "")).strip().lower()
+        if folder:
+            skill_map[folder] = s
+
+        name = str(getattr(s, "name", "") or s.get("name", "")).strip().lower()
+        if name:
+            skill_map[name] = s
+
+    def replacer(match):
+        full_match = match.group(0)
+
+        name = ""
+        if full_match.startswith("[$"):
+            # Codex format
+            name = match.group(1)
+        elif full_match.startswith("/"):
+            # Antigravity format
+            name = full_match[1:]
+        elif full_match.startswith("@"):
+            # Gemini CLI format
+            parts = full_match.split("/")
+            if full_match.endswith("/SKILL.md"):
+                if len(parts) >= 2:
+                    name = parts[-2]
+            else:
+                name = parts[-1]
+            name = name.lstrip("@")
+
+        if name:
+            name_lower = name.lower()
+            if name_lower in skill_map:
+                # Don't pass all_skills down again to avoid infinite recursion
+                # if someone somehow puts a command reference inside a command.
+                return format_project_skill_reference(skill_map[name_lower], client_format)
+
+        return full_match
+
+    # Pattern matches:
+    # 1. Codex: [$name](path) -> \[\$([^\]]+)\]\([^)]+\)
+    # 2. Antigravity: /name -> \/[a-zA-Z0-9_-]+
+    # 3. Gemini CLI: @name or @path/to/name -> @[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*
+    pattern = r"\[\$([^\]]+)\]\([^)]+\)|\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*"
+    return re.sub(pattern, replacer, str(content))
+
+
+# Perf: Memoizes frequent redundant filesystem lookups during discovery file-walks
+@lru_cache(maxsize=2048)
+def resolve_resilient_path(path_str):
+    """Resolve a skill path and auto-detect .agents/skills for project roots."""
+    if not path_str:
+        return Path()
+
+    path = Path(os.path.expanduser(str(path_str).strip()))
+    try:
+        if path.exists():
+            # Auto-detect .agents/skills if project root was provided
+            if path.is_dir() and path.name.lower() not in ("skills", ".agents"):
+                potential = path / ".agents" / "skills"
+                if potential.exists() and potential.is_dir():
+                    # Local import: copier imports quick_copy at module level.
+                    from skill_manager.core.copier import auto_detect_skills_dir
+
+                    return auto_detect_skills_dir(path)
+            return path.resolve()
+    except OSError:
+        pass
+
+    return path
+
+
+def discover_package_skills(sources, parse_skill_md, categorize_skill, build_search_text):
+    """Discover skills from master package folders (config['sources']).
+
+    Returns a flat list of skill dicts, each tagged with ``is_source=True``.
+    Deduplicates by resolved path so the same folder listed twice is only
+    scanned once.
+
+    Args:
+        sources: Iterable of source folder paths (from config["sources"]).
+        parse_skill_md: Callable(path) -> dict with skill metadata.
+        categorize_skill: Callable(name, description) -> category string.
+        build_search_text: Callable(skill_dict) -> search text string.
+
+    Returns:
+        List[dict] — one entry per discovered skill.
+    """
+    import sys
+
+    if getattr(sys, "is_shutting_down", False):
+        return []
+
+    skills = []
+    seen_sources = set()
+    unique_sources = []
+
+    for source in sources:
+        resolved_source = resolve_resilient_path(source)
+        if not resolved_source or not resolved_source.is_dir():
+            continue
+
+        source_key = os.path.normcase(str(resolved_source))
+        if source_key in seen_sources:
+            continue
+        seen_sources.add(source_key)
+        unique_sources.append(resolved_source)
+
+    if not unique_sources:
+        return []
+
+    def scan_source(resolved_source):
+        source_skills = []
+        ignore_spec = load_ignore_spec(resolved_source)
+        for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
+            if not child.is_dir():
+                continue
+            if is_ignored(child, resolved_source, ignore_spec):
+                continue
+            skill_md_path = child / "SKILL.md"
+            if not skill_md_path.is_file():
+                continue
+
+            skill_data = parse_skill_md(str(skill_md_path))
+            # Minimal normalization if not already done by cached wrapper
+            if not skill_data.get("name"):
+                skill_data["name"] = child.name
+            skill_data["folder_name"] = child.name
+            skill_data["local_path"] = str(child)
+            skill_data["skill_md_path"] = str(skill_md_path)
+            skill_data["source_path"] = str(resolved_source)
+            skill_data["project_path"] = str(resolved_source)
+            skill_data["project_label"] = "Master Library"
+            skill_data["project_root"] = str(resolved_source)
+            skill_data["skill_base_relative"] = skill_base_relative(resolved_source)
+            skill_data["is_package"] = True
+            skill_data["is_source"] = True  # Compatibility
+
+            # These might be no-ops if parse_skill_md was our cached wrapper
+            if not skill_data.get("main_category"):
+                skill_data.setdefault("metadata", {})
+                cat_info = categorize_skill(
+                    skill_data.get("name", ""),
+                    classification_text(skill_data),
+                    skill_data.get("metadata", {}),
+                )
+                skill_data["main_category"] = cat_info.get("main_category", "")
+                skill_data["category"] = cat_info.get("sub_category", "")
+
+            if not skill_data.get("search_text"):
+                skill_data["search_text"] = build_search_text(skill_data)
+
+            source_skills.append(skill_data)
+        return source_skills
+
+    # Capped to 2 workers to prevent RAM exhaustion with multiple instances.
+    parallel_results = Parallel(n_jobs=joblib_workers(), prefer=joblib_prefer())(
+        delayed(scan_source)(src) for src in unique_sources
+    )
+
+    for new_skills in parallel_results:
+        try:
+            skills.extend(new_skills)  # type: ignore[arg-type]
+        except Exception as e:
+            logger.warning("[DISCOVERY] Error scanning source: %s", e)
+
+    return skills
+
+
+def discover_single_project(
+    project: str,
+    parse_skill_md: Callable,
+    categorize_skill: Callable,
+    build_search_text: Callable,
+    project_aliases: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """Discovers skills in a single project path.
+
+    Args:
+        project: Project path to discover.
+        parse_skill_md: Callable to parse SKILL.md.
+        categorize_skill: Callable to categorize a skill.
+        build_search_text: Callable to build search text.
+        project_aliases: Project name/alias mapping.
+
+    Returns:
+        dict with project metadata and discovered skills, or None.
+    """
+    if project_aliases is None:
+        project_aliases = {}
+
+    resolved_project = resolve_resilient_path(project)
+    if not resolved_project or not resolved_project.is_dir():
+        return None
+
+    project_key = os.path.normcase(str(resolved_project))
+    skills = []
+    ignore_spec = load_ignore_spec(resolved_project)
+
+    for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
+        if not child.is_dir():
+            continue
+        if is_ignored(child, resolved_project, ignore_spec):
+            continue
+        skill_md_path = child / "SKILL.md"
+        if not skill_md_path.is_file():
+            continue
+
+        skill_data = parse_skill_md(str(skill_md_path))
+        if not skill_data.get("name"):
+            skill_data["name"] = child.name
+        skill_data["folder_name"] = child.name
+        skill_data["local_path"] = str(child)
+        skill_data["skill_md_path"] = str(skill_md_path)
+        skill_data["project_key"] = project_key
+        skill_data["project_path"] = str(resolved_project)
+        skill_data["project_root"] = str(project_root_for_project(resolved_project))
+        skill_data["skill_base_relative"] = skill_base_relative(resolved_project)
+        skill_data["project_label"] = project_label(resolved_project, project_aliases, str(project))
+        skill_data.setdefault("metadata", {})
+        cat_info = categorize_skill(
+            skill_data.get("name", ""),
+            classification_text(skill_data),
+            skill_data.get("metadata", {}),
+        )
+        skill_data["main_category"] = cat_info.get("main_category", "")
+        skill_data["category"] = cat_info.get("sub_category", "")
+        skill_data["search_text"] = build_search_text(skill_data)
+        skills.append(skill_data)
+
+    # ── Scan for Screenshots
+    project_root_path = project_root_for_project(resolved_project)
+    snap_dir = project_root_path / ".agents" / "screenshots"
+    if snap_dir.is_dir():
+        for img in sorted(snap_dir.iterdir(), key=lambda item: item.name.lower(), reverse=True):
+            if img.is_file() and img.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                # Map to virtual skill
+                skill_data = {
+                    "name": img.name,
+                    "folder_name": ".agents/screenshots",
+                    "local_path": str(img),
+                    "skill_md_path": str(img),
+                    "project_key": project_key,
+                    "project_path": str(resolved_project),
+                    "project_root": str(project_root_path),
+                    "project_label": project_label(resolved_project, project_aliases, str(project)),
+                    "main_category": "Special",
+                    "category": "Snaps",
+                    "search_text": f"snap capture {img.name}",
+                    "is_snap": True,
+                    "metadata": {"category": "Capture"},
+                }
+                skills.append(skill_data)
+
+    if skills:
+        project_root = project_root_for_project(resolved_project)
+        return {
+            "project_path": str(resolved_project),
+            "project_root": str(project_root),
+            "project_label": project_label(resolved_project, project_aliases, str(project)),
+            "skill_base_relative": skill_base_relative(resolved_project),
+            "project_key": project_key,
+            "skills": skills,
+        }
+    return None
+
+
+def discover_project_skills(
+    projects: list[str],
+    parse_skill_md: Callable,
+    categorize_skill: Callable,
+    build_search_text: Callable,
+    project_aliases: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Discover skills from multiple project folders in parallel.
+
+    Args:
+        projects: List of project folder paths.
+        parse_skill_md: Callable to parse SKILL.md.
+        categorize_skill: Callable to categorize a skill.
+        build_search_text: Callable to build search text.
+        project_aliases: Project name/alias mapping.
+
+    Returns:
+        List of project dicts, each with discovered skills.
+    """
+    import sys
+
+    if getattr(sys, "is_shutting_down", False):
+        return []
+
+    if project_aliases is None:
+        project_aliases = {}
+
+    seen_projects = set()
+    unique_projects = []
+
+    for project in projects:
+        resolved_project = resolve_resilient_path(project)
+        if not resolved_project or not resolved_project.is_dir():
+            continue
+        project_key = os.path.normcase(str(resolved_project))
+        if project_key in seen_projects:
+            continue
+        seen_projects.add(project_key)
+        unique_projects.append(project)
+
+    if not unique_projects:
+        return []
+
+    # Parallelize project discovery
+    # Capped to 2 workers to prevent RAM exhaustion with multiple instances.
+    projects_list = []
+    parallel_results = Parallel(n_jobs=joblib_workers(), prefer=joblib_prefer())(
+        delayed(discover_single_project)(
+            proj, parse_skill_md, categorize_skill, build_search_text, project_aliases
+        )
+        for proj in unique_projects
+    )
+
+    for res in parallel_results:
+        try:
+            if res:
+                projects_list.append(res)
+        except Exception as e:
+            logger.warning("[DISCOVERY] Error scanning project: %s", e)
+
+    return projects_list
+
+
+# Perf: Caches expensive path normalizations (normcase/normpath) in hot loops
+@lru_cache(maxsize=2048)
+def normalize_path(path):
+    if not path:
+        return ""
+    return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
+
+
+def load_ignore_spec(root: Path):
+    gitignore = root / ".gitignore"
+    if not gitignore.is_file():
+        return None
+    try:
+        return pathspec.PathSpec.from_lines(
+            "gitignore", gitignore.read_text(encoding="utf-8").splitlines()
+        )
+    except OSError:
+        return None
+
+
+def is_ignored(path: Path, root: Path, spec) -> bool:
+    if spec is None:
+        return False
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError:
+        return False
+    return spec.match_file(relative) or spec.match_file(f"{relative}/")
+
+
+def project_label(project_path, project_aliases=None, original_project=None):
+    if project_aliases is None:
+        project_aliases = {}
+
+    norm_project = normalize_path(project_path)
+    norm_original = normalize_path(original_project) if original_project else ""
+
+    # Try using original project (exact or normalized)
+    if original_project and original_project in project_aliases:
+        return project_aliases[original_project]
+    if norm_original and norm_original in project_aliases:
+        return project_aliases[norm_original]
+
+    # Try resolved path (exact or normalized)
+    project_str = str(project_path)
+    if project_str in project_aliases:
+        return project_aliases[project_str]
+    if norm_project in project_aliases:
+        return project_aliases[norm_project]
+
+    # Try normalized project root
+    project_path_obj = Path(project_path)
+    root = project_root_for_project(project_path_obj)
+    norm_root = normalize_path(root)
+    if norm_root in project_aliases:
+        return project_aliases[norm_root]
+
+    # Full scan for matching normalized keys
+    for k, v in project_aliases.items():
+        norm_k = normalize_path(k)
+        if norm_k in (norm_project, norm_root, norm_original):
+            return v
+
+    # Use standard format if no alias: "RootName (Base)"
+    base = skill_base_relative(project_path_obj)
+
+    # Clean up the .agents/skills suffix if it exists
+    if base == ".agents/skills" or base == ".agents\\skills":
+        return f"{root.name}"
+    if base.endswith("/.agents/skills") or base.endswith("\\.agents\\skills"):
+        return f"{root.name} ({base[:-15]})"
+
+    return f"{root.name} ({base})"
+
+
+def _get_val(obj, key: str, default: Any = "") -> Any:
+    """Safely retrieve an attribute or key from dicts, dataclasses, or objects."""
+    if hasattr(obj, key):
+        val = getattr(obj, key)
+        if val is not None:
+            return val
+    if isinstance(obj, dict):
+        val = obj.get(key, default)
+        if val is not None:
+            return val
+    if hasattr(obj, "get"):
+        try:
+            val = obj.get(key, default)
+            if val is not None:
+                return val
+        except Exception:  # noqa: BLE001
+            pass
+    return default
+
+
+def format_project_skill_reference(skill, client_format, all_skills=None):
+    is_command = _get_val(skill, "is_command", False)
+    local_path = Path(_get_val(skill, "local_path", ""))
+
+    if is_command:
+        content = _get_val(skill, "body_content", "") or _get_val(skill, "raw_content", "")
+        if not content:
+            return ""
+        if all_skills is not None:
+            return replace_skill_references_in_command(content, client_format, all_skills)
+        return content
+
+    if client_format == "Codex":
+        name = _get_val(skill, "name") or local_path.name
+        path = _get_val(skill, "skill_md_path", "")
+        return f"[${name}]({path})"
+
+    if _get_val(skill, "is_snap", False):
+        # For screenshots, the reference is just the relative path to the image
+        project_root = _get_val(skill, "project_root", "")
+        if project_root:
+            try:
+                relative_path = local_path.relative_to(project_root).as_posix()
+            except ValueError:
+                relative_path = local_path.name
+        else:
+            relative_path = local_path.name
+
+        if client_format == "Gemini CLI":
+            return f"@{relative_path}"
+        return relative_path
+
+    relative_path = project_skill_relative_path(skill)
+    if client_format in ("Antigravity", "OpenCode"):
+        name = _get_val(skill, "name") or local_path.name
+        return f"/{name}"
+    if client_format == "Gemini CLI":
+        return f"@{relative_path}"
+    return relative_path
+
+
+def normalize_command_references(text):
+    references = []
+    seen = set()
+    for line in str(text or "").splitlines():
+        reference = normalize_command_reference(line)
+        if not reference:
+            continue
+        key = reference.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        references.append(reference)
+    return references
+
+
+def normalize_command_reference(value):
+    reference = str(value or "").strip()
+    if not reference:
+        return ""
+    if looks_like_explicit_reference(reference):
+        return reference
+    return f"@{reference.lstrip('@')}"
+
+
+def merge_command_references(existing, additions):
+    merged = []
+    seen = set()
+    for reference in list(existing or []) + list(additions or []):
+        normalized = normalize_command_reference(reference)
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(normalized)
+    return merged
+
+
+def looks_like_explicit_reference(reference):
+    lowered = reference.lower()
+    if reference.startswith(("@", "[", ".", "/", "~")):
+        return True
+    if lowered.endswith(".md") or "/" in reference or "\\" in reference:
+        return True
+    return ":" in reference
+
+
+def project_skill_relative_path(skill):
+    base = str(_get_val(skill, "skill_base_relative", "") or "").replace("\\", "/").strip("/")
+    folder = (
+        str(_get_val(skill, "folder_name", "") or Path(_get_val(skill, "local_path", "")).name)
+        .replace("\\", "/")
+        .strip("/")
+    )
+    return f"{base}/{folder}/SKILL.md" if base else f"{folder}/SKILL.md"
+
+
+def delete_project_skill_folders(skills):
+    result = {"deleted": 0, "skipped": 0, "failed": 0, "details": []}
+    for skill in skills:
+        label = skill.get("name") or skill.get("folder_name") or "Unknown"
+        source_path = Path(os.path.expanduser(str(skill.get("local_path") or ""))).resolve()
+        project_path = Path(os.path.expanduser(str(skill.get("project_path") or ""))).resolve()
+        error = _delete_validation_error(source_path, project_path)
+
+        if error:
+            result["skipped"] += 1
+            result["details"].append(
+                {"skill": label, "path": str(source_path), "status": "skipped", "message": error}
+            )
+            continue
+
+        try:
+            shutil.rmtree(source_path)
+        except Exception as exc:
+            result["failed"] += 1
+            result["details"].append(
+                {"skill": label, "path": str(source_path), "status": "failed", "message": str(exc)}
+            )
+            continue
+
+        result["deleted"] += 1
+        result["details"].append(
+            {
+                "skill": label,
+                "path": str(source_path),
+                "status": "deleted",
+                "message": str(source_path),
+            }
+        )
+
+    return result
+
+
+def _delete_validation_error(source_path, project_path):
+    if not project_path.is_dir():
+        return f"Project folder does not exist: {project_path}"
+    if not source_path.is_dir():
+        return f"Skill folder does not exist: {source_path}"
+    if source_path.parent != project_path:
+        return f"Skill folder is not a direct child of project: {project_path}"
+    if not (source_path / "SKILL.md").is_file():
+        return f"Skill folder is missing SKILL.md: {source_path}"
+    return ""
+
+
+@lru_cache(maxsize=2048)
+def project_root_for_project(project_path):
+    parts = project_path.parts
+    for marker in (".agents", ".codex", ".gemini"):
+        if marker in parts:
+            marker_index = parts.index(marker)
+            if marker_index >= 0:
+                return Path(*parts[:marker_index])
+
+    # If no marker in path parts, check if the directory itself contains a marker
+    try:
+        for marker in (".agents", ".codex", ".gemini"):
+            if (project_path / marker).exists():
+                return project_path
+    except OSError:
+        pass
+
+    return project_path
+
+
+@lru_cache(maxsize=2048)
+def skill_base_relative(project_path):
+    root = project_root_for_project(project_path)
+    try:
+        return project_path.relative_to(root).as_posix()
+    except ValueError:
+        return project_path.name
+
+
+def classification_text(skill_data):
+    parts = [skill_data.get("description", "")]
+    metadata = skill_data.get("metadata") or {}
+    for key in ("category", "source", "risk", "tags", "use_cases"):
+        value = metadata.get(key)
+        if value not in (None, ""):
+            parts.append(str(value))
+    return " ".join(parts)

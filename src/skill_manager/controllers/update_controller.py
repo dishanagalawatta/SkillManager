@@ -1,0 +1,680 @@
+"""
+Purpose: Manages skill updates, synchronization, and scanning.
+Usage: Accessed via AppController.updates
+"""
+
+import json
+import logging
+from pathlib import Path
+
+from PySide6.QtCore import QObject, QTimer, Slot
+
+from skill_manager.controllers.base import BaseController
+from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.schemas import UpdatePackageRecord
+from skill_manager.core.update_service import UpdateService
+from skill_manager.utils.qt_threading import schedule_on_ui_thread
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_single_shot(msec: int, context, functor):
+    ctx = context if isinstance(context, QObject) else None
+    QTimer.singleShot(msec, ctx, functor)
+
+
+class UpdateController(BaseController):
+    """Controller for skill updates and synchronization."""
+
+    def _resolvePackageStorageState(self):
+        """Internal helper to refresh package state from config.
+
+        Mutates ``app._update_packages`` in place so that every reference
+        captured by QML delegates (``modelData``) or background workers
+        stays valid.  Emits ``updatePackagesChanged`` once at the end.
+        """
+        from skill_manager.core.persistence import load_package_skill_inventory
+        from skill_manager.core.skill_packages import (
+            normalize_skill_package_config,
+            resolve_package_storage,
+        )
+
+        packages = []
+        for package in self.app._update_packages:
+            try:
+                # Ensure each package in memory is a valid record
+                normalized = normalize_skill_package_config(package)
+                record = UpdatePackageRecord.model_validate({**normalized, **package})
+                packages.append(record.model_dump())
+            except Exception as e:
+                logger.error("Failed to normalize package during storage resolution: %s", e)
+
+        refreshed = resolve_package_storage(packages, load_package_skill_inventory())
+
+        # Update each dict in place so that every captured reference (QML
+        # modelData, background workers) keeps pointing at the same object.
+        for i, item in enumerate(refreshed):
+            if i < len(self.app._update_packages):
+                self.app._update_packages[i].clear()
+                self.app._update_packages[i].update(item)
+            else:
+                self.app._update_packages.append(item)
+
+        # Remove excess entries when the resolved list is shorter.
+        del self.app._update_packages[len(refreshed) :]
+
+        self.config.set("skills", self.app._update_packages)
+        self.app.updatePackagesChanged.emit()
+
+    @Slot()
+    def updateNow(self):
+        """Starts a global update of all skills and projects."""
+        self.app._set_status("Starting global update...")
+
+        # Mark projects as syncing
+        for p in self.app._projects:
+            if p not in self.app._syncing_projects:
+                self.app._syncing_projects.append(p)
+        self.app.projectsChanged.emit()
+
+        # Mark sources as updating
+        for s in self.app._update_packages:
+            s["is_updating"] = True
+            s["just_finished"] = False
+        self.app.updatePackagesChanged.emit()
+
+        service = UpdateService(
+            sources=self.app._sources,
+            projects=self.app._projects,
+            update_packages=self.app._update_packages,
+            project_aliases=self.app._project_aliases,
+            task_runner=self.app.task_runner,
+        )
+
+        def source_progress_callback(idx, data):
+            def update_item():
+                if 0 <= idx < len(self.app._update_packages):
+                    self.app._update_packages[idx] = data
+                    self.app.updatePackagesChanged.emit()
+
+            _safe_single_shot(0, self.app, update_item)
+
+        def completion_callback(result, _updated_sources):
+            def finalize():
+                self.app.loadInitialData()
+                msg = (
+                    f"Global update complete: {result['merged']} updated, {result['failed']} failed"
+                )
+                self.app._set_status(msg)
+
+                # Capture analytics
+                capture_event(
+                    "skill_package_updated",
+                    {"source_type": "global", "success": result["failed"] == 0},
+                )
+
+                self.config.set("skills", self.app._update_packages)
+                self.app._syncing_projects = []
+                self.app.projectsChanged.emit()
+
+            _safe_single_shot(0, self.app, finalize)
+
+        service.run_global_update(
+            status_callback=self.app._set_status,
+            source_progress_callback=source_progress_callback,
+            completion_callback=completion_callback,
+        )
+
+    @Slot()
+    def scanForUpdates(self):
+        """Scans all sources and projects for potential updates."""
+        self.app._set_status("Scanning for updates...")
+        self.app._is_loading = True
+        self.app.isLoadingChanged.emit()
+
+        service = UpdateService(
+            sources=self.app._sources,
+            projects=self.app._projects,
+            update_packages=self.app._update_packages,
+            project_aliases=self.app._project_aliases,
+            task_runner=self.app.task_runner,
+        )
+
+        def completion_callback(results, updated_sources):
+            def finalize():
+                self.app._update_results = results
+                self.app._update_packages = updated_sources
+                self.recalculateStats()
+                self.app._is_loading = False
+                self.app.isLoadingChanged.emit()
+                self.app.updatePackagesChanged.emit()
+                self.app._set_status(
+                    f"Update scan complete: {len(results)} package skills processed"
+                )
+
+                # Handle Silent Auto-Update
+                if (
+                    self.config.get("skill_package_auto_update_mode") == "silent"
+                    and self.app._stats_outdated > 0
+                ):
+                    logger.info("Silent auto-update triggered for outdated skill packages.")
+                    self.updateNow()
+
+            _safe_single_shot(0, self.app, finalize)
+
+        service.scan_for_updates(
+            status_callback=self.app._set_status, completion_callback=completion_callback
+        )
+
+    @Slot(str, str)
+    def updateSkillInProject(self, skill_name: str, project_name: str):
+        """Updates a specific skill in a specific project."""
+        self.app._set_status(f"Updating {skill_name} in {project_name}...")
+
+        def run_surgical_sync():
+            try:
+                # 1. Find source skill
+                source_skill = next(
+                    (
+                        s
+                        for s in self.app._library_model._all_skills
+                        if s.get("is_source") and s.get("name") == skill_name
+                    ),
+                    None,
+                )
+                if not source_skill:
+                    self.app._set_status(f"Error: Could not find source skill {skill_name}")
+                    return
+
+                # 2. Find project path
+                project_path = next(
+                    (p for p in self.app._projects if self.app.getProjectLabel(p) == project_name),
+                    None,
+                )
+                if not project_path:
+                    self.app._set_status(f"Error: Could not find project {project_name}")
+                    return
+
+                # 3. Perform copy
+                from skill_manager.core.copier import copy_skill_folders_to_projects
+
+                result = copy_skill_folders_to_projects(
+                    [source_skill], [project_path], update_only=True
+                )
+
+                msg = f"Updated {skill_name} in {project_name}"
+                if result["failed"] > 0:
+                    msg = f"Failed to update {skill_name} in {project_name}"
+
+                schedule_on_ui_thread(self.app, lambda: self.app._set_status(msg))
+                schedule_on_ui_thread(self.app, self.scanForUpdates, delay_ms=500)
+            except Exception as e:
+                err_msg = f"Surgical update failed: {e}"
+                capture_exception(e)
+                schedule_on_ui_thread(self.app, lambda: self.app._set_status(err_msg))
+
+        self.app.task_runner.run(run_surgical_sync)
+
+    @Slot()
+    def recalculateStats(self):
+        """Recalculates the up-to-date/outdated/missing stats."""
+        up_to_date = 0
+        outdated = 0
+        missing = 0
+        for item in self.app._update_results:
+            if item["status"] == "up_to_date":
+                up_to_date += 1
+            elif item["status"] == "outdated":
+                outdated += 1
+            elif item["status"] == "missing":
+                missing += 1
+
+        self.app._stats_up_to_date = up_to_date
+        self.app._stats_outdated = outdated
+        self.app._stats_missing = missing
+        self.app.statsChanged.emit()
+
+    @Slot(str)
+    def addUpdatePackage(self, package_name: str):
+        """Adds a basic NPX-style source."""
+        if not package_name:
+            return
+        try:
+            record = UpdatePackageRecord(
+                name=package_name,
+                source_type="npx",
+                package_name=package_name,
+            )
+            self.app._update_packages.append(record.model_dump())
+            self.config.set("skills", self.app._update_packages)
+            self.app.updatePackagesChanged.emit()
+            self.app._set_status(f"Added update package: {package_name}")
+        except Exception as e:
+            logger.error("Failed to add update package: %s", e)
+            self.app._set_status(f"Error adding package: {e}")
+
+    @Slot(dict, result=str)
+    def addSkillPackage(self, data: dict) -> str:
+        """Adds a fully configured skill package (git/npx/custom).
+
+        Returns a JSON-encoded dict with keys ``ok`` (bool), ``error``
+        (str | None), and ``name`` (str).  QML callers should inspect the
+        return value and show an inline error on failure instead of closing
+        the dialog.
+        """
+        if not data:
+            return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
+
+        from skill_manager.core.skill_packages import (
+            check_skill_package_versions,
+            normalize_skill_package_config,
+        )
+
+        try:
+            # 1. Normalize and Validate
+            normalized = normalize_skill_package_config(data)
+            record = UpdatePackageRecord.model_validate(normalized)
+            record.is_updating = False
+            record.last_updated = "Never"
+
+            # 2. Phase 1 — detect latest_version only (no snap yet)
+            detected_data = check_skill_package_versions(record.model_dump())
+
+            # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
+            if not detected_data.get("latest_version"):
+                if record.package_name or record.repository_url or record.update_command:
+                    detected_data["latest_version"] = "latest"
+                else:
+                    pkg_name = record.name or "unknown"
+                    error_msg = (
+                        f'Could not detect latest version for "{pkg_name}". '
+                        "Provide a repository URL or a latest_version_command and try again."
+                    )
+                    self.app._set_status(f"Add failed: {error_msg}")
+                    return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
+
+            # 4. Phase 2 — snap current_version = latest_version on add
+            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            final_record = UpdatePackageRecord.model_validate(synced_data)
+
+            # 5. Commit to state
+            self.app._update_packages.append(final_record.model_dump())
+            self._resolvePackageStorageState()
+            self.app._set_status(f"Added skill package: {final_record.name}")
+            capture_event("skill_package_added", {"source_type": final_record.source_type})
+
+            # 6. Trigger initial install in background so skill files are
+            #    actually downloaded/relocated into the resolved package
+            #    storage path.  Without this the package metadata shows
+            #    "Up to Date" (current_version == latest_version) but no
+            #    skill folders exist on disk yet.
+            new_index = len(self.app._update_packages) - 1
+            QTimer.singleShot(500, lambda idx=new_index: self.runPackageUpdate(idx))
+
+            return json.dumps({"ok": True, "error": None, "name": final_record.name})
+        except Exception as e:
+            logger.error("Failed to add skill package: %s", e)
+            self.app._set_status(f"Error adding skill package: {e}")
+            return json.dumps({"ok": False, "error": str(e), "name": data.get("name", "")})
+
+    @Slot(int, dict, result=str)
+    def updateUpdatePackage(self, index: int, data: dict) -> str:
+        """Updates configuration for an existing skill package.
+
+        Returns a JSON-encoded dict with keys ``ok`` (bool), ``error``
+        (str | None), and ``name`` (str).  QML callers should inspect the
+        return value and show an inline error on failure instead of closing
+        the dialog.
+        """
+        if not (0 <= index < len(self.app._update_packages)):
+            return json.dumps({"ok": False, "error": "Invalid package index.", "name": ""})
+
+        if not data:
+            return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
+
+        from skill_manager.core.skill_packages import (
+            check_skill_package_versions,
+            normalize_skill_package_config,
+        )
+
+        try:
+            # Preserve internal state from existing record
+            existing = self.app._update_packages[index]
+            is_updating = existing.get("is_updating", False)
+            just_finished = existing.get("just_finished", False)
+            last_updated = existing.get("last_updated", "Never")
+
+            # 1. Normalize and Validate
+            normalized = normalize_skill_package_config(data)
+            record = UpdatePackageRecord.model_validate(normalized)
+            record.is_updating = is_updating
+            record.just_finished = just_finished
+            record.last_updated = last_updated
+
+            # 2. Phase 1 — detect latest_version only (no snap yet)
+            detected_data = check_skill_package_versions(record.model_dump())
+
+            # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
+            if not detected_data.get("latest_version"):
+                if record.package_name or record.repository_url or record.update_command:
+                    detected_data["latest_version"] = existing.get("latest_version") or "latest"
+                else:
+                    pkg_name = record.name or "unknown"
+                    error_msg = (
+                        f'Could not detect latest version for "{pkg_name}". '
+                        "Provide a repository URL or a latest_version_command and try again."
+                    )
+                    self.app._set_status(f"Edit failed: {error_msg}")
+                    return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
+
+            # 4. Phase 2 — snap current_version = latest_version on edit
+            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            final_record = UpdatePackageRecord.model_validate(synced_data)
+
+            # Re-apply internal state (model_validate defaults these)
+            final_record.is_updating = is_updating
+            final_record.just_finished = just_finished
+            final_record.last_updated = last_updated
+
+            # 5. Commit to state
+            self.app._update_packages[index] = final_record.model_dump()
+            self._resolvePackageStorageState()
+
+            # Informative log: show what was saved and the version check result
+            current_ver = final_record.current_version or "unknown"
+            latest_ver = final_record.latest_version or "unknown"
+            status_msg = (
+                f"Package settings saved: {final_record.name} "
+                f"(version check: {current_ver} → {latest_ver})"
+            )
+            self.app._set_status(status_msg)
+
+            # Diagnostic log with full context
+            from skill_manager.core.diagnostics import (
+                CATEGORY_UPDATE_RESULT,
+                get_diagnostic_logger,
+            )
+
+            get_diagnostic_logger().log_event(
+                "INFO",
+                CATEGORY_UPDATE_RESULT,
+                f"Config saved for package: {final_record.name}",
+                data={
+                    "package_id": final_record.package_id,
+                    "source_type": final_record.source_type,
+                    "current_version": final_record.current_version,
+                    "latest_version": final_record.latest_version,
+                    "repository_url": final_record.repository_url,
+                    "index": index,
+                },
+            )
+
+            return json.dumps({"ok": True, "error": None, "name": final_record.name})
+        except Exception as e:
+            logger.error("Failed to update skill package: %s", e)
+            self.app._set_status(f"Error updating skill package: {e}")
+            return json.dumps({"ok": False, "error": str(e), "name": data.get("name", "")})
+
+    @Slot(int)
+    def removeUpdatePackage(self, index: int):
+        """Removes a skill package."""
+        if 0 <= index < len(self.app._update_packages):
+            source = self.app._update_packages.pop(index)
+            self._resolvePackageStorageState()
+            self.app._set_status(f"Removed update package: {source.get('name')}")
+            capture_event(
+                "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
+            )
+
+    @Slot(int)
+    def runPackageUpdate(self, index: int):
+        """Runs update for a single skill package."""
+        from skill_manager.core.diagnostics import (
+            CATEGORY_UPDATE_RESULT,
+            CATEGORY_UPDATE_SLOT,
+            get_diagnostic_logger,
+        )
+
+        if 0 <= index < len(self.app._update_packages):
+            diag = get_diagnostic_logger()
+            diag.log_event(
+                "INFO",
+                CATEGORY_UPDATE_SLOT,
+                f"runPackageUpdate({index}) invoked",
+                data={"package_count": len(self.app._update_packages)},
+            )
+
+            self._resolvePackageStorageState()
+
+            # Replace the dict (not mutate in-place) so QML's QVariantMap
+            # snapshot is invalidated and delegate bindings re-evaluate.
+            source = dict(self.app._update_packages[index])
+            source["is_updating"] = True
+            source["just_finished"] = False
+            source["update_error"] = ""
+            self.app._update_packages[index] = source
+            self.app.updatePackagesChanged.emit()
+            self.app._set_status(f"Updating {source.get('name')}...")
+
+            diag.log_event(
+                "DEBUG",
+                CATEGORY_UPDATE_SLOT,
+                f"Package {source.get('name')} marked is_updating=True",
+            )
+
+            def run():
+                from datetime import datetime
+                from pathlib import Path
+
+                from skill_manager.core.persistence import load_package_skill_inventory
+                from skill_manager.core.skill_packages import package_project_path_conflicts
+                from skill_manager.core.update_service import update_single_package
+
+                try:
+                    pkg_path = (
+                        source.get("resolved_package_path")
+                        or source.get("package_path")
+                        or source.get("local_path")
+                    )
+                    if not pkg_path and self.app._sources:
+                        potential_path = self.app._sources[0]
+                        if Path(potential_path).resolve() == Path.cwd().resolve():
+                            source["package_path"] = str(
+                                Path(potential_path) / ".agents" / "skills"
+                            )
+                        else:
+                            source["package_path"] = potential_path
+                    else:
+                        source["package_path"] = pkg_path
+
+                    conflicts = package_project_path_conflicts([source], self.app._projects)
+                    if conflicts:
+                        conflict_path = conflicts[0]
+                        raise RuntimeError(
+                            f"Package storage path overlaps a project skills path: {conflict_path}"
+                        )
+
+                    def log_callback(msg):
+                        _safe_single_shot(0, self.app, lambda: self.app._set_status(msg))
+
+                    inventory = load_package_skill_inventory()
+                    previous_inventory = inventory.get(source.get("package_id"), {})  # type: ignore[arg-type,call-overload]
+                    updated_source = update_single_package(source, previous_inventory, log_callback)
+                    source.update(updated_source)
+                    source["update_error"] = ""
+                    source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    diag.log_event(
+                        "INFO",
+                        CATEGORY_UPDATE_RESULT,
+                        f"Package {source.get('name')} updated successfully",
+                    )
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": True},
+                    )
+                except Exception as e:
+                    source["update_error"] = str(e)
+                    diag.log_event(
+                        "ERROR",
+                        CATEGORY_UPDATE_RESULT,
+                        f"Package {source.get('name')} update failed: {e}",
+                        data={"error": str(e)},
+                    )
+                    capture_event(
+                        "skill_package_updated",
+                        {"source_type": source.get("source_type", "unknown"), "success": False},
+                    )
+                    capture_exception(e)
+                    err_msg = f"Update failed for {source.get('name')}: {e}"
+                    _safe_single_shot(0, self.app, lambda: self.app._set_status(err_msg))
+                finally:
+
+                    def finalize_ui():
+                        source["is_updating"] = False
+                        source["just_finished"] = True
+                        # Replace dict to force QML re-eval of final state.
+                        self.app._update_packages[index] = dict(source)
+                        self.app.updatePackagesChanged.emit()
+                        self.app._set_status(f"Update finished for {source.get('name')}")
+
+                        removed = source.get("removed_folders", [])
+                        removals_verified = source.get("removals_verified", False)
+                        if removed and removals_verified:
+                            self.app._library_model.removeSkillsByPath(removed)
+                            self.app._quick_copy_model.removeSkillsByPath(removed)
+
+                        updated = source.get("updated_folders", [])
+                        if updated:
+                            from skill_manager.core.discovery import DiscoveryService
+                            from skill_manager.core.persistence import patch_cache_add
+
+                            pkg_path = (
+                                source.get("resolved_package_path")
+                                or source.get("package_path")
+                                or source.get("local_path")
+                                or ""
+                            )
+                            service = DiscoveryService(
+                                sources=[pkg_path] if pkg_path else [],
+                                projects=[],
+                                archive_paths=self.app._archive_paths,
+                                starred_paths=self.app._starred_paths,
+                                project_aliases=self.app._project_aliases,
+                            )
+                            discovered = []
+                            for folder in updated:
+                                try:
+                                    folder_path = (
+                                        Path(pkg_path) / folder if pkg_path else Path(folder)
+                                    )
+                                    if folder_path.is_dir():
+                                        skill_data = service.discover_single(
+                                            folder_path, folder_path
+                                        )
+                                        if skill_data:
+                                            discovered.append(skill_data)
+                                except Exception:
+                                    pass
+
+                            if discovered:
+                                patch_cache_add(discovered)
+                                self._merge_discovered_skills(discovered)
+                                for skill_dict in discovered:
+                                    self.app.ops._refresh_selected_skill(
+                                        skill_dict.get("local_path", "")
+                                    )
+
+                        self.config.set("skills", self.app._update_packages)
+
+                    _safe_single_shot(0, self.app, finalize_ui)
+
+            self.app.task_runner.run(run)
+
+    @Slot(str)
+    def syncProject(self, path: str):
+        """Synchronizes and updates all skills in a specific project."""
+        if path not in self.app._projects:
+            return
+
+        self.app._set_status(f"Updating {self.app.getProjectLabel(path)}...")
+        if path not in self.app._syncing_projects:
+            self.app._syncing_projects.append(path)
+            self.app.projectsChanged.emit()
+
+        def run_sync():
+            try:
+                from skill_manager.core.discovery import DiscoveryService
+                from skill_manager.core.parsing import (
+                    build_skill_search_text,
+                    categorize_skill,
+                    parse_skill_md,
+                )
+                from skill_manager.core.persistence import patch_cache_add
+                from skill_manager.core.quick_copy import discover_package_skills
+
+                source_skills = discover_package_skills(
+                    sources=self.app._sources,
+                    parse_skill_md=parse_skill_md,
+                    categorize_skill=categorize_skill,
+                    build_search_text=build_skill_search_text,
+                )
+
+                from skill_manager.core.copier import copy_skill_folders_to_projects
+
+                result = copy_skill_folders_to_projects(source_skills, [path], update_only=True)
+
+                discovered_skills = []
+                if result["details"]:
+                    service = DiscoveryService(
+                        sources=list(self.app._sources),
+                        projects=self.app._projects,
+                        archive_paths=self.app._archive_paths,
+                        starred_paths=self.app._starred_paths,
+                        project_aliases=self.app._project_aliases,
+                    )
+                    for detail in result["details"]:
+                        if detail["status"] in ("copied", "merged") and detail.get("message"):
+                            skill_path = Path(detail["message"])
+                            proj_path = Path(detail["project"])
+                            try:
+                                skill_data = service.discover_single(skill_path, proj_path)
+                                if skill_data:
+                                    discovered_skills.append(skill_data)
+                            except Exception as exc:
+                                logger.error("[SYNC SCAN] Failed scanning %s: %s", skill_path, exc)
+
+                if discovered_skills:
+                    patch_cache_add(discovered_skills)
+
+                    def update_ui():
+                        self._merge_discovered_skills(discovered_skills)
+                        for skill_dict in discovered_skills:
+                            self.app.ops._refresh_selected_skill(skill_dict.get("local_path", ""))
+
+                    _safe_single_shot(0, self.app, update_ui)
+
+                msg = f"Update complete for {self.app.getProjectLabel(path)}: {result['merged']} updated, {result['failed']} failed"
+                _safe_single_shot(0, self.app, lambda: self.app._set_status(msg))
+            except Exception as e:
+                err_msg = f"Update failed for {path}: {e}"
+                _safe_single_shot(0, self.app, lambda: self.app._set_status(err_msg))
+            finally:
+                if path in self.app._syncing_projects:
+                    self.app._syncing_projects.remove(path)
+                _safe_single_shot(0, self.app, self.app.projectsChanged.emit)
+
+        self.app.task_runner.run(run_sync)
+
+    @Slot()
+    def updateAllOutdated(self):
+        """Updates all skills that are marked as outdated."""
+        # This was missing in the restored version, let's add it.
+        self.app._set_status("Updating all outdated skills...")
+        # Placeholder for implementation if needed, or call updateNow
+        self.updateNow()
+
+    @Slot(int)
+    def clearPackageJustFinished(self, index: int):
+        if 0 <= index < len(self.app._update_packages):
+            self.app._update_packages[index]["just_finished"] = False
+            self.app.updatePackagesChanged.emit()

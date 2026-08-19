@@ -1,0 +1,50 @@
+# SkillManager Dependencies
+# Generated from pyproject.toml — use `uv sync` for locked installs.
+# To regenerate: pip-compile pyproject.toml or uv pip compile pyproject.toml -o requirements.txt
+
+# === Core Runtime ===
+PySide6
+httpx
+markdown-it-py
+pyyaml
+pathspec
+platformdirs
+posthog>=7.14.2
+pydantic>=2
+pydantic-settings>=2.14.2
+python-frontmatter
+python-dotenv>=1.2.2
+rapidfuzz
+packaging
+cryptography>=48.0.1
+tenacity
+watchdog
+orjson
+diskcache
+sentry-sdk
+gitpython>=3.1.50
+apscheduler>=3.11.2
+pynput>=1.8.2
+msgpack>=1.2.1
+joblib>=1.5.3
+psutil
+mcp>=1.2.0
+pyautogui>=0.9.54
+
+# === Windows extras (pywinstyles) ===
+# pywinstyles  # uncomment on Windows only
+
+# === Test ===
+pytest>=8.0.0
+pytest-qt>=4.5.0
+pytest-cov>=5.0.0
+pytest-asyncio>=0.23.0
+pytest-xdist
+pytest-sugar
+
+# === Dev ===
+ruff>=0.8.0
+pyinstaller>=6.0.0
+pillow>=10.0.0
+pip-audit
+python-semantic-release>=10.5.3

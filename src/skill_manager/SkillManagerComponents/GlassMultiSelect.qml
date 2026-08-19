@@ -1,0 +1,264 @@
+pragma ComponentBehavior: Bound
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import App 1.0
+
+Item {
+    id: root
+
+    property var model: []
+    property var selectedValues: []
+    property string placeholderText: "Select clients..."
+    property string allLabel: "All Clients"
+
+    property string displayText: {
+        if (selectedValues.length === 0) return placeholderText
+        if (selectedValues.length === model.length && model.length > 1) return allLabel
+        return selectedValues.join(", ")
+    }
+
+    property bool allSelected: selectedValues.length === model.length && model.length > 1
+
+    signal selectionChanged()
+
+    implicitWidth: root.iconOnlyMode ? 36 : 160
+    implicitHeight: 36
+
+    activeFocusOnTab: true
+    Accessible.role: Accessible.ComboBox
+    Accessible.name: root.displayText
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            popup.opened ? popup.close() : popup.open()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+            popup.close()
+            event.accepted = true
+        } else {
+            event.accepted = false
+        }
+    }
+
+    function toggleAll(checked) {
+        selectedValues = checked ? model.slice() : []
+        selectionChanged()
+    }
+
+    function toggleItem(value) {
+        var arr = selectedValues.slice()
+        var idx = arr.indexOf(value)
+        if (idx >= 0) {
+            arr.splice(idx, 1)
+        } else {
+            arr.push(value)
+        }
+        selectedValues = arr
+        selectionChanged()
+    }
+
+    property string iconSource: ""
+    property bool iconOnlyMode: false
+
+    Rectangle {
+        id: trigger
+        anchors.fill: parent
+        radius: Theme.radiusPill
+        color: mouseArea.containsMouse ? Theme.glassHover : Theme.glassPill
+        border.color: root.activeFocus || popup.opened ? Theme.accent : Theme.glassBorder
+        border.width: root.activeFocus || popup.opened ? 2 : 1
+
+        Behavior on color { ColorAnimation { duration: 200 } }
+        Behavior on border.color { ColorAnimation { duration: 200 } }
+
+        MouseArea {
+            id: mouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: popup.opened ? popup.close() : popup.open()
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: root.iconOnlyMode ? (root.width - 14) / 2 : 12
+            anchors.rightMargin: 8
+            spacing: 6
+
+            Item {
+                width: root.iconSource !== "" ? 14 : 0
+                visible: root.iconSource !== ""
+                Layout.fillHeight: true
+                Image {
+                    id: iconImage
+                    source: root.iconSource !== "" ? AppController.ui_controller.getAssetUri(root.iconSource) : ""
+                    width: 14
+                    height: 14
+                    sourceSize.width: 14
+                    sourceSize.height: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    fillMode: Image.PreserveAspectFit
+                    opacity: 0.8
+                    visible: false
+                }
+                ColorOverlay {
+                    anchors.fill: iconImage
+                    source: iconImage
+                    color: Theme.accent
+                    opacity: 0.8
+                    visible: root.iconSource !== ""
+                }
+            }
+
+            Text {
+                visible: !root.iconOnlyMode
+                Layout.fillWidth: true
+                text: root.displayText
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+                color: root.selectedValues.length > 0 ? Theme.label : Theme.secondaryLabel
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+
+            Image {
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                source: AppController.ui_controller.getAssetUri("ui/dropdown-arrow-icon.svg")
+                sourceSize.width: 32
+                sourceSize.height: 32
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                visible: !root.iconOnlyMode
+                Layout.alignment: Qt.AlignVCenter
+            }
+        }
+    }
+
+    Popup {
+        id: popup
+        x: (root.width - width) / 2
+        y: root.height + 4
+        width: Math.max(root.width, 180)
+        padding: 5
+
+        implicitHeight: Math.min(listContent.implicitHeight + topPadding + bottomPadding, 300)
+
+        contentItem: ScrollView {
+            id: scrollView
+            clip: true
+            contentWidth: availableWidth
+            ScrollBar.vertical: AppScrollBar { }
+
+            ColumnLayout {
+                id: listContent
+                width: scrollView.width
+                spacing: 0
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 32
+                color: allHover.containsMouse ? Theme.glassHover : "transparent"
+                visible: root.model.length > 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    spacing: 8
+
+                    GlassCheckBox {
+                        id: allCheck
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
+                        checkState: root.allSelected ? Qt.Checked : Qt.Unchecked
+                        iconSize: 9
+                        onToggled: root.toggleAll(checkState !== Qt.Checked)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.allLabel
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        color: Theme.label
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                MouseArea {
+                    id: allHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: allCheck.toggled()
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
+                Layout.preferredHeight: 1
+                color: Theme.separator
+                visible: root.model.length > 1
+            }
+
+            Repeater {
+                model: root.model
+
+                delegate: Rectangle {
+                    id: delegateRoot
+                    required property string modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    color: itemHover.containsMouse ? Theme.glassHover : "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 8
+
+                        GlassCheckBox {
+                            id: itemCheck
+                            Layout.preferredWidth: 20
+                            Layout.preferredHeight: 20
+                            checkState: root.selectedValues.indexOf(delegateRoot.modelData) >= 0 ? Qt.Checked : Qt.Unchecked
+                            iconSize: 9
+                            onToggled: root.toggleItem(delegateRoot.modelData)
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: delegateRoot.modelData
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            color: Theme.label
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    MouseArea {
+                        id: itemHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: itemCheck.toggled()
+                    }
+                }
+            }
+        }
+
+        }
+        
+        background: Rectangle {
+            radius: Theme.radiusCard
+            color: Theme.glassPill
+            border.color: Theme.glassBorder
+            border.width: 1
+            opacity: 0.95
+        }
+    }
+}

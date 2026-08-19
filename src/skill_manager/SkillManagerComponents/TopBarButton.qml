@@ -1,0 +1,110 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import App 1.0
+
+Button {
+    id: control
+
+    property bool active: false
+    property string iconText: ""
+    property string iconSource: ""
+    property string labelText: ""
+    property bool showLabel: true
+    property string tooltipText: labelText
+
+    padding: 0
+    implicitHeight: 36
+
+    SleekToolTip {
+        id: btnToolTip
+        visible: (control.hovered || control.visualFocus) && !control.showLabel && control.tooltipText !== ""
+        text: control.tooltipText
+    }
+
+    contentItem: Item {
+        implicitHeight: 36
+        implicitWidth: contentLayout.implicitWidth + 24
+
+        RowLayout {
+            id: contentLayout
+            anchors.centerIn: parent
+            spacing: 8
+
+            Item {
+                visible: control.iconText !== "" || control.iconSource !== ""
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: control.iconText
+                    visible: control.iconSource === "" && control.iconText !== ""
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    font.weight: control.active ? Font.Bold : Font.Normal
+                    color: control.active ? Theme.label : Theme.secondaryLabel
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Image {
+                    id: iconImg
+                    anchors.fill: parent
+                    visible: control.iconSource !== ""
+                    source: control.iconSource
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                DuotoneColorOverlay {
+                    sourceItem: iconImg
+                    primaryColor: control.active ? Theme.iconLabel : Theme.iconSecondaryLabel
+                    secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : (control.active ? "#CBD5E1" : "#E2E8F0")
+                    visible: control.iconSource !== ""
+                }
+            }
+
+            Text {
+                text: control.labelText
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.sizeBody
+                font.weight: control.active ? Font.Bold : Font.Normal
+                color: control.active ? Theme.label : Theme.secondaryLabel
+                visible: control.labelText !== "" && control.showLabel
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignVCenter
+            }
+        }
+    }
+
+    background: Item {
+        Rectangle {
+            anchors.fill: parent
+            color: control.active ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
+            radius: Theme.radiusPill
+            border.color: control.visualFocus ? Theme.accent : "transparent"
+            border.width: control.visualFocus ? 2 : 0
+        }
+
+        Rectangle {
+            visible: control.active
+            anchors.bottom: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width * 0.6
+            height: 3
+            radius: Theme.radiusSmall
+            color: Theme.accent
+        }
+    }
+    Accessible.role: Accessible.Button
+    Accessible.name: control.tooltipText
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
+    }
+}

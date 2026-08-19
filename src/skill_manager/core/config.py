@@ -1,0 +1,469 @@
+import logging
+import os
+import shutil
+from pathlib import Path
+from typing import Any
+
+import orjson
+from platformdirs import user_data_dir
+
+from skill_manager.core.diagnostics import (
+    CATEGORY_CONFIG_MIGRATION,
+    get_diagnostic_logger,
+)
+from skill_manager.core.schemas import AppConfig
+
+logger = logging.getLogger(__name__)
+
+APP_NAME = "SkillManager"
+DATA_DIR_ENV = "SKILL_MANAGER_DATA_DIR"
+
+# File Filenames
+CONFIG_FILENAME = "config.json"
+SKILL_LIBRARY_CACHE_FILENAME = "skill_library_index.json"
+SKILL_LIBRARY_ARCHIVE_FILENAME = "skill_library_archive.json"
+SKILL_LIBRARY_STARRED_FILENAME = "skill_library_starred.json"
+SKILL_LIBRARY_CLIPBOARD_FILENAME = "skill_library_clipboard.json"
+QUICK_COPY_FILENAME = "quick_copy.json"
+PROJECT_SKILL_OWNERSHIP_FILENAME = "project_skill_ownership.json"
+PACKAGE_SKILL_INVENTORY_FILENAME = "package_skill_inventory.json"
+SKILLS_LOCK_FILENAME = "skills-lock.json"
+TEMP_COPIES_FILENAME = "temp_copies.json"
+TEMP_SNAPS_FILENAME = "temp_screenshots.json"
+LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME = "project_skill_clipboard.json"
+DATA_FILENAMES = (
+    CONFIG_FILENAME,
+    SKILL_LIBRARY_CACHE_FILENAME,
+    SKILL_LIBRARY_ARCHIVE_FILENAME,
+    SKILL_LIBRARY_STARRED_FILENAME,
+    SKILL_LIBRARY_CLIPBOARD_FILENAME,
+    QUICK_COPY_FILENAME,
+    PROJECT_SKILL_OWNERSHIP_FILENAME,
+    PACKAGE_SKILL_INVENTORY_FILENAME,
+    SKILLS_LOCK_FILENAME,
+    TEMP_COPIES_FILENAME,
+)
+
+
+def get_app_data_dir() -> Path:
+    """Returns the platform-specific directory for application data."""
+    override = os.environ.get(DATA_DIR_ENV)
+    if override:
+        return Path(override).expanduser()
+
+    if base_dir := os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA"):
+        app_dir = Path(base_dir) / APP_NAME
+    else:
+        app_dir = Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
+
+    try:
+        app_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        app_dir = Path.cwd() / "data"
+        app_dir.mkdir(parents=True, exist_ok=True)
+    return app_dir
+
+
+def migrate_legacy_data_files(data_dir: Path | None = None, legacy_dir: Path | None = None) -> None:
+    """Copies old root-level JSON data into the app-data folder when missing."""
+    for filename in DATA_FILENAMES:
+        resolve_data_file(filename, data_dir, legacy_dir)
+
+
+def resolve_data_file(
+    filename: str, data_dir: Path | None = None, legacy_dir: Path | None = None
+) -> Path:
+    """Returns the app-data path, falling back to a legacy root file if migration is blocked."""
+    target_dir = data_dir or get_app_data_dir()
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    if (
+        os.environ.get("SKILL_MANAGER_TESTING") == "1"
+        and not legacy_dir
+        and os.environ.get("SKILL_MANAGER_ALLOW_MIGRATION") != "1"
+    ):
+        # In testing mode, don't fallback to CWD unless explicitly asked or allowed
+        return target_dir / filename
+
+    source_dir = legacy_dir or Path.cwd()
+    target_path = target_dir / filename
+    legacy_path = source_dir / filename
+    fallback_paths = [source_dir / "data" / filename]
+    if filename == QUICK_COPY_FILENAME:
+        fallback_paths.append(target_dir / LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME)
+        fallback_paths.append(source_dir / LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME)
+        fallback_paths.append(source_dir / "data" / LEGACY_PROJECT_SKILL_CLIPBOARD_FILENAME)
+
+    if target_path.exists():
+        return target_path
+
+    for fallback_path in fallback_paths:
+        if fallback_path.is_file():
+            try:
+                shutil.copy2(fallback_path, target_path)
+                return target_path
+            except OSError:
+                return fallback_path
+
+    if legacy_path.is_file():
+        try:
+            shutil.copy2(legacy_path, target_path)
+            return target_path
+        except OSError:
+            return legacy_path
+
+    return target_path
+
+
+# Exported Full Paths for the App
+DATA_DIR = get_app_data_dir()
+CONFIG_FILE = resolve_data_file(CONFIG_FILENAME)
+SKILL_LIBRARY_CACHE_FILE = resolve_data_file(SKILL_LIBRARY_CACHE_FILENAME)
+SKILL_LIBRARY_ARCHIVE_FILE = resolve_data_file(
+    SKILL_LIBRARY_ARCHIVE_FILE_NAME := SKILL_LIBRARY_ARCHIVE_FILENAME
+)
+SKILL_LIBRARY_STARRED_FILE = resolve_data_file(SKILL_LIBRARY_STARRED_FILENAME)
+SKILL_LIBRARY_CLIPBOARD_FILE = resolve_data_file(SKILL_LIBRARY_CLIPBOARD_FILENAME)
+QUICK_COPY_FILE = resolve_data_file(QUICK_COPY_FILENAME)
+PROJECT_SKILL_OWNERSHIP_FILE = resolve_data_file(PROJECT_SKILL_OWNERSHIP_FILENAME)
+PACKAGE_SKILL_INVENTORY_FILE = resolve_data_file(PACKAGE_SKILL_INVENTORY_FILENAME)
+SKILLS_LOCK_FILE = resolve_data_file(SKILLS_LOCK_FILENAME)
+TEMP_COPIES_FILE = resolve_data_file(TEMP_COPIES_FILENAME)
+TEMP_SNAPS_FILE = resolve_data_file(TEMP_SNAPS_FILENAME)
+SKILL_LIBRARY_CACHE_VERSION = 8
+
+DEFAULT_SHORTCUTS = {
+    # Find & Select
+    "search": "Ctrl+F",
+    "select_all": "Ctrl+A",
+    "clear_selection": "Esc",
+    # Clipboard
+    "copy": "Ctrl+C",
+    # Skill Ops
+    "refresh": "F5",
+    "archive": "Ctrl+Shift+X",
+    "delete": "Delete",
+    # Tree View
+    "expand_all": "Ctrl+E",
+    "collapse_all": "Ctrl+Shift+E",
+    "top_of_list": "Home",
+    # Navigate
+    "quick_copy_view": "Alt+1",
+    "library_view": "Alt+2",
+    "updates_view": "Alt+3",
+    "settings_view": "Alt+4",
+    # Tools
+    "theme_toggle": "Ctrl+T",
+    "snap": "Ctrl+Shift+S",
+}
+
+DEFAULT_DISABLED_SHORTCUTS: list[str] = []
+
+
+class ConfigManager:
+    def __init__(self, filename: str = CONFIG_FILENAME):
+        self.config_path = resolve_data_file(filename)
+        self.data: dict[str, Any] = {}
+        # Safety guard: prevent test code from writing to production data dir
+        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
+            real_prod = str(Path(os.environ.get("LOCALAPPDATA", "")) / APP_NAME)
+            if str(self.config_path).startswith(real_prod) and not str(self.config_path).startswith(
+                str(Path(os.environ.get("SKILL_MANAGER_DATA_DIR", "")))
+            ):
+                raise RuntimeError(
+                    f"ConfigManager in test mode must not write to production "
+                    f"data dir: {self.config_path}. Set SKILL_MANAGER_DATA_DIR "
+                    f"to a test-specific path."
+                )
+        self.load()
+
+    def load(self) -> dict[str, Any]:
+        """Loads configuration. Migrates from root if needed."""
+        diag = get_diagnostic_logger()
+        root_config = Path.cwd() / self.config_path.name
+
+        if not self.config_path.exists() and root_config.is_file():
+            try:
+                with open(root_config, "rb") as f:
+                    self.data = orjson.loads(f.read())
+                self.save()  # Migrate to new location
+                diag.log_event(
+                    "INFO",
+                    CATEGORY_CONFIG_MIGRATION,
+                    f"Migrated config from {root_config} to {self.config_path}",
+                )
+                # Continue loading to handle potential secondary migrations (e.g. targets -> projects)
+            except Exception as e:
+                logger.warning("Error migrating config: %s", e)
+
+        if self.config_path.exists():
+            try:
+                with open(self.config_path, "rb") as f:
+                    self.data = orjson.loads(f.read())
+
+                old_data = dict(self.data)
+                self.data = AppConfig.from_legacy(self.data).model_dump(by_alias=True)
+                if self.data != old_data:
+                    self.save()
+                    diag.log_event(
+                        "INFO",
+                        CATEGORY_CONFIG_MIGRATION,
+                        "Applied legacy field migration (targets→projects, etc.)",
+                    )
+
+                # LEGACY FALLBACK: If app-data config has no projects but
+                # the legacy data/config.json has targets, merge them.
+                # This handles the case where the app-data file was created
+                # by an older version that never ran the targets→projects migration.
+                if not self.data.get("projects"):
+                    legacy_data_dir = Path.cwd() / "data"
+                    legacy_config_path = legacy_data_dir / CONFIG_FILENAME
+                    if legacy_config_path.is_file():
+                        try:
+                            with open(legacy_config_path, "rb") as f:
+                                legacy_data = orjson.loads(f.read())
+                            legacy_targets = legacy_data.get("targets", [])
+                            if legacy_targets:
+                                self.data["projects"] = legacy_targets
+                                self.save()
+                                diag.log_event(
+                                    "INFO",
+                                    CATEGORY_CONFIG_MIGRATION,
+                                    f"Merged {len(legacy_targets)} targets from "
+                                    f"legacy config into app-data config",
+                                    data={
+                                        "legacy_path": str(legacy_config_path),
+                                        "targets": legacy_targets,
+                                    },
+                                )
+                                logger.info(
+                                    "[CONFIG] Legacy fallback: merged %d targets from %s",
+                                    len(legacy_targets),
+                                    legacy_config_path,
+                                )
+                        except Exception as e:
+                            logger.warning("Error reading legacy config for fallback: %s", e)
+
+                # Ensure default shortcuts are present
+                if "shortcuts" not in self.data:
+                    self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+                    self.save()
+                else:
+                    # Migrate pre-rename "screenshot" key to "snap"
+                    shortcuts = self.data["shortcuts"]
+                    if "screenshot" in shortcuts and "snap" not in shortcuts:
+                        shortcuts["snap"] = shortcuts.pop("screenshot")
+                        self.save()
+                    # Merge defaults for new shortcuts if any added in future versions
+                    changed = False
+                    for key, val in DEFAULT_SHORTCUTS.items():
+                        if key not in self.data["shortcuts"]:
+                            self.data["shortcuts"][key] = val
+                            changed = True
+                    if changed:
+                        self.save()
+
+                # Migrate pre-rename "screenshot" entry in disabled_shortcuts
+                if (
+                    "disabled_shortcuts" in self.data
+                    and "screenshot" in self.data["disabled_shortcuts"]
+                ):
+                    self.data["disabled_shortcuts"] = [
+                        "snap" if item == "screenshot" else item
+                        for item in self.data["disabled_shortcuts"]
+                    ]
+                    self.save()
+
+                # Ensure disabled_shortcuts list is present
+                if "disabled_shortcuts" not in self.data:
+                    self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
+                    self.save()
+
+            except Exception as e:
+                logger.warning("Error loading config: %s", e)
+        else:
+            # New config
+            self.data["shortcuts"] = DEFAULT_SHORTCUTS.copy()
+            self.data["disabled_shortcuts"] = DEFAULT_DISABLED_SHORTCUTS.copy()
+            self.save()
+
+        return self.data
+
+    def save(self) -> None:
+        """Saves current configuration."""
+        try:
+            content = orjson.dumps(
+                self.data, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE
+            )
+            with open(self.config_path, "wb") as f:
+                f.write(content)
+        except Exception as e:
+            logger.warning("Error saving config: %s", e)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        self.data[key] = value
+        self.save()
+
+    def set_many(self, updates: dict[str, Any]) -> None:
+        """Sets multiple config keys and writes to disk once."""
+        self.data.update(updates)
+        self.save()
+
+    def delete(self, key: str) -> None:
+        """Removes a key from config and saves."""
+        self.data.pop(key, None)
+        self.save()
+
+    def get_command_emoji(self, local_path: str) -> str:
+        """Return the emoji override for a command, or the default ``⚡``."""
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            return "⚡"
+        normalized = os.path.normpath(local_path)
+        return overrides.get(normalized, "⚡")
+
+    def set_command_emoji(self, local_path: str, emoji: str) -> None:
+        """Store (or clear) an emoji override for a command.
+
+        An ``emoji`` of ``""`` or ``"⚡"`` clears any existing override.
+        """
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            overrides = {}
+        normalized = os.path.normpath(local_path)
+        if emoji in ("", "⚡"):
+            overrides.pop(normalized, None)
+        else:
+            overrides[normalized] = emoji
+        self.data["command_emoji_overrides"] = overrides
+        self.save()
+
+    def clear_command_emoji(self, local_path: str) -> None:
+        """Remove any emoji override for a command."""
+        overrides = self.data.get("command_emoji_overrides", {})
+        if not isinstance(overrides, dict):
+            return
+        normalized = os.path.normpath(local_path)
+        if overrides.pop(normalized, None) is not None:
+            self.data["command_emoji_overrides"] = overrides
+            self.save()
+
+    def get_emoji_recents(self) -> list[str]:
+        """Return the recent-emoji list (most-recent-first), capped at 16."""
+        recents = self.data.get("emoji_recents", [])
+        if not isinstance(recents, list):
+            return []
+        return recents[:16]
+
+    def add_emoji_recent(self, emoji: str) -> None:
+        """Insert an emoji at the front of the recents list, deduped, capped at 16."""
+        recents = self.data.get("emoji_recents", [])
+        if not isinstance(recents, list):
+            recents = []
+        recents = [e for e in recents if e != emoji]
+        recents.insert(0, emoji)
+        self.data["emoji_recents"] = recents[:16]
+        self.save()
+
+
+class ScopedConfigManager:
+    """Wraps a parent ConfigManager and prefixes all keys with a namespace.
+
+    Allows multiple SkillModel instances to share the same config file
+    without their filter state colliding.  For example, ``library``
+    and ``quickcopy`` scopes each get their own ``is_package_only``,
+    ``project_filter``, etc.
+    """
+
+    def __init__(self, parent: ConfigManager, namespace: str):
+        self._parent = parent
+        self._namespace = namespace
+
+    def _scoped(self, key: str) -> str:
+        return f"{self._namespace}.{key}"
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._parent.get(self._scoped(key), default)
+
+    def set(self, key: str, value: Any) -> None:
+        self._parent.set(self._scoped(key), value)
+
+    def set_many(self, updates: dict[str, Any]) -> None:
+        scoped = {self._scoped(k): v for k, v in updates.items()}
+        self._parent.set_many(scoped)
+
+    def delete(self, key: str) -> None:
+        self._parent.delete(self._scoped(key))
+
+    @property
+    def config_path(self):
+        return self._parent.config_path
+
+    @property
+    def data(self):
+        return self._parent.data
+
+    # --- Global emoji keys (NOT namespaced) ---
+    def get_command_emoji(self, local_path: str) -> str:
+        return self._parent.get_command_emoji(local_path)
+
+    def set_command_emoji(self, local_path: str, emoji: str) -> None:
+        self._parent.set_command_emoji(local_path, emoji)
+
+    def clear_command_emoji(self, local_path: str) -> None:
+        self._parent.clear_command_emoji(local_path)
+
+    def get_emoji_recents(self) -> list[str]:
+        return self._parent.get_emoji_recents()
+
+    def add_emoji_recent(self, emoji: str) -> None:
+        self._parent.add_emoji_recent(emoji)
+
+
+# Filter keys that are per-model and must be namespaced.
+_SCOPED_FILTER_KEYS = (
+    "show_archived",
+    "category_filter",
+    "collection_filter",
+    "project_filter",
+    "show_commands",
+    "show_starred",
+    "is_package_only",
+    "is_source_only",
+    "collapsed_categories",
+    "project_selections",
+)
+
+
+def migrate_scoped_filter_keys(config: ConfigManager) -> None:
+    """Move legacy un-namespaced filter keys to ``library.*`` and ``quickcopy.*``.
+
+    Called once on startup.  Idempotent — skips keys that are already
+    namespaced.
+    """
+    library = ScopedConfigManager(config, "library")
+    quickcopy = ScopedConfigManager(config, "quickcopy")
+
+    migrated = False
+    for key in _SCOPED_FILTER_KEYS:
+        unnamespaced = config.get(key)
+        if unnamespaced is None:
+            continue
+
+        # Only migrate if the namespaced slot is still empty.
+        if library.get(key) is None:
+            library.set(key, unnamespaced)
+            migrated = True
+        if quickcopy.get(key) is None:
+            quickcopy.set(key, unnamespaced)
+            migrated = True
+
+        # Remove the legacy un-namespaced key.
+        del config.data[key]
+        migrated = True
+
+    if migrated:
+        config.save()
