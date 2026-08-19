@@ -11,8 +11,8 @@ SkillManager supports two unified release mechanisms: **Commit-Based Opt-in Toke
 ```mermaid
 flowchart TD
     subgraph "1. Triggering Version Bumps"
-        A1["Commit Tokens in Subject/Body: [patch], [minor], [major]"] --> B["Push to origin main"]
-        A2["Explicit Local CLI bump: patch, minor, major, X.Y.Z"] --> C["uv run python scripts/release.py"]
+        A1["Commit Tokens in Subject/Body: [patch], [minor], [major], [dev]"] --> B["Push to origin main"]
+        A2["Explicit Local CLI bump: patch, minor, major, dev, X.Y.Z(-dev.N)"] --> C["uv run python scripts/release.py"]
     end
 
     subgraph "2. Automated CI/CD (auto-release.yml)"

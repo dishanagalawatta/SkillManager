@@ -48,6 +48,22 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 > rm -f ~/.local/bin/skill-manager
 > ```
 
+### Installing a Specific Version (incl. Dev Builds)
+
+```bash
+# Install a specific stable version
+curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --version 2.2.3
+
+# Install a specific dev pre-release (e.g. v2.2.5-dev.1)
+curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --version 2.2.5-dev.1
+```
+
+Dev pre-releases (`x.y.z-dev.n`) are published as GitHub **prereleases** and are
+**excluded** from `--update` and the in-app update check — both resolve the
+`/releases/latest` endpoint, which skips prereleases. Installing a dev build
+requires the explicit `--version` flag above; a later `--update` moves you back
+to the latest stable release. See [VERSIONING.md §4](VERSIONING.md#4-pre-release-versions).
+
 ### Uninstall
 
 Remove the application and desktop entries cleanly:

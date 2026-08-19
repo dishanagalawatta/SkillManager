@@ -83,6 +83,7 @@
 - Prefix: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`, `docs:`
 - Keep subject line ≤ 50 characters
 - Body only when "why" isn't obvious from subject
+- **Release tokens**: Commits on `main` may carry opt-in tokens `[patch]`, `[minor]`, `[major]`, `[dev]` matched as substrings in the subject **or** body. `[dev]` publishes a prerelease (`x.y.z-dev.n`); a `[patch]` while a dev line is active promotes it to stable. Never write a bracketed token word in body prose — e.g. "promotion via `[patch]`" in a `[dev]` commit body overrides the subject token and releases stable instead.
 
 ### Documentation & Architecture Diagrams
 

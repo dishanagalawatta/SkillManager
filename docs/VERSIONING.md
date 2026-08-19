@@ -13,18 +13,23 @@ Versions are automatically bumped when pushed to `main` if any commit since the 
 Releases are fully automated via GitHub Actions (`.github/workflows/auto-release.yml`) and can also be run locally via `scripts/release.py`:
 
 ```bash
-# Auto-detect bump from commit tokens ([patch], [minor], [major])
+# Auto-detect bump from commit tokens ([patch], [minor], [major], [dev])
 uv run python scripts/release.py
 
 # Or specify an explicit SemVer bump
 uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
 uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
 uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
+uv run python scripts/release.py dev     # x.y.z -> x.y.(z+1)-dev.1
+
+# Or set an explicit version (incl. pre-releases)
+uv run python scripts/release.py 2.0.1
+uv run python scripts/release.py 2.0.1-dev.1
 ```
 
 ### How It Works
 
-1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, or `[major]` (in subject or body).
+1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, `[major]`, or `[dev]` (in subject or body).
 2. **Automated CI/CD**: On push to `main`, GitHub Actions scans commits since the last tag.
 3. **Metadata Synchronization**: `scripts/release.py` automatically synchronizes all 7 metadata files (`pyproject.toml`, `uv.lock` via `uv lock`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
 4. **Git Tag & Push**: An annotated git tag (`vX.Y.Z`) and release commit (`[skip ci]`) are created and pushed to GitHub.

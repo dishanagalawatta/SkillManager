@@ -42,14 +42,14 @@ Releases are fully automated from Git commits and tags:
 ```mermaid
 flowchart TD
     subgraph "1. Developer Push"
-        A["git push origin main (with [patch], [minor], [major], or feat:/fix:)"]
+        A["git push origin main (with [patch], [minor], [major], [dev], or feat:/fix:)"]
     end
 
     subgraph "2. Auto Version Bump & Tagging (auto-release.yml)"
         A --> B["auto-release.yml triggers on main"]
         B --> C["Scan commit subject & body for SemVer tokens"]
         C --> D["uv run python scripts/release.py auto --only-if-triggered"]
-        D --> E["Sync version in 6 metadata files & commit [skip ci]"]
+        D --> E["Sync version in 7 metadata files & commit [skip ci]"]
         E --> F["Create annotated git tag: vX.Y.Z"]
         F --> G["Push commit & tag to origin main"]
     end
@@ -66,6 +66,8 @@ flowchart TD
 ```
 
 The Release workflow compiles all platform binaries on native GitHub runners, signs Windows installers (when certificate secrets are present), and attaches verified artifacts to the GitHub Release.
+
+Dev pre-releases (`vX.Y.Z-dev.N` tags) are published with `prerelease: true` and are skipped by the GitHub `/releases/latest` endpoint, so stable users never receive them via `install.sh --update` or the in-app update check. A `[patch]` commit while a dev line is active promotes it to stable. See [VERSIONING.md §4](VERSIONING.md#4-pre-release-versions).
 
 ## Action Pinning
 
@@ -90,7 +92,7 @@ When a push to `main` occurs, GitHub Actions triggers two distinct workflows in 
 ```mermaid
 flowchart TD
     A["git push origin main"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• Quality Gate"]
-    A --> C["Auto Version & Release (auto-release.yml)\n• Write permissions\n• Scans commits for SemVer tokens\n• Tags vX.Y.Z & triggers release-build.yml\n• Exits in ~5s if no bump needed"]
+    A --> C["Auto Version & Release (auto-release.yml)\n• Write permissions\n• Scans commits for SemVer tokens\n• Tags vX.Y.Z(-dev.N) & triggers release-build.yml\n• Exits in ~5s if no bump needed"]
 ```
 
 ### Why They Are Decoupled

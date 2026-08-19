@@ -1,6 +1,6 @@
 # SkillManager Documentation
 
-> Complete documentation hub for SkillManager v2.1.2.
+> Complete documentation hub for SkillManager v2.2.4.
 > For the project overview, quickstart, and architecture summary, see the [root README](../README.md).
 
 ---
