@@ -214,3 +214,10 @@ class TestDetectBumpFromCommits:
     def test_major_beats_all(self, tmp_path: Path) -> None:
         repo = self._repo_with_commits(tmp_path, ["[patch] a", "[minor] b", "[major] c"])
         assert release.detect_bump_from_commits(repo) == "major"
+
+    def test_body_prose_token_triggers_bump(self, tmp_path: Path) -> None:
+        """Bracket tokens are substring-matched across subject and body."""
+        repo = self._repo_with_commits(
+            tmp_path, ["feat: describe sequencing\n\nmention [patch] in prose"]
+        )
+        assert release.detect_bump_from_commits(repo) == "patch"
