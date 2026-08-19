@@ -704,8 +704,8 @@ main() {
     esac
 }
 
-# Run the installer only when executed directly; sourcing the script (tests)
-# must only define functions without triggering the entrypoint.
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+# Run the installer when executed directly or piped via stdin (curl | bash);
+# sourcing the script (tests) must only define functions without triggering the entrypoint.
+if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
     main "$@"
 fi
