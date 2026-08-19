@@ -228,6 +228,44 @@ def sync_readme(project_root: str, new_ver: str, dry_run: bool = False) -> None:
     print(f"  [OK] README.md -> badge version-{new_ver}")
 
 
+def sync_uvlock(project_root: str, new_ver: str, dry_run: bool = False) -> None:
+    """Regenerate uv.lock so its skill-manager entry matches pyproject.toml.
+
+    uv.lock is not part of the release metadata sync list and drifts whenever
+    pyproject.toml is bumped (the release commit changes the version in
+    pyproject.toml but not in the lockfile). CI's `uv sync` then rewrites
+    uv.lock, which trips check_git_status on the next release run. Running
+    `uv lock` after the pyproject bump keeps the lockfile in sync so release
+    commits stay clean and self-contained.
+    """
+    uv_lock_path = os.path.join(project_root, "uv.lock")
+    if not os.path.exists(uv_lock_path):
+        print("  [SKIP] uv.lock not found; skipping lockfile sync.")
+        return
+    if dry_run:
+        print(f"  [OK] uv.lock -> would regenerate lockfile for version {new_ver}")
+        return
+
+    res = subprocess.run(
+        ["uv", "lock"], cwd=project_root, capture_output=True, text=True
+    )
+    if res.returncode != 0:
+        print(f"  [ERROR] uv lock failed: {res.stderr.strip()}")
+        sys.exit(1)
+
+    with open(uv_lock_path, encoding="utf-8") as f:
+        content = f.read()
+    match = re.search(r'name = "skill-manager"\nversion = "([^"]+)"', content)
+    actual_ver = match.group(1) if match else "unknown"
+    if actual_ver != new_ver:
+        print(
+            f"  [ERROR] uv.lock skill-manager version is {actual_ver}, "
+            f"expected {new_ver}. Lockfile sync did not converge."
+        )
+        sys.exit(1)
+    print(f"  [OK] uv.lock -> skill-manager version {new_ver}")
+
+
 def update_changelog(
     project_root: str, new_ver: str, release_notes: str | None = None, dry_run: bool = False
 ) -> None:
@@ -326,6 +364,7 @@ def git_commit_and_tag(
             "git",
             "add",
             "pyproject.toml",
+            "uv.lock",
             "src/skill_manager/__init__.py",
             "packaging/",
             "README.md",
@@ -444,6 +483,7 @@ def main() -> None:
 
     print("\nSynchronizing version across files...")
     sync_pyproject(project_root, next_ver, args.dry_run)
+    sync_uvlock(project_root, next_ver, args.dry_run)
     sync_init_py(project_root, next_ver, args.dry_run)
     sync_installer_iss(project_root, next_ver, args.dry_run)
     sync_metainfo_xml(project_root, next_ver, args.dry_run)
