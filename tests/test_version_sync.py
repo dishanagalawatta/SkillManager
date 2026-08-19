@@ -17,23 +17,24 @@ from release import (  # noqa: E402
     calculate_next_version,
     get_current_version,
     get_project_root,
-    parse_semver,
+    parse_version,
 )
 
 import skill_manager  # noqa: E402
 
 
 def test_semver_parsing():
-    """Test semantic version parsing helper."""
-    assert parse_semver("1.9.0") == (1, 9, 0)
-    assert parse_semver("v1.9.0") == (1, 9, 0)
-    assert parse_semver("2.0.15") == (2, 0, 15)
+    """Test semantic version parsing helper (4-tuple: major, minor, patch, dev)."""
+    assert parse_version("1.9.0") == (1, 9, 0, None)
+    assert parse_version("v1.9.0") == (1, 9, 0, None)
+    assert parse_version("2.0.15") == (2, 0, 15, None)
+    assert parse_version("2.2.5-dev.1") == (2, 2, 5, 1)
 
-    with pytest.raises(ValueError, match="Invalid semantic version format"):
-        parse_semver("1.9")
+    with pytest.raises(ValueError, match="Invalid version format"):
+        parse_version("1.9")
 
-    with pytest.raises(ValueError, match="Invalid semantic version format"):
-        parse_semver("alpha.1")
+    with pytest.raises(ValueError, match="Invalid version format"):
+        parse_version("alpha.1")
 
 
 def test_calculate_next_version():
