@@ -162,10 +162,13 @@ check_dependencies() {
     if ! command -v sed &>/dev/null; then
         missing+=("sed")
     fi
+    if ! command -v sha256sum &>/dev/null; then
+        missing+=("sha256sum")
+    fi
 
     if [ ${#missing[@]} -gt 0 ]; then
         log_error "Missing required utilities: ${missing[*]}"
-        log_error "Please install them using your package manager (e.g. sudo apt install curl grep sed)"
+        log_error "Please install them using your package manager (e.g. sudo apt install curl grep sed sha256sum)"
         exit 1
     fi
 }
@@ -191,6 +194,46 @@ get_http_text() {
     elif command -v wget &>/dev/null; then
         wget -qO- "$url"
     fi
+}
+
+# Verify a downloaded artifact against the release SHA256SUMS manifest.
+# Aborts on mismatch; only warns (and proceeds) when the manifest or its
+# entry is unavailable, so installs of older releases stay possible.
+verify_checksum() {
+    local file="$1"
+    local filename="$2"
+    local sums_url="$3"
+
+    local sums_file="${file}.sha256"
+    if ! download_file "$sums_url" "$sums_file"; then
+        log_warn "SHA256SUMS manifest not available for this release; skipping integrity check."
+        rm -f "$sums_file"
+        return 0
+    fi
+
+    # Entries look like "<hex>  dist/<artifact>" - match by basename so the
+    # manifest layout cannot drift out of sync with the download URLs.
+    local expected
+    expected=$(awk -v f="$filename" '{ n=$2; sub(/^.*\//, "", n); if (n == f) { print $1; exit } }' "$sums_file")
+    if [ -z "$expected" ]; then
+        log_warn "SHA256SUMS contains no entry for ${filename}; skipping integrity check."
+        rm -f "$sums_file"
+        return 0
+    fi
+
+    local actual
+    actual=$(sha256sum "$file" | awk '{print $1}')
+    if [ "$actual" != "$expected" ]; then
+        log_error "Checksum mismatch for ${filename}!"
+        log_error "  expected (SHA256SUMS): ${expected}"
+        log_error "  actual  (downloaded):  ${actual}"
+        log_error "Downloaded file is corrupt or tampered with. Aborting install."
+        rm -f "$sums_file"
+        exit 1
+    fi
+
+    log_info "Checksum verified: ${filename}"
+    rm -f "$sums_file"
 }
 
 # Resolve latest version from GitHub
@@ -301,6 +344,10 @@ do_install() {
 
     local temp_dir
     temp_dir=$(mktemp -d -t skill-manager-install-XXXXXX)
+    # mktemp creates mode-700 dirs; apt's _apt sandbox user cannot read the deb
+    # inside, which triggers the "Download is performed unsandboxed as root"
+    # notice on every install. Make the dir world-readable to avoid it.
+    chmod 0755 "$temp_dir"
     trap 'rm -rf "$temp_dir"' EXIT
 
     if [ "$pkg_type" = "deb" ]; then
@@ -315,10 +362,12 @@ do_install() {
             exit 1
         fi
 
+        verify_checksum "$deb_path" "$deb_name" "https://github.com/${REPO}/releases/download/${target_tag}/SHA256SUMS"
+
         log_info "Installing Debian package with dependencies via apt..."
-        run_as_root apt-get update -qq || true
         if ! run_as_root apt install -y "$deb_path"; then
             log_warn "apt install failed; attempting dpkg -i with apt-get -f install fallback..."
+            run_as_root apt-get update -qq || true
             run_as_root dpkg -i "$deb_path"
             run_as_root apt-get install -f -y
         fi
@@ -339,19 +388,41 @@ do_install() {
             fi
         done
 
+        # A user-level binary (leftover AppImage install, dev symlink) shadows
+        # this fresh system package whenever ~/.local/bin precedes /usr/bin in
+        # PATH, silently keeping the old version active after an update.
+        local user_bin="$HOME/.local/bin/skill-manager"
+        if [ -e "$user_bin" ] || [ -L "$user_bin" ]; then
+            local system_real user_real
+            system_real=$(readlink -f "/usr/bin/skill-manager" 2>/dev/null || echo "/usr/bin/skill-manager")
+            user_real=$(readlink -f "$user_bin" 2>/dev/null || echo "$user_bin")
+            if [ "$user_real" != "$system_real" ]; then
+                log_warn "Found a user-level binary that may shadow this install: ${user_bin}"
+                log_warn "  -> user-level resolves to: ${user_real}"
+                log_warn "  -> system install (v${raw_version}) resolves to: ${system_real}"
+                log_warn "If '~/.local/bin' precedes '/usr/bin' in your PATH, 'skill-manager' still launches the OLD version."
+                log_warn "Remove it to use the packaged version:  rm -f ${user_bin}"
+            fi
+        fi
+
     elif [ "$pkg_type" = "appimage" ]; then
         local appimage_name="SkillManager-${raw_version}-x86_64.AppImage"
         local appimage_url="https://github.com/${REPO}/releases/download/${target_tag}/${appimage_name}"
         local install_dir="$HOME/.local/bin"
         local app_dest="${install_dir}/skill-manager"
+        local app_tmp="${temp_dir}/${appimage_name}"
 
         mkdir -p "$install_dir"
-        log_info "Downloading ${appimage_name} to ${app_dest}..."
-        if ! download_file "$appimage_url" "$app_dest"; then
+        log_info "Downloading ${appimage_name}..."
+        if ! download_file "$appimage_url" "$app_tmp"; then
             log_error "Failed to download AppImage from $appimage_url."
             exit 1
         fi
-        chmod +x "$app_dest"
+
+        verify_checksum "$app_tmp" "$appimage_name" "https://github.com/${REPO}/releases/download/${target_tag}/SHA256SUMS"
+
+        install -m 0755 "$app_tmp" "$app_dest"
+        log_info "Installed ${appimage_name} to ${app_dest}"
 
         # Desktop entry setup
         local apps_dir="$HOME/.local/share/applications"
