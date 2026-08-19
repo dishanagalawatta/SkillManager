@@ -277,6 +277,15 @@ def test_fingerprint_matches_unmemoized_formula(tmp_path: Path) -> None:
     _make_skill_dir(d, "alpha")
     _make_skill_dir(d, "bravo")
 
+    # Pin mtimes so the stat reads below and the re-reads inside
+    # compute_dir_fingerprint see identical values. Windows NTFS delays
+    # directory mtime updates after mutations, which made this test flaky
+    # on CI (Py 3.13) when the two reads straddled a metadata flush.
+    fixed_mtime = 1_700_000_000.0
+    for child in d.iterdir():
+        os.utime(child, (fixed_mtime, fixed_mtime))
+    os.utime(d, (fixed_mtime, fixed_mtime))
+
     # Compute the expected raw string using only the public building blocks,
     # independent of the memoization path inside compute_dir_fingerprint.
     stat = d.stat()
