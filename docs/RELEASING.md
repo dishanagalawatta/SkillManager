@@ -18,13 +18,13 @@ flowchart TD
     subgraph "2. Automated CI/CD (auto-release.yml)"
         B --> D["auto-release.yml triggers on main"]
         D --> E["scripts/release.py auto --only-if-triggered"]
-        E --> F["Sync versions across 6 files, commit [skip ci] & tag vX.Y.Z"]
+        E --> F["Sync versions across 7 files, commit [skip ci] & tag vX.Y.Z"]
         F --> G["Push to origin main --tags"]
     end
 
     subgraph "3. Local Orchestration"
         C --> H["Pre-flight checks: ruff + pytest"]
-        H --> I["Sync version across 6 files, commit & tag vX.Y.Z"]
+        H --> I["Sync version across 7 files, commit & tag vX.Y.Z"]
         I --> G
     end
 
@@ -52,7 +52,7 @@ You can declare version bumps directly within your Git commit messages using opt
 ### How It Operates
 1. Include the token anywhere in your commit message (e.g. `feat: add quick copy button [minor]` or in a bullet point inside the commit body `* Added new filter. [minor]`).
 2. When pushed to `main`, GitHub Actions (`.github/workflows/auto-release.yml`) scans all commits since the previous release tag.
-3. If an unreleased token is detected, it runs `scripts/release.py auto`, commits the version sync across all 6 metadata files, creates the `vX.Y.Z` git tag, and pushes to GitHub.
+3. If an unreleased token is detected, it runs `scripts/release.py auto`, commits the version sync across all 7 metadata files, creates the `vX.Y.Z` git tag, and pushes to GitHub.
 4. The tag push immediately triggers `.github/workflows/release-build.yml` to compile and publish the multi-platform release.
 
 Commits **without** a token (e.g. `docs: update README`, `chore: lint`) will not trigger a version bump.
@@ -98,6 +98,7 @@ The release script ensures the working directory is clean and executes:
 ### 2. Version Synchronization
 The version is synchronized across all repository components in lockstep:
 - `pyproject.toml` (`[project].version`)
+- `uv.lock` (regenerated via `uv lock` so the lockfile version never drifts)
 - `src/skill_manager/__init__.py` (`__version__`)
 - `packaging/windows/installer.iss` (`#define MyAppVersion`)
 - `packaging/linux/org.dishanagalawatta.SkillManager.metainfo.xml` (`<release version="...">`)

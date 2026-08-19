@@ -26,7 +26,7 @@ uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
 
 1. **Commit with Tokens**: Developers annotate commits with tokens like `[patch]`, `[minor]`, or `[major]` (in subject or body).
 2. **Automated CI/CD**: On push to `main`, GitHub Actions scans commits since the last tag.
-3. **Metadata Synchronization**: `scripts/release.py` automatically synchronizes all 6 metadata files (`pyproject.toml`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
+3. **Metadata Synchronization**: `scripts/release.py` automatically synchronizes all 7 metadata files (`pyproject.toml`, `uv.lock` via `uv lock`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
 4. **Git Tag & Push**: An annotated git tag (`vX.Y.Z`) and release commit (`[skip ci]`) are created and pushed to GitHub.
 5. **Multi-Platform Build**: GitHub Actions builds the multi-platform installer assets (`.deb`, `AppImage`, `.exe`, `SHA256SUMS`) and attaches them to the release.
 6. **End-User Distribution**: End users can install or update in one command via `scripts/install.sh`.
