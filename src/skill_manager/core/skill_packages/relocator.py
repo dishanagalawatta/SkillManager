@@ -183,18 +183,27 @@ def relocate_packages_from_output(
         resolve_base = Path(os.path.expanduser(str(base_path))).resolve()
 
     # Match an absolute or relative path that could be an install location
-    path_regex = re.compile(r"((?:/|[a-zA-Z]:\\|\~)[^\s│]+)")
+    path_regex = re.compile(r"((?:\.{1,2}[/\\]|[/\\]|[a-zA-Z]:[\\/]|\~)[^\s│\(\)]+)")
     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     emit(output_callback, f"[DEBUG] Scanning {len(captured_output)} lines for package paths...")
     detected_paths = set()
+
+    # If base_path is provided, inspect standard skill directories in staging directly
+    if base_path:
+        for common_sub in (".agents/skills", "skills", ".claude/skills", ".agents"):
+            sub_dir = (resolve_base / common_sub).resolve()
+            if sub_dir.is_dir() and is_safe_relative_to(sub_dir, resolve_base):
+                detected_paths.add(sub_dir)
+                emit(output_callback, f"[DEBUG] Staging folder detected: {sub_dir}")
+
     for line in captured_output:
         clean_line = ansi_escape.sub("", line)
         match_found = False
         for match in path_regex.finditer(clean_line):
             raw_path = match.group(1).strip()
             try:
-                raw_path = re.sub(r"[…\s│]+$", "", raw_path).strip()
+                raw_path = re.sub(r"[…\s│\(\)]+$", "", raw_path).strip()
                 candidate = Path(os.path.expanduser(raw_path))
                 if not candidate.is_absolute():
                     candidate = resolve_base / candidate

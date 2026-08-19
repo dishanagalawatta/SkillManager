@@ -3,6 +3,7 @@ Purpose: Manages skill updates, synchronization, and scanning.
 Usage: Accessed via AppController.updates
 """
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -417,14 +418,145 @@ class UpdateController(BaseController):
 
     @Slot(int)
     def removeUpdatePackage(self, index: int):
-        """Removes a skill package."""
-        if 0 <= index < len(self.app._update_packages):
-            source = self.app._update_packages.pop(index)
-            self._resolvePackageStorageState()
-            self.app._set_status(f"Removed update package: {source.get('name')}")
-            capture_event(
-                "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
-            )
+        """Removes a skill package and completely cleans up its local files."""
+        if not (0 <= index < len(self.app._update_packages)):
+            return
+
+        import os
+
+        from skill_manager.core.persistence import (
+            load_package_skill_inventory,
+            load_project_skill_ownership,
+            patch_cache_remove,
+            save_package_skill_inventory,
+            save_project_skill_ownership,
+        )
+        from skill_manager.core.skill_packages import delete_package_storage
+
+        source = dict(self.app._update_packages[index])
+        pkg_name = source.get("name") or "package"
+        pkg_id = source.get("package_id") or ""
+        pkg_path = (
+            source.get("resolved_package_path")
+            or source.get("package_path")
+            or source.get("local_path")
+            or ""
+        )
+
+        # 1. Identify all skill paths belonging to this package across models and on disk
+        deleted_skill_paths = set()
+        if pkg_path:
+            with contextlib.suppress(Exception):
+                norm_pkg_path = str(Path(os.path.expanduser(pkg_path)).resolve()).casefold()
+                for model in (
+                    getattr(self.app, "_library_model", None),
+                    getattr(self.app, "_quick_copy_model", None),
+                ):
+                    if model is not None and hasattr(model, "_all_skills"):
+                        for s in model._all_skills:
+                            lp = (
+                                s.get("local_path", "")
+                                if isinstance(s, dict)
+                                else getattr(s, "local_path", "")
+                            )
+                            if lp:
+                                with contextlib.suppress(Exception):
+                                    if (
+                                        str(Path(os.path.expanduser(lp)).resolve())
+                                        .casefold()
+                                        .startswith(norm_pkg_path)
+                                    ):
+                                        deleted_skill_paths.add(lp)
+
+            for folder in source.get("managed_folders", []):
+                with contextlib.suppress(Exception):
+                    deleted_skill_paths.add(str(Path(os.path.expanduser(pkg_path)) / folder))
+
+        inv = load_package_skill_inventory()
+        if pkg_id and pkg_id in inv:
+            for skill_info in inv[pkg_id].get("skills", {}).values():
+                if isinstance(skill_info, dict) and skill_info.get("local_path"):
+                    deleted_skill_paths.add(skill_info["local_path"])
+
+        # 2. Safely clean up disk storage, clones, and manifests
+        protected = list(getattr(self.app, "_projects", []) or []) + list(
+            getattr(self.app, "_sources", []) or []
+        )
+        cleanup_result = delete_package_storage(source, protected_paths=protected)
+        deleted_skill_paths.update(cleanup_result.get("deleted_skill_paths", []))
+
+        # 3. Clean up persistence (inventory, ownership, cache)
+        if pkg_id and pkg_id in inv:
+            del inv[pkg_id]
+            save_package_skill_inventory(inv)
+
+        if pkg_id:
+            ownership = load_project_skill_ownership()
+            ownership_changed = False
+            for proj_map in ownership.values():
+                if isinstance(proj_map, dict):
+                    folders_to_del = [f for f, pid in proj_map.items() if pid == pkg_id]
+                    for f in folders_to_del:
+                        del proj_map[f]
+                        ownership_changed = True
+            if ownership_changed:
+                save_project_skill_ownership(ownership)
+
+        if deleted_skill_paths:
+            patch_cache_remove(list(deleted_skill_paths))
+
+        # 4. Clean up in-memory UI models
+        if deleted_skill_paths:
+            if hasattr(self.app, "_library_model") and hasattr(
+                self.app._library_model, "removeSkillsByPath"
+            ):
+                self.app._library_model.removeSkillsByPath(list(deleted_skill_paths))
+            if hasattr(self.app, "_quick_copy_model") and hasattr(
+                self.app._quick_copy_model, "removeSkillsByPath"
+            ):
+                self.app._quick_copy_model.removeSkillsByPath(list(deleted_skill_paths))
+
+            # Reset selected skill if it was deleted
+            cur_sel = getattr(self.app, "_selected_skill", None)
+            cur_sel_path = ""
+            if cur_sel is not None:
+                cur_sel_path = (
+                    cur_sel.get("local_path", "")
+                    if isinstance(cur_sel, dict)
+                    else getattr(cur_sel, "local_path", "")
+                )
+            if cur_sel_path and cur_sel_path in deleted_skill_paths:
+                if hasattr(self.app, "ops") and hasattr(self.app.ops, "setSelectedSkill"):
+                    self.app.ops.setSelectedSkill({})
+                elif hasattr(self.app, "set_selected_skill"):
+                    self.app.set_selected_skill({})
+
+        # 5. Clean up file watcher
+        if pkg_path and hasattr(self.app, "_watcher") and self.app._watcher:
+            try:
+                self.app._watcher.remove_path(pkg_path)
+            except Exception as exc:
+                logger.debug("Failed unwatching package path: %s", exc)
+
+        # 6. Remove from _update_packages and update config
+        self.app._update_packages.pop(index)
+        self._resolvePackageStorageState()
+
+        # 7. Clean up update scan results and recalculate stats
+        if hasattr(self.app, "_update_results") and self.app._update_results:
+            self.app._update_results = [
+                r
+                for r in self.app._update_results
+                if r.get("package_id") != pkg_id
+                and r.get("name") != pkg_name
+                and r.get("package_name") != source.get("package_name")
+            ]
+            self.recalculateStats()
+
+        self.app._set_status(f"Removed update package: {pkg_name}")
+        capture_event(
+            "skill_package_removed", {"source_type": source.get("source_type", "unknown")}
+        )
 
     @Slot(int)
     def runPackageUpdate(self, index: int):
@@ -513,6 +645,7 @@ class UpdateController(BaseController):
                         {"source_type": source.get("source_type", "unknown"), "success": True},
                     )
                 except Exception as e:
+                    err_detail = getattr(e, "output", "") or str(e)
                     source["update_error"] = str(e)
                     diag.log_event(
                         "ERROR",
@@ -525,7 +658,7 @@ class UpdateController(BaseController):
                         {"source_type": source.get("source_type", "unknown"), "success": False},
                     )
                     capture_exception(e)
-                    err_msg = f"Update failed for {source.get('name')}: {e}"
+                    err_msg = f"Update failed for {source.get('name')}: {err_detail}"
                     _safe_single_shot(0, self.app, lambda: self.app._set_status(err_msg))
                 finally:
 
@@ -535,7 +668,8 @@ class UpdateController(BaseController):
                         # Replace dict to force QML re-eval of final state.
                         self.app._update_packages[index] = dict(source)
                         self.app.updatePackagesChanged.emit()
-                        self.app._set_status(f"Update finished for {source.get('name')}")
+                        if not source.get("update_error"):
+                            self.app._set_status(f"Update finished for {source.get('name')}")
 
                         removed = source.get("removed_folders", [])
                         removals_verified = source.get("removals_verified", False)

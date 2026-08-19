@@ -95,6 +95,8 @@ a property on `AppController` and is independently testable.
 | `ops.copySkillReference(skill, arg)` | `None` | Format and copy a skill reference to system clipboard. |
 | `ops.copyCollectionToClipboard(name)` | `None` | Copy skill references of a collection to clipboard and trigger auto-paste. |
 | `ops.copyCurrentSelectionOrFocusedSkill()` | `None` | Copy current selection or focused skill reference to system clipboard. |
+| `detectPackageMetadata(raw_input)` | `str` | Infer protocol, humanized display name, and normalized fields as JSON string. |
+
 
 **Side effect.** `updateCustomCommandFull` and `createCustomCommand` may
 emit `selectedSkillChanged` as a side effect of refreshing the
@@ -181,7 +183,26 @@ class SkillEntity(BaseModel):
     ...
 ```
 
+### `core/skill_packages/config.py`
+
+```python
+def infer_package_metadata(raw_input: str) -> dict[str, str]: ...
+def humanize_slug(slug: str) -> str: ...
+def detect_package_config(data: dict[str, Any]) -> dict[str, Any]: ...
+```
+
+### `core/skill_packages/storage.py`
+
+```python
+def resolve_package_storage(packages: list[dict[str, Any]], inventory: dict[str, Any] | None = None) -> list[dict[str, Any]]: ...
+def delete_package_storage(package: dict[str, Any], protected_paths: list[str | Path] | None = None) -> dict[str, Any]: ...
+def is_safe_deletion_target(target_path: Path, protected_paths: list[str | Path] | None = None) -> bool: ...
+def scan_package_inventory(package: dict[str, Any]) -> dict[str, Any]: ...
+def diff_package_inventory(previous: dict[str, Any] | None, current: dict[str, Any]) -> dict[str, list[str]]: ...
+```
+
 ## 7. CLI Entry Point
+
 
 ```bash
 # Development

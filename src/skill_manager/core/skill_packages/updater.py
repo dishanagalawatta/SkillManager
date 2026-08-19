@@ -104,7 +104,14 @@ def run_npx_update(
         from .config import split_args
 
         command.extend(split_args(source["package_args"]))
-    run_process(command, output_callback, cwd=cwd)
+
+    env = dict(os.environ)
+    token = source.get("github_token")
+    if token:
+        env["GITHUB_TOKEN"] = token
+        env["GH_TOKEN"] = token
+
+    run_process(command, output_callback, cwd=cwd, env=env)
 
 
 def intercept_cross_platform_command(
@@ -165,11 +172,12 @@ def run_shell_command(
     command: str,
     output_callback: Callable[[str], None] | None,
     cwd: str | os.PathLike | None = None,
+    env: dict[str, str] | None = None,
 ):
     if intercept_cross_platform_command(command, output_callback):
         return
     command_list = shlex.split(command, posix=sys.platform != "win32")
-    run_process(command_list, output_callback, shell=False, cwd=cwd)
+    run_process(command_list, output_callback, shell=False, cwd=cwd, env=env)
 
 
 def run_skill_package_update(
@@ -201,7 +209,14 @@ def run_skill_package_update(
         if source.get("source_type") == "npx":
             run_npx_update(source, intercept_callback, cwd=staging_path)
         elif source.get("update_command"):
-            run_shell_command(source["update_command"], intercept_callback, cwd=staging_path)
+            env = dict(os.environ)
+            token = source.get("github_token")
+            if token:
+                env["GITHUB_TOKEN"] = token
+                env["GH_TOKEN"] = token
+            run_shell_command(
+                source["update_command"], intercept_callback, cwd=staging_path, env=env
+            )
         else:
             run_git_package_update(source, intercept_callback)
 

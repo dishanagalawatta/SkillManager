@@ -102,3 +102,12 @@ class SourcesMixin:
         else:
             self.app._set_status(f"Verification failed for: {url}")
         return tag or ""
+
+    @Slot(str, result=str)
+    def detectPackageMetadata(self, raw_input: str) -> str:
+        """Infers protocol (source_type), display_name, and package fields from user input."""
+        import json
+
+        from skill_manager.core.skill_packages import infer_package_metadata
+
+        return json.dumps(infer_package_metadata(raw_input))

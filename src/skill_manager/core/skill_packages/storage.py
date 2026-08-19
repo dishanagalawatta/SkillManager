@@ -215,6 +215,230 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
     return {"moved": moved, "skipped": 0}
 
 
+def _on_rmtree_error(func, path, _exc_info):
+    """Error handler for shutil.rmtree to clear read-only permissions on Windows."""
+    import stat
+
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
+def is_safe_deletion_target(
+    target_path: Path,
+    protected_paths: list[str | Path] | None = None,
+) -> bool:
+    """Checks whether target_path is safe to delete.
+
+    A path is unsafe if it is:
+    - Root ('/', 'C:\\', etc.)
+    - User home directory
+    - Current working directory
+    - The DATA_DIR root itself
+    - Any path in protected_paths or an ancestor of any path in protected_paths.
+    """
+    try:
+        resolved_target = target_path.expanduser().resolve()
+    except Exception:
+        return False
+
+    # Root / anchor
+    if resolved_target == Path(resolved_target.anchor) or str(resolved_target) in ("/", "\\"):
+        return False
+
+    # User home
+    try:
+        if resolved_target == Path.home().resolve():
+            return False
+    except Exception:
+        pass
+
+    # Current working dir
+    try:
+        if resolved_target == Path.cwd().resolve():
+            return False
+    except Exception:
+        pass
+
+    # DATA_DIR root
+    from skill_manager.core.config import DATA_DIR
+
+    try:
+        if resolved_target == DATA_DIR.resolve():
+            return False
+    except Exception:
+        pass
+
+    # Protected paths (projects, source roots)
+    if protected_paths:
+        for p in protected_paths:
+            if not p:
+                continue
+            try:
+                resolved_p = Path(os.path.expanduser(str(p))).resolve()
+                if resolved_target == resolved_p:
+                    return False
+                # If target is ancestor of a protected path, unsafe!
+                if resolved_p.is_relative_to(resolved_target):
+                    return False
+            except Exception:
+                continue
+
+    return True
+
+
+def delete_package_storage(
+    package: dict[str, Any],
+    protected_paths: list[str | Path] | None = None,
+) -> dict[str, Any]:
+    """Safely cleans up all filesystem artifacts for a deleted package.
+
+    Removes:
+    1. The package storage folder (if grouped or dedicated directory).
+    2. Any managed subfolders if direct mode is inside a shared directory.
+    3. The git clone directory under package_clones.
+    4. Associated manifest and lock files in the target root.
+
+    Returns a dict with:
+    - 'deleted_folders': list[str] of successfully deleted directory paths
+    - 'deleted_files': list[str] of successfully deleted file paths
+    - 'deleted_skill_paths': list[str] of all skill paths removed
+    - 'errors': list[str] of any deletion errors encountered
+    """
+    deleted_folders: list[str] = []
+    deleted_files: list[str] = []
+    deleted_skill_paths: list[str] = []
+    errors: list[str] = []
+
+    from skill_manager.core.config import DATA_DIR
+
+    package_name = safe_package_folder_name(package)
+    configured_pkg_path = str(package.get("configured_package_path") or "").strip()
+    resolved_pkg_path = str(
+        package.get("resolved_package_path")
+        or package.get("package_path")
+        or package.get("local_path")
+        or ""
+    ).strip()
+    storage_mode = package.get("storage_mode") or "direct"
+    managed_folders = list(package.get("managed_folders") or [])
+    clone_path = str(package.get("clone_path") or "").strip()
+    name_prefix = str(package.get("name") or "").strip()
+
+    # 1. Package Storage Directory / Managed Folders
+    if resolved_pkg_path:
+        dest_base = Path(os.path.expanduser(resolved_pkg_path))
+        if dest_base.is_dir():
+            # If storage_mode is grouped or if dest_base is not the configured root path
+            # and is safe to delete:
+            is_grouped = storage_mode == "grouped"
+            if not is_grouped and configured_pkg_path:
+                conf_base = Path(os.path.expanduser(configured_pkg_path)).resolve()
+                if dest_base.resolve() != conf_base:
+                    is_grouped = True
+
+            # Also consider dedicated if folder name matches package slug
+            if not is_grouped:
+                folder_name_lower = dest_base.name.lower()
+                if (
+                    folder_name_lower == package_name.lower()
+                    or folder_name_lower == name_prefix.lower()
+                ):
+                    is_grouped = True
+
+            if is_grouped and is_safe_deletion_target(dest_base, protected_paths):
+                # Collect skill paths inside before deleting
+                try:
+                    for child in dest_base.iterdir():
+                        if child.is_dir():
+                            deleted_skill_paths.append(str(child.resolve()))
+                except Exception:
+                    pass
+
+                try:
+                    shutil.rmtree(dest_base, onerror=_on_rmtree_error)
+                    deleted_folders.append(str(dest_base.resolve()))
+                    logger.info("[PACKAGE_CLEANUP] Deleted package folder: %s", dest_base)
+                except Exception as exc:
+                    err = f"Failed to delete package folder {dest_base}: {exc}"
+                    logger.error("[PACKAGE_CLEANUP] %s", err)
+                    errors.append(err)
+            else:
+                # Direct mode or shared root: delete managed folders only
+                for folder_name in managed_folders:
+                    child_folder = dest_base / folder_name
+                    if child_folder.is_dir() and is_safe_deletion_target(
+                        child_folder, protected_paths
+                    ):
+                        deleted_skill_paths.append(str(child_folder.resolve()))
+                        try:
+                            shutil.rmtree(child_folder, onerror=_on_rmtree_error)
+                            deleted_folders.append(str(child_folder.resolve()))
+                            logger.info(
+                                "[PACKAGE_CLEANUP] Deleted managed skill folder: %s", child_folder
+                            )
+                        except Exception as exc:
+                            err = f"Failed to delete managed folder {child_folder}: {exc}"
+                            logger.error("[PACKAGE_CLEANUP] %s", err)
+                            errors.append(err)
+
+    # 2. Git Clone Directory
+    candidate_clones = []
+    if clone_path:
+        candidate_clones.append(Path(os.path.expanduser(clone_path)))
+    if package_name:
+        candidate_clones.append(DATA_DIR / "package_clones" / package_name)
+
+    for clone_dir in candidate_clones:
+        if clone_dir.is_dir() and is_safe_deletion_target(clone_dir, protected_paths):
+            try:
+                resolved_clone = clone_dir.resolve()
+                if resolved_clone.is_dir() and str(resolved_clone) not in deleted_folders:
+                    shutil.rmtree(resolved_clone, onerror=_on_rmtree_error)
+                    deleted_folders.append(str(resolved_clone))
+                    logger.info("[PACKAGE_CLEANUP] Deleted package clone: %s", resolved_clone)
+            except Exception as exc:
+                err = f"Failed to delete clone directory {clone_dir}: {exc}"
+                logger.error("[PACKAGE_CLEANUP] %s", err)
+                errors.append(err)
+
+    # 3. Lockfiles and Manifests
+    target_root = None
+    if resolved_pkg_path:
+        target_root = Path(os.path.expanduser(resolved_pkg_path)).parent
+    if not target_root or target_root.resolve() == Path.cwd().resolve():
+        target_root = DATA_DIR
+
+    prefixes = [p for p in (name_prefix, package_name) if p]
+    for prefix in prefixes:
+        for lock_template in (
+            f".{prefix}-skill-lock.json",
+            f"{prefix}-skills-lock.json",
+            f".{prefix}-antigravity-install-manifest.json",
+        ):
+            lock_path = target_root / lock_template
+            if lock_path.is_file() and is_safe_deletion_target(lock_path, protected_paths):
+                try:
+                    lock_path.unlink()
+                    deleted_files.append(str(lock_path.resolve()))
+                    logger.info(
+                        "[PACKAGE_CLEANUP] Deleted package manifest/lockfile: %s", lock_path
+                    )
+                except Exception as exc:
+                    err = f"Failed to delete lockfile {lock_path}: {exc}"
+                    logger.error("[PACKAGE_CLEANUP] %s", err)
+                    errors.append(err)
+
+    return {
+        "deleted_folders": deleted_folders,
+        "deleted_files": deleted_files,
+        "deleted_skill_paths": deleted_skill_paths,
+        "errors": errors,
+    }
+
+
 def skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name).
 

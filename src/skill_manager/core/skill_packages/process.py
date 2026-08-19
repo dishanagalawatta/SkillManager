@@ -83,11 +83,13 @@ def run_process(
     output_callback: Callable[[str], None] | None = None,
     shell: bool = False,
     cwd: str | os.PathLike | None = None,
+    env: dict[str, str] | None = None,
 ):
     command = resolve_process_command(command, shell)
     kwargs = {
         "shell": shell,
         "cwd": cwd,
+        "env": env,
         "stdout": subprocess.PIPE,
         "stderr": subprocess.STDOUT,
         "stdin": subprocess.DEVNULL,
@@ -123,10 +125,37 @@ def run_process(
 
     process.wait()
     if process.returncode != 0:
+        last_error = ""
         if output_log:
             logger.error("Process failed. Last output lines:")
             for logged_line in output_log:
                 logger.error("[PROCESS FAILED] %s", logged_line)
+
+            filtered_lines = []
+            for raw_line in output_log:
+                clean = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", raw_line)
+                clean = re.sub(r"^[█╔═╗╚╝┌┐└┘│─\s■◇◑◓●▲▼*#]+\s*", "", clean).strip()
+                if clean:
+                    filtered_lines.append(clean)
+
+            if filtered_lines:
+                error_candidates = [
+                    line_item
+                    for line_item in filtered_lines
+                    if any(
+                        k in line_item.lower()
+                        for k in (
+                            "failed",
+                            "error",
+                            "authentication",
+                            "not found",
+                            "fatal",
+                            "denied",
+                            "cannot",
+                        )
+                    )
+                ]
+                last_error = error_candidates[-1] if error_candidates else filtered_lines[-1]
 
         sanitized_command: list[str] | str
         if isinstance(command, list):
@@ -138,4 +167,6 @@ def run_process(
             ]
         else:
             sanitized_command = sanitize_token(str(command)) or ""
-        raise subprocess.CalledProcessError(process.returncode, sanitized_command)
+        raise subprocess.CalledProcessError(
+            process.returncode, sanitized_command, output=last_error
+        )
