@@ -55,9 +55,13 @@
 - `rebuildCache()` now executes asynchronously via `BackgroundTaskRunner` instead of blocking the UI.
 
 ### Bug Fixes
+- Fix application UI freeze and OS "Not Responding" modal during skill package addition (`addSkillPackage`) by replacing blocking subprocess retry loops with direct HTTP NPM registry lookups (`fetch_npm_registry_version`, 3.0s timeout) and fast command execution.
+- Fix package version resolution failure for GitHub repository shorthand packages (e.g. `vercel-labs/find-skills`) by probing remote GitHub HTTPS repositories rather than failing over SSH Git commands.
+- Support graceful fallback to `"latest"` version for valid packages when remote tags or offline registries are unavailable, preventing false-positive blocking errors on package addition.
 - Fix "Cannot create delegate / Object or context destroyed during incubation" QML warning at startup by deferring `beginResetModel`/`endResetModel` via `Qt.callLater` (one event-loop tick) so QML can process `cacheBuffer = 0` before delegates are destroyed.
 - Fix filter-setter re-entrancy during incubation: `_commit_prepared_state` no longer toggles the `incubating` flag at end of commit (avoids premature queue drain); only sets `incubating = True` when the model already has skills (skips on first startup).
 - Connect `onAboutToMutateStructure` / `onStructureMutated` in `QuickCopyView.qml` so `cacheBuffer` is zeroed and restored around model resets (matches `LibraryView.qml` pattern).
+
 
 ### Tests
 - Add 5 regression tests in `test_incubation_coordination.py` for `replacePreparedState` incubation deferral (deferred-when-incubating, applied-when-empty, replayed-on-ready, replayed-on-force-end, applied-when-not-incubating).

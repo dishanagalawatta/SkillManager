@@ -1,7 +1,8 @@
 # SkillManager Architecture
 
-> Status: **Accepted** | Last reviewed: 2026-08-17
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md)
+> Status: **Accepted** | Last reviewed: 2026-08-19
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md), [ADR-0028](adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md)
+
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
 
@@ -98,14 +99,56 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 
 | File | Purpose |
 |------|---------|
-| `config.py` | Package configuration |
-| `process.py` | Package processing pipeline |
-| `relocator.py` | Skill relocation logic |
-| `storage.py` | Package storage management |
-| `updater.py` | Package update logic |
-| `versioning.py` | Version comparison |
+| `config.py` | Package configuration, defaults, command normalization |
+| `process.py` | Subprocess execution pipeline with token sanitization |
+| `relocator.py` | Skill relocation logic from staging to target paths |
+| `storage.py` | Package storage management and path conflict detection |
+| `updater.py` | Staging area execution and update pipelines |
+| `versioning.py` | Non-blocking multi-protocol version detection (ADR-0028) |
+
+#### Non-Blocking Multi-Protocol Package Addition (ADR-0028)
+
+Skill package registration uses a non-blocking multi-protocol probe pipeline designed to eliminate Qt event loop freezes and prevent OS "Not Responding" modals:
+
+1. **Direct HTTP NPM Registry Lookup**: Uses `fetch_npm_registry_version()` to query `registry.npmjs.org` with a 3-second timeout for scoped (`@scope/pkg`) and standard npm packages in <100ms without shell overhead.
+2. **GitHub Shorthand Resolution**: Automatically detects `owner/repo` formats (e.g. `vercel-labs/find-skills`) and probes remote repository tags or HEAD commits via HTTPS.
+3. **Graceful Fallback & Snap**: Unresolvable or offline packages default to `"latest"` and snap `current_version`, enabling immediate registration with "Up to Date" status while actual downloads execute on `BackgroundTaskRunner`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as PackageEditDialog (QML)
+    participant Ctrl as UpdateController
+    participant Ver as versioning.py
+    participant HTTP as NPM Registry API
+    participant Git as Git Remote (HTTPS)
+    participant Runner as BackgroundTaskRunner
+    participant Disk as Local Storage
+
+    UI->>Ctrl: addSkillPackage(data)
+    Ctrl->>Ver: check_skill_package_versions(config)
+    
+    alt Standard / Scoped NPM Package
+        Ver->>HTTP: GET registry.npmjs.org/{pkg}/latest (Timeout 3s)
+        HTTP-->>Ver: Latest Version ("1.5.0")
+    else GitHub Shorthand (owner/repo)
+        Ver->>Git: git ls-remote --tags https://github.com/owner/repo
+        Git-->>Ver: Latest Tag ("v2.0.0")
+    else Offline / Undetectable
+        Ver-->>Ver: Fallback to "latest" (No blocking error)
+    end
+    
+    Ver-->>Ctrl: Normalized Record with latest_version & current_version snapped
+    Ctrl->>Ctrl: Commit to app._update_packages & save config
+    Ctrl-->>UI: {"ok": true, "error": null, "name": pkg_name} (Dialog Closes <5ms)
+    
+    Ctrl->>Runner: runPackageUpdate(new_index) [Async Worker]
+    Runner->>Disk: Run npx/git/script update into staging & relocate skills
+    Runner-->>UI: Update finished notification & skill discovery refresh
+```
 
 ---
+
 
 ## 4. Utilities (`utils/`)
 

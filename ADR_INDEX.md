@@ -22,6 +22,8 @@
 | [ADR-0025](docs/adr/ADR-0025-selection-persistence-shutdown-sync.md) | Selection State Synchronization and Shutdown Persistence | Accepted | 2026-08-13 | @DIKKA |
 | [ADR-0026](docs/adr/ADR-0026-workspace-2026-08-standardization.md) | Workspace Standardization — 2026-08 Round | Accepted | 2026-08-16 | @DIKKA |
 | [ADR-0027](docs/adr/ADR-0027-path-self-healing-and-two-phase-incubation.md) | Storage Path Self-Healing Normalization & Two-Phase Model Incubation | Accepted | 2026-08-17 | @DIKKA |
+| [ADR-0028](docs/adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md) | Non-Blocking Package Versioning and NPX / GitHub Shorthand Resolution | Accepted | 2026-08-19 | @DIKKA |
+
 
 ## Template
 

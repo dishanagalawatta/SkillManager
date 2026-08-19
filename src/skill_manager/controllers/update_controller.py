@@ -280,15 +280,18 @@ class UpdateController(BaseController):
             # 2. Phase 1 — detect latest_version only (no snap yet)
             detected_data = check_skill_package_versions(record.model_dump())
 
-            # 3. Block save if latest_version is undetectable
+            # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
             if not detected_data.get("latest_version"):
-                pkg_name = record.name or "unknown"
-                error_msg = (
-                    f'Could not detect latest version for "{pkg_name}". '
-                    "Provide a repository URL or a latest_version_command and try again."
-                )
-                self.app._set_status(f"Add failed: {error_msg}")
-                return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
+                if record.package_name or record.repository_url or record.update_command:
+                    detected_data["latest_version"] = "latest"
+                else:
+                    pkg_name = record.name or "unknown"
+                    error_msg = (
+                        f'Could not detect latest version for "{pkg_name}". '
+                        "Provide a repository URL or a latest_version_command and try again."
+                    )
+                    self.app._set_status(f"Add failed: {error_msg}")
+                    return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
 
             # 4. Phase 2 — snap current_version = latest_version on add
             synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
@@ -351,15 +354,18 @@ class UpdateController(BaseController):
             # 2. Phase 1 — detect latest_version only (no snap yet)
             detected_data = check_skill_package_versions(record.model_dump())
 
-            # 3. Block save if latest_version is undetectable
+            # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
             if not detected_data.get("latest_version"):
-                pkg_name = record.name or "unknown"
-                error_msg = (
-                    f'Could not detect latest version for "{pkg_name}". '
-                    "Provide a repository URL or a latest_version_command and try again."
-                )
-                self.app._set_status(f"Edit failed: {error_msg}")
-                return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
+                if record.package_name or record.repository_url or record.update_command:
+                    detected_data["latest_version"] = existing.get("latest_version") or "latest"
+                else:
+                    pkg_name = record.name or "unknown"
+                    error_msg = (
+                        f'Could not detect latest version for "{pkg_name}". '
+                        "Provide a repository URL or a latest_version_command and try again."
+                    )
+                    self.app._set_status(f"Edit failed: {error_msg}")
+                    return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
 
             # 4. Phase 2 — snap current_version = latest_version on edit
             synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
