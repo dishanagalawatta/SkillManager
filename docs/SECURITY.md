@@ -4,6 +4,18 @@
 
 If you discover a security vulnerability, please report it via [GitHub Security Advisories](https://github.com/dishanagalawatta/SkillManager/security/advisories/new).
 
+## Download Integrity
+
+Every release publishes a `SHA256SUMS` manifest alongside its artifacts (`.deb`, `.AppImage`, `.exe`).
+
+- The Linux installer (`scripts/install.sh`) verifies every downloaded artifact against this
+  manifest **before** installation and **aborts** on any checksum mismatch — a corrupt or
+  tampered file is never installed.
+- If the manifest itself (or the artifact's entry) is unavailable — e.g. very old releases
+  that predate checksums — the installer warns and proceeds, since the download still travels
+  over TLS from GitHub Releases.
+- Windows (`winget`) installs are verified by Microsoft's package index.
+
 ## Suppressed CVEs
 
 The following CVEs are known in pinned dependencies but are **not exploitable

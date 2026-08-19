@@ -434,10 +434,12 @@ flowchart TD
         A["curl -fsSL .../install.sh | bash"] --> B{Detect Linux Distro}
         B -->|Ubuntu / Debian| C[Query GitHub API for latest .deb]
         B -->|Other Linux / --appimage| D[Query GitHub API for latest AppImage]
-        C --> E[Download .deb to /tmp]
-        E --> F[sudo apt install -y /tmp/skill-manager_*.deb]
-        D --> G[Download to ~/.local/bin/skill-manager]
-        G --> H[Install desktop file & icons to ~/.local/share]
+        C --> E[Download .deb + SHA256SUMS to /tmp]
+        E --> E2[Verify sha256 checksum]
+        E2 --> F[sudo apt install -y /tmp/skill-manager_*.deb]
+        D --> G[Download AppImage + SHA256SUMS to /tmp]
+        G --> G2[Verify sha256 checksum]
+        G2 --> H[Install to ~/.local/bin + desktop file & icons]
         F --> I[Update desktop database & verify install]
         H --> I
     end

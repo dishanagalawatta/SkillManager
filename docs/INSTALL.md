@@ -6,7 +6,7 @@ SkillManager provides fast, automated 1-command installation and update workflow
 
 ## 1. Linux & Ubuntu (Recommended: 1-Command Script)
 
-No repository cloning or Python dependencies required. The universal installer automatically detects your Linux distribution, resolves required Qt/system dependencies via `apt`, downloads the latest release, and configures application icons and `.desktop` launchers.
+No repository cloning or Python dependencies required. The universal installer automatically detects your Linux distribution, resolves required Qt/system dependencies via `apt`, downloads the latest release, verifies its integrity against the published `SHA256SUMS` manifest, and configures application icons and `.desktop` launchers.
 
 ```mermaid
 flowchart TD
@@ -36,6 +36,17 @@ Check for the latest release and update seamlessly in one command:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --update
 ```
+
+> **Switching package types (AppImage → deb):** If the previous installation was an AppImage
+> (or any other user-level binary at `~/.local/bin/skill-manager`), the updater installs the
+> `.deb` *alongside* the old binary instead of replacing it. Because `~/.local/bin` often
+> precedes `/usr/bin` in `PATH`, your terminal may keep launching the old version even after a
+> successful update. The installer detects this conflict and prints a warning with the exact
+> command to remove the shadowing binary:
+>
+> ```bash
+> rm -f ~/.local/bin/skill-manager
+> ```
 
 ### Uninstall
 
@@ -165,3 +176,25 @@ SkillManager features direct dual-write clipboard operations. For reliable nativ
 - On **X11**: `sudo apt install -y xclip` (or `xsel`)
 
 The 1-command installer script and `.deb` packages configure this dependency automatically.
+
+### "skill-manager" still launches the old version after updating
+A leftover user-level binary (an earlier AppImage install or a development symlink) at
+`~/.local/bin/skill-manager` shadows the system package whenever `~/.local/bin` precedes
+`/usr/bin` in `PATH`. The updater prints a warning when it detects this conflict. Remove
+the shadowing binary to use the packaged version:
+
+```bash
+rm -f ~/.local/bin/skill-manager
+```
+
+### apt prints "Download is performed unsandboxed as root ... Permission denied"
+Benign notice shown when apt's `_apt` sandbox user cannot read the `.deb` staged in a private
+temporary directory. Current installer versions create the staging directory with
+world-readable permissions (`chmod 0755`), which suppresses the notice. Older script versions
+may still show it — it is safe to ignore.
+
+### Install aborts with "Checksum mismatch"
+Every download is verified against the release's `SHA256SUMS` manifest before installation.
+A mismatch means the file is corrupt or tampered with, so the installer aborts. Simply re-run
+the command to download the artifact again; if the failure persists, the release assets may
+be corrupted — please [report it](https://github.com/dishanagalawatta/SkillManager/issues).
