@@ -46,6 +46,7 @@
 | Document | Description |
 |----------|-------------|
 | [CI_CD.md](CI_CD.md) | CI/CD pipeline reference (GitHub Actions) |
+| [QA.md](QA.md) | Living QA checklist: installer & update pipeline statuses |
 | [RELEASING.md](RELEASING.md) | Release checklist, semantic-release workflow, versioning |
 | [VERSIONING.md](VERSIONING.md) | Semantic versioning policy and commit keyword conventions |
 | [SECURITY.md](SECURITY.md) | Security policy and token handling guidelines |
