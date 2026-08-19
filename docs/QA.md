@@ -10,8 +10,8 @@
 - [x] **Installed version detection (deb)** — `dpkg -s skill-manager` → `Version:` parsed correctly.
   *Evidence: live run reported `v2.2.1` from a deb install.*
 - [x] **Latest version resolution** — `/releases/latest` returns the newest **stable** release
-  (v2.2.4) and skips prereleases (`v2.2.5-dev.1` published with `prerelease: true` is excluded).
-  *Evidence: GitHub API responses during dev-release validation.*
+  (v2.2.5, promoted from the dev line) and skips prereleases (`v2.2.5-dev.1` published with
+  `prerelease: true` is excluded). *Evidence: GitHub API responses during dev-release validation.*
 - [x] **Redirect fallback** (`releases/latest` URL → `url_effective`) — implemented; not exercised
   this cycle (primary API path succeeded).
 - [x] **Up-to-date short-circuit** — string equality on versions skips reinstall.
@@ -53,8 +53,9 @@
 - [x] **Desktop/icon integration** — desktop database + icon cache refreshed for user and system
   dirs (code review; ran without error in live run).
 - [ ] **AppImage update path** — not exercised this cycle (deb auto-selected on Debian/Ubuntu).
-- [ ] **`--version <VER>` specific install** — not exercised this cycle; dev asset naming verified
-  (`skill-manager_2.2.5-dev.1_amd64.deb` exists in release).
+- [ ] **`--version <VER>` specific install** — not exercised live this cycle; dev asset naming
+  verified (`skill-manager_2.2.5-dev.1_amd64.deb` exists in release) and the downgrade/update
+  decision flow is covered by `tests/test_install_script.py` (stubbed dpkg, no root/network).
 
 ## D. Edge Cases & Security
 
@@ -99,3 +100,4 @@
 |------|---------|--------|
 | 2026-08-19 | 0.1.0 | Initial scaffold. Live update run 2.2.1→2.2.4 verified (download, checksum, fallback install). Artifact control-file audit for v2.2.4. Findings: D-1 (P2 dev→stable downgrade no-op), D-2 (P4 mislabel), C-primary (P4 sudo auth timeout, recovered), F-no-tests (P3). No existing QA artifacts found in repo before this scaffold. |
 | 2026-08-19 | 0.2.0 | D-1 fixed: `ver_compare()` + `--allow-downgrades` in `do_install`; D-2 fixed: conditional "Downgrade available"/"Target version" labels; F resolved: `tests/test_install_script.py` added (16 tests, win32-skipped). Verified: `bash -n`, 63 tests pass, ruff clean. |
+| 2026-08-19 | 0.2.1 | D-1 fix shipped in stable **v2.2.5** (dev line promoted; `fix:` prefix triggered patch bump per VERSIONING.md). CI restored to green: `test_version_sync.py` aligned with the `parse_version` API (was failing collection since the dev-pipeline refactor), and the flaky Windows fingerprint test pinned its mtimes (NTFS delayed directory mtime flush). `/releases/latest` re-verified as v2.2.5. |
