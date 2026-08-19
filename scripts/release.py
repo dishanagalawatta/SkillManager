@@ -20,6 +20,8 @@ import subprocess
 import sys
 import tomllib
 
+from packaging.version import InvalidVersion, Version
+
 
 def get_project_root() -> str:
     """Return the absolute path to the repository root."""
@@ -279,10 +281,14 @@ def sync_uvlock(project_root: str, new_ver: str, dry_run: bool = False) -> None:
     with open(uv_lock_path, encoding="utf-8") as f:
         content = f.read()
     match = re.search(r'name = "skill-manager"\nversion = "([^"]+)"', content)
-    actual_ver = match.group(1) if match else "unknown"
-    if actual_ver != new_ver:
+    actual_ver = match.group(1) if match else None
+    try:
+        converged = bool(actual_ver) and Version(actual_ver) == Version(new_ver)
+    except InvalidVersion:
+        converged = False
+    if not converged:
         print(
-            f"  [ERROR] uv.lock skill-manager version is {actual_ver}, "
+            f"  [ERROR] uv.lock skill-manager version is {actual_ver or 'unknown'}, "
             f"expected {new_ver}. Lockfile sync did not converge."
         )
         sys.exit(1)
