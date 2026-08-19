@@ -6,7 +6,7 @@
   <p>
     <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.12%2B-3776AB.svg?logo=python&logoColor=white" alt="Python 3.12+" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT" /></a>
-    <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-2.3.0-orange.svg" alt="Version" /></a>
+    <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-2.3.1-orange.svg" alt="Version" /></a>
     <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
     <a href="https://github.com/dishanagalawatta/SkillManager/releases"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-blue.svg" alt="Platforms" /></a>
     <a href="https://qt.io"><img src="https://img.shields.io/badge/UI-PySide6%20%7C%20Qt%206%20QML-41CD52.svg?logo=qt&logoColor=white" alt="Qt 6 QML" /></a>
