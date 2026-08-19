@@ -32,7 +32,7 @@ flowchart TD
         G --> J["release-build.yml triggers on tag v*"]
         J --> K["Build Windows .exe, Linux .deb & AppImage"]
         K --> L["Compute SHA256SUMS & publish GitHub Release"]
-        L --> M["End users install/update via scripts/install.sh"]
+        L --> M["End users install/update via scripts/install.sh (SHA256SUMS-verified)"]
     end
 ```
 
@@ -118,3 +118,5 @@ Once published, end users can immediately install or upgrade via the 1-command i
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --update
 ```
+The installer verifies every downloaded artifact against the release `SHA256SUMS` manifest
+before installation and aborts on any mismatch (see [docs/SECURITY.md](SECURITY.md)).

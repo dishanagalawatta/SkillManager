@@ -58,6 +58,8 @@ However, managing agent skills and multimodal context across multiple project re
 
 No repository cloning, virtual environment setup, or build toolchains required. Get started immediately:
 
+> Every downloaded artifact is verified against the release's `SHA256SUMS` manifest before installation.
+
 ### 🐧 Ubuntu / Debian (Recommended)
 
 ```bash
@@ -337,6 +339,17 @@ You can also trigger screenshots directly via the camera icon in the SkillManage
 <summary><strong>Q: How do I backup my custom collections and project links?</strong></summary>
 
 All configuration is stored locally as standard JSON under your user data directory (`~/.config/SkillManager` on Linux or `%APPDATA%\SkillManager` on Windows). You can back up or migrate this directory at any time.
+</details>
+
+<details>
+<summary><strong>Q: I updated, but "skill-manager" still runs the old version in my terminal</strong></summary>
+
+A leftover binary from a previous AppImage install (or a development symlink) at `~/.local/bin/skill-manager`
+takes precedence over the system package whenever `~/.local/bin` is before `/usr/bin` in your `PATH`.
+Remove it to use the updated packaged version:
+```bash
+rm -f ~/.local/bin/skill-manager
+```
 </details>
 
 ---
