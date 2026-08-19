@@ -47,7 +47,7 @@ You can declare version bumps directly within your Git commit messages using opt
 | `[patch]` / `fix:` | Patch | `x.y.z` → `x.y.(z+1)` | `fix: correct dropdown alignment [patch]` |
 | `[minor]` / `feat:` | Minor | `x.y.z` → `x.(y+1).0` | `feat: add new search filter [minor]` |
 | `[major]` / `feat!:` | Major | `x.y.z` → `(x+1).0.0` | `feat!: redesign configuration API [major]` |
-| `[dev]` | Pre-release | `x.y.z` → `x.y.z-dev.N` | `fix: experiment with snapshot capture [dev]` |
+| `[dev]` | Pre-release | `x.y.z` → `x.y.(z+1)-dev.1` | `fix: experiment with snapshot capture [dev]` |
 
 ### How It Operates
 1. Include the token anywhere in your commit message (e.g. `feat: add quick copy button [minor]` or in a bullet point inside the commit body `* Added new filter. [minor]`).
@@ -71,9 +71,11 @@ uv run python scripts/release.py
 uv run python scripts/release.py patch   # 2.0.0 -> 2.0.1
 uv run python scripts/release.py minor   # 2.0.0 -> 2.1.0
 uv run python scripts/release.py major   # 2.0.0 -> 3.0.0
+uv run python scripts/release.py dev     # 2.0.0 -> 2.0.1-dev.1
 
 # Or set an explicit version:
 uv run python scripts/release.py 2.0.1
+uv run python scripts/release.py 2.0.1-dev.1
 ```
 
 ### CLI Flags
@@ -113,6 +115,7 @@ When tag `v*` is pushed:
 1. **Windows Build Job**: Builds PyInstaller bundle and Inno Setup installer (`SkillManager_Setup.exe`).
 2. **Linux Build Job**: Compiles PyInstaller binary, builds `.deb` (`skill-manager_<version>_amd64.deb`), and builds portable `AppImage` (`SkillManager-<version>-x86_64.AppImage`).
 3. **Publish Job**: Computes SHA256 checksums (`SHA256SUMS`) and creates the GitHub Release with attached assets.
+4. **Pre-releases** (`vX.Y.Z-dev.N` tags) are published with `prerelease: true`, so they are skipped by the GitHub `/releases/latest` endpoint. Stable users never see them via `install.sh --update` or the in-app update check; only explicit `--version` installs target a dev build. See [VERSIONING.md §4](VERSIONING.md#4-pre-release-versions).
 
 ### 5. End-User 1-Command Installation
 Once published, end users can immediately install or upgrade via the 1-command installer script:

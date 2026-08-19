@@ -42,7 +42,7 @@ Commits can include release tokens in the subject or body:
 | `[patch]` / `fix:` | `x.y.z` → `x.y.(z+1)` | `fix: ui alignment [patch]` |
 | `[minor]` / `feat:` | `x.y.z` → `x.(y+1).0` | `feat: add new view [minor]` |
 | `[major]` / `feat!:` | `x.y.z` → `(x+1).0.0` | `feat!: redesign API [major]` |
-| `[dev]` | `x.y.z` → `x.y.z-dev.N` | `fix: experiment [dev]` |
+| `[dev]` | `x.y.z` → `x.y.(z+1)-dev.1` | `fix: experiment [dev]` |
 
 ---
 
@@ -51,18 +51,38 @@ Commits can include release tokens in the subject or body:
 - **Patch** (`x.y.z` → `x.y.(z+1)`): `[patch]` token
 - **Minor** (`x.y.z` → `x.(y+1).0`): `[minor]` token
 - **Major** (`x.y.z` → `(x+1).0.0`): `[major]` token
-- **Pre-release** (`x.y.z-dev.N`): `[dev]` token
+- **Pre-release** (`x.y.(z+1)-dev.N`): `[dev]` token
+- Token precedence in a commit range: `[major]` > `[minor]` > `[dev]` > `[patch]`
 
 ---
 
 ## 4. Pre-Release Versions
 
-Development pre-releases use the format `x.y.z-dev.n` (e.g., `2.0.1-dev.1`).
+Development pre-releases use the format `x.y.(z+1)-dev.n` (e.g., `2.0.1-dev.1` is
+the first pre-release of the upcoming `2.0.1` patch).
 
-- Created when `[dev]` token is found in the latest commit
-- The pre-release counter increments automatically
-- Pre-release versions have lower precedence than stable versions
-- `2.0.1-dev.1` < `2.0.1-dev.2` < `2.0.1`
+### Sequencing
+
+- `[dev]` on a stable version `x.y.z` → `x.y.(z+1)-dev.1` (first pre-release of the next patch)
+- `[dev]` on a pre-release `x.y.z-dev.n` → `x.y.z-dev.(n+1)` (increments the counter)
+- `[patch]` while on a pre-release `x.y.z-dev.n` → `x.y.z` (promotes the pre-release to stable)
+- `[minor]` / `[major]` while on a pre-release → drops the suffix (`x.y.z-dev.n` → `x.(y+1).0` / `(x+1).0.0`)
+
+### Distribution
+
+Pre-releases are tagged `vx.y.z-dev.n` and published as GitHub **prereleases**
+(`prerelease: true`). Both the in-app update check and `install.sh --update`
+resolve the latest release via the GitHub `/releases/latest` endpoint, which
+skips prereleases — so **stable users are never offered dev builds**. Installing
+a specific dev build requires the explicit `--version` flag on `install.sh`.
+
+### Precedence
+
+Pre-release versions always have *lower* precedence than their stable counterpart:
+
+```
+2.0.1-dev.1 < 2.0.1-dev.2 < 2.0.1
+```
 
 ---
 
@@ -105,3 +125,7 @@ Pre-release versions always have *lower* precedence than their standard counterp
 ```
 2.0.1-dev.1 < 2.0.1-dev.2 < 2.0.1
 ```
+
+A `[patch]` bump while a pre-release is active promotes it to stable: if the
+latest tag is `2.0.1-dev.3`, a `[patch]` commit releases `2.0.1` (not
+`2.0.2`).

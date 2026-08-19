@@ -5,7 +5,9 @@
 #   uv run python scripts/release.py patch
 #   uv run python scripts/release.py minor
 #   uv run python scripts/release.py major
+#   uv run python scripts/release.py dev
 #   uv run python scripts/release.py 1.9.1
+#   uv run python scripts/release.py 2.2.4-dev.1
 #   uv run python scripts/release.py patch --dry-run
 # ==============================================================================
 """Release and version synchronization tool for SkillManager."""
@@ -32,15 +34,20 @@ def get_current_version(project_root: str) -> str:
     return data["project"]["version"]
 
 
-def parse_semver(version_str: str) -> tuple[int, int, int]:
-    """Parse a semantic version string X.Y.Z into (major, minor, patch)."""
+def parse_version(version_str: str) -> tuple[int, int, int, int | None]:
+    """Parse 'X.Y.Z' or 'X.Y.Z-dev.N' into (major, minor, patch, dev).
+
+    dev is None for stable versions, else the pre-release counter.
+    """
     clean_ver = version_str.lstrip("v").strip()
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)$", clean_ver)
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-dev\.(\d+))?$", clean_ver)
     if not match:
         raise ValueError(
-            f"Invalid semantic version format: '{version_str}'. Expected 'MAJOR.MINOR.PATCH'."
+            f"Invalid version format: '{version_str}'. "
+            "Expected 'MAJOR.MINOR.PATCH' or 'MAJOR.MINOR.PATCH-dev.N'."
         )
-    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+    dev = int(match.group(4)) if match.group(4) is not None else None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3)), dev
 
 
 def detect_bump_from_commits(project_root: str) -> str | None:
@@ -78,8 +85,10 @@ def detect_bump_from_commits(project_root: str) -> str | None:
             commit_bump = "major"
         elif "[minor]" in msg_lower:
             commit_bump = "minor"
-        elif "[patch]" in msg_lower or "[dev]" in msg_lower:
+        elif "[patch]" in msg_lower:
             commit_bump = "patch"
+        elif "[dev]" in msg_lower:
+            commit_bump = "dev"
         # Step 2: Conventional Commits heuristic fallback when no explicit bracket token is set
         elif (
             msg_lower.startswith("feat!:")
@@ -97,31 +106,45 @@ def detect_bump_from_commits(project_root: str) -> str | None:
         ):
             commit_bump = "patch"
 
-        # Step 3: Aggregate across commits (major > minor > patch)
+        # Step 3: Aggregate across commits (major > minor > dev > patch)
         if commit_bump == "major":
             return "major"
         if commit_bump == "minor":
             highest_bump = "minor"
-        elif commit_bump == "patch" and highest_bump != "minor":
+        elif commit_bump == "dev" and highest_bump != "minor":
+            highest_bump = "dev"
+        elif commit_bump == "patch" and highest_bump not in ("minor", "dev"):
             highest_bump = "patch"
 
     return highest_bump
 
 
 def calculate_next_version(current_ver: str, bump_type_or_ver: str) -> str:
-    """Calculate next version string given a bump type or explicit version."""
+    """Calculate the next version given a bump type or explicit version.
+
+    'dev' sequencing:
+      - stable X.Y.Z      -> X.Y.(Z+1)-dev.1  (first pre-release of next patch)
+      - dev X.Y.Z-dev.N   -> X.Y.Z-dev.(N+1)  (increment pre-release counter)
+      - 'patch' on a dev  -> X.Y.Z            (promote pre-release to stable)
+      - 'minor'/'major' on a dev -> drop the pre-release suffix
+    """
     bump_lower = bump_type_or_ver.lower().strip()
-    if bump_lower in ("patch", "minor", "major"):
-        major, minor, patch = parse_semver(current_ver)
+    if bump_lower in ("patch", "minor", "major", "dev"):
+        major, minor, patch, dev = parse_version(current_ver)
+        if bump_lower == "dev":
+            if dev is None:
+                return f"{major}.{minor}.{patch + 1}-dev.1"
+            return f"{major}.{minor}.{patch}-dev.{dev + 1}"
         if bump_lower == "patch":
+            if dev is not None:
+                return f"{major}.{minor}.{patch}"
             return f"{major}.{minor}.{patch + 1}"
         if bump_lower == "minor":
             return f"{major}.{minor + 1}.0"
         return f"{major + 1}.0.0"
 
-    # Validate explicit version format
-    major, minor, patch = parse_semver(bump_type_or_ver)
-    return f"{major}.{minor}.{patch}"
+    parse_version(bump_type_or_ver)
+    return bump_type_or_ver.lstrip("v").strip()
 
 
 def sync_pyproject(project_root: str, new_ver: str, dry_run: bool = False) -> None:
@@ -410,7 +433,7 @@ def main() -> None:
         "target",
         nargs="?",
         default="auto",
-        help="Bump type ('patch', 'minor', 'major', 'auto') or explicit version (e.g. '1.9.1'). Default: auto",
+        help="Bump type ('patch', 'minor', 'major', 'dev', 'auto') or explicit version (e.g. '1.9.1' or '2.2.4-dev.1'). Default: auto",
     )
     parser.add_argument(
         "--only-if-triggered",
