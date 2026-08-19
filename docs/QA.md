@@ -15,8 +15,8 @@
 - [x] **Redirect fallback** (`releases/latest` URL → `url_effective`) — implemented; not exercised
   this cycle (primary API path succeeded).
 - [x] **Up-to-date short-circuit** — string equality on versions skips reinstall.
-- [!] **Version comparison is string equality, not SemVer** — see Edge Cases D-1 (dev → stable
-  downgrade silently no-ops).
+- [x] **Version comparison is SemVer-aware** — `ver_compare()` handles `X.Y.Z` and
+  `X.Y.Z-dev.N` (numeric parts, pre-release < stable). D-1/D-2 below are resolved.
 
 ## B. Download & Integrity
 
@@ -58,19 +58,13 @@
 
 ## D. Edge Cases & Security
 
-- [!] **D-1: Update from a dev pre-release to stable silently no-ops** (P2).
-  - Repro (predicted): install `--version 2.2.5-dev.1`, then run `--update`. Latest = 2.2.4
-    (stable; dev excluded from `/releases/latest`). `do_update` compares strings: `2.2.5-dev.1` ≠
-    `2.2.4` → proceeds. `apt install -y ./skill-manager_2.2.4_amd64.deb` refuses to downgrade
-    ("already the newest version"), exits 0 → script prints `[SUCCESS]` while **nothing changed**.
-  - Expected: either the downgrade installs (documented behavior: "a later --update moves you back
-    to the latest stable release") or a clear warning that a dev build is installed.
-  - Actual: false success (code analysis; live repro requires a dev install).
-  - Suggested fix: SemVer-compare in `do_update`; when `target < installed`, use
-    `apt install --allow-downgrades` (or `dpkg -i` fallback) and label the log line "Downgrade"
-    instead of "Upgrade available".
-- [!] **D-2: "Upgrade available" mislabel** — same root cause as D-1; log line claims an upgrade
-  when the target is lower (P4, cosmetic).
+- [x] **D-1: Update from a dev pre-release to stable (resolved 0.2.0)** — `do_update` now
+  SemVer-compares and labels the path "Downgrade available"; `do_install` adds
+  `apt install --allow-downgrades` when the target is older than the installed version.
+  Covered by `test_update_downgrade_from_dev_pre_release` (stubbed dpkg, no root/network).
+- [x] **D-2: "Upgrade available" mislabel (resolved 0.2.0)** — log line now says "Downgrade
+  available" when the target is older, and "Target version:" is shown instead of
+  "Latest version:" in that case.
 - [x] **Supply-chain posture** — HTTPS-only downloads, checksum-verified before any root
   execution, no shell execution of remote content (only `bash -s --` argument passing).
 - [x] **Cleanup on failure** — `set -eo pipefail` + EXIT trap remove the staged `.deb` on abort.
@@ -92,9 +86,10 @@
 - [x] Release chain version source: `release-build.yml` derives version from tag
   (`GITHUB_REF_NAME#v`); deb built from the tagged commit — no drift between tag, filename,
   control version, and `__version__`.
-- [!] **No automated tests exist for `scripts/install.sh`** — grep of `tests/` finds no coverage
-  of install/update/uninstall logic (P3: shell logic is regression-prone; a bats-style harness or
-  `--dry-run` smoke test is recommended).
+- [!] **No automated tests existed for `scripts/install.sh`** — resolved in 0.2.0 with
+  `tests/test_install_script.py` (16 tests: `ver_compare` unit cases, sourcing guard,
+  upgrade/up-to-date/downgrade decision flow via stubbed `dpkg`/`uname`, win32-skipped).
+  Remaining gap: the live `apt install` execution path still requires a real root session.
 
 ---
 
@@ -103,3 +98,4 @@
 | Date | Version | Change |
 |------|---------|--------|
 | 2026-08-19 | 0.1.0 | Initial scaffold. Live update run 2.2.1→2.2.4 verified (download, checksum, fallback install). Artifact control-file audit for v2.2.4. Findings: D-1 (P2 dev→stable downgrade no-op), D-2 (P4 mislabel), C-primary (P4 sudo auth timeout, recovered), F-no-tests (P3). No existing QA artifacts found in repo before this scaffold. |
+| 2026-08-19 | 0.2.0 | D-1 fixed: `ver_compare()` + `--allow-downgrades` in `do_install`; D-2 fixed: conditional "Downgrade available"/"Target version" labels; F resolved: `tests/test_install_script.py` added (16 tests, win32-skipped). Verified: `bash -n`, 63 tests pass, ruff clean. |
