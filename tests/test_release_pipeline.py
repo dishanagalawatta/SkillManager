@@ -56,9 +56,10 @@ class TestSyncUvlock:
     def test_uv_lock_failure_exits(self, project_root: Path) -> None:
         """uv lock returns non-zero -> SystemExit with error message."""
         mock_result = type("R", (), {"returncode": 1, "stderr": "resolution failed"})
-        with patch.object(
-            release.subprocess, "run", return_value=mock_result
-        ) as mock_run, pytest.raises(SystemExit) as exc_info:
+        with (
+            patch.object(release.subprocess, "run", return_value=mock_result) as mock_run,
+            pytest.raises(SystemExit) as exc_info,
+        ):
             release.sync_uvlock(str(project_root), "2.2.1")
         mock_run.assert_called_once()
         assert exc_info.value.code == 1
@@ -79,9 +80,10 @@ class TestSyncUvlock:
     def test_guard_detects_stale_lockfile(self, project_root: Path) -> None:
         """uv lock 'succeeds' but version did not converge -> SystemExit."""
         mock_result = type("R", (), {"returncode": 0, "stderr": ""})
-        with patch.object(
-            release.subprocess, "run", return_value=mock_result
-        ), pytest.raises(SystemExit) as exc_info:
+        with (
+            patch.object(release.subprocess, "run", return_value=mock_result),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             release.sync_uvlock(str(project_root), "2.2.1")
         assert exc_info.value.code == 1
 
@@ -211,7 +213,9 @@ class TestDetectBumpFromCommits:
             (["chore: [minor] in body"], "minor"),
         ],
     )
-    def test_token_detection(self, tmp_path: Path, messages: list[str], expected: str | None) -> None:
+    def test_token_detection(
+        self, tmp_path: Path, messages: list[str], expected: str | None
+    ) -> None:
         repo = self._repo_with_commits(tmp_path, messages)
         assert release.detect_bump_from_commits(repo) == expected
 

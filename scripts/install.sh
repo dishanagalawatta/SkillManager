@@ -299,6 +299,55 @@ run_as_root() {
     fi
 }
 
+# Compare two versions (X.Y.Z or X.Y.Z-dev.N, optional leading v).
+# Echoes -1, 0, or 1. Pre-release versions sort below their stable
+# counterpart, so 2.2.5-dev.1 < 2.2.5.
+ver_compare() {
+    local a="$1" b="$2"
+    a="${a#v}"
+    b="${b#v}"
+    local amain="${a%%-*}" bmain="${b%%-*}"
+    local adev=0 bdev=0
+    if [[ "$a" == *-dev.* ]]; then
+        adev="${a##*-dev.}"
+    fi
+    if [[ "$b" == *-dev.* ]]; then
+        bdev="${b##*-dev.}"
+    fi
+    local -a ap=() bp=()
+    IFS='.' read -r -a ap <<< "$amain"
+    IFS='.' read -r -a bp <<< "$bmain"
+    local i
+    for i in 0 1 2; do
+        if (( ${ap[$i]:-0} < ${bp[$i]:-0} )); then
+            echo -1
+            return 0
+        fi
+        if (( ${ap[$i]:-0} > ${bp[$i]:-0} )); then
+            echo 1
+            return 0
+        fi
+    done
+    # Main version equal: a pre-release sorts below its stable counterpart.
+    if [[ "$a" == *-dev.* ]] && [[ "$b" != *-dev.* ]]; then
+        echo -1
+        return 0
+    fi
+    if [[ "$a" != *-dev.* ]] && [[ "$b" == *-dev.* ]]; then
+        echo 1
+        return 0
+    fi
+    if (( adev < bdev )); then
+        echo -1
+        return 0
+    fi
+    if (( adev > bdev )); then
+        echo 1
+        return 0
+    fi
+    echo 0
+}
+
 # Detect package type
 determine_package_type() {
     if [ "$FORCE_APPIMAGE" = true ]; then
@@ -364,8 +413,16 @@ do_install() {
 
         verify_checksum "$deb_path" "$deb_name" "https://github.com/${REPO}/releases/download/${target_tag}/SHA256SUMS"
 
+        local installed_ver
+        installed_ver=$(get_installed_version)
+        local apt_args=(-y)
+        if [ -n "$installed_ver" ] && [ "$(ver_compare "$installed_ver" "$raw_version")" -gt 0 ]; then
+            log_info "Target is older than the installed version; allowing apt downgrade..."
+            apt_args+=("--allow-downgrades")
+        fi
+
         log_info "Installing Debian package with dependencies via apt..."
-        if ! run_as_root apt install -y "$deb_path"; then
+        if ! run_as_root apt install "${apt_args[@]}" "$deb_path"; then
             log_warn "apt install failed; attempting dpkg -i with apt-get -f install fallback..."
             run_as_root apt-get update -qq || true
             run_as_root dpkg -i "$deb_path"
@@ -508,14 +565,25 @@ do_update() {
     fi
 
     log_info "Installed version: ${COLOR_BOLD}v${installed_ver}${COLOR_RESET}"
-    log_info "Latest version:    ${COLOR_BOLD}v${target_ver}${COLOR_RESET}"
 
-    if [ "$installed_ver" = "$target_ver" ]; then
+    local cmp
+    cmp=$(ver_compare "$installed_ver" "$target_ver")
+    if [ "$cmp" -gt 0 ]; then
+        log_info "Target version:    ${COLOR_BOLD}v${target_ver}${COLOR_RESET}"
+    else
+        log_info "Latest version:    ${COLOR_BOLD}v${target_ver}${COLOR_RESET}"
+    fi
+
+    if [ "$cmp" -eq 0 ]; then
         log_success "SkillManager is already up to date (v${installed_ver})."
         return 0
     fi
 
-    log_info "Upgrade available: v${installed_ver} -> v${target_ver}"
+    if [ "$cmp" -gt 0 ]; then
+        log_info "Downgrade available: v${installed_ver} -> v${target_ver}"
+    else
+        log_info "Upgrade available: v${installed_ver} -> v${target_ver}"
+    fi
     local pkg_type
     pkg_type=$(determine_package_type)
     do_install "$target_tag" "$pkg_type"
@@ -636,4 +704,8 @@ main() {
     esac
 }
 
-main "$@"
+# Run the installer only when executed directly; sourcing the script (tests)
+# must only define functions without triggering the entrypoint.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
