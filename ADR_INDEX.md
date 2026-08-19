@@ -23,6 +23,7 @@
 | [ADR-0026](docs/adr/ADR-0026-workspace-2026-08-standardization.md) | Workspace Standardization — 2026-08 Round | Accepted | 2026-08-16 | @DIKKA |
 | [ADR-0027](docs/adr/ADR-0027-path-self-healing-and-two-phase-incubation.md) | Storage Path Self-Healing Normalization & Two-Phase Model Incubation | Accepted | 2026-08-17 | @DIKKA |
 | [ADR-0028](docs/adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md) | Non-Blocking Package Versioning and NPX / GitHub Shorthand Resolution | Accepted | 2026-08-19 | @DIKKA |
+| [ADR-0029](docs/adr/ADR-0029-package-deletion-storage-cleanup.md) | Package Deletion and Local Storage Cleanup Lifecycle | Accepted | 2026-08-20 | @DIKKA |
 
 
 ## Template

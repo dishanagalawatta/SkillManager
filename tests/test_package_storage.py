@@ -143,3 +143,99 @@ def test_promote_package_storage_aborts_when_destination_not_empty(tmp_path):
 
     assert result == {"moved": 0, "skipped": 1}
     move.assert_not_called()
+
+
+def test_delete_package_storage_grouped(tmp_path):
+    from skill_manager.core.skill_packages.storage import delete_package_storage
+
+    shared_root = tmp_path / "skills"
+    pkg_folder = shared_root / "find-skills-12345678"
+    pkg_folder.mkdir(parents=True)
+    skill1 = pkg_folder / "skill-a"
+    skill1.mkdir()
+    (skill1 / "SKILL.md").write_text("skill a")
+
+    clone_dir = tmp_path / "clones" / "find-skills-12345678"
+    clone_dir.mkdir(parents=True)
+    (clone_dir / "README.md").write_text("clone content")
+
+    lockfile = shared_root / ".find-skills-skill-lock.json"
+    lockfile.write_text("{}")
+
+    package = {
+        "name": "find-skills",
+        "package_id": "pkg_12345678",
+        "configured_package_path": str(shared_root),
+        "resolved_package_path": str(pkg_folder),
+        "storage_mode": "grouped",
+        "clone_path": str(clone_dir),
+    }
+
+    result = delete_package_storage(package, protected_paths=[str(shared_root)])
+
+    assert not pkg_folder.exists()
+    assert not clone_dir.exists()
+    assert not lockfile.exists()
+    assert str(pkg_folder.resolve()) in result["deleted_folders"]
+    assert str(clone_dir.resolve()) in result["deleted_folders"]
+    assert str(lockfile.resolve()) in result["deleted_files"]
+    assert len(result["errors"]) == 0
+
+
+def test_delete_package_storage_direct_managed_folders(tmp_path):
+    from skill_manager.core.skill_packages.storage import delete_package_storage
+
+    shared_root = tmp_path / "skills"
+    shared_root.mkdir(parents=True)
+    managed1 = shared_root / "managed-skill-1"
+    managed1.mkdir()
+    (managed1 / "SKILL.md").write_text("skill 1")
+
+    unrelated = shared_root / "unrelated-skill"
+    unrelated.mkdir()
+    (unrelated / "SKILL.md").write_text("unrelated")
+
+    package = {
+        "name": "custom-package",
+        "package_id": "pkg_custom",
+        "configured_package_path": str(shared_root),
+        "resolved_package_path": str(shared_root),
+        "storage_mode": "direct",
+        "managed_folders": ["managed-skill-1"],
+    }
+
+    result = delete_package_storage(package, protected_paths=[str(shared_root)])
+
+    assert not managed1.exists()
+    assert unrelated.exists()
+    assert shared_root.exists()
+    assert str(managed1.resolve()) in result["deleted_folders"]
+
+
+def test_delete_package_storage_safety_guards(tmp_path):
+    from skill_manager.core.skill_packages.storage import (
+        delete_package_storage,
+        is_safe_deletion_target,
+    )
+
+    project_dir = tmp_path / "my_project"
+    project_dir.mkdir()
+
+    assert not is_safe_deletion_target(Path("/"), protected_paths=[project_dir])
+    assert not is_safe_deletion_target(Path.home(), protected_paths=[project_dir])
+    assert not is_safe_deletion_target(Path.cwd(), protected_paths=[project_dir])
+    assert not is_safe_deletion_target(project_dir, protected_paths=[project_dir])
+
+    # Target being ancestor of protected path is unsafe
+    assert not is_safe_deletion_target(tmp_path, protected_paths=[project_dir])
+
+    # Package trying to delete project root is rejected
+    package = {
+        "name": "dangerous",
+        "package_id": "pkg_danger",
+        "resolved_package_path": str(project_dir),
+        "storage_mode": "grouped",
+    }
+    result = delete_package_storage(package, protected_paths=[str(project_dir)])
+    assert project_dir.exists()
+    assert len(result["deleted_folders"]) == 0

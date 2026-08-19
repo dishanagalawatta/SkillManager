@@ -106,16 +106,25 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | `updater.py` | Staging area execution and update pipelines |
 | `versioning.py` | Non-blocking multi-protocol version detection (ADR-0028) |
 
+#### Real-Time Protocol and Display Name Auto-Detection
+The package creation dialog (`PackageEditDialog.qml`) integrates directly with `infer_package_metadata()` and `humanize_slug()` in `config.py` via `AppController.detectPackageMetadata()`. When a user types or pastes into the primary package/URL/command input:
+1. **Protocol Inference**: URLs (`https://`, `git@`, `.git`) dispatch to `git`, shell prefixes (`bash `, `./`, `python `) dispatch to `custom`, and npm scopes or slugs dispatch to `npx`.
+2. **Display Name Humanization**: Slugs are stripped of leading scopes, split along delimiters (`-`, `_`, `/`), and capitalized into human-readable titles (e.g. `vercel-labs/find-skills` $\rightarrow$ `Find Skills`, `agentic-awesome-skills` $\rightarrow$ `Agentic Awesome Skills`).
+3. **Canonical Repository Mapping & Self-Healing**: Shorthand aliases and meta-skill names (e.g., `vercel-labs/find-skills`) are canonicalized via `KNOWN_SKILL_REPO_ALIASES` to their upstream source repository (`vercel-labs/skills`) for backend execution while preserving the user's specific display title (`Find Skills`).
+4. **Headless Non-Interactive Flags**: `skills add` commands are automatically augmented with `-y` (or `--all`) to prevent subprocess terminal blocking.
+5. **User-Edit Preservation**: Manual edits in the Display Name or Protocol fields set explicit override flags (`userEditedName`, `userEditedProtocol`), guaranteeing the user's manual choices are preserved unless explicitly cleared.
+
 #### Non-Blocking Multi-Protocol Package Addition (ADR-0028)
 
 Skill package registration uses a non-blocking multi-protocol probe pipeline designed to eliminate Qt event loop freezes and prevent OS "Not Responding" modals:
 
 1. **Direct HTTP NPM Registry Lookup**: Uses `fetch_npm_registry_version()` to query `registry.npmjs.org` with a 3-second timeout for scoped (`@scope/pkg`) and standard npm packages in <100ms without shell overhead.
-2. **GitHub Shorthand Resolution**: Automatically detects `owner/repo` formats (e.g. `vercel-labs/find-skills`) and probes remote repository tags or HEAD commits via HTTPS.
+2. **GitHub Shorthand Resolution**: Automatically detects `owner/repo` formats (e.g. `vercel-labs/skills`) and probes remote repository tags or HEAD commits via HTTPS.
 3. **Graceful Fallback & Snap**: Unresolvable or offline packages default to `"latest"` and snap `current_version`, enabling immediate registration with "Up to Date" status while actual downloads execute on `BackgroundTaskRunner`.
 
 ```mermaid
 sequenceDiagram
+
     autonumber
     participant UI as PackageEditDialog (QML)
     participant Ctrl as UpdateController
@@ -147,7 +156,51 @@ sequenceDiagram
     Runner-->>UI: Update finished notification & skill discovery refresh
 ```
 
+#### Lockfile Lifecycle & `skills` CLI Interoperability
+When packages run tools such as `npx skills add <package>` or `npx skills update`, the staging engine manages `.skill-lock.json` and `.skills-lock.json` lockfiles:
+- **Lockfile Relocation & Merge (`merge_and_move_lockfile`)**: Moves the lockfile from the temporary staging root into the target project root, merging JSON skill definitions and versions across multiple updates without clobbering existing tracked skills.
+- **Outdated Folder Cleanup**: Detects outdated or removed skills between package versions and cleans up disk structures while refreshing the in-memory library model.
+- **Subprocess Environment & Error Filtering**: Propagates `GITHUB_TOKEN` and `GH_TOKEN` for authenticated rate limits, strips ANSI escape sequences and decorative box borders, and extracts the exact failure summary line into the status bar.
+
+#### Package Deletion & Storage Cleanup Lifecycle
+
+When a package is removed from the Updates view, `UpdateController.removeUpdatePackage(index)` coordinates with `delete_package_storage()` to execute a multi-tier cleanup with strict safety guards:
+
+```mermaid
+flowchart TD
+    A[User clicks Remove Package] --> B[UpdateController.removeUpdatePackage]
+    B --> C[is_safe_deletion_target Guards]
+    C -->|Guards Valid| D[delete_package_storage]
+    C -->|Unsafe Path| E[Skip FS deletion & Log Error]
+    
+    D --> D1[Delete Grouped/Dedicated Storage Folder]
+    D --> D2[Delete Git Clones in package_clones/]
+    D --> D3[Delete Target Root Manifests & Lockfiles]
+    
+    B --> F[Persistence Cleanup]
+    F --> F1[Prune package_skill_inventory.json]
+    F --> F2[Prune project_skill_ownership.json]
+    F --> F3[patch_cache_remove on cache.json]
+    
+    B --> G[UI & System Sync]
+    G --> G1[removeSkillsByPath on Library & QuickCopy Models]
+    G --> G2[Reset Selected Skill if deleted]
+    G --> G3[Unregister Path from SkillFolderWatcher]
+    G --> G4[Recalculate Update Stats]
+```
+
+1. **Safety Boundary Enforcement**: Prevents accidental deletion of filesystem roots (`/`, `C:\`), user home (`~`), current working directory (`CWD`), `DATA_DIR` root, active project directories (`_projects`), and user source roots (`_sources`).
+2. **Dedicated vs. Shared Storage**:
+   - For **Grouped mode** or isolated subdirectories (e.g. `~/.agent/skills/find-skills-2b87d3d3`), the package's folder and all contained skill subfolders are completely removed.
+   - For **Direct mode** or shared storage roots, only the specific package's `managed_folders` are removed.
+3. **Repository Clone Staging**: Safely prunes repository clone folders under `DATA_DIR / "package_clones"` (with Windows read-only file handling).
+4. **State Pruning & Model Synchronization**:
+   - Removes entries from `package_skill_inventory.json` and `project_skill_ownership.json`.
+   - Surgically purges deleted skill paths from `cache.json` using `patch_cache_remove()`.
+   - Removes skill instances from in-memory models (`_library_model`, `_quick_copy_model`) and unregisters the directory from the live file watcher (`_watcher`).
+
 ---
+
 
 
 ## 4. Utilities (`utils/`)

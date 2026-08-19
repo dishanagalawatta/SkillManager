@@ -718,7 +718,7 @@ def test_controller_run_update_success_and_failure(mock_timer, controller, temp_
     ):
         controller.runPackageUpdate(0)
     capture_exception.assert_called_once()
-    assert "Update finished for Repo" in controller.statusMessage
+    assert "Update failed for Repo" in controller.statusMessage
 
 
 def test_controller_on_quit_flushes_pending_save(controller):

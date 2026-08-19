@@ -784,6 +784,37 @@ def test_remove_update_package(update_controller, mock_app):
     mock_app.updatePackagesChanged.emit.assert_called()
 
 
+def test_remove_update_package_cleans_up_disk_and_models(update_controller, mock_app, tmp_path):
+    pkg_dir = tmp_path / "skills" / "test-pkg-12345678"
+    pkg_dir.mkdir(parents=True)
+    skill_dir = pkg_dir / "my-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("dummy")
+
+    mock_app._update_packages = [
+        {
+            "name": "Test Pkg",
+            "package_id": "pkg_12345678",
+            "resolved_package_path": str(pkg_dir),
+            "storage_mode": "grouped",
+            "source_type": "npx",
+        }
+    ]
+    mock_app._library_model._all_skills = [{"local_path": str(skill_dir)}]
+    mock_app._library_model.removeSkillsByPath = MagicMock()
+    mock_app._quick_copy_model.removeSkillsByPath = MagicMock()
+    mock_app._selected_skill = {"local_path": str(skill_dir)}
+    mock_app._update_results = [{"package_id": "pkg_12345678", "status": "outdated"}]
+
+    update_controller.removeUpdatePackage(0)
+
+    assert not pkg_dir.exists()
+    assert len(mock_app._update_packages) == 0
+    assert len(mock_app._update_results) == 0
+    mock_app._library_model.removeSkillsByPath.assert_called()
+    mock_app.ops.setSelectedSkill.assert_called_with({})
+
+
 def test_update_update_package_logs_version_check(update_controller, mock_app):
     """updateUpdatePackage must log version check details."""
     mock_app._update_packages = [

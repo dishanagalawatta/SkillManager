@@ -61,10 +61,20 @@ When you modify a skill in your central library, you need to push those changes 
 - **Git Updates**: Manage your skill sources (Git repos). Check for new versions and update your local library.
 - **Surgical Sync**: The system compares skill versions across projects and identifies precisely which skills are outdated.
 - **Syncing**: Update individual skills in specific projects, or use sync to bring all projects up to date.
-- **Skill Package Management**: Add, edit, and remove update sources (Git repos or local paths).
-- **Source Updating**: Run batch updates on all or selected skill packages.
+- **Skill Package Management**: Add, edit, and manage update sources across multiple protocols with an ultra-sleek, streamlined dialog:
+  - **Smart Real-Time Auto-Detection**: As you type or paste a package identifier into the primary input, SkillManager instantly infers both the **Protocol** (NPX, GitHub, or Custom Script) and a humanized **Display Name** (e.g. `npx skills add vercel-labs/find-skills` $\rightarrow$ `Find Skills`, `https://github.com/sickn33/agentic-awesome-skills.git` $\rightarrow$ `Agentic Awesome Skills`, `@modelcontextprotocol/server-filesystem` $\rightarrow$ `Server Filesystem`, `./sync.sh` $\rightarrow$ `Sync`). Both the Display Name and Protocol remain fully editable at any time.
+  - **Live Input Validation**: Package name fields feature dynamic inline validation (such as a green `✓` indicator) confirming valid package structures as you type.
+  - **NPX Packages & Skills CLI**: Direct support for NPM-published skill packages (e.g. `@org/skills`), GitHub shorthand repositories (`owner/repo`), and `skills` CLI commands (`npx skills add <repo>`). SkillManager provides **Auto-Detected Versioning** via the NPM registry and upstream Git tags (<100ms non-blocking lookups), automatic non-interactive flags (`-y`), and self-healing canonical repository resolution. An optional *Advanced Overrides* section is available if custom repository URLs or CLI flags are needed.
+  - **Git Repositories**: Track upstream GitHub/GitLab repositories with **Auto-Detected Versioning** (semantic release tags, git tags, and HEAD commits from remote repositories and local workspaces). Supports full URLs (`https://github.com/owner/repo.git`) and GitHub shorthand (`owner/repo`), connection verification, optional authentication tokens, and collapsible *Advanced Overrides* for custom version query commands.
+  - **Custom Scripts**: Configure arbitrary shell commands to pull, generate, and check versions for local or custom skills pipelines.
+
+
+
+- **Source Updating**: Run batch updates on all or selected skill packages with real-time status reporting.
+- **Clean Package Removal**: Removing a package via the delete button in the Updates view automatically cleans up its local storage directory (e.g. `~/.agent/skills/<pkg-slug>`), git clone cache under `package_clones/`, lockfiles, and persisted inventory, while simultaneously purging all package skills from the Library and Quick Copy models with zero orphaned disk files.
 - **Instant Discovery on Add**: Adding a project or package folder registers it with the file watcher and triggers a silent background refresh — its skills appear in the Library immediately, with no restart or manual refresh needed.
 - **Automatic Skill Linking**: When you add a project folder, any skill already present there that matches a package skill by name **and** identical file contents is automatically linked to that package. Linked skills are tracked as package-owned, so future updates and syncs manage them correctly without a full update cycle.
+
 
 ---
 

@@ -280,7 +280,7 @@ def test_check_skill_package_versions_npx_github_shorthand(mock_git_tag):
     mock_git_tag.return_value = "v1.5.0"
     source = {
         "source_type": "npx",
-        "package_name": "vercel-labs/find-skills",
+        "package_name": "sickn33/agentic-awesome-skills",
         "current_version": "",
     }
 
@@ -288,5 +288,5 @@ def test_check_skill_package_versions_npx_github_shorthand(mock_git_tag):
     assert updated["latest_version"] == "1.5.0"
     assert updated["current_version"] == "1.5.0"
     mock_git_tag.assert_called_with(
-        "https://github.com/vercel-labs/find-skills", is_remote=True, token=""
+        "https://github.com/sickn33/agentic-awesome-skills", is_remote=True, token=""
     )

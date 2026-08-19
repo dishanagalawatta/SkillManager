@@ -98,21 +98,8 @@ def step1_wait():
 
 
 def step2_open_package_edit_dialog():
-    print(f"[+{time.monotonic() - START_TIME:.1f}s] Switching view to Updates & Opening Edit Skill Package dialog...")
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Switching view to Updates & Opening Add Skill Package dialog to test auto-detection...")
     controller.ui_controller.currentView = "Updates"
-
-    test_pkg = {
-        "name": "agentic-awesome-skills",
-        "source_type": "git",
-        "package_name": "agentic-awesome-skills",
-        "repository_url": "https://github.com/sickn33/agentic-awesome-skills",
-        "github_token": "ghp_xxxxxxxxxxxx",
-        "package_path": "/tmp/packages/agentic-awesome-skills",
-        "package_args": "",
-        "update_command": "git pull",
-        "current_version_command": "npx list -g @org/skills --json",
-        "latest_version_command": "npx show @org/skills version",
-    }
 
     def find_dialog(obj):
         if not obj:
@@ -127,22 +114,161 @@ def step2_open_package_edit_dialog():
                 return res
         return None
 
+    global dlg
     dlg = find_dialog(window)
-    if dlg and hasattr(dlg, "loadPackage") and hasattr(dlg, "open"):
-        dlg.editIndex = 0
-        dlg.loadPackage(test_pkg)
+    if dlg and hasattr(dlg, "handlePackageInputChanged") and hasattr(dlg, "open"):
+        dlg.editIndex = -1
         dlg.open()
-        print("Opened PackageEditDialog via QML hierarchy.")
+        # Test real-time auto-detection by passing typed package input
+        dlg.handlePackageInputChanged("npx skills add vercel-labs/find-skills")
+        print("Tested live auto-detection with 'npx skills add vercel-labs/find-skills'.")
     else:
         print("ERR: Could not locate PackageEditDialog in QML tree!")
 
-    QTimer.singleShot(3500, step3_take_shot)
+    QTimer.singleShot(2500, step2b_test_git_autodetect)
 
 
-def step3_take_shot():
-    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing real app screenshot...")
+def step2b_test_git_autodetect():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing NPX Auto-detection screenshot...")
+    shot_path = CAPTURES_DIR / "verify_package_autodetect_npx.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
 
-    shot_path = CAPTURES_DIR / "verify_package_edit_scroll.png"
+    # Test auto-detecting GitHub repo from URL pasted into package input
+    dlg.open()
+    dlg.handlePackageInputChanged("https://github.com/sickn33/agentic-awesome-skills.git")
+    print("Tested live auto-detection with Git URL.")
+    QTimer.singleShot(2500, step3_take_shot_npx)
+
+
+def step3_take_shot_npx():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing Git Auto-detection screenshot...")
+    shot_path = CAPTURES_DIR / "verify_package_autodetect_git.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
+
+    test_npx_pkg = {
+        "name": "Find-Skills",
+        "source_type": "npx",
+        "package_name": "vercel-labs/find-skills",
+        "repository_url": "",
+        "github_token": "",
+        "package_path": "/home/user/.agent/skills",
+        "package_args": "",
+        "update_command": "npx --yes -- vercel-labs/find-skills",
+        "current_version_command": "",
+        "latest_version_command": "",
+    }
+    if dlg and hasattr(dlg, "loadPackage"):
+        dlg.loadPackage(test_npx_pkg)
+
+    shot_path = CAPTURES_DIR / "verify_package_edit_npx.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
+
+    # Load NPX package with upstream override (automatically expands advanced overrides)
+    test_npx_override_pkg = {
+        "name": "Find-Skills",
+        "source_type": "npx",
+        "package_name": "vercel-labs/find-skills",
+        "repository_url": "https://github.com/vercel-labs/skills",
+        "github_token": "",
+        "package_path": "/home/user/.agent/skills",
+        "package_args": "--force --no-cache",
+        "update_command": "npx --yes -- vercel-labs/find-skills --force --no-cache",
+        "current_version_command": "",
+        "latest_version_command": "",
+    }
+    if dlg and hasattr(dlg, "loadPackage"):
+        dlg.loadPackage(test_npx_override_pkg)
+    QTimer.singleShot(1500, step4_take_shot_npx_advanced)
+
+
+def step4_take_shot_npx_advanced():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing NPX Advanced dialog screenshot (scrolled)...")
+    if dlg and hasattr(dlg, "scrollDown"):
+        dlg.scrollDown(250)
+        print("Called dlg.scrollDown(250).")
+
+    shot_path = CAPTURES_DIR / "verify_package_edit_npx_advanced.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
+
+
+
+    # Switch to Git mode
+    test_git_pkg = {
+        "name": "agentic-awesome-skills",
+        "source_type": "git",
+        "package_name": "",
+        "repository_url": "https://github.com/sickn33/agentic-awesome-skills",
+        "github_token": "",
+        "package_path": "/tmp/packages/agentic-awesome-skills",
+        "package_args": "",
+        "update_command": "",
+        "current_version_command": "",
+        "latest_version_command": "",
+    }
+    if dlg and hasattr(dlg, "loadPackage"):
+        dlg.loadPackage(test_git_pkg)
+    QTimer.singleShot(1500, step5_take_shot_git)
+
+
+
+def step5_take_shot_git():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing Git dialog screenshot (default auto-detected)...")
+    if dlg and hasattr(dlg, "scrollDown"):
+        dlg.scrollDown(0)
+
+    shot_path = CAPTURES_DIR / "verify_package_edit_git.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
+
+    # Expand Git advanced
+    if dlg and hasattr(dlg, "setAdvancedOverrides"):
+        dlg.setAdvancedOverrides(True)
+    QTimer.singleShot(1500, step6_take_shot_git_advanced)
+
+
+def step6_take_shot_git_advanced():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing Git dialog screenshot (advanced overrides)...")
+    if dlg and hasattr(dlg, "scrollDown"):
+        dlg.scrollDown(250)
+
+    shot_path = CAPTURES_DIR / "verify_package_edit_git_advanced.png"
+    img = window.grabWindow()
+    img.save(str(shot_path))
+    print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
+
+    # Switch to Custom mode
+    test_custom_pkg = {
+        "name": "Local-Custom-Script",
+        "source_type": "custom",
+        "package_name": "",
+        "repository_url": "",
+        "github_token": "",
+        "package_path": "/tmp/packages/custom",
+        "package_args": "",
+        "update_command": "./build-skills.sh",
+        "current_version_command": "./build-skills.sh --version",
+        "latest_version_command": "./build-skills.sh --latest",
+    }
+    if dlg and hasattr(dlg, "loadPackage"):
+        dlg.loadPackage(test_custom_pkg)
+    QTimer.singleShot(1500, step7_take_shot_custom)
+
+
+def step7_take_shot_custom():
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing Custom dialog screenshot...")
+    if dlg and hasattr(dlg, "scrollDown"):
+        dlg.scrollDown(0)
+
+    shot_path = CAPTURES_DIR / "verify_package_edit_custom.png"
     img = window.grabWindow()
     img.save(str(shot_path))
     print(f"SAVED SCREENSHOT TO: {shot_path.resolve()}")
@@ -153,4 +279,6 @@ def step3_take_shot():
 
 QTimer.singleShot(1000, step1_wait)
 app.exec()
+
 print(f"[+{time.monotonic() - START_TIME:.1f}s] Script complete.")
+

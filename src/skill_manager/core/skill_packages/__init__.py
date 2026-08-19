@@ -1,6 +1,8 @@
 from .config import (
     detect_command_type,
     detect_package_config,
+    humanize_slug,
+    infer_package_metadata,
     normalize_skill_package_config,
     parse_npx_command,
     split_args,
@@ -12,8 +14,10 @@ from .relocator import (
     relocate_path_internal,
 )
 from .storage import (
+    delete_package_storage,
     diff_package_inventory,
     inventory_removals_verified,
+    is_safe_deletion_target,
     package_project_path_conflicts,
     promote_package_storage,
     resolve_package_storage,
@@ -35,13 +39,17 @@ from .versioning import (
 
 __all__ = [
     "check_skill_package_versions",
+    "delete_package_storage",
     "detect_command_type",
     "detect_git_remote",
     "detect_package_config",
     "diff_package_inventory",
     "get_git_tag",
+    "humanize_slug",
+    "infer_package_metadata",
     "intercept_cross_platform_command",
     "inventory_removals_verified",
+    "is_safe_deletion_target",
     "merge_and_move_lockfile",
     "normalize_skill_package_config",
     "package_project_path_conflicts",

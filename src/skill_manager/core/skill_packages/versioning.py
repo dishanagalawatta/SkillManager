@@ -85,8 +85,16 @@ def get_git_tag(path_or_url: str, is_remote: bool = False, token: str | None = N
     """Fetches the latest semantic tag or fallback to commit hash using GitPython."""
     try:
         if is_remote:
+            if path_or_url and "://" not in path_or_url and not path_or_url.startswith("git@"):
+                parts = path_or_url.strip().split("/")
+                if len(parts) == 2 and not parts[0].startswith("@"):
+                    path_or_url = f"https://github.com/{parts[0]}/{parts[1]}"
+                    if not path_or_url.endswith(".git"):
+                        path_or_url += ".git"
+
             g = cmd.Git()
             env = {}
+
             if token:
                 # Use a custom credential helper to provide the token
                 env["GIT_TERMINAL_PROMPT"] = "0"
@@ -235,13 +243,19 @@ def check_skill_package_versions(
 
     if source.get("source_type") == "npx" and (not latest_version or force_refresh):
         package_name = str(source.get("package_name") or "").strip()
-        if package_name:
-            # 1. If package_name is owner/repo (e.g. vercel-labs/find-skills), probe GitHub repo
-            if "/" in package_name and not package_name.startswith("@"):
-                git_url = f"https://github.com/{package_name}.git"
-                git_latest = get_git_tag(git_url, is_remote=True, token=token)
-                if git_latest:
-                    latest_version = clean_v(git_latest)
+        repo_url = str(source.get("repository_url") or "").strip()
+
+        # 1. If repository_url is set or package_name is owner/repo, probe GitHub repo
+        if repo_url and "github.com" in repo_url:
+            git_url = repo_url if repo_url.endswith(".git") else f"{repo_url}.git"
+            git_latest = get_git_tag(git_url, is_remote=True, token=token)
+            if git_latest:
+                latest_version = clean_v(git_latest)
+        elif package_name and "/" in package_name and not package_name.startswith("@"):
+            git_url = f"https://github.com/{package_name}.git"
+            git_latest = get_git_tag(git_url, is_remote=True, token=token)
+            if git_latest:
+                latest_version = clean_v(git_latest)
 
             # 2. Fast direct HTTP registry lookup
             if not latest_version:

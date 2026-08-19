@@ -6,6 +6,8 @@ import pytest
 from skill_manager.core.skill_packages.config import (
     detect_command_type,
     detect_package_config,
+    humanize_slug,
+    infer_package_metadata,
     normalize_skill_package_config,
     parse_npx_command,
     split_args,
@@ -71,19 +73,41 @@ def test_detect_package_config_npx():
 
 
 def test_detect_package_config_npx_github_shorthand():
-    data = {"package_name": "vercel-labs/find-skills", "package_args": "--force"}
+    data = {"package_name": "sickn33/agentic-awesome-skills", "package_args": "--force"}
     detected = detect_package_config(data)
     assert detected["source_type"] == "npx"
-    assert detected["package_name"] == "vercel-labs/find-skills"
+    assert detected["package_name"] == "sickn33/agentic-awesome-skills"
     assert detected["package_args"] == "--force"
-    assert detected["repository_url"] == "https://github.com/vercel-labs/find-skills"
-    assert "npx --yes -- vercel-labs/find-skills --force" in detected["update_command"]
+    assert detected["repository_url"] == "https://github.com/sickn33/agentic-awesome-skills"
+    assert "npx --yes -- sickn33/agentic-awesome-skills --force" in detected["update_command"]
+
+
+def test_detect_package_config_npx_full_command():
+    data = {"package_name": "npx skills add vercel-labs/skills", "package_args": "--force"}
+    detected = detect_package_config(data)
+    assert detected["source_type"] == "npx"
+    assert detected["package_name"] == "skills"
+    assert "add vercel-labs/skills" in detected["package_args"]
+    assert "-y" in detected["package_args"]
+    assert "npx --yes -- skills add vercel-labs/skills" in detected["update_command"]
 
 
 def test_detect_package_config_git():
     data = {"source_type": "git", "repository_url": "http://git.com/repo"}
     detected = detect_package_config(data)
     assert detected["source_type"] == "git"
+    assert detected["repository_url"] == "http://git.com/repo"
+    assert detected["latest_version_command"] == ""
+    assert detected["current_version_command"] == ""
+
+
+def test_detect_package_config_git_shorthand():
+    data = {"source_type": "git", "repository_url": "sickn33/agentic-awesome-skills"}
+    detected = detect_package_config(data)
+    assert detected["source_type"] == "git"
+    assert detected["repository_url"] == "https://github.com/sickn33/agentic-awesome-skills.git"
+    assert detected["latest_version_command"] == ""
+    assert detected["current_version_command"] == ""
 
 
 def test_relocate_packages(temp_dir):
@@ -558,3 +582,105 @@ def test_run_process_timeout(mock_popen):
     mock_proc.poll.return_value = None
     mock_proc.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_proc
+
+
+def test_humanize_slug():
+    assert humanize_slug("find-skills") == "Find Skills"
+    assert humanize_slug("agentic_awesome_skills") == "Agentic Awesome Skills"
+    assert humanize_slug("@scope/server-filesystem") == "Scope Server Filesystem"
+    assert humanize_slug("") == ""
+    assert humanize_slug(None) == ""
+
+
+def test_infer_package_metadata_npx():
+    meta = infer_package_metadata("sickn33/agentic-awesome-skills")
+    assert meta["source_type"] == "npx"
+    assert meta["display_name"] == "Agentic Awesome Skills"
+    assert meta["package_name"] == "sickn33/agentic-awesome-skills"
+
+    # Test 'npx skills add <target>' unwrapping
+    meta_skills_add = infer_package_metadata(
+        "npx skills add vercel-labs/skills --skill find-skills"
+    )
+    assert meta_skills_add["source_type"] == "npx"
+    assert meta_skills_add["display_name"] == "Find Skills"
+    assert meta_skills_add["package_name"] == "skills"
+    assert "find-skills" in meta_skills_add["package_args"]
+    assert "-y" in meta_skills_add["package_args"]
+
+    # Test known alias auto-normalization
+    meta_alias = infer_package_metadata("npx skills add vercel-labs/find-skills")
+    assert meta_alias["source_type"] == "npx"
+    assert meta_alias["package_name"] == "skills"
+    assert "vercel-labs/skills" in meta_alias["package_args"]
+
+    # Test 'skills add <target>' unwrapping
+    meta_skills_add_scoped = infer_package_metadata("skills add @anthropic-ai/claude-code")
+    assert meta_skills_add_scoped["source_type"] == "npx"
+    assert meta_skills_add_scoped["display_name"] == "Claude Code"
+    assert meta_skills_add_scoped["package_name"] == "skills"
+    assert "@anthropic-ai/claude-code" in meta_skills_add_scoped["package_args"]
+
+    # Test 'npm install <target>' unwrapping
+    meta_npm_install = infer_package_metadata("npm install @modelcontextprotocol/server-filesystem")
+    assert meta_npm_install["source_type"] == "npx"
+    assert meta_npm_install["display_name"] == "Server Filesystem"
+    assert meta_npm_install["package_name"] == "@modelcontextprotocol/server-filesystem"
+
+    meta_scoped = infer_package_metadata("@modelcontextprotocol/server-filesystem")
+    assert meta_scoped["source_type"] == "npx"
+    assert meta_scoped["display_name"] == "Server Filesystem"
+    assert meta_scoped["package_name"] == "@modelcontextprotocol/server-filesystem"
+
+    meta_cmd = infer_package_metadata("npx @anthropic-ai/claude-code --yes")
+    assert meta_cmd["source_type"] == "npx"
+    assert meta_cmd["display_name"] == "Claude Code"
+    assert meta_cmd["package_name"] == "@anthropic-ai/claude-code"
+
+
+def test_infer_package_metadata_git():
+    meta = infer_package_metadata("https://github.com/sickn33/agentic-awesome-skills.git")
+    assert meta["source_type"] == "git"
+    assert meta["display_name"] == "Agentic Awesome Skills"
+    assert meta["repository_url"] == "https://github.com/sickn33/agentic-awesome-skills.git"
+
+    # Test 'git clone <url>' unwrapping
+    meta_clone = infer_package_metadata(
+        "git clone https://github.com/sickn33/agentic-awesome-skills.git"
+    )
+    assert meta_clone["source_type"] == "git"
+    assert meta_clone["display_name"] == "Agentic Awesome Skills"
+    assert meta_clone["repository_url"] == "https://github.com/sickn33/agentic-awesome-skills.git"
+
+    # Test 'npx skills add <git_url>' unwrapping
+    meta_skills_git = infer_package_metadata(
+        "npx skills add https://github.com/sickn33/agentic-awesome-skills.git"
+    )
+    assert meta_skills_git["source_type"] == "git"
+    assert meta_skills_git["display_name"] == "Agentic Awesome Skills"
+    assert (
+        meta_skills_git["repository_url"] == "https://github.com/sickn33/agentic-awesome-skills.git"
+    )
+
+    meta_ssh = infer_package_metadata("git@github.com:sickn33/agentic-awesome-skills.git")
+    assert meta_ssh["source_type"] == "git"
+    assert meta_ssh["display_name"] == "Agentic Awesome Skills"
+    assert meta_ssh["repository_url"] == "git@github.com:sickn33/agentic-awesome-skills.git"
+
+
+def test_infer_package_metadata_custom():
+    meta = infer_package_metadata("bash ./scripts/update-skills.sh")
+    assert meta["source_type"] == "custom"
+    assert meta["display_name"] == "Update Skills"
+    assert meta["update_command"] == "bash ./scripts/update-skills.sh"
+
+    meta_rel = infer_package_metadata("./sync.sh")
+    assert meta_rel["source_type"] == "custom"
+    assert meta_rel["display_name"] == "Sync"
+    assert meta_rel["update_command"] == "./sync.sh"
+
+
+def test_infer_package_metadata_empty():
+    meta = infer_package_metadata("")
+    assert meta["source_type"] == "npx"
+    assert meta["display_name"] == ""

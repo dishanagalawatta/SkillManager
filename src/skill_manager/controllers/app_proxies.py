@@ -133,6 +133,10 @@ class AppControllerProxyMixin:
     def verifyGitPackage(self, u, t=None):
         return self.config_mgr.verifyGitPackage(u, t)
 
+    @Slot(str, result=str)
+    def detectPackageMetadata(self, raw_input: str) -> str:
+        return self.config_mgr.detectPackageMetadata(raw_input)
+
     @Slot(str, str)
     def setShortcut(self, a, s):
         self.config_mgr.setShortcut(a, s)
