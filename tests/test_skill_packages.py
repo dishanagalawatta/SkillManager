@@ -67,6 +67,17 @@ def test_detect_package_config_npx():
     assert detected["source_type"] == "npx"
     assert detected["package_name"] == "my-pkg"
     assert detected["package_args"] == "--foo"
+    assert "npm view my-pkg version" in detected["latest_version_command"]
+
+
+def test_detect_package_config_npx_github_shorthand():
+    data = {"package_name": "vercel-labs/find-skills", "package_args": "--force"}
+    detected = detect_package_config(data)
+    assert detected["source_type"] == "npx"
+    assert detected["package_name"] == "vercel-labs/find-skills"
+    assert detected["package_args"] == "--force"
+    assert detected["repository_url"] == "https://github.com/vercel-labs/find-skills"
+    assert "npx --yes -- vercel-labs/find-skills --force" in detected["update_command"]
 
 
 def test_detect_package_config_git():

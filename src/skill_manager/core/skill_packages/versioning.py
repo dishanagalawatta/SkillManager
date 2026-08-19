@@ -1,13 +1,15 @@
 import asyncio
+import json
 import logging
 import os
 import shlex
 import subprocess
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 from git import Repo, cmd
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .config import normalize_skill_package_config
 
@@ -29,13 +31,30 @@ def detect_git_remote(package_path: str | None) -> str:
         return ""
 
 
-@retry(
-    retry=retry_if_exception_type(subprocess.SubprocessError),
-    stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=0.5, max=5),
-    reraise=False,
-)
-def run_version_command(command: str) -> str:
+def fetch_npm_registry_version(package_name: str, timeout: float = 3.0) -> str:
+    """Fetches the latest version directly from registry.npmjs.org with a fast HTTP request."""
+    package_name = str(package_name or "").strip()
+    if not package_name or ("/" in package_name and not package_name.startswith("@")):
+        return ""
+
+    encoded_name = urllib.parse.quote(package_name, safe="@")
+    url = f"https://registry.npmjs.org/{encoded_name}/latest"
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "SkillManager/1.0", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                return str(data.get("version") or "").strip()
+    except Exception as e:
+        logger.debug("NPM registry lookup failed for %s: %s", package_name, e)
+    return ""
+
+
+def run_version_command(command: str, timeout: float = 5.0) -> str:
+    """Executes a version detection command with a short timeout to prevent UI blocking."""
     command = str(command or "").strip()
     if not command:
         return ""
@@ -48,7 +67,7 @@ def run_version_command(command: str) -> str:
         if executable:
             command_list[0] = executable
 
-        kwargs = {"shell": False, "capture_output": True, "text": True, "timeout": 30}
+        kwargs = {"shell": False, "capture_output": True, "text": True, "timeout": timeout}
         if hasattr(subprocess, "CREATE_NO_WINDOW"):
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
@@ -215,11 +234,31 @@ def check_skill_package_versions(
                 latest_version = clean_v(git_latest)
 
     if source.get("source_type") == "npx" and (not latest_version or force_refresh):
-        package_name = source.get("package_name")
+        package_name = str(source.get("package_name") or "").strip()
         if package_name:
-            detected_latest = run_version_command(f"npx npm view -- {package_name} version")
-            if detected_latest:
-                latest_version = clean_v(detected_latest)
+            # 1. If package_name is owner/repo (e.g. vercel-labs/find-skills), probe GitHub repo
+            if "/" in package_name and not package_name.startswith("@"):
+                git_url = f"https://github.com/{package_name}.git"
+                git_latest = get_git_tag(git_url, is_remote=True, token=token)
+                if git_latest:
+                    latest_version = clean_v(git_latest)
+
+            # 2. Fast direct HTTP registry lookup
+            if not latest_version:
+                npm_version = fetch_npm_registry_version(package_name, timeout=3.0)
+                if npm_version:
+                    latest_version = clean_v(npm_version)
+
+            # 3. Fallback to npm view if npm binary is locally available
+            if not latest_version:
+                import shutil
+
+                if shutil.which("npm"):
+                    detected_latest = run_version_command(
+                        f"npm view {package_name} version", timeout=3.0
+                    )
+                    if detected_latest:
+                        latest_version = clean_v(detected_latest)
 
     # After a successful update (force_refresh) or on initial add
     # (sync_current_to_latest), snap current_version to latest_version

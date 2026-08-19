@@ -252,3 +252,41 @@ class TestCheckVersionsSyncCurrentToLatest:
         updated = check_skill_package_versions(source, sync_current_to_latest=True)
         assert updated["current_version"] == "1.0"
         assert updated["latest_version"] == "2.0"
+
+
+def test_fetch_npm_registry_version_success():
+    from skill_manager.core.skill_packages.versioning import fetch_npm_registry_version
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"version": "2.4.1"}'
+
+    with patch("urllib.request.urlopen") as mock_url:
+        mock_url.return_value.__enter__.return_value = mock_resp
+        ver = fetch_npm_registry_version("@scope/pkg")
+        assert ver == "2.4.1"
+
+
+def test_fetch_npm_registry_version_error():
+    from skill_manager.core.skill_packages.versioning import fetch_npm_registry_version
+
+    with patch("urllib.request.urlopen", side_effect=Exception("Network down")):
+        ver = fetch_npm_registry_version("some-pkg")
+        assert ver == ""
+
+
+@patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+def test_check_skill_package_versions_npx_github_shorthand(mock_git_tag):
+    mock_git_tag.return_value = "v1.5.0"
+    source = {
+        "source_type": "npx",
+        "package_name": "vercel-labs/find-skills",
+        "current_version": "",
+    }
+
+    updated = check_skill_package_versions(source, sync_current_to_latest=True)
+    assert updated["latest_version"] == "1.5.0"
+    assert updated["current_version"] == "1.5.0"
+    mock_git_tag.assert_called_with(
+        "https://github.com/vercel-labs/find-skills", is_remote=True, token=""
+    )

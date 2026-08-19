@@ -81,12 +81,14 @@ def _apply_npx_defaults(source: dict[str, Any]):
         source["package_name"] = package_name
         source.setdefault("package_args", parsed_args)
 
-    if not package_name:
-        return
-
     args = str(source.get("package_args") or "").strip()
     source["update_command"] = f"npx --yes -- {package_name}" + (f" {args}" if args else "")
-    source["latest_version_command"] = f"npx npm show -- {package_name} version"
+    if "/" in package_name and not package_name.startswith("@"):
+        if not source.get("repository_url"):
+            source["repository_url"] = f"https://github.com/{package_name}"
+        source.setdefault("latest_version_command", "")
+    else:
+        source["latest_version_command"] = f"npm view {package_name} version"
 
 
 def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:

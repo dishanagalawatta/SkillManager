@@ -458,6 +458,31 @@ def test_add_skill_package_snaps_current_to_latest(update_controller, mock_app):
     assert mock_app._update_packages[0]["latest_version"] == "1.9.0"
 
 
+def test_add_skill_package_npx_find_skills_with_fallback(update_controller, mock_app):
+    """addSkillPackage succeeds for npx package even when remote detection yields no tag by falling back to latest."""
+    mock_app._update_packages = []
+    mock_app._config = MagicMock()
+
+    result = json.loads(
+        update_controller.addSkillPackage(
+            {
+                "name": "Find-skills",
+                "source_type": "npx",
+                "package_name": "vercel-labs/find-skills",
+                "package_args": "--force --no-cache",
+                "package_path": "/home/user/.agent/skills",
+            }
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["name"] == "Find-skills"
+    assert len(mock_app._update_packages) == 1
+    pkg = mock_app._update_packages[0]
+    assert pkg["current_version"] == "latest" or pkg["latest_version"] != ""
+    assert pkg["current_version"] == pkg["latest_version"]
+
+
 # --- updateUpdatePackage error-return + snap-to-latest tests ---
 
 
