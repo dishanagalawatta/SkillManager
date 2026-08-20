@@ -215,7 +215,30 @@ class DeleteMixin:
     @Slot()
     def deleteSelectedSkills(self):
         """Deletes all currently selected skills from the active view's model."""
-        selected_paths = self.app.skillModel.getSelectedPaths()
+        if (
+            hasattr(self.app, "ui_controller")
+            and getattr(self.app.ui_controller, "currentView", "") == "QuickCopy"
+            and hasattr(self.app, "quickCopyModel")
+        ):
+            model = self.app.quickCopyModel
+        else:
+            model = getattr(self.app, "skillModel", None)
+
+        raw_paths = model.getSelectedPaths() if model is not None else []
+        selected_paths = list(raw_paths) if isinstance(raw_paths, (list, tuple, set)) else []
+        if not selected_paths and model is not getattr(self.app, "quickCopyModel", None):
+            qc_model = getattr(self.app, "quickCopyModel", None)
+            if qc_model is not None:
+                qc_paths = qc_model.getSelectedPaths()
+                if isinstance(qc_paths, (list, tuple, set)) and qc_paths:
+                    selected_paths = list(qc_paths)
+        if not selected_paths and model is not getattr(self.app, "skillModel", None):
+            sm_model = getattr(self.app, "skillModel", None)
+            if sm_model is not None:
+                sm_paths = sm_model.getSelectedPaths()
+                if isinstance(sm_paths, (list, tuple, set)) and sm_paths:
+                    selected_paths = list(sm_paths)
+
         self.deleteSkillsByPaths(selected_paths)
 
     def cleanup_temp_copies(self):

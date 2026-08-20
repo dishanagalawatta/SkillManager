@@ -228,6 +228,17 @@ flowchart TD
 
 ### Verified Dual-Write Clipboard Architecture
 
+### Active View Model Routing & Selection Resolution
+The application manages two distinct skill models:
+- `_library_model` (`skillModel`): Master repository containing global package skills (`isPackageOnly = True`).
+- `_quick_copy_model` (`quickCopyModel`): Project-scoped repository containing skills and custom commands installed within individual workspaces.
+
+To ensure consistent behavior regardless of which view is active:
+- `OpsController` mixins (`ClipboardMixin`, `DeleteMixin`, `TogglesMixin`, `CopyMixin`) route selection queries via `_get_active_model()`.
+- When `ui_controller.currentView == "QuickCopy"`, operations query `quickCopyModel` first, falling back to `skillModel`.
+- When in `Library` view, operations query `skillModel` first, falling back to `quickCopyModel`.
+- Multi-model state updates (e.g. archiving, deletion) synchronize property changes across both models and clear selection state cleanly.
+
 On Linux (Wayland and X11), Qt's `QClipboard` selection data source can be destroyed or disconnected when the application window minimizes (such as during QuickCopy auto-minimize). To ensure clipboard persistence across window minimization and reliable cross-app paste operations:
 
 1. **Subprocess Environment Sanitization (`get_clean_env()`)**: When running in frozen binary bundles (PyInstaller onedir/onefile) or AppImages, `LD_LIBRARY_PATH` points to bundled runtime libraries (`_internal`). System binaries (`wl-copy`, `wl-paste`, `xclip`, `ydotool`) dynamically link against the host system's libraries. `get_clean_env()` restores `LD_LIBRARY_PATH` to `LD_LIBRARY_PATH_ORIG` or removes it to prevent shared library version mismatch crashes.
