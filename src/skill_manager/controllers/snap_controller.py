@@ -375,24 +375,29 @@ class SnapController(QObject):
         Falls back to ``os.getcwd()`` for all three fields when no project
         is configured or none of the registered projects match.
         """
-        if not project_label_or_path or not self.app.projects:
+        if not self.app.projects:
             cwd = os.getcwd()
             return cwd, cwd, cwd
 
-        aliases = self.app.config_controller.project_aliases
+        aliases = getattr(getattr(self.app, "config_controller", None), "project_aliases", {}) or {}
 
         # First pass: match by label or path
-        for p in self.app.projects:
-            lbl = quick_copy.project_label(p, aliases, p)
-            if lbl == project_label_or_path or str(p) == project_label_or_path:
-                candidate = str(quick_copy.project_root_for_project(Path(p)))
-                if Path(candidate).is_dir():
-                    return candidate, str(p), lbl
-                logger.warning(
-                    "Matched project root does not exist: %s (from %s)",
-                    candidate,
-                    p,
-                )
+        if (
+            project_label_or_path
+            and isinstance(project_label_or_path, str)
+            and project_label_or_path.strip()
+        ):
+            for p in self.app.projects:
+                lbl = quick_copy.project_label(p, aliases, p)
+                if lbl == project_label_or_path or str(p) == project_label_or_path:
+                    candidate = str(quick_copy.project_root_for_project(Path(p)))
+                    if Path(candidate).is_dir():
+                        return candidate, str(p), lbl
+                    logger.warning(
+                        "Matched project root does not exist: %s (from %s)",
+                        candidate,
+                        p,
+                    )
 
         # Second pass: first project with an existing root directory
         for p in self.app.projects:

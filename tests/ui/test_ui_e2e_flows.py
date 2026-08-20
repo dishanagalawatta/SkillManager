@@ -1,3 +1,4 @@
+import contextlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,8 +18,12 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     skill_folder.mkdir(exist_ok=True)
     (skill_folder / "SKILL.md").write_text("# Test Skill\nDescription here.", encoding="utf-8")
 
+    # Setup dummy project directories on disk FIRST before adding to config
     proj_dir = temp_dir / "proj"
     proj_dir.mkdir(exist_ok=True)
+    proj_skill_dir = proj_dir / ".agents" / "skills" / "proj-skill"
+    proj_skill_dir.mkdir(parents=True, exist_ok=True)
+    (proj_skill_dir / "SKILL.md").write_text("# Project Skill\nDescription here.", encoding="utf-8")
 
     # Clear previous state. The session-scoped ``app_controller`` fixture
     # accumulates model data across tests (e.g. ``test_ui_discovery_flow``
@@ -36,15 +41,18 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     app_controller.config_mgr.addSource(str(lib_dir))
     app_controller.config_mgr.addProject(str(proj_dir))
 
-    # Add a skill to the project directory too
-    proj_skill_dir = proj_dir / ".agents" / "skills" / "proj-skill"
-    proj_skill_dir.mkdir(parents=True, exist_ok=True)
-    (proj_skill_dir / "SKILL.md").write_text("# Project Skill\nDescription here.", encoding="utf-8")
-
-    # Add a dummy update package by adding a source to the config
-    # The AppController should pick it up on refresh.
-    # However, to be absolutely sure for the Updates view, we use the controller method
-    app_controller.updates.addUpdatePackage("test-package")
+    # Add a dummy update package directly to state (without launching background npm runner)
+    app_controller._update_packages = [
+        {
+            "name": "test-package",
+            "source_type": "npx",
+            "package_name": "test-package",
+            "current_version": "1.0.0",
+            "latest_version": "1.0.0",
+            "status": "up_to_date",
+        }
+    ]
+    app_controller.updatePackagesChanged.emit()
 
     # Trigger refresh
     app_controller.refreshSkills("test", False)
@@ -52,11 +60,13 @@ def setup_controller_data(qapp, app_controller, temp_dir):
     # Process events to allow schedule_on_ui_thread callbacks to run
     qapp.processEvents()
 
-    # Clear filters on both models to be sure
+    # Clear filters and selections on both models to be sure
     app_controller.libraryModel.projectFilter = ""
     app_controller.libraryModel.filterByClient = False
+    app_controller.libraryModel.clearSelection()
     app_controller.quickCopyModel.projectFilter = ""
     app_controller.quickCopyModel.filterByClient = False
+    app_controller.quickCopyModel.clearSelection()
     qapp.processEvents()
 
 
@@ -77,6 +87,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     assert nav_library is not None
     nav_library.clicked.emit()
     qapp.processEvents()
+    qtbot.wait(100)
     assert app_controller.ui.currentView == "Library"
 
     # --- 2. Search Filtering ---
@@ -109,6 +120,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     nav_qc = root.findChild(QQuickItem, "navQuickCopy")
     nav_qc.clicked.emit()
     qapp.processEvents()
+    qtbot.wait(100)
     assert app_controller.ui.currentView == "QuickCopy"
 
     # Ensure model has data
@@ -117,12 +129,14 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
     # Trigger selection of first item (Project Skill)
     app_controller.quickCopyModel.toggleSelection(0)
     qapp.processEvents()
+    qtbot.wait(50)
     assert app_controller.quickCopyModel.selectedCount == 1
 
     # Find and click copy button (wait for async Loader)
     qtbot.waitUntil(lambda: root.findChild(QQuickItem, "copySelectedBtn") is not None, timeout=3000)
     copy_btn = root.findChild(QQuickItem, "copySelectedBtn")
     assert copy_btn is not None
+    qtbot.wait(50)
 
     # The app writes via native tools (system-truth) when prefer_native is
     # enabled, so Qt's cached clipboard is not updated. Simulate a working
@@ -134,9 +148,19 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
         stored["content"] = text
         return True
 
-    with patch(
-        "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
-        side_effect=_fake_set_clipboard,
+    with (
+        patch.object(
+            app_controller.clipboard_service,
+            "copy_text",
+            side_effect=_fake_set_clipboard,
+        )
+        if hasattr(app_controller, "clipboard_service")
+        and app_controller.clipboard_service is not None
+        else contextlib.nullcontext(),
+        patch(
+            "skill_manager.utils.clipboard_service.ClipboardService.copy_text",
+            side_effect=_fake_set_clipboard,
+        ),
     ):
         copy_btn.clicked.emit()
         qapp.processEvents()
