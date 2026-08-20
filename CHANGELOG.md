@@ -100,6 +100,7 @@
 - `rebuildCache()` now executes asynchronously via `BackgroundTaskRunner` instead of blocking the UI.
 
 ### Bug Fixes
+- Fix batch operations (`copySelectedSkillsToClipboard`, `deleteSelectedSkills`, `archiveSelectedSkills`, `copySelectedSkillsToProject`) failing when invoked from the Quick Copy view by routing selection inspection to `quickCopyModel` when `currentView == "QuickCopy"`, preventing silent no-ops and fixing Windows CI test `test_ui_comprehensive_flow`.
 - Fix newly added or updated skill packages not appearing in the Master Library view by dynamically registering package storage paths (`resolved_package_path`) with `SkillFolderWatcher` and triggering asynchronous discovery refreshes (`app.loadInitialData()`).
 - Fix `DiscoveryService.discover_single()` and `_discover_single_skill_folder()` hardcoding `is_package=False`, enabling typed `is_package=True` and `project_label="Master Library"` assignment so newly discovered package skills pass `FilterEngine` criteria in the Library model.
 - Fix application UI freeze and OS "Not Responding" modal during skill package addition (`addSkillPackage`) by replacing blocking subprocess retry loops with direct HTTP NPM registry lookups (`fetch_npm_registry_version`, 3.0s timeout) and fast command execution.

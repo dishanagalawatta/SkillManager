@@ -53,19 +53,30 @@ class ClipboardMixin:
             if hasattr(model, "onIncubationReady"):
                 model.onIncubationReady()
 
+    def _get_active_model(self):
+        """Return the model corresponding to the active view (QuickCopy vs Library)."""
+        if (
+            hasattr(self.app, "ui_controller")
+            and getattr(self.app.ui_controller, "currentView", "") == "QuickCopy"
+            and hasattr(self.app, "quickCopyModel")
+        ):
+            return self.app.quickCopyModel
+        return getattr(self.app, "skillModel", None)
+
     def _find_skill_by_path(self, path: str):
         """Locate skill entity across all_filtered_skills, all_skills, or discovery state."""
         self._flush_incubation_if_needed()
-        model = getattr(self.app, "skillModel", None)
-        if model is not None:
-            filtered = getattr(model, "_all_filtered_skills", [])
-            for s in filtered:
-                if _get_item_attr(s, "local_path") == path:
-                    return s
-            all_skills = getattr(model, "_all_skills", [])
-            for s in all_skills:
-                if _get_item_attr(s, "local_path") == path:
-                    return s
+        for model_attr in ("_quick_copy_model", "_library_model", "quickCopyModel", "skillModel"):
+            model = getattr(self.app, model_attr, None)
+            if model is not None:
+                filtered = getattr(model, "_all_filtered_skills", [])
+                for s in filtered:
+                    if _get_item_attr(s, "local_path") == path:
+                        return s
+                all_skills = getattr(model, "_all_skills", [])
+                for s in all_skills:
+                    if _get_item_attr(s, "local_path") == path:
+                        return s
 
         dc = getattr(self.app, "discovery_controller", None)
         if dc is not None:
@@ -105,11 +116,27 @@ class ClipboardMixin:
         else:
             self.copyTextToClipboard(path)
 
+    def _get_model_selected_count(self, model) -> int:
+        """Safely retrieve the selected count of a model."""
+        if model is None:
+            return 0
+        cnt = getattr(model, "selectedCount", 0)
+        if isinstance(cnt, (int, float)):
+            return int(cnt)
+        return 0
+
     @Slot()
     def copyCurrentSelectionOrFocusedSkill(self):
         """Orchestrates copying based on selection or focus."""
         self._flush_incubation_if_needed()
-        if self.app.skillModel.selectedCount > 0:
+        model = self._get_active_model()
+        if self._get_model_selected_count(model) > 0:
+            self.copySelectedSkillsToClipboard()
+            return
+        if self._get_model_selected_count(getattr(self.app, "quickCopyModel", None)) > 0:
+            self.copySelectedSkillsToClipboard()
+            return
+        if self._get_model_selected_count(getattr(self.app, "skillModel", None)) > 0:
             self.copySelectedSkillsToClipboard()
             return
         selected = self.app._selected_skill
@@ -127,7 +154,9 @@ class ClipboardMixin:
             }
             self.copySkillReference(data)
             return
-        first_skill = self.app.skillModel.get_skill_at(0)
+        first_skill = model.get_skill_at(0) if model is not None else None
+        if not first_skill and hasattr(self.app, "skillModel"):
+            first_skill = self.app.skillModel.get_skill_at(0)
         if first_skill:
             self.copySkillReference(first_skill)
             return
@@ -137,7 +166,22 @@ class ClipboardMixin:
     def copySelectedSkillsToClipboard(self):
         """Copies selected skill references for the current project to clipboard."""
         self._flush_incubation_if_needed()
-        paths = self.app.skillModel.getFilteredSelectedPaths()
+        model = self._get_active_model()
+        raw_paths = model.getFilteredSelectedPaths() if model is not None else []
+        paths = list(raw_paths) if isinstance(raw_paths, (list, tuple, set)) else []
+        if not paths and model is not getattr(self.app, "quickCopyModel", None):
+            qc_model = getattr(self.app, "quickCopyModel", None)
+            if qc_model is not None:
+                qc_paths = qc_model.getFilteredSelectedPaths()
+                if isinstance(qc_paths, (list, tuple, set)) and qc_paths:
+                    paths = list(qc_paths)
+        if not paths and model is not getattr(self.app, "skillModel", None):
+            sm_model = getattr(self.app, "skillModel", None)
+            if sm_model is not None:
+                sm_paths = sm_model.getFilteredSelectedPaths()
+                if isinstance(sm_paths, (list, tuple, set)) and sm_paths:
+                    paths = list(sm_paths)
+
         if not paths:
             self.app._set_status("No skills selected")
             return

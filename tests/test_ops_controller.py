@@ -1574,3 +1574,64 @@ def test_format_project_skill_reference_with_skill_object():
 
     ref_gemini = format_project_skill_reference(s, "Gemini CLI")
     assert ref_gemini == "@test-skill/SKILL.md"
+
+
+def test_copy_selected_skills_to_clipboard_uses_quick_copy_model(ops_controller, mock_app):
+    mock_app.ui_controller.currentView = "QuickCopy"
+    mock_qc_model = MagicMock()
+    mock_qc_model.getFilteredSelectedPaths.return_value = ["/path/qc_skill"]
+    mock_qc_model._all_filtered_skills = [{"local_path": "/path/qc_skill", "name": "qc-skill"}]
+    mock_qc_model._all_skills = [{"local_path": "/path/qc_skill", "name": "qc-skill"}]
+    mock_app.quickCopyModel = mock_qc_model
+
+    mock_lib_model = MagicMock()
+    mock_lib_model.getFilteredSelectedPaths.return_value = []
+    mock_app.skillModel = mock_lib_model
+    mock_app._client_format = "Antigravity"
+
+    with patch.object(ops_controller, "_write_clipboard", return_value=True) as mock_write:
+        ops_controller.copySelectedSkillsToClipboard()
+
+        mock_qc_model.getFilteredSelectedPaths.assert_called_once()
+        mock_write.assert_called_once()
+        assert "Copied 1 skills to clipboard" in mock_app._set_status.call_args[0][0]
+
+
+def test_delete_selected_skills_uses_quick_copy_model(ops_controller, mock_app):
+    mock_app.ui_controller.currentView = "QuickCopy"
+    mock_qc_model = MagicMock()
+    mock_qc_model.getSelectedPaths.return_value = ["/path/del_skill"]
+    mock_app.quickCopyModel = mock_qc_model
+
+    mock_lib_model = MagicMock()
+    mock_lib_model.getSelectedPaths.return_value = []
+    mock_app.skillModel = mock_lib_model
+
+    with patch.object(ops_controller, "deleteSkillsByPaths") as mock_delete:
+        ops_controller.deleteSelectedSkills()
+
+        mock_qc_model.getSelectedPaths.assert_called_once()
+        mock_delete.assert_called_once_with(["/path/del_skill"])
+
+
+def test_archive_selected_skills_uses_quick_copy_model(ops_controller, mock_app):
+    mock_app.ui_controller.currentView = "QuickCopy"
+    mock_app._archive_paths = []
+    mock_qc_model = MagicMock()
+    mock_qc_model.getSelectedPaths.return_value = ["/path/arc_skill"]
+    mock_app.quickCopyModel = mock_qc_model
+
+    mock_lib_model = MagicMock()
+    mock_lib_model.getSelectedPaths.return_value = []
+    mock_app.skillModel = mock_lib_model
+
+    with (
+        patch.object(ops_controller, "_saveArchive"),
+        patch.object(ops_controller, "_updateModelsProperty"),
+    ):
+        ops_controller.archiveSelectedSkills()
+
+        mock_qc_model.getSelectedPaths.assert_called_once()
+        assert "/path/arc_skill" in mock_app._archive_paths
+        mock_qc_model.clearSelection.assert_called_once()
+        mock_lib_model.clearSelection.assert_called_once()

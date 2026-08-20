@@ -29,12 +29,30 @@ class CopyMixin:
         if not project_path:
             return
 
-        selected_paths = self.app.skillModel.getSelectedPaths()
-        selected_skills = [
-            s
-            for s in self.app.skillModel._all_skills
-            if _get_item_attr(s, "local_path") in selected_paths
-        ]
+        if (
+            hasattr(self.app, "ui_controller")
+            and getattr(self.app.ui_controller, "currentView", "") == "QuickCopy"
+            and hasattr(self.app, "quickCopyModel")
+        ):
+            model = self.app.quickCopyModel
+        else:
+            model = getattr(self.app, "skillModel", None)
+
+        selected_paths = model.getSelectedPaths() if model is not None else []
+        if not selected_paths and hasattr(self.app, "skillModel"):
+            model = self.app.skillModel
+            selected_paths = model.getSelectedPaths()
+        if not selected_paths and hasattr(self.app, "quickCopyModel"):
+            model = self.app.quickCopyModel
+            selected_paths = model.getSelectedPaths()
+
+        selected_skills = []
+        if model is not None:
+            selected_skills = [
+                s
+                for s in getattr(model, "_all_skills", [])
+                if _get_item_attr(s, "local_path") in selected_paths
+            ]
 
         if not selected_skills:
             self.app._set_status("No skills selected to copy")
