@@ -892,3 +892,20 @@ def test_save_screenshot_success(controller, mock_app, tmp_path):
     # Check categories update
     assert "Snaps" in mock_app._categories
     mock_app.categoriesChanged.emit.assert_called_once()
+
+
+def test_resolve_save_path_empty_filter_falls_back_to_first_project(controller, mock_app, tmp_path):
+    proj_dir = tmp_path / "valid_project"
+    proj_dir.mkdir(parents=True, exist_ok=True)
+    mock_app.projects = [str(proj_dir)]
+
+    # When filter is empty string, should resolve to valid_project instead of CWD
+    resolved_path, matched_p, lbl = controller._resolve_save_path("")
+    assert resolved_path == str(proj_dir)
+    assert matched_p == str(proj_dir)
+
+
+def test_resolve_save_path_no_projects_falls_back_to_cwd(controller, mock_app):
+    mock_app.projects = []
+    resolved_path, matched_p, lbl = controller._resolve_save_path("")
+    assert resolved_path == os.getcwd()
