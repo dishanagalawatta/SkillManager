@@ -131,7 +131,9 @@ sequenceDiagram
     participant Ver as versioning.py
     participant HTTP as NPM Registry API
     participant Git as Git Remote (HTTPS)
+    participant Watch as SkillFolderWatcher
     participant Runner as BackgroundTaskRunner
+    participant Disc as DiscoveryController
     participant Disk as Local Storage
 
     UI->>Ctrl: addSkillPackage(data)
@@ -149,12 +151,22 @@ sequenceDiagram
     
     Ver-->>Ctrl: Normalized Record with latest_version & current_version snapped
     Ctrl->>Ctrl: Commit to app._update_packages & save config
+    Ctrl->>Watch: _refresh_after_package_add (add_path to watcher)
+    Ctrl->>Disc: loadInitialData() [Silent background scan]
     Ctrl-->>UI: {"ok": true, "error": null, "name": pkg_name} (Dialog Closes <5ms)
     
     Ctrl->>Runner: runPackageUpdate(new_index) [Async Worker]
     Runner->>Disk: Run npx/git/script update into staging & relocate skills
-    Runner-->>UI: Update finished notification & skill discovery refresh
+    Runner->>Watch: Register resolved_package_path with file watcher
+    Runner->>Disc: discover_single(..., is_package=True) & loadInitialData()
+    Runner-->>UI: Update finished notification & automatic library refresh
 ```
+
+#### Reactive Package File Watching & Instant Library Refresh
+When a skill package is added (`addSkillPackage`, `addUpdatePackage`) or updated (`runPackageUpdate`):
+1. **Dynamic Watcher Registration**: The package's resolved storage directory (`resolved_package_path`) is registered with `SkillFolderWatcher.add_path()`. This attaches inotify/ReadDirectoryChanges watchers immediately to detect subsequent on-disk modifications.
+2. **Typed Single-Skill Discovery**: During incremental folder extraction, `DiscoveryService.discover_single(path, is_package=True)` enforces `is_package=True` and `project_label="Master Library"`, ensuring skills are immediately visible in the Library model (`isPackageOnly = True`).
+3. **Automated Discovery Refresh**: Upon completion, `DiscoveryController.loadInitialData()` runs the full background discovery pipeline asynchronously, atomically syncing category headers, search engine indices, and filter models via `PreparedModelState`.
 
 #### Lockfile Lifecycle & `skills` CLI Interoperability
 When packages run tools such as `npx skills add <package>` or `npx skills update`, the staging engine manages `.skill-lock.json` and `.skills-lock.json` lockfiles:

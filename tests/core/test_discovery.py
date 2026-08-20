@@ -1025,3 +1025,47 @@ class TestDiscoveryControllerSDET:
         state.generation = 0  # Old generation
         controller._commit_prepared_state(state)
         sdet_app._library_model.replacePreparedState.assert_not_called()
+
+
+def test_discover_single_package_skill_explicit_and_autodetect(temp_dir):
+    pkg_dir = temp_dir / "my_package"
+    pkg_dir.mkdir()
+    skill_dir = pkg_dir / "my_skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nname: My Skill\ndescription: Test\n---")
+
+    from skill_manager.core.discovery import DiscoveryService
+
+    service = DiscoveryService(
+        sources=[str(pkg_dir)],
+        projects=[],
+        archive_paths=[],
+        starred_paths=[],
+        project_aliases={},
+    )
+
+    # 1. Explicit is_package=True
+    result_explicit = service.discover_single(skill_dir, pkg_dir, is_package=True)
+    assert result_explicit is not None
+    assert result_explicit["is_package"] is True
+    assert result_explicit["is_source"] is True
+    assert result_explicit["project_label"] == "Master Library"
+
+    # 2. Auto-detected is_package because pkg_dir is in service.sources
+    result_auto = service.discover_single(skill_dir, pkg_dir)
+    assert result_auto is not None
+    assert result_auto["is_package"] is True
+    assert result_auto["is_source"] is True
+    assert result_auto["project_label"] == "Master Library"
+
+    # 3. Non-package project path
+    other_proj = temp_dir / "other_project"
+    other_proj.mkdir()
+    other_skill = other_proj / "other_skill"
+    other_skill.mkdir()
+    (other_skill / "SKILL.md").write_text("---\nname: Other Skill\n---")
+
+    result_project = service.discover_single(other_skill, other_proj)
+    assert result_project is not None
+    assert result_project["is_package"] is False
+    assert result_project["is_source"] is False

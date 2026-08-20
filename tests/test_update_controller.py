@@ -309,7 +309,7 @@ def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_pa
         mock_patch_cache.assert_called_once()
         mock_app._library_model.addOrUpdateSkills.assert_called_once_with([mock_skill])
         mock_app._quick_copy_model.addOrUpdateSkills.assert_called_once_with([mock_skill])
-        mock_app.loadInitialData.assert_not_called()
+        mock_app.loadInitialData.assert_called_once()
         assert "NewCat" in mock_app._categories
         mock_app.categoriesChanged.emit.assert_called()
 
@@ -374,7 +374,7 @@ def test_run_package_update_removes_old_skills(update_controller, mock_app, tmp_
 
         mock_app._library_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
         mock_app._quick_copy_model.removeSkillsByPath.assert_called_once_with(["old_skill"])
-        mock_app.loadInitialData.assert_not_called()
+        mock_app.loadInitialData.assert_called_once()
 
 
 # --- addSkillPackage error-return + snap-to-latest tests ---
@@ -885,3 +885,67 @@ def test_update_update_package_diagnostic_event(update_controller, mock_app):
         assert data["current_version"] == "v1.0.0"
         assert data["latest_version"] == "v2.0.0"
         assert data["repository_url"] == "https://github.com/test/repo.git"
+
+
+def test_add_skill_package_registers_watcher_and_triggers_discovery(
+    update_controller, mock_app, tmp_path
+):
+    pkg_dir = tmp_path / "new_pkg"
+    pkg_dir.mkdir()
+    mock_app._update_packages = []
+    mock_app._watcher = MagicMock()
+    mock_app.loadInitialData = MagicMock()
+
+    detected = {
+        "name": "auto-refresh-pkg",
+        "source_type": "git",
+        "repository_url": "https://github.com/test/repo.git",
+        "current_version": "1.0.0",
+        "latest_version": "1.0.0",
+        "package_path": str(pkg_dir),
+        "resolved_package_path": str(pkg_dir),
+    }
+
+    with (
+        patch(
+            "skill_manager.core.skill_packages.check_skill_package_versions", return_value=detected
+        ),
+        patch.object(update_controller, "_resolvePackageStorageState"),
+        patch("skill_manager.controllers.update_controller.QTimer.singleShot"),
+    ):
+        result = json.loads(
+            update_controller.addSkillPackage(
+                {
+                    "name": "auto-refresh-pkg",
+                    "source_type": "git",
+                    "repository_url": "https://github.com/test/repo.git",
+                }
+            )
+        )
+
+    assert result["ok"] is True
+    mock_app._watcher.add_path.assert_called_once_with(str(pkg_dir.resolve()))
+    mock_app.loadInitialData.assert_called_once()
+
+
+def test_add_update_package_registers_watcher_and_triggers_discovery(
+    update_controller, mock_app, tmp_path
+):
+    pkg_dir = tmp_path / "npx_pkg"
+    pkg_dir.mkdir()
+    mock_app._update_packages = []
+    mock_app._watcher = MagicMock()
+    mock_app.loadInitialData = MagicMock()
+
+    def mock_resolve():
+        if mock_app._update_packages:
+            mock_app._update_packages[0]["resolved_package_path"] = str(pkg_dir)
+
+    with (
+        patch.object(update_controller, "_resolvePackageStorageState", side_effect=mock_resolve),
+        patch("skill_manager.controllers.update_controller.QTimer.singleShot"),
+    ):
+        update_controller.addUpdatePackage("npx-test-pkg")
+
+    mock_app._watcher.add_path.assert_called_once_with(str(pkg_dir.resolve()))
+    mock_app.loadInitialData.assert_called_once()

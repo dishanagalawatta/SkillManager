@@ -144,7 +144,9 @@ class DiscoveryController(BaseController):
         # ---- Phase 1: build discovery sources ----
         discovery_sources = list(self.app._sources)
         for src in self.app._update_packages:
-            pkg_path = src.get("package_path") or src.get("local_path")
+            pkg_path = (
+                src.get("resolved_package_path") or src.get("package_path") or src.get("local_path")
+            )
             if pkg_path and os.path.exists(pkg_path) and pkg_path not in discovery_sources:
                 discovery_sources.append(pkg_path)
 
