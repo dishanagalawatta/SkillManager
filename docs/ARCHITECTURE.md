@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
-> Status: **Accepted** | Last reviewed: 2026-08-19
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md), [ADR-0028](adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md)
+> Status: **Accepted** | Last reviewed: 2026-08-20
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md), [ADR-0028](adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md), [ADR-0029](adr/ADR-0029-package-deletion-storage-cleanup.md), [ADR-0030](adr/ADR-0030-project-skill-classification-and-diff-model-sync.md)
 
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
@@ -207,13 +207,49 @@ flowchart TD
    - For **Direct mode** or shared storage roots, only the specific package's `managed_folders` are removed.
 3. **Repository Clone Staging**: Safely prunes repository clone folders under `DATA_DIR / "package_clones"` (with Windows read-only file handling).
 4. **State Pruning & Model Synchronization**:
-   - Removes entries from `package_skill_inventory.json` and `project_skill_ownership.json`.
-   - Surgically purges deleted skill paths from `cache.json` using `patch_cache_remove()`.
-   - Removes skill instances from in-memory models (`_library_model`, `_quick_copy_model`) and unregisters the directory from the live file watcher (`_watcher`).
+    - Removes entries from `package_skill_inventory.json` and `project_skill_ownership.json`.
+    - Surgically purges deleted skill paths from `cache.json` using `patch_cache_remove()`.
+    - Removes skill instances from in-memory models (`_library_model`, `_quick_copy_model`) and unregisters the directory from the live file watcher (`_watcher`).
+
+#### Skill Copying, Project Classification & Differential Ingest (ADR-0030)
+
+When skills are copied from the Master Library into project workspaces (`copySelectedSkillsToProject`), the operational pipeline ensures clean separation between master package skills and project-installed copies:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Library / QuickCopy View
+    participant Ops as OpsController (CopyMixin)
+    participant Copier as copier.py
+    participant Disc as DiscoveryService
+    participant Cache as cache.json
+    participant LibModel as _library_model (isPackageOnly=True)
+    participant QCModel as _quick_copy_model (isPackageOnly=False)
+
+    UI->>Ops: copySelectedSkillsToProject(project_path)
+    Ops->>Copier: copy_skill_folders_to_projects(source_skills, [project_path])
+    Copier-->>Ops: Result {"details": [{"status": "copied", "message": dest_path, "project": project_path}]}
+    
+    loop For each copied skill
+        Ops->>Disc: discover_single(dest_path, project_path, is_package=False)
+        Disc->>Disc: Enforce .agents/skills boundary rule (is_package=False)
+        Disc->>Disc: Compute canonical project_label (e.g. "my-project")
+        Disc-->>Ops: Normalized skill dict
+    end
+    
+    Ops->>Cache: patch_cache_add(discovered_skills)
+    Ops->>LibModel: addOrUpdateSkills(discovered_skills)
+    Note over LibModel: Evaluates is_package=False -> filtered out by isPackageOnly -> no duplicates!
+    Ops->>QCModel: addOrUpdateSkills(discovered_skills)
+    Note over QCModel: Evaluates is_package=False -> diffs state & emits beginInsertRows
+    Ops-->>UI: Status updated & selection cleared
+```
+
+1. **Strict Project Boundary Enforcement**: Any skill residing inside an `.agents/skills` or `.agents/commands` folder is explicitly identified as `is_package = False`. Even if the workspace root or parent folder is registered in `sources`, the project boundary prevents misclassifying project copies as Master Library packages.
+2. **Package Label Invariance**: In `addOrUpdateSkills`, `project_label` recomputation is scoped exclusively to project skills (`not skill.is_package`), permanently preserving `"Master Library"` for package records.
+3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization.
 
 ---
-
-
 
 ## 4. Utilities (`utils/`)
 

@@ -110,7 +110,6 @@ class IngestMixin:
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]):
         was_empty = len(self._all_skills) == 0
-        updated_paths = {s_dict.get("local_path", "") for s_dict in new_skills}
         skills_dict = {s.local_path: s for s in self._all_skills}
 
         # Recompute project_label from project_path to ensure the label
@@ -128,7 +127,7 @@ class IngestMixin:
 
         for s_dict in new_skills:
             skill = Skill.from_dict_fast(s_dict)
-            if skill.project_path:
+            if not skill.is_package and skill.project_path:
                 new_label = canonical_label(skill.project_path, project_aliases=project_aliases)
                 incoming = s_dict.get("project_label", "")
                 if incoming and incoming != new_label:
@@ -145,6 +144,8 @@ class IngestMixin:
                         },
                     )
                 skill.project_label = new_label
+            elif skill.is_package and not skill.project_label:
+                skill.project_label = "Master Library"
             skills_dict[skill.local_path] = skill
         self._all_skills = list(skills_dict.values())
 
@@ -154,13 +155,10 @@ class IngestMixin:
         else:
             self._search_engine = SearchEngine(new_skills)
 
-        self._apply_filter(reset=was_empty)
-
-        if updated_paths and not was_empty:
-            for row, skill in enumerate(self._filtered_skills):
-                if skill.local_path in updated_paths:
-                    idx = self.index(row, 0)
-                    self.dataChanged.emit(idx, idx, self._ALL_ROLES)
+        if was_empty:
+            self._apply_filter(reset=True)
+        else:
+            self._apply_filter_with_diff()
 
     @Slot(int, result=dict)
     def get_skill_at(self, row):

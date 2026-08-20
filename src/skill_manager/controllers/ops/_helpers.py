@@ -24,15 +24,25 @@ def _get_item_attr(item: Any, attr: str, default: Any = "") -> Any:
 def _build_discovery_service(app: Any):
     """Build a :class:`DiscoveryService` configured from the app's current state.
 
-    The 5-argument construction is identical at every call site; centralising
+    The construction matches DiscoveryController._run_pipeline; centralising
     it keeps the sources/projects/archive/starred/aliases wiring in one place.
     """
+    import os
+
     from skill_manager.core.discovery import DiscoveryService
 
+    discovery_sources = list(getattr(app, "_sources", []) or [])
+    for src in getattr(app, "_update_packages", []) or []:
+        pkg_path = (
+            src.get("resolved_package_path") or src.get("package_path") or src.get("local_path")
+        )
+        if pkg_path and os.path.exists(pkg_path) and pkg_path not in discovery_sources:
+            discovery_sources.append(pkg_path)
+
     return DiscoveryService(
-        sources=list(app._sources),
-        projects=app._projects,
-        archive_paths=app._archive_paths,
-        starred_paths=app._starred_paths,
-        project_aliases=app._project_aliases,
+        sources=discovery_sources,
+        projects=getattr(app, "_projects", []) or [],
+        archive_paths=getattr(app, "_archive_paths", []) or [],
+        starred_paths=getattr(app, "_starred_paths", []) or [],
+        project_aliases=getattr(app, "_project_aliases", {}) or {},
     )
