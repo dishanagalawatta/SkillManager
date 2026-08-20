@@ -798,7 +798,9 @@ class DiscoveryService:
                         skill_dir = Path(entry.path)
                         skill_md = skill_dir / "SKILL.md"
                         if skill_md.is_file():
-                            result = self._discover_single_skill_folder(skill_dir, project_path)
+                            result = self._discover_single_skill_folder(
+                                skill_dir, project_path, is_package=False
+                            )
                             if result is not None:
                                 results.append(result)
             except OSError as e:
@@ -853,19 +855,28 @@ class DiscoveryService:
             return None
 
         if is_package is None:
-            from skill_manager.core.quick_copy import resolve_resilient_path
+            # Skills located under .agents/skills/ are by definition project skills.
+            is_under_agents = ".agents" in skill_path.parts or ".agents" in project_path.parts
+            if is_under_agents:
+                is_package = False
+            else:
+                from skill_manager.core.quick_copy import resolve_resilient_path
 
-            resolved_proj = resolve_resilient_path(project_path)
-            source_paths = [resolve_resilient_path(s) for s in self.sources if s]
-            is_package = any(
-                resolved_proj
-                and s
-                and (
-                    resolved_proj == s
-                    or (resolved_proj.is_dir() and s.is_dir() and resolved_proj.is_relative_to(s))
+                resolved_proj = resolve_resilient_path(project_path)
+                source_paths = [resolve_resilient_path(s) for s in self.sources if s]
+                is_package = any(
+                    resolved_proj
+                    and s
+                    and (
+                        resolved_proj == s
+                        or (
+                            resolved_proj.is_dir()
+                            and s.is_dir()
+                            and resolved_proj.is_relative_to(s)
+                        )
+                    )
+                    for s in source_paths
                 )
-                for s in source_paths
-            )
 
         project_label = "Master Library" if is_package else data.get("project_label", "")
         return self.transform_skill(data, is_package=is_package, project_label=project_label)

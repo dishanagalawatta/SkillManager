@@ -1635,3 +1635,98 @@ def test_archive_selected_skills_uses_quick_copy_model(ops_controller, mock_app)
         assert "/path/arc_skill" in mock_app._archive_paths
         mock_qc_model.clearSelection.assert_called_once()
         mock_lib_model.clearSelection.assert_called_once()
+
+
+def test_ops_controller_copy_selected_skills_no_library_duplicates(temp_dir, mock_config):
+    """Verify that copying a skill from library to a project does NOT duplicate in library."""
+    from skill_manager.app import AppController
+    from skill_manager.core.discovery import DiscoveryService
+
+    source_dir = temp_dir / "master_pkg"
+    source_dir.mkdir()
+    skill_src = source_dir / "my-cool-skill"
+    skill_src.mkdir()
+    (skill_src / "SKILL.md").write_text(
+        "---\nname: my-cool-skill\ndescription: Cool skill\n---\n# Body"
+    )
+
+    project_root = temp_dir / "sample_project"
+    project_root.mkdir()
+    (project_root / ".agents" / "skills").mkdir(parents=True)
+
+    app = AppController(skip_initial_load=True, config=mock_config)
+    app.task_runner = SynchronousTaskRunner()
+    app._sources = [
+        str(source_dir),
+        str(project_root),
+    ]  # Project root also in sources to test collision
+    app._projects = [str(project_root / ".agents" / "skills")]
+    app._archive_paths = []
+    app._starred_paths = []
+    app._project_aliases = {}
+    app._categories = []
+
+    # Initial full load into library model
+    service = DiscoveryService(
+        sources=app._sources,
+        projects=app._projects,
+        archive_paths=[],
+        starred_paths=[],
+        project_aliases={},
+    )
+    initial_data = service.discover_all(use_cache=False)
+    app._library_model.isPackageOnly = True
+    app._library_model.setSkills(initial_data["skills"])
+
+    assert len(app._library_model._filtered_skills) == 1
+    assert app._library_model._filtered_skills[0].name == "my-cool-skill"
+
+    # Select the skill in library
+    app._library_model.toggleSelection(0)
+    app._selected_skill = app._library_model._filtered_skills[0]
+
+    # Perform copy to project
+    with patch("skill_manager.controllers.ops._helpers.QTimer.singleShot") as mock_timer:
+        mock_timer.side_effect = lambda msec, receiver, functor=None: (
+            functor() if functor is not None else receiver()
+        )
+        app.ops.copySelectedSkillsToProject(str(project_root))
+
+    # Assert skill was copied to destination
+    dest_skill = project_root / ".agents" / "skills" / "my-cool-skill"
+    assert (dest_skill / "SKILL.md").is_file()
+
+    # Verify Library model STILL only shows 1 skill (NO duplicate!)
+    assert len(app._library_model._filtered_skills) == 1
+    assert app._library_model._filtered_skills[0].is_package is True
+    assert app._library_model._filtered_skills[0].project_label == "Master Library"
+
+    # Verify QuickCopy model received the project skill with is_package=False
+    qc_skills = [s for s in app._quick_copy_model._all_skills if s.local_path == str(dest_skill)]
+    assert len(qc_skills) == 1
+    assert qc_skills[0].is_package is False
+    assert qc_skills[0].project_label == "sample_project"
+
+
+def test_discovery_service_discover_single_project_nested_under_source(temp_dir):
+    """Ensure discover_single classifies .agents/skills as is_package=False even when under source."""
+    from skill_manager.core.discovery import DiscoveryService
+
+    project_root = temp_dir / "my_project"
+    project_root.mkdir()
+    agents_skills = project_root / ".agents" / "skills"
+    agents_skills.mkdir(parents=True)
+    skill_dir = agents_skills / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nname: test-skill\ndescription: Test\n---\n# Body")
+
+    service = DiscoveryService(
+        sources=[str(project_root)],  # project root in sources
+        projects=[str(agents_skills)],
+        project_aliases={},
+    )
+
+    data = service.discover_single(skill_dir, agents_skills)
+    assert data is not None
+    assert data["is_package"] is False
+    assert data["project_label"] == "my_project"

@@ -104,7 +104,9 @@ class CopyMixin:
                             skill_path = Path(detail["message"])
                             proj_path = Path(detail["project"])
                             try:
-                                skill_data = service.discover_single(skill_path, proj_path)
+                                skill_data = service.discover_single(
+                                    skill_path, proj_path, is_package=False
+                                )
                                 if skill_data:
                                     discovered_skills.append(skill_data)
                                 else:
