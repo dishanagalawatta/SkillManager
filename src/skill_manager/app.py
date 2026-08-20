@@ -330,7 +330,9 @@ class AppController(AppControllerProxyMixin, QObject):
 
         watch_paths = self._sources.copy()
         for src in self._update_packages:
-            pkg_path = src.get("package_path") or src.get("local_path")
+            pkg_path = (
+                src.get("resolved_package_path") or src.get("package_path") or src.get("local_path")
+            )
             if pkg_path:
                 watch_paths.append(pkg_path)
 

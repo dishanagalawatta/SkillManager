@@ -636,9 +636,11 @@ class DiscoveryService:
             "category": skill.get("category", "Uncategorized"),
             "description": skill.get("description", ""),
             "local_path": local_path,
-            "project_label": skill.get("project_label")
-            or project_label
-            or ("Master Library" if is_package else "Unknown Project"),
+            "project_label": (
+                project_label or "Master Library"
+                if is_package
+                else (project_label or skill.get("project_label") or "Unknown Project")
+            ),
             "project_root": skill.get("project_root", ""),
             "project_path": skill.get("project_path", ""),
             "is_starred": metadata.get("starred", False)
@@ -723,7 +725,9 @@ class DiscoveryService:
         data["search_text"] = build_skill_search_text(data)
         return data
 
-    def discover_single(self, path: Path, project_path: Path) -> dict[str, Any] | None:
+    def discover_single(
+        self, path: Path, project_path: Path, is_package: bool | None = None
+    ) -> dict[str, Any] | None:
         """Parse and normalize a single skill or command file.
 
         Dispatches to the correct parser based on the path shape:
@@ -738,7 +742,7 @@ class DiscoveryService:
             return self._discover_single_command(path, project_path)
 
         if path.is_dir():
-            return self._discover_single_skill_folder(path, project_path)
+            return self._discover_single_skill_folder(path, project_path, is_package=is_package)
 
         return None
 
@@ -841,15 +845,30 @@ class DiscoveryService:
         return project_path
 
     def _discover_single_skill_folder(
-        self, skill_path: Path, project_path: Path
+        self, skill_path: Path, project_path: Path, is_package: bool | None = None
     ) -> dict[str, Any] | None:
         """Parse a single skill folder (containing ``SKILL.md``)."""
         data = discover_single_skill(skill_path, project_path, self.project_aliases)
         if data is None:
             return None
-        return self.transform_skill(
-            data, is_package=False, project_label=data.get("project_label", "")
-        )
+
+        if is_package is None:
+            from skill_manager.core.quick_copy import resolve_resilient_path
+
+            resolved_proj = resolve_resilient_path(project_path)
+            source_paths = [resolve_resilient_path(s) for s in self.sources if s]
+            is_package = any(
+                resolved_proj
+                and s
+                and (
+                    resolved_proj == s
+                    or (resolved_proj.is_dir() and s.is_dir() and resolved_proj.is_relative_to(s))
+                )
+                for s in source_paths
+            )
+
+        project_label = "Master Library" if is_package else data.get("project_label", "")
+        return self.transform_skill(data, is_package=is_package, project_label=project_label)
 
     def _resolve_project_dict(self, project_path: Path) -> dict[str, Any] | None:
         """Build the minimal project dict needed by ``_process_command_file``."""

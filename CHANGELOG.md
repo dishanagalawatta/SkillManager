@@ -95,6 +95,8 @@
 - `rebuildCache()` now executes asynchronously via `BackgroundTaskRunner` instead of blocking the UI.
 
 ### Bug Fixes
+- Fix newly added or updated skill packages not appearing in the Master Library view by dynamically registering package storage paths (`resolved_package_path`) with `SkillFolderWatcher` and triggering asynchronous discovery refreshes (`app.loadInitialData()`).
+- Fix `DiscoveryService.discover_single()` and `_discover_single_skill_folder()` hardcoding `is_package=False`, enabling typed `is_package=True` and `project_label="Master Library"` assignment so newly discovered package skills pass `FilterEngine` criteria in the Library model.
 - Fix application UI freeze and OS "Not Responding" modal during skill package addition (`addSkillPackage`) by replacing blocking subprocess retry loops with direct HTTP NPM registry lookups (`fetch_npm_registry_version`, 3.0s timeout) and fast command execution.
 - Fix package version resolution failure for GitHub repository shorthand packages (e.g. `vercel-labs/find-skills`) by probing remote GitHub HTTPS repositories rather than failing over SSH Git commands.
 - Support graceful fallback to `"latest"` version for valid packages when remote tags or offline registries are unavailable, preventing false-positive blocking errors on package addition.

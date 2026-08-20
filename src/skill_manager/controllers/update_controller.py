@@ -235,6 +235,25 @@ class UpdateController(BaseController):
         self.app._stats_missing = missing
         self.app.statsChanged.emit()
 
+    def _refresh_after_package_add(self, package_path: str) -> None:
+        """Register the new package directory with the file watcher and trigger
+        a silent background discovery refresh so its skills appear without restart."""
+        try:
+            watcher = getattr(self.app, "_watcher", None)
+            if watcher is not None and package_path:
+                p = Path(package_path).expanduser().resolve()
+                if p.is_dir():
+                    watcher.add_path(str(p))
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to register package watcher path: %s", exc)
+
+        try:
+            refresh = getattr(self.app, "loadInitialData", None)
+            if refresh is not None:
+                refresh()
+        except Exception as exc:
+            logger.warning("[CONFIG] Failed to trigger discovery refresh: %s", exc)
+
     @Slot(str)
     def addUpdatePackage(self, package_name: str):
         """Adds a basic NPX-style source."""
@@ -247,9 +266,19 @@ class UpdateController(BaseController):
                 package_name=package_name,
             )
             self.app._update_packages.append(record.model_dump())
-            self.config.set("skills", self.app._update_packages)
-            self.app.updatePackagesChanged.emit()
+            self._resolvePackageStorageState()
             self.app._set_status(f"Added update package: {package_name}")
+
+            new_index = len(self.app._update_packages) - 1
+            pkg_record = self.app._update_packages[new_index]
+            pkg_path = (
+                pkg_record.get("resolved_package_path")
+                or pkg_record.get("package_path")
+                or pkg_record.get("local_path")
+                or ""
+            )
+            self._refresh_after_package_add(pkg_path)
+            QTimer.singleShot(500, lambda idx=new_index: self.runPackageUpdate(idx))
         except Exception as e:
             logger.error("Failed to add update package: %s", e)
             self.app._set_status(f"Error adding package: {e}")
@@ -303,6 +332,16 @@ class UpdateController(BaseController):
             self._resolvePackageStorageState()
             self.app._set_status(f"Added skill package: {final_record.name}")
             capture_event("skill_package_added", {"source_type": final_record.source_type})
+
+            new_index = len(self.app._update_packages) - 1
+            pkg_record = self.app._update_packages[new_index]
+            pkg_path = (
+                pkg_record.get("resolved_package_path")
+                or pkg_record.get("package_path")
+                or pkg_record.get("local_path")
+                or ""
+            )
+            self._refresh_after_package_add(pkg_path)
 
             # 6. Trigger initial install in background so skill files are
             #    actually downloaded/relocated into the resolved package
@@ -671,6 +710,22 @@ class UpdateController(BaseController):
                         if not source.get("update_error"):
                             self.app._set_status(f"Update finished for {source.get('name')}")
 
+                        pkg_path = (
+                            source.get("resolved_package_path")
+                            or source.get("package_path")
+                            or source.get("local_path")
+                            or ""
+                        )
+                        if pkg_path:
+                            try:
+                                watcher = getattr(self.app, "_watcher", None)
+                                if watcher is not None:
+                                    p = Path(pkg_path).expanduser().resolve()
+                                    if p.is_dir():
+                                        watcher.add_path(str(p))
+                            except Exception as exc:
+                                logger.debug("Failed registering watcher path: %s", exc)
+
                         removed = source.get("removed_folders", [])
                         removals_verified = source.get("removals_verified", False)
                         if removed and removals_verified:
@@ -682,12 +737,6 @@ class UpdateController(BaseController):
                             from skill_manager.core.discovery import DiscoveryService
                             from skill_manager.core.persistence import patch_cache_add
 
-                            pkg_path = (
-                                source.get("resolved_package_path")
-                                or source.get("package_path")
-                                or source.get("local_path")
-                                or ""
-                            )
                             service = DiscoveryService(
                                 sources=[pkg_path] if pkg_path else [],
                                 projects=[],
@@ -703,7 +752,7 @@ class UpdateController(BaseController):
                                     )
                                     if folder_path.is_dir():
                                         skill_data = service.discover_single(
-                                            folder_path, folder_path
+                                            folder_path, folder_path, is_package=True
                                         )
                                         if skill_data:
                                             discovered.append(skill_data)
@@ -719,6 +768,8 @@ class UpdateController(BaseController):
                                     )
 
                         self.config.set("skills", self.app._update_packages)
+                        if hasattr(self.app, "loadInitialData"):
+                            self.app.loadInitialData()
 
                     _safe_single_shot(0, self.app, finalize_ui)
 
