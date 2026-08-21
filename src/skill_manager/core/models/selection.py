@@ -7,6 +7,7 @@ the facade. Signals are module-level aliases of the declarations in
 them at class-definition time.
 """
 
+import logging
 import os
 
 from PySide6.QtCore import Property, Slot
@@ -16,13 +17,36 @@ from skill_manager.core.models.roles import RolesMixin
 selectionStateChanged = RolesMixin.selectionStateChanged  # noqa: N816
 totalSelectableCountChanged = RolesMixin.totalSelectableCountChanged  # noqa: N816
 
+logger = logging.getLogger(__name__)
+
 
 class SelectionMixin:
-    """Selection state, counts, and project-selection persistence."""
+    """Selection state, counts, and project-selection persistence.
+
+    Count semantics (intentionally separated):
+
+    * ``selectedCount`` — total selected items in ``_selected_ids``,
+      independent of current search/filter/collapse. This is the badge
+      number the user sees ("3 selected") and must not flicker when
+      the user types in the search box.
+    * ``filteredSelectedCount`` — selected items that survive the current
+      filter pipeline (project + category + search …). Useful for
+      filter-aware operations.
+    * ``visibleSelectedCount`` / ``visibleSelectableCount`` — collapsed-state
+      aware counts derived from ``_filtered_skills``.
+    * ``totalSelectableCount`` — length of ``_all_filtered_skills``
+      (filter-aware, collapse-agnostic).
+    """
 
     @Property(int, notify=selectionStateChanged)
     def selectedCount(self):
+        """Total selected count, stable across search/filter changes."""
         return self._cached_selected_count
+
+    @Property(int, notify=selectionStateChanged)
+    def filteredSelectedCount(self):
+        """Selected count limited to the current filtered set."""
+        return self._cached_filtered_selected
 
     @Property(int, notify=selectionStateChanged)
     def visibleSelectableCount(self):
@@ -39,15 +63,48 @@ class SelectionMixin:
         return self._cached_total_selectable
 
     def _update_selection_counts(self):
-        """Recomputes cached selection/visibility counts."""
-        self._cached_selected_count = sum(
-            1 for s in self._all_filtered_skills if s.local_path in self._selected_ids
-        )
+        """Recomputes all cached selection/visibility counts.
+
+        The critical invariant: ``selectedCount`` must NOT be derived from
+        ``_all_filtered_skills`` (which is search/filter-dependent). It
+        represents the user's total selection and is therefore derived
+        from ``_selected_ids`` alone, optionally intersected with
+        ``_all_skills`` to exclude ghost paths for skills that no longer
+        exist on disk.
+        """
+        # --- total selected (filter-independent) ---
+        all_skills = getattr(self, "_all_skills", None)
+        if all_skills:
+            existing_paths = {s.local_path for s in all_skills if getattr(s, "local_path", None)}
+            if existing_paths:
+                # Exclude orphaned selections (skill deleted externally)
+                self._cached_selected_count = sum(
+                    1 for p in self._selected_ids if p in existing_paths
+                )
+            else:
+                self._cached_selected_count = len(self._selected_ids)
+        else:
+            self._cached_selected_count = len(self._selected_ids)
+
+        # --- filtered selected (filter-aware, collapse-agnostic) ---
+        filtered_paths = {s.local_path for s in self._all_filtered_skills if s.local_path}
+        self._cached_filtered_selected = sum(1 for p in self._selected_ids if p in filtered_paths)
+
+        # --- visible (collapse-aware) ---
         self._cached_visible_selectable = sum(1 for s in self._filtered_skills if s.local_path)
         self._cached_visible_selected = sum(
             1 for s in self._filtered_skills if s.local_path and s.local_path in self._selected_ids
         )
         self._cached_total_selectable = len(self._all_filtered_skills)
+
+        logger.debug(
+            "selection counts: total=%d filtered=%d visible=%d/%d totalSelectable=%d",
+            self._cached_selected_count,
+            self._cached_filtered_selected,
+            self._cached_visible_selected,
+            self._cached_visible_selectable,
+            self._cached_total_selectable,
+        )
 
     def _sync_current_project_selection(self) -> None:
         """Keep ``_selections_by_project[current_project]`` in sync with ``_selected_ids``."""

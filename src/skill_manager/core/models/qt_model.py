@@ -105,6 +105,7 @@ class SkillModel(
         self._project_selections_save_timer = None
         self._collapse_save_timer = None
         self._cached_selected_count = 0
+        self._cached_filtered_selected = 0
         self._cached_visible_selectable = 0
         self._cached_visible_selected = 0
         self._cached_total_selectable = 0
