@@ -1,6 +1,7 @@
 """Skill ingestion and row lookup for the SkillModel facade."""
 
 import os
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Slot
@@ -110,7 +111,22 @@ class IngestMixin:
     @Slot(list)
     def addOrUpdateSkills(self, new_skills: list[dict[str, Any]]):
         was_empty = len(self._all_skills) == 0
-        skills_dict = {s.local_path: s for s in self._all_skills}
+
+        def _canonical(p: str | Path) -> str:
+            if not p or str(p).strip() == "":
+                return ""
+            try:
+                resolved = str(Path(p).resolve())
+                if os.name == "nt":
+                    return os.path.normcase(resolved)
+                return resolved
+            except Exception:
+                try:
+                    return os.path.normpath(str(p))
+                except Exception:
+                    return str(p)
+
+        skills_dict = {_canonical(s.local_path): s for s in self._all_skills if s.local_path}
 
         # Recompute project_label from project_path to ensure the label
         # matches what getProjectLabel (dropdown) produces for the same path.
@@ -146,7 +162,7 @@ class IngestMixin:
                 skill.project_label = new_label
             elif skill.is_package and not skill.project_label:
                 skill.project_label = "Master Library"
-            skills_dict[skill.local_path] = skill
+            skills_dict[_canonical(skill.local_path)] = skill
         self._all_skills = list(skills_dict.values())
 
         # Use incremental update if engine exists, else full init

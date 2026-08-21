@@ -11,11 +11,25 @@ on:
         description: Python version for the build
         type: string
         default: "3.12"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to checkout
+        type: string
+        default: ""
+      python-version:
+        description: Python version for the build
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
 
 jobs:
   build:
     name: Build on Windows
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -34,7 +48,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Build with PyInstaller and Package
         run: uv run skill-manager-build
@@ -44,4 +58,5 @@ jobs:
         with:
           name: artifacts-windows
           path: dist/
+          if-no-files-found: error
           retention-days: 30

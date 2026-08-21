@@ -1,6 +1,7 @@
 """Copy-to-project operations for the OpsController."""
 
 import logging
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Slot
@@ -99,23 +100,88 @@ class CopyMixin:
                 if result["details"]:
                     diag = get_diagnostic_logger()
                     service = _build_discovery_service(self.app)
+
+                    def _canon(p: str | Path) -> str:
+                        if not p or str(p).strip() == "":
+                            return ""
+                        try:
+                            r = str(Path(p).resolve())
+                            if os.name == "nt":
+                                return os.path.normcase(r)
+                            return r
+                        except Exception:
+                            try:
+                                return os.path.normpath(str(p))
+                            except Exception:
+                                return str(p)
+
                     for detail in result["details"]:
                         if detail["status"] in ("copied", "merged") and detail.get("message"):
                             skill_path = Path(detail["message"])
                             proj_path = Path(detail["project"])
+                            diag.log_event(
+                                "INFO",
+                                CATEGORY_SELECTION_REFRESHED,
+                                f"copy detail: skill_path={skill_path} project={proj_path} "
+                                f"canonical_skill={_canon(skill_path)} canonical_proj={_canon(proj_path)}",
+                                data={
+                                    "skill_path": str(skill_path),
+                                    "project_path": str(proj_path),
+                                    "canonical_skill_path": _canon(skill_path),
+                                    "canonical_project_path": _canon(proj_path),
+                                    "detail_status": detail.get("status"),
+                                },
+                            )
                             try:
                                 skill_data = service.discover_single(
                                     skill_path, proj_path, is_package=False
                                 )
                                 if skill_data:
+                                    diag.log_event(
+                                        "INFO",
+                                        CATEGORY_SELECTION_REFRESHED,
+                                        f"discover_single success: skill_path={skill_path} "
+                                        f"project_label={skill_data.get('project_label')} "
+                                        f"is_package={skill_data.get('is_package')} "
+                                        f"local_path={skill_data.get('local_path')}",
+                                        data={
+                                            "skill_path": str(skill_path),
+                                            "project_path": str(proj_path),
+                                            "discovered_local_path": str(
+                                                skill_data.get("local_path", "")
+                                            ),
+                                            "project_label": str(
+                                                skill_data.get("project_label", "")
+                                            ),
+                                            "is_package": bool(skill_data.get("is_package")),
+                                            "canonical_skill_path": _canon(skill_path),
+                                        },
+                                    )
                                     discovered_skills.append(skill_data)
                                 else:
                                     diag.log_event(
                                         "WARNING",
                                         CATEGORY_SELECTION_REFRESHED,
-                                        f"discover_single returned None for skill: {skill_path}",
+                                        f"discover_single returned None for skill: {skill_path} "
+                                        f"canonical={_canon(skill_path)} proj={proj_path} canonical_proj={_canon(proj_path)}",
+                                        data={
+                                            "skill_path": str(skill_path),
+                                            "project_path": str(proj_path),
+                                            "canonical_skill_path": _canon(skill_path),
+                                            "canonical_project_path": _canon(proj_path),
+                                        },
                                     )
                             except Exception as exc:
+                                diag.log_event(
+                                    "WARNING",
+                                    CATEGORY_SELECTION_REFRESHED,
+                                    f"discover_single exception for {skill_path}: {exc}",
+                                    data={
+                                        "skill_path": str(skill_path),
+                                        "project_path": str(proj_path),
+                                        "error": str(exc),
+                                    },
+                                )
                                 logger.error(
                                     "[TARGETED SCAN] Failed scanning %s: %s", skill_path, exc
                                 )

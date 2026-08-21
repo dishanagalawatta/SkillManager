@@ -1702,7 +1702,24 @@ def test_ops_controller_copy_selected_skills_no_library_duplicates(temp_dir, moc
     assert app._library_model._filtered_skills[0].project_label == "Master Library"
 
     # Verify QuickCopy model received the project skill with is_package=False
-    qc_skills = [s for s in app._quick_copy_model._all_skills if s.local_path == str(dest_skill)]
+    # Canonical-path aware comparison: Windows 8.3 short paths (C:\Users\RUNNER~1\...)
+    # vs long paths (C:\Users\runneradmin\...) after copier/discovery canonicalization.
+    import os
+
+    def _canonical(p) -> str:
+        try:
+            return os.path.normcase(str(Path(p).resolve()))
+        except Exception:
+            try:
+                return os.path.normcase(os.path.normpath(str(p)))
+            except Exception:
+                return os.path.normcase(str(p))
+
+    qc_skills = [
+        s
+        for s in app._quick_copy_model._all_skills
+        if _canonical(s.local_path) == _canonical(dest_skill)
+    ]
     assert len(qc_skills) == 1
     assert qc_skills[0].is_package is False
     assert qc_skills[0].project_label == "sample_project"
@@ -1726,7 +1743,19 @@ def test_discovery_service_discover_single_project_nested_under_source(temp_dir)
         project_aliases={},
     )
 
+    import os
+
+    def _canonical(p) -> str:
+        try:
+            return os.path.normcase(str(Path(p).resolve()))
+        except Exception:
+            try:
+                return os.path.normcase(os.path.normpath(str(p)))
+            except Exception:
+                return os.path.normcase(str(p))
+
     data = service.discover_single(skill_dir, agents_skills)
     assert data is not None
     assert data["is_package"] is False
     assert data["project_label"] == "my_project"
+    assert _canonical(data["local_path"]) == _canonical(skill_dir)
