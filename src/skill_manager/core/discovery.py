@@ -31,23 +31,28 @@ logger = logging.getLogger(__name__)
 
 
 def _canonical_path(p: str | Path) -> str:
-    """Canonical resolved path for comparison.
+    """Canonical resolved path for storage (preserves case).
 
-    Expands 8.3 short names on Windows via ``Path.resolve()`` and
-    folds case via ``os.path.normcase``.  Falls back to normpath.
+    Expands 8.3 short names via ``Path.resolve()``; case folding is
+    handled by ``_canonical_key`` for comparison/dedup.
     """
     if p is None or str(p).strip() == "":
         return ""
     try:
-        resolved = str(Path(p).resolve())
-        if os.name == "nt":
-            return os.path.normcase(resolved)
-        return resolved
+        return str(Path(p).resolve())
     except Exception:
         try:
             return os.path.normpath(str(p))
         except Exception:
             return str(p)
+
+
+def _canonical_key(p: str | Path) -> str:
+    """Case-insensitive canonical key for dedup/comparison."""
+    cp = _canonical_path(p)
+    if os.name == "nt":
+        return os.path.normcase(cp)
+    return cp
 
 
 def get_discovery_cache() -> Cache:
@@ -109,7 +114,7 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
             max_sub_mtime = max(d.stat(follow_symlinks=False).st_mtime for d in skill_dirs)
 
         prefix_tuple = (stat.st_mtime, stat.st_size, skill_count, max_sub_mtime)
-        key = _canonical_path(str(dir_path))
+        key = _canonical_key(str(dir_path))
         child_names_hash = _hash_child_names(dir_path)
         cached = _fp_memo.get(key)
         if cached is not None and cached[0] == prefix_tuple and cached[1] == child_names_hash:
@@ -230,7 +235,7 @@ class DiscoveryService:
                             all_skills.append(SkillRecord.model_validate(cmd_data))
 
         # 3a. Deduplicate by local_path, preferring project skills over
-        # package skills. Uses canonical comparison (resolve+normcase on
+        # package skills. Uses canonical key (resolve+normcase on
         # Windows) so short 8.3 (RUNNER~1) and long (runneradmin) paths
         # collapse to the same key.
         seen_paths: dict[str, SkillRecord] = {}
@@ -238,7 +243,7 @@ class DiscoveryService:
             lp = skill.local_path
             if not lp:
                 continue
-            canon_lp = _canonical_path(lp)
+            canon_lp = _canonical_key(lp)
             existing = seen_paths.get(canon_lp)
             if existing is None or (existing.is_package and not skill.is_package):
                 seen_paths[canon_lp] = skill
@@ -287,7 +292,7 @@ class DiscoveryService:
             resolved = resolve_resilient_path(source)
             if not resolved or not resolved.is_dir():
                 continue
-            key = _canonical_path(str(resolved))
+            key = _canonical_key(str(resolved))
             if key not in seen_sources:
                 seen_sources.add(key)
                 unique_sources.append(resolved)
@@ -304,7 +309,7 @@ class DiscoveryService:
             changed_sources = list(unique_sources)
         else:
             for src in unique_sources:
-                fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_path(str(src))}"
+                fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_key(str(src))}"
                 current_fp = compute_dir_fingerprint(src)
                 stored_fp = disk_cache.get(fp_key)  # type: ignore[arg-type]
 
@@ -379,7 +384,7 @@ class DiscoveryService:
             for src, new_skills in zip(changed_sources, parallel_results, strict=False):
                 try:
                     skills.extend(new_skills)  # type: ignore[arg-type]
-                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_path(str(src))}"
+                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_key(str(src))}"
                     disk_cache.set(fp_key, compute_dir_fingerprint(src))
                     disk_cache.set(f"pkg_skills:{fp_key}", new_skills)
                 except Exception as e:
@@ -410,15 +415,15 @@ class DiscoveryService:
                 grouped: dict[str, list[dict[str, Any]]] = _defaultdict(list)
                 for s in verified:
                     sp = s.get("source_path") or s.get("project_path") or ""
-                    grouped[_canonical_path(sp)].append(s)
+                    grouped[_canonical_key(sp)].append(s)
                 cached_grouped: dict[str, int] = {}
                 for s in cached_skills:
                     sp = s.get("source_path") or s.get("project_path") or ""
-                    k = _canonical_path(sp)
+                    k = _canonical_key(sp)
                     cached_grouped[k] = cached_grouped.get(k, 0) + 1
                 for src in unique_sources:
-                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_path(str(src))}"
-                    norm_src = _canonical_path(str(src))
+                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{_canonical_key(str(src))}"
+                    norm_src = _canonical_key(str(src))
                     verified_for_src = grouped.get(norm_src, [])
                     cached_count = cached_grouped.get(norm_src, 0)
                     try:
@@ -472,7 +477,7 @@ class DiscoveryService:
             resolved = resolve_resilient_path(project)
             if not resolved or not resolved.is_dir():
                 continue
-            key = _canonical_path(str(resolved))
+            key = _canonical_key(str(resolved))
             if key not in seen_projects:
                 seen_projects.add(key)
                 unique_projects.append(resolved)
@@ -490,7 +495,7 @@ class DiscoveryService:
                     projects_state.append(project_data)
                 continue
 
-            fp_key = f"proj_{self._DIR_FP_PREFIX}{_canonical_path(str(resolved))}"
+            fp_key = f"proj_{self._DIR_FP_PREFIX}{_canonical_key(str(resolved))}"
             current_fp = compute_dir_fingerprint(resolved)
             stored_fp = disk_cache.get(fp_key)  # type: ignore[arg-type]
 
@@ -542,7 +547,7 @@ class DiscoveryService:
                     )
                     orig_len = len(orig.get("skills", [])) if orig else 0
                     if len(skills) != orig_len:
-                        fp_key = f"proj_{self._DIR_FP_PREFIX}{_canonical_path(str(proj.get('project_path', '')))}"
+                        fp_key = f"proj_{self._DIR_FP_PREFIX}{_canonical_key(str(proj.get('project_path', '')))}"
                         disk_cache.set(f"proj_skills:{fp_key}", proj)  # type: ignore[arg-type]
                         disk_cache.set(fp_key, compute_dir_fingerprint(Path(proj["project_path"])))
                 logger.info(
