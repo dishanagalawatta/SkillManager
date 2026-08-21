@@ -20,23 +20,34 @@ logger = logging.getLogger(__name__)
 def canonical_path(p: str | Path) -> str:
     """Return canonical resolved path string.
 
-    On Windows this expands 8.3 short names (RUNNER~1) via ``Path.resolve()``
-    and folds case via ``os.path.normcase`` so that short and long forms
-    compare equal.  On POSIX it is just ``Path.resolve()`` (normcase is a
-    no-op).  Falls back to ``os.path.normpath`` if resolve fails.
+    Expands 8.3 short names (RUNNER~1) via ``Path.resolve()`` and preserves
+    original case so stored paths match ``str(Path)`` expectations in tests.
+    Case-insensitive comparison on Windows is handled separately via
+    ``canonical_key`` / ``os.path.normcase`` for dedup keys — do not fold
+    case here.
     """
     if p is None or str(p).strip() == "":
         return ""
     try:
-        resolved = str(Path(p).resolve())
-        if os.name == "nt":
-            return os.path.normcase(resolved)
-        return resolved
+        return str(Path(p).resolve())
     except Exception:
         try:
             return os.path.normpath(str(p))
         except Exception:
             return str(p)
+
+
+def canonical_key(p: str | Path) -> str:
+    """Return case-insensitive canonical key for dedup/comparison.
+
+    On Windows this is ``normcase(canonical_path(p))`` so that
+    ``C:\\Users\\ADMIN`` and ``c:\\users\\admin`` collapse. On POSIX it is
+    just ``canonical_path(p)``.
+    """
+    cp = canonical_path(p)
+    if os.name == "nt":
+        return os.path.normcase(cp)
+    return cp
 
 
 def copy_skill_folders_to_projects(skills, projects, update_only=False):

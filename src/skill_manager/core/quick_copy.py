@@ -15,23 +15,28 @@ from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers  # 
 
 
 def canonical_path(p: str | Path) -> str:
-    """Return canonical resolved path string.
+    """Return canonical resolved path string (preserves case).
 
-    On Windows expands 8.3 short names via ``Path.resolve()`` and folds
-    case via ``os.path.normcase``.  Falls back to ``os.path.normpath``.
+    Expands 8.3 short names via ``Path.resolve()``; case folding for
+    comparison is handled by ``canonical_key``.
     """
     if p is None or str(p).strip() == "":
         return ""
     try:
-        resolved = str(Path(p).resolve())
-        if os.name == "nt":
-            return os.path.normcase(resolved)
-        return resolved
+        return str(Path(p).resolve())
     except Exception:
         try:
             return os.path.normpath(str(p))
         except Exception:
             return str(p)
+
+
+def canonical_key(p: str | Path) -> str:
+    """Case-insensitive canonical key for dedup/comparison."""
+    cp = canonical_path(p)
+    if os.name == "nt":
+        return os.path.normcase(cp)
+    return cp
 
 
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
