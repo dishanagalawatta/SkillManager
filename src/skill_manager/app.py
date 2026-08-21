@@ -465,14 +465,56 @@ class AppController(AppControllerProxyMixin, QObject):
         if update_packages:
             try:
                 refreshed = resolve_package_storage(update_packages)
+                # Semantic comparison: only fields that affect storage behaviour.
+                # Transient keys like "_previous_resolved_package_path" must be
+                # ignored otherwise every boot appears dirty.
+                SEMANTIC_KEYS = {
+                    "package_path",
+                    "resolved_package_path",
+                    "local_path",
+                    "storage_mode",
+                    "configured_package_path",
+                    "clone_path",
+                    "package_id",
+                    "name",
+                }
                 changed_packages = False
                 for i, item in enumerate(refreshed):
                     if i < len(self._update_packages):
-                        if self._update_packages[i] != item:
+                        old = self._update_packages[i]
+                        old_sem = {k: old.get(k) for k in SEMANTIC_KEYS}
+                        new_sem = {k: item.get(k) for k in SEMANTIC_KEYS}
+                        if old_sem != new_sem:
                             changed_packages = True
+                            diff_keys = [
+                                k for k in SEMANTIC_KEYS if old_sem.get(k) != new_sem.get(k)
+                            ]
+                            for k in diff_keys:
+                                logger.info(
+                                    "Boot self-healing: package[%d] field %r changed %r -> %r",
+                                    i,
+                                    k,
+                                    old_sem.get(k),
+                                    new_sem.get(k),
+                                )
+                            # Extra detail for the two most relevant fields at INFO
+                            if "resolved_package_path" in diff_keys or "storage_mode" in diff_keys:
+                                logger.debug(
+                                    "Boot self-healing detail package[%d] resolved %r -> %r storage_mode %r -> %r",
+                                    i,
+                                    old.get("resolved_package_path"),
+                                    item.get("resolved_package_path"),
+                                    old.get("storage_mode"),
+                                    item.get("storage_mode"),
+                                )
                         self._update_packages[i].clear()
                         self._update_packages[i].update(item)
                     else:
+                        logger.info(
+                            "Boot self-healing: package[%d] new entry added %r",
+                            i,
+                            {k: item.get(k) for k in SEMANTIC_KEYS},
+                        )
                         self._update_packages.append(item)
                         changed_packages = True
                 if changed_packages:
