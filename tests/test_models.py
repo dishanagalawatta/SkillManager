@@ -718,7 +718,7 @@ def test_skill_model_selection_persists_across_client_change_default(qapp):
 
 
 def test_skill_model_selection_survives_client_filter_when_explicitly_enabled(qapp):
-    """Even with filterByClient=True, _selected_ids must persist (only filtered count drops)."""
+    """Even with filterByClient=True, _selected_ids must persist; only filtered counts drop."""
     skills = [
         {"name": "Client A Skill 1", "local_path": "/a1", "client": "Antigravity"},
         {"name": "Client A Skill 2", "local_path": "/a2", "client": "Antigravity"},
@@ -733,19 +733,22 @@ def test_skill_model_selection_survives_client_filter_when_explicitly_enabled(qa
     assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
     assert model.selectedCount == 2
 
-    # Switch to client B — selection persists, but filtered count drops
+    # Switch to client B — total selection persists, filtered/visible drop to 0
     model.clientFilter = "Codex"
     assert set(model.getSelectedPaths()) == {"/a1", "/a2"}, (
         "Selection changed when it should not have"
     )
     assert model.data(model.index(0, 0), SkillModel.IsSelectedRole) is False
     assert model.data(model.index(1, 0), SkillModel.IsSelectedRole) is False
-    assert model.selectedCount == 0, "selectedCount drops because client-filtered skills are hidden"
+    assert model.selectedCount == 2, "selectedCount must stay 2 (total), independent of filter"
+    assert model.filteredSelectedCount == 0
+    assert model.visibleSelectedCount == 0
 
     # Switch back to client A — original selection restored in view
     model.clientFilter = "Antigravity"
     assert set(model.getSelectedPaths()) == {"/a1", "/a2"}
     assert model.selectedCount == 2
+    assert model.filteredSelectedCount == 2
     assert model.data(model.index(0, 0), SkillModel.IsSelectedRole) is True
     assert model.data(model.index(1, 0), SkillModel.IsSelectedRole) is True
 
@@ -789,3 +792,47 @@ def test_get_selected_names(qapp, skill_list):
     model.setSkills(skill_list)
     model.selectByPaths(["/b", "/a"])
     assert model.getSelectedNames() == ["Skill B", "Skill A"]
+
+
+def test_selected_count_stable_across_search(qapp):
+    """selectedCount must remain total while search filters hide selected items."""
+    from unittest.mock import MagicMock
+
+    skills = [
+        {"name": "Alpha", "local_path": "/a", "category": "Dev"},
+        {"name": "Beta", "local_path": "/b", "category": "Dev"},
+        {"name": "Gamma", "local_path": "/c", "category": "Dev"},
+        {"name": "Delta", "local_path": "/d", "category": "Dev"},
+    ]
+    model = SkillModel()
+    model.setSkills(skills)
+    model.selectByPaths(["/a", "/b", "/c"])
+    assert model.selectedCount == 3
+    assert model.filteredSelectedCount == 3
+    assert model.visibleSelectedCount == 3
+
+    mock_search = MagicMock()
+    mock_search.query.return_value = [(skills[1], 1.0)]
+    model._search_engine = mock_search
+    model.filterText = "beta"
+
+    assert model.rowCount() == 1
+    assert model.selectedCount == 3
+    assert model.filteredSelectedCount == 1
+    assert model.visibleSelectedCount == 1
+    assert set(model.getSelectedPaths()) == {"/a", "/b", "/c"}
+    assert model.getFilteredSelectedPaths() == ["/b"]
+
+    model.filterText = ""
+    assert model.selectedCount == 3
+    assert model.filteredSelectedCount == 3
+
+
+def test_selected_count_excludes_ghost_paths(qapp, skill_list):
+    """selectedCount ignores orphaned paths no longer present in _all_skills."""
+    model = SkillModel()
+    model.setSkills(skill_list)
+    model.selectByPaths(["/a", "/ghost"])
+    assert "/ghost" in model.getSelectedPaths()
+    assert model.selectedCount == 1
+    assert model.filteredSelectedCount == 1

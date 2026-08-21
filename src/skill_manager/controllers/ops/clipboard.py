@@ -117,12 +117,18 @@ class ClipboardMixin:
             self.copyTextToClipboard(path)
 
     def _get_model_selected_count(self, model) -> int:
-        """Safely retrieve the selected count of a model."""
+        """Safely retrieve the selected count of a model.
+
+        Prefers ``filteredSelectedCount`` (filter-aware) so the badge's
+        total count does not cause clipboard ops to fire when the
+        current search hides all selected items.
+        """
         if model is None:
             return 0
-        cnt = getattr(model, "selectedCount", 0)
-        if isinstance(cnt, (int, float)):
-            return int(cnt)
+        for attr in ("filteredSelectedCount", "selectedCount"):
+            cnt = getattr(model, attr, None)
+            if isinstance(cnt, (int, float)):
+                return int(cnt)
         return 0
 
     @Slot()

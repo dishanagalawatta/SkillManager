@@ -358,7 +358,10 @@ class UIController(BaseController):
     def selectAllVisibleSkills(self):
         """Selects all skills currently visible in the active model."""
         self.app.skillModel.selectAll()
-        self.app._set_status(f"Selected {self.app.skillModel.selectedCount} visible skills")
+        count = getattr(
+            self.app.skillModel, "filteredSelectedCount", self.app.skillModel.selectedCount
+        )
+        self.app._set_status(f"Selected {count} visible skills")
 
     @Slot()
     def clearVisibleSelection(self):

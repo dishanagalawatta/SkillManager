@@ -89,6 +89,7 @@ class SkillModel(QAbstractListModel):
 
     # Read-only properties (no setter in qt_model.py)
     selectedCount: int
+    filteredSelectedCount: int
     visibleSelectableCount: int
     visibleSelectedCount: int
     totalSelectableCount: int
@@ -110,6 +111,7 @@ class SkillModel(QAbstractListModel):
     _collapse_save_timer: Any
     _project_selections_save_timer: Any
     _cached_selected_count: int
+    _cached_filtered_selected: int
     _cached_visible_selectable: int
     _cached_visible_selected: int
     _cached_total_selectable: int
