@@ -381,6 +381,57 @@ class DiscoveryService:
             verified.append(skill)
         if removed_count:
             logger.info("[DISCOVERY] Verification removed %d missing skill(s)", removed_count)
+            # Cache repair: fingerprint matched but cached entries were stale.
+            # Update per-source cache with verified subset so next boot is idempotent.
+            try:
+                from collections import defaultdict as _defaultdict
+
+                grouped: dict[str, list[dict[str, Any]]] = _defaultdict(list)
+                for s in verified:
+                    sp = s.get("source_path") or s.get("project_path") or ""
+                    grouped[os.path.normcase(sp)].append(s)
+                cached_grouped: dict[str, int] = {}
+                for s in cached_skills:
+                    sp = s.get("source_path") or s.get("project_path") or ""
+                    k = os.path.normcase(sp)
+                    cached_grouped[k] = cached_grouped.get(k, 0) + 1
+                for src in unique_sources:
+                    fp_key = f"pkg_{self._DIR_FP_PREFIX}{os.path.normcase(str(src))}"
+                    norm_src = os.path.normcase(str(src))
+                    verified_for_src = grouped.get(norm_src, [])
+                    cached_count = cached_grouped.get(norm_src, 0)
+                    try:
+                        current_fp = compute_dir_fingerprint(src)
+                    except Exception:
+                        current_fp = ""
+                    if current_fp:
+                        disk_cache.set(fp_key, current_fp)  # type: ignore[arg-type]
+                    disk_cache.set(f"pkg_skills:{fp_key}", verified_for_src)  # type: ignore[arg-type]
+                    if cached_count != len(verified_for_src):
+                        logger.info(
+                            "[DISCOVERY] Fingerprint inconsistency for source %s: cached=%d verified=%d fingerprint=%s removed=%d",
+                            src,
+                            cached_count,
+                            len(verified_for_src),
+                            current_fp,
+                            removed_count,
+                        )
+                    else:
+                        logger.info(
+                            "[DISCOVERY] Diskcache updated for source %s: fingerprint=%s verified=%d removed=%d",
+                            src,
+                            current_fp,
+                            len(verified_for_src),
+                            removed_count,
+                        )
+                logger.info(
+                    "[DISCOVERY] Cache repaired after package verification: removed %d stale skill(s)",
+                    removed_count,
+                )
+            except Exception as e:  # noqa: BLE001 — defensive: cache repair must not break discovery
+                logger.warning(
+                    "[DISCOVERY] Failed to repair package cache after verification: %s", e
+                )
         return verified
 
     def discover_projects_incremental(
@@ -435,7 +486,6 @@ class DiscoveryService:
                 disk_cache.set(fp_key, compute_dir_fingerprint(resolved))
                 disk_cache.set(f"proj_skills:{fp_key}", project_data)
 
-        # Verification: remove skills whose local_path no longer exists on disk
         verified_projects: list[dict[str, Any]] = []
         total_removed = 0
         for project in projects_state:
@@ -458,6 +508,30 @@ class DiscoveryService:
             logger.info(
                 "[DISCOVERY] Verification removed %d missing skill(s) from projects", total_removed
             )
+            try:
+                for proj in verified_projects:
+                    skills = proj.get("skills", [])
+                    orig = next(
+                        (
+                            p
+                            for p in projects_state
+                            if p.get("project_key") == proj.get("project_key")
+                        ),
+                        None,
+                    )
+                    orig_len = len(orig.get("skills", [])) if orig else 0
+                    if len(skills) != orig_len:
+                        fp_key = f"proj_{self._DIR_FP_PREFIX}{os.path.normcase(str(proj.get('project_path', '')))}"
+                        disk_cache.set(f"proj_skills:{fp_key}", proj)  # type: ignore[arg-type]
+                        disk_cache.set(fp_key, compute_dir_fingerprint(Path(proj["project_path"])))
+                logger.info(
+                    "[DISCOVERY] Cache repaired after project verification: removed %d stale skill(s)",
+                    total_removed,
+                )
+            except Exception as e:  # noqa: BLE001 — defensive
+                logger.warning(
+                    "[DISCOVERY] Failed to repair project cache after verification: %s", e
+                )
         return verified_projects
 
     def _scan_single_project(

@@ -141,14 +141,15 @@ class IncubationMixin:
     def _apply_prepared_state_now(self, state: PreparedModelState) -> None:
         """Apply a pre-computed model state via a reset.
 
-        If the model is completely empty (e.g. startup) or in tests, applies
-        synchronously. If delegates exist, emits ``aboutToMutateStructure`` and
-        defers the actual ``beginResetModel``/``endResetModel`` by 1 tick via
-        ``QTimer.singleShot(0)`` so that QML can zero ``cacheBuffer`` before
-        delegates are destroyed.
+        Always defers the actual ``beginResetModel``/``endResetModel`` by 1
+        tick via ``QTimer.singleShot(0)`` so that QML can zero
+        ``cacheBuffer`` before delegates are destroyed. The deferred tick
+        gives delegates one event-loop turn to process
+        ``aboutToMutateStructure`` (which clears ``cacheBuffer``) before any
+        ``beginResetModel``/``endResetModel`` destroys incubating objects.
+        In tests (``SKILL_MANAGER_TESTING=1``) the reset runs synchronously
+        so assertions pass immediately.
         """
-        had_skills = bool(self._all_skills)
-
         self._all_skills = state.all_skills
         self._search_engine = state.search_engine
         self._all_filtered_skills = state.all_filtered_skills
@@ -165,7 +166,7 @@ class IncubationMixin:
             self.selectionStateChanged.emit()
             self.totalSelectableCountChanged.emit()
 
-        if not had_skills or os.environ.get("SKILL_MANAGER_TESTING") == "1":
+        if os.environ.get("SKILL_MANAGER_TESTING") == "1":
             _do_reset()
         else:
             self._reset_pending = True
