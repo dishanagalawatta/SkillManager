@@ -11,6 +11,7 @@ on:
       - 'image/**'
       - 'conductor/**'
       - 'LICENSE'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,26 +24,30 @@ concurrency:
 jobs:
   auto-release:
     name: Auto Detect Release & Bump Version
-    # Prevent infinite loop: do not run if commit contains [skip ci]
+    # Prevent infinite loop: semantic-release commits include [skip ci] and
+    # this guard skips those pushes so auto-release does not trigger itself.
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository (full history and tags)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
       - name: Install dependencies
-        run: uv sync --only-group dev
+        run: uv sync --frozen --only-group dev
 
       - name: Configure Git Identity
         run: |
@@ -52,14 +57,15 @@ jobs:
       - name: Run Automated Release & Version Sync
         id: release
         run: |
+          set -euo pipefail
           OLD_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           uv run python scripts/release.py auto --only-if-triggered --skip-tests --skip-lint
           NEW_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -n "$NEW_TAG" ] && [ "$NEW_TAG" != "$OLD_TAG" ]; then
-            echo "NEW_TAG=$NEW_TAG" >> $GITHUB_OUTPUT
-            echo "RELEASED=true" >> $GITHUB_OUTPUT
+            echo "NEW_TAG=$NEW_TAG" >> "$GITHUB_OUTPUT"
+            echo "RELEASED=true" >> "$GITHUB_OUTPUT"
           else
-            echo "RELEASED=false" >> $GITHUB_OUTPUT
+            echo "RELEASED=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Trigger Release Build Workflow
@@ -69,4 +75,4 @@ jobs:
         run: |
           TAG="${{ steps.release.outputs.NEW_TAG }}"
           echo "Triggering release-build.yml for tag: $TAG"
-          gh workflow run release-build.yml --ref "$TAG" || true
+          gh workflow run release-build.yml --ref "$TAG" || echo "::warning::gh workflow run failed — trigger release-build manually for $TAG"

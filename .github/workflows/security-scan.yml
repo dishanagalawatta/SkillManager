@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   security:
     name: Security

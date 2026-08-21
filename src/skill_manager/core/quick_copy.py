@@ -13,6 +13,27 @@ logger = logging.getLogger(__name__)
 
 from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers  # noqa: E402
 
+
+def canonical_path(p: str | Path) -> str:
+    """Return canonical resolved path string.
+
+    On Windows expands 8.3 short names via ``Path.resolve()`` and folds
+    case via ``os.path.normcase``.  Falls back to ``os.path.normpath``.
+    """
+    if p is None or str(p).strip() == "":
+        return ""
+    try:
+        resolved = str(Path(p).resolve())
+        if os.name == "nt":
+            return os.path.normcase(resolved)
+        return resolved
+    except Exception:
+        try:
+            return os.path.normpath(str(p))
+        except Exception:
+            return str(p)
+
+
 CLIENT_FORMATS = {"Codex", "Gemini CLI", "Antigravity", "Plain Text", "OpenCode"}
 
 # Re-exported for convenience; canonical impl lives in skill_references.
@@ -100,8 +121,11 @@ def resolve_resilient_path(path_str):
                     from skill_manager.core.copier import auto_detect_skills_dir
 
                     return auto_detect_skills_dir(path)
-            return path.resolve()
+            canon = canonical_path(path)
+            return Path(canon) if canon else path.resolve()
     except OSError:
+        pass
+    except Exception:
         pass
 
     return path
@@ -370,7 +394,15 @@ def discover_project_skills(
 def normalize_path(path):
     if not path:
         return ""
-    return os.path.normcase(os.path.normpath(path)).replace("\\", "/")
+    try:
+        p = Path(os.path.expanduser(str(path).strip()))
+        if p.exists():
+            canon = canonical_path(p)
+            if canon:
+                return os.path.normcase(canon).replace("\\", "/")
+    except Exception:
+        pass
+    return os.path.normcase(os.path.normpath(str(path))).replace("\\", "/")
 
 
 def load_ignore_spec(root: Path):

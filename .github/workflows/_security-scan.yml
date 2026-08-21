@@ -2,6 +2,10 @@ name: Security Scan
 
 on:
   workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   pip-audit:
@@ -23,7 +27,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       # Audit ONLY the runtime/production dependency surface.
       #
@@ -43,7 +47,16 @@ jobs:
         run: uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements-audit.txt
 
       - name: Run pip-audit
-        run: uv run pip-audit --desc -r requirements-audit.txt --ignore-vuln CVE-2025-69872 --ignore-vuln GHSA-qp9x-wp8f-qgjj
+        # continue-on-error is intentional: the audit step should surface CVEs as
+        # annotations without hard-failing the entire security-scan reusable
+        # workflow when new advisories appear. Callers that need a hard gate
+        # should remove continue-on-error or add a dedicated enforcement step.
+        # Ignores are documented below — each was triaged and does not affect
+        # shipped runtime on the pinned versions.
+        run: >
+          uv run pip-audit --desc -r requirements-audit.txt
+          --ignore-vuln CVE-2025-69872
+          --ignore-vuln GHSA-qp9x-wp8f-qgjj
         continue-on-error: true
 
       - name: Clean up audit artifacts

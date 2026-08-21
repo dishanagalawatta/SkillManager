@@ -17,6 +17,28 @@ from urllib.request import url2pathname
 logger = logging.getLogger(__name__)
 
 
+def canonical_path(p: str | Path) -> str:
+    """Return canonical resolved path string.
+
+    On Windows this expands 8.3 short names (RUNNER~1) via ``Path.resolve()``
+    and folds case via ``os.path.normcase`` so that short and long forms
+    compare equal.  On POSIX it is just ``Path.resolve()`` (normcase is a
+    no-op).  Falls back to ``os.path.normpath`` if resolve fails.
+    """
+    if p is None or str(p).strip() == "":
+        return ""
+    try:
+        resolved = str(Path(p).resolve())
+        if os.name == "nt":
+            return os.path.normcase(resolved)
+        return resolved
+    except Exception:
+        try:
+            return os.path.normpath(str(p))
+        except Exception:
+            return str(p)
+
+
 def copy_skill_folders_to_projects(skills, projects, update_only=False):
     result = {"copied": 0, "merged": 0, "skipped": 0, "failed": 0, "details": []}
 
@@ -114,7 +136,12 @@ def auto_detect_skills_dir(project_root: str | Path) -> Path:
     - Path already at <root>/.agents → return <path>/skills
     - Path at project root → return <root>/.agents/skills (existing or intended)
     """
-    path = Path(project_root).resolve()
+    # Use canonical_path to expand 8.3 short names on Windows
+    try:
+        canon = canonical_path(project_root)
+        path = Path(canon) if canon else Path(project_root).resolve()
+    except Exception:
+        path = Path(project_root).resolve()
     name_lower = path.name.lower()
 
     if name_lower == "skills":
@@ -123,7 +150,10 @@ def auto_detect_skills_dir(project_root: str | Path) -> Path:
     if name_lower == ".agents":
         return path / "skills"
 
-    return (path / ".agents" / "skills").resolve()
+    try:
+        return Path(canonical_path(path / ".agents" / "skills"))
+    except Exception:
+        return (path / ".agents" / "skills").resolve()
 
 
 def get_skills_dir(project_path: str | Path) -> Path:
@@ -306,7 +336,8 @@ def url_to_local_path(raw_input: str) -> str:
 
     try:
         p = Path(path_str).expanduser()
-        return str(p.resolve())
+        canon = canonical_path(p)
+        return canon if canon else path_str
     except Exception:
         return path_str
 

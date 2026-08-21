@@ -48,6 +48,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
+    # Always run so the branch protection gate has a single required check.
     if: always()
     needs: [lint, test-py312, test-py313]
     runs-on: ubuntu-latest
@@ -55,16 +56,24 @@ jobs:
     steps:
       - name: Check all jobs
         run: |
+          # Intentionally treat skipped/cancelled as failure — the gate must
+          # only pass when every required job succeeded. A skipped job means
+          # required coverage is missing and should block merge.
+          failed=0
           if [[ "${{ needs.lint.result }}" != "success" ]]; then
-            echo "Lint failed"
-            exit 1
+            echo "::error::Lint: ${{ needs.lint.result }}"
+            failed=1
           fi
           if [[ "${{ needs.test-py312.result }}" != "success" ]]; then
-            echo "Test (Py 3.12) failed"
-            exit 1
+            echo "::error::Test (Py 3.12): ${{ needs.test-py312.result }}"
+            failed=1
           fi
           if [[ "${{ needs.test-py313.result }}" != "success" ]]; then
-            echo "Test (Py 3.13) failed"
+            echo "::error::Test (Py 3.13): ${{ needs.test-py313.result }}"
+            failed=1
+          fi
+          if [ "$failed" -ne 0 ]; then
+            echo "CI gate failed — see errors above."
             exit 1
           fi
           echo "All checks passed"

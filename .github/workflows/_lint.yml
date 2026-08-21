@@ -2,6 +2,10 @@ name: Lint
 
 on:
   workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -19,6 +23,48 @@ jobs:
 
       - name: Ruff check + format
         run: |
-          RUFF_VERSION=$(sed -n '/name = "ruff"/,/version =/p' uv.lock | grep -m1 'version = ' | cut -d'"' -f2)
-          uvx --from "ruff==$RUFF_VERSION" ruff check src tests
-          uvx --from "ruff==$RUFF_VERSION" ruff format --check src tests
+          set -euo pipefail
+          # --- Robust ruff version extraction with fallbacks ---
+          # 1) Parse uv.lock via Python regex (immune to line-order changes)
+          # 2) Parse pyproject.toml dependency-groups / optional-dependencies
+          # 3) Fall back to unpinned uvx (always works, just not reproducible)
+          RUFF_VERSION=""
+          if [ -f uv.lock ]; then
+            RUFF_VERSION=$(python3 - << 'PY' 2>/dev/null || true
+          import re, pathlib
+          p = pathlib.Path("uv.lock")
+          if p.exists():
+              text = p.read_text(encoding="utf-8", errors="ignore")
+              m = re.search(r'\[\[package\]\]\s*name\s*=\s*"ruff"\s*version\s*=\s*"([^"]+)"', text)
+              if m:
+                  print(m.group(1).strip())
+          PY
+            )
+          fi
+          if [ -z "$RUFF_VERSION" ] && [ -f pyproject.toml ]; then
+            RUFF_VERSION=$(python3 - << 'PY' 2>/dev/null || true
+          import re, pathlib
+          p = pathlib.Path("pyproject.toml")
+          if p.exists():
+              text = p.read_text(encoding="utf-8", errors="ignore")
+              # dependency-groups dev = ["ruff>=0.8.0", ...] or optional-dependencies
+              for pat in [r'"ruff[^"]*>=([0-9.]+)"', r'"ruff==([0-9.]+)"', r"'ruff[^']*>=([0-9.]+)'"]:
+                  import re as _re
+                  m = _re.search(pat, text)
+                  if m:
+                      print(m.group(1).strip())
+                      break
+          PY
+            )
+          fi
+          # Normalise: strip whitespace/newlines
+          RUFF_VERSION=$(echo "$RUFF_VERSION" | tr -d '[:space:]')
+          if [ -n "$RUFF_VERSION" ]; then
+            echo "Using pinned ruff $RUFF_VERSION"
+            uvx --from "ruff==$RUFF_VERSION" ruff check src tests
+            uvx --from "ruff==$RUFF_VERSION" ruff format --check src tests
+          else
+            echo "::warning::Could not resolve ruff version; falling back to unpinned uvx ruff"
+            uvx ruff check src tests
+            uvx ruff format --check src tests
+          fi

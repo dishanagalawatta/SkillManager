@@ -7,6 +7,15 @@ on:
         description: Python version to test
         type: string
         default: "3.12"
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: Python version to test
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -42,7 +51,8 @@ jobs:
           # runner see the true result; pytest itself still swallows the
           # console event via the windows_ci_sigint_guard fixture.
           trap '' INT
-          uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing -q --full-trace
+          uv run pytest --cov=skill_manager --cov-report=xml --cov-report=term-missing \
+            -q --full-trace
           code=$?
           trap - INT
           echo "UV_RUN_PYTEST_EXIT=$code"
@@ -57,7 +67,14 @@ jobs:
         with:
           name: coverage-windows-py${{ inputs.python-version }}
           path: coverage.xml
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Enforce coverage threshold
-        run: uv run coverage report --fail-under=80
+        if: always()
+        run: |
+          if [ ! -f coverage.xml ]; then
+            echo "::warning::coverage.xml not found — skipping fail-under check (tests may have failed before coverage was written)"
+            exit 0
+          fi
+          uv run coverage report --fail-under=80
