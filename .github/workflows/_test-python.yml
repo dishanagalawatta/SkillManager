@@ -72,6 +72,7 @@ jobs:
 
       - name: Enforce coverage threshold
         if: always()
+        shell: bash
         run: |
           if [ ! -f coverage.xml ]; then
             echo "::warning::coverage.xml not found — skipping fail-under check (tests may have failed before coverage was written)"
