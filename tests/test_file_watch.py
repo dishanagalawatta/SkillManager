@@ -7,29 +7,65 @@ from skill_manager.core.file_watch import SkillFolderEventHandler, SkillFolderWa
 
 
 def test_skill_folder_event_handler():
-    """Test that the handler coalesces events and triggers the callback for markdown files or directories."""
+    """Handler only fires for `.agents` relative paths and .md files/directories."""
     mock_callback = Mock()
-    # Use debounce_ms=0 to test filtering logic without debounce delay
     handler = SkillFolderEventHandler(mock_callback, debounce_ms=0)
 
-    # Trigger with a markdown file
-    md_event = FileModifiedEvent("test_skill.md")
+    md_event = FileModifiedEvent("/tmp/proj/.agents/skills/my-skill/SKILL.md")
     handler.on_any_event(md_event)
     mock_callback.assert_called_with(md_event.src_path)
 
     mock_callback.reset_mock()
 
-    # Trigger with a directory (this is allowed by the logic)
-    dir_event = FileModifiedEvent("some_dir")
+    dir_event = FileModifiedEvent("/tmp/proj/.agents/skills/new-skill")
     dir_event.is_directory = True
     handler.on_any_event(dir_event)
     mock_callback.assert_called_with(dir_event.src_path)
 
     mock_callback.reset_mock()
 
-    # Trigger with a non-markdown file
-    txt_event = FileModifiedEvent("test.txt")
+    txt_event = FileModifiedEvent("/tmp/proj/.agents/skills/test.txt")
     handler.on_any_event(txt_event)
+    mock_callback.assert_not_called()
+
+    # Irrelevant paths (frontend, tests, etc.) must be ignored even if .md
+    mock_callback.reset_mock()
+    irrelevant_md = FileModifiedEvent("/tmp/proj/frontend/README.md")
+    handler.on_any_event(irrelevant_md)
+    mock_callback.assert_not_called()
+
+    irrelevant_dir = FileModifiedEvent("/tmp/proj/frontend")
+    irrelevant_dir.is_directory = True
+    handler.on_any_event(irrelevant_dir)
+    mock_callback.assert_not_called()
+
+
+def test_skill_folder_event_handler_deleted_and_moved_filtering():
+    mock_callback = Mock()
+    handler = SkillFolderEventHandler(mock_callback, debounce_ms=0)
+
+    deleted = FileModifiedEvent("/tmp/proj/.agents/skills/old-skill")
+    deleted.is_directory = True
+    handler.on_deleted(deleted)
+    mock_callback.assert_called_with(deleted.src_path)
+
+    mock_callback.reset_mock()
+    deleted_outside = FileModifiedEvent("/tmp/proj/frontend")
+    deleted_outside.is_directory = True
+    handler.on_deleted(deleted_outside)
+    mock_callback.assert_not_called()
+
+    mock_callback.reset_mock()
+    moved = FileModifiedEvent("/tmp/proj/.agents/skills/a")
+    moved.is_directory = True
+    moved.dest_path = "/tmp/proj/.agents/skills/b"
+    handler.on_moved(moved)
+    mock_callback.assert_called()
+
+    mock_callback.reset_mock()
+    moved_outside = FileModifiedEvent("/tmp/proj/frontend")
+    moved_outside.dest_path = "/tmp/proj/backend"
+    handler.on_moved(moved_outside)
     mock_callback.assert_not_called()
 
 

@@ -180,6 +180,10 @@ Window {
     }
 
     function focusCurrentSearch() {
+        if (typeof topBar !== "undefined" && topBar && typeof topBar.focusSearch === "function") {
+            topBar.focusSearch()
+            return
+        }
         if (viewLoader.item && viewLoader.item.focusSearch) {
             viewLoader.item.focusSearch()
         }
