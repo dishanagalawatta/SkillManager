@@ -22,34 +22,34 @@ class TestOnDeletedAlwaysFires:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/my-skill/SKILL.md"
+        evt.src_path = "/.agents/skills/my-skill/SKILL.md"
         h.on_deleted(evt)
-        cb.assert_called_once_with("/skills/my-skill/SKILL.md")
+        cb.assert_called_once_with("/.agents/skills/my-skill/SKILL.md")
 
     def test_on_deleted_fires_for_non_md_file(self):
         cb = MagicMock()
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/my-skill/README.txt"
+        evt.src_path = "/.agents/skills/my-skill/README.txt"
         h.on_deleted(evt)
-        cb.assert_called_once_with("/skills/my-skill/README.txt")
+        cb.assert_called_once_with("/.agents/skills/my-skill/README.txt")
 
     def test_on_deleted_fires_for_directory(self):
         cb = MagicMock()
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = True
-        evt.src_path = "/skills/my-skill"
+        evt.src_path = "/.agents/skills/my-skill"
         h.on_deleted(evt)
-        cb.assert_called_once_with("/skills/my-skill")
+        cb.assert_called_once_with("/.agents/skills/my-skill")
 
     def test_on_deleted_fires_with_debounce(self):
         cb = MagicMock()
         h = SkillFolderEventHandler(cb, debounce_ms=50)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/some-file.json"
+        evt.src_path = "/.agents/skills/some-file.json"
         h.on_deleted(evt)
         # Should schedule, not call immediately
         cb.assert_not_called()
@@ -65,27 +65,27 @@ class TestOnMovedAlwaysFires:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/SKILL.md"
+        evt.src_path = "/.agents/skills/SKILL.md"
         h.on_moved(evt)
-        cb.assert_called_once_with("/skills/SKILL.md")
+        cb.assert_called_once_with("/.agents/skills/SKILL.md")
 
     def test_on_moved_fires_for_non_md_file(self):
         cb = MagicMock()
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/data.json"
+        evt.src_path = "/.agents/skills/data.json"
         h.on_moved(evt)
-        cb.assert_called_once_with("/skills/data.json")
+        cb.assert_called_once_with("/.agents/skills/data.json")
 
     def test_on_moved_fires_for_directory(self):
         cb = MagicMock()
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = True
-        evt.src_path = "/skills/old-name"
+        evt.src_path = "/.agents/skills/old-name"
         h.on_moved(evt)
-        cb.assert_called_once_with("/skills/old-name")
+        cb.assert_called_once_with("/.agents/skills/old-name")
 
 
 class TestOnAnyEventStillFilters:
@@ -96,7 +96,7 @@ class TestOnAnyEventStillFilters:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = True
-        evt.src_path = "/skills/my-skill"
+        evt.src_path = "/.agents/skills/my-skill"
         h.on_any_event(evt)
         cb.assert_called_once()
 
@@ -105,7 +105,7 @@ class TestOnAnyEventStillFilters:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/my-skill/SKILL.md"
+        evt.src_path = "/.agents/skills/my-skill/SKILL.md"
         h.on_any_event(evt)
         cb.assert_called_once()
 
@@ -114,7 +114,7 @@ class TestOnAnyEventStillFilters:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = False
-        evt.src_path = "/skills/my-skill/data.json"
+        evt.src_path = "/.agents/skills/my-skill/data.json"
         h.on_any_event(evt)
         cb.assert_not_called()
 
@@ -128,7 +128,7 @@ class TestDebounceForAllHandlers:
         for i in range(5):
             evt = MagicMock()
             evt.is_directory = False
-            evt.src_path = f"/skills/file-{i}.txt"
+            evt.src_path = f"/.agents/skills/file-{i}.txt"
             h.on_deleted(evt)
         # All 5 should coalesce into one pending timer
         assert h._timer is not None
@@ -140,7 +140,7 @@ class TestDebounceForAllHandlers:
         for i in range(5):
             evt = MagicMock()
             evt.is_directory = True
-            evt.src_path = f"/skills/dir-{i}"
+            evt.src_path = f"/.agents/skills/dir-{i}"
             h.on_moved(evt)
         assert h._timer is not None
         h.cancel()
@@ -152,7 +152,7 @@ class TestDebounceForAllHandlers:
         # on_deleted
         evt1 = MagicMock()
         evt1.is_directory = False
-        evt1.src_path = "/skills/file.txt"
+        evt1.src_path = "/.agents/skills/file.txt"
         h.on_deleted(evt1)
         timer1 = h._timer
         assert timer1 is not None
@@ -163,7 +163,7 @@ class TestDebounceForAllHandlers:
         assert h._timer is None
         evt2 = MagicMock()
         evt2.is_directory = True
-        evt2.src_path = "/skills/dir"
+        evt2.src_path = "/.agents/skills/dir"
         h.on_moved(evt2)
         # Should have a new timer, callback not yet called
         assert h._timer is not None
@@ -179,7 +179,7 @@ class TestCancelAndFire:
         h = SkillFolderEventHandler(cb, debounce_ms=200)
         evt = MagicMock()
         evt.is_directory = True
-        evt.src_path = "/skills/something"
+        evt.src_path = "/.agents/skills/something"
         h.on_any_event(evt)
         assert h._timer is not None
         h.cancel()
@@ -192,7 +192,7 @@ class TestCancelAndFire:
         h = SkillFolderEventHandler(cb, debounce_ms=0)
         evt = MagicMock()
         evt.is_directory = True
-        evt.src_path = "/skills/something"
+        evt.src_path = "/.agents/skills/something"
         h.on_any_event(evt)
         # debounce_ms=0 means _fire_or_schedule calls _callback directly
-        cb.assert_called_once_with("/skills/something")
+        cb.assert_called_once_with("/.agents/skills/something")
