@@ -45,7 +45,9 @@ def test_search_expand_collapse_via_icon(qtbot, qml_engine, app_controller):
 
     # Wait for TopBar children to be created
     qtbot.waitUntil(lambda: root.findChild(QQuickItem, "topSearchInput") is not None, timeout=5000)
-    qtbot.waitUntil(lambda: root.findChild(QQuickItem, "topSearchIconBtn") is not None, timeout=5000)
+    qtbot.waitUntil(
+        lambda: root.findChild(QQuickItem, "topSearchIconBtn") is not None, timeout=5000
+    )
 
     search_input = root.findChild(QQuickItem, "topSearchInput")
     search_btn = root.findChild(QQuickItem, "topSearchIconBtn")
@@ -134,6 +136,7 @@ def test_search_filter_still_works_when_expanded(qtbot, qml_engine, app_controll
 
     qtbot.waitUntil(lambda: root.findChild(QQuickItem, "topSearchInput") is not None, timeout=5000)
     search_input = root.findChild(QQuickItem, "topSearchInput")
+    assert search_input is not None
     search_btn = root.findChild(QQuickItem, "topSearchIconBtn")
     search_btn.clicked.emit()
     qapp.processEvents()
