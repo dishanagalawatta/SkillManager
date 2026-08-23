@@ -134,6 +134,5 @@ Item {
     }
 
     Accessible.role: Accessible.Button
-    Accessible.name: root.mainCatName
-    Accessible.description: headerToolTip.text
+    Accessible.name: headerToolTip.text
 }

@@ -117,8 +117,7 @@ Item {
             }
 
             Accessible.role: Accessible.Button
-            Accessible.name: root.subCat
-            Accessible.description: subCatToolTip.text
+            Accessible.name: subCatToolTip.text
         }
 
         // --- SKILL ITEM CONTENT ---
@@ -295,7 +294,6 @@ Item {
 
                         Accessible.role: Accessible.CheckBox
                         Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
-                        Accessible.description: selToolTip.text
                     }
 
                     // Icon Section
