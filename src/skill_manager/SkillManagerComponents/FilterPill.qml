@@ -58,6 +58,8 @@ Button {
 
     onClicked: control.activeChanged(control.isActive)
 
-    Accessible.role: Accessible.Button
+    Accessible.role: Accessible.CheckBox
+    Accessible.checkable: true
+    Accessible.checked: control.isActive
     Accessible.name: control.text
 }
