@@ -66,7 +66,14 @@ def setup_logging():
         handlers=[logging.StreamHandler(), logging.FileHandler(log_file, encoding="utf-8")],
     )
 
-    for noisy in ("markdown_it", "urllib3"):
+    for noisy in (
+        "markdown_it",
+        "urllib3",
+        "watchdog.observers.inotify_buffer",
+        "watchdog.observers.inotify",
+        "watchdog.observers",
+        "watchdog.events",
+    ):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 

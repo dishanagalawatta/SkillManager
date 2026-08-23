@@ -23,6 +23,26 @@ Rectangle {
     
     signal navigationChanged(string view)
     property string currentView: "QuickCopy"
+    // --- Search expand state (future-proof, binding-safe) ---
+    // When _topPhase >=1 the inline search collapses to an icon.
+    // Clicking the icon sets searchExpanded=true which forces the
+    // GlassSearchInput visible via declarative binding (no imperative
+    // `visible = ...` that would break the QML binding).
+    property bool searchExpanded: false
+    function expandSearch() { searchExpanded = true; Qt.callLater(() => topSearchInput.forceActiveFocus()) }
+    function collapseSearch() { searchExpanded = false }
+    function focusSearch() {
+        if (_topPhase >= 1 && !searchExpanded) expandSearch()
+        else topSearchInput.forceActiveFocus()
+    }
+    on_TopPhaseChanged: if (_topPhase < 1 && searchExpanded) searchExpanded = false
+    onSearchExpandedChanged: if (searchExpanded) Qt.callLater(() => topSearchInput.forceActiveFocus())
+
+    Shortcut {
+        sequence: "Escape"
+        enabled: root.searchExpanded
+        onActivated: root.collapseSearch()
+    }
 
     // --- Dynamic Collapse Phases ---
     //   Phase 0: All expanded (nav labels + search bar + refresh)
@@ -83,8 +103,12 @@ Rectangle {
 
         // Navigation
         RowLayout {
-            Layout.fillWidth: true
+            id: navRow
+            Layout.fillWidth: !root.searchExpanded
+            visible: !root.searchExpanded
+            opacity: root.searchExpanded ? 0 : 1
             spacing: 4
+            Behavior on opacity { NumberAnimation { duration: 180 } }
             
             TopBarButton {
                 id: topSnapBtn
@@ -168,7 +192,7 @@ Rectangle {
 
             IconButton {
                 id: topRefreshBtn
-                visible: root._topPhase < 3
+                visible: root._topPhase < 3 && !root.searchExpanded
                 buttonSize: 32
                 iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
                 tooltipText: "Refresh skill library"
@@ -184,7 +208,7 @@ Rectangle {
 
             IconButton {
                 id: topOverflowBtn
-                visible: root._topPhase >= 3
+                visible: root._topPhase >= 3 && !root.searchExpanded
                 iconText: "⋮"
                 iconSize: 24
                 buttonSize: 32
@@ -216,12 +240,25 @@ Rectangle {
             GlassSearchInput {
                 id: topSearchInput
                 objectName: "topSearchInput"
-                visible: root._topPhase < 1
+                visible: root._topPhase < 1 || root.searchExpanded
                 Layout.fillWidth: true
-                Layout.minimumWidth: 50
-                Layout.maximumWidth: Math.min(200, root.width * 0.3)
+                Layout.minimumWidth: root.searchExpanded ? 120 : 50
+                Layout.maximumWidth: root.searchExpanded ? Math.min(420, root.width - 80) : Math.min(200, root.width * 0.3)
                 Layout.alignment: Qt.AlignVCenter
-                
+                // Smooth width/opacity transition when expanding via searchExpanded
+                Behavior on Layout.maximumWidth { NumberAnimation { duration: 220; easing.type: Easing.InOutQuad } }
+                opacity: visible ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 160 } }
+
+                Keys.onEscapePressed: (event) => { if (root.searchExpanded) { root.collapseSearch(); event.accepted = true } }
+                onActiveFocusChanged: {
+                    // Auto-collapse when focus lost and text empty in collapsed-phase mode
+                    if (!activeFocus && root.searchExpanded && text === "" && root._topPhase >= 1) {
+                        // delay allows clear-button clicks to fire before collapse
+                        Qt.callLater(() => { if (!topSearchInput.activeFocus) root.collapseSearch() })
+                    }
+                }
+
                 onDebouncedTextChanged: (text) => {
                     if (root.currentView === "Quick Copy" || root.currentView === "QuickCopy") {
                         AppController.quickCopyModel.filterText = text
@@ -246,7 +283,8 @@ Rectangle {
 
             IconButton {
                 id: topSearchIconBtn
-                visible: root._topPhase >= 1
+                objectName: "topSearchIconBtn"
+                visible: root._topPhase >= 1 && !root.searchExpanded
                 buttonSize: 28
                 iconSource: AppController.ui_controller.getAssetUri("ui/search-icon.svg")
                 tooltipText: "Search skills"
@@ -258,6 +296,25 @@ Rectangle {
                     border.color: Theme.alpha(Theme.label, 0.15)
                     border.width: 1
                 }
+                onClicked: (mouse) => root.expandSearch()
+            }
+
+            IconButton {
+                id: topSearchCloseBtn
+                objectName: "topSearchCloseBtn"
+                visible: root.searchExpanded
+                buttonSize: 28
+                iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
+                tooltipText: "Close search"
+                role: "ghost"
+                Layout.alignment: Qt.AlignVCenter
+                background: Rectangle {
+                    radius: 14
+                    color: topSearchCloseBtn.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.alpha(Theme.label, 0.15)
+                    border.width: 1
+                }
+                onClicked: (mouse) => root.collapseSearch()
             }
         }
 
