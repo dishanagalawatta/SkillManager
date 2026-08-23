@@ -54,3 +54,8 @@
 **Vulnerability:** The application used `tempfile.mktemp(suffix=".png")` to generate output paths for screenshot capture tools (`portal_capture` and `gnome-screenshot`). This function is deprecated because it creates a time-of-check to time-of-use (TOCTOU) race condition, allowing an attacker to predict the filename and create a malicious symlink before the application writes to it.
 **Learning:** `tempfile.mktemp` only returns a string path and does not actually create the file or reserve it securely on the filesystem.
 **Prevention:** Always use `tempfile.NamedTemporaryFile(delete=False)` or `tempfile.mkstemp` (closing the file descriptor immediately if passing the path to a subprocess) to securely create and reserve the file on the filesystem with safe permissions (e.g., 0o600) before writing to it.
+
+## 2026-08-01 - [Argument Injection in npm view Version Check]
+**Vulnerability:** In `src/skill_manager/core/skill_packages/versioning.py`, the `npm view` command interpolated the user-provided `package_name` directly into the command string without a `--` separator or quoting. This allowed argument injection if a malicious package name starting with `-` was provided.
+**Learning:** Even internal versioning checks that seemingly just read data from a remote registry are susceptible to argument injection if they execute CLI tools (like `npm`) with user-supplied arguments. `shlex.split` does not inherently protect against flags when it tokenizes the string.
+**Prevention:** Always insert the `--` separator before passing a user-controlled value to CLI tools (e.g., `npm view -- <package>`), and ideally, quote the value with `shlex.quote()` when building the string representation for `shlex.split`.

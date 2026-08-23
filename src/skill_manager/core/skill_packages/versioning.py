@@ -269,7 +269,7 @@ def check_skill_package_versions(
 
                 if shutil.which("npm"):
                     detected_latest = run_version_command(
-                        f"npm view {package_name} version", timeout=3.0
+                        f"npm view -- {shlex.quote(package_name)} version", timeout=3.0
                     )
                     if detected_latest:
                         latest_version = clean_v(detected_latest)
