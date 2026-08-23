@@ -17,6 +17,7 @@ import sentry_sdk
 from apscheduler.schedulers.qt import QtScheduler  # type: ignore[reportMissingImports]
 from PySide6.QtCore import (  # noqa: E402
     Property,
+    QMetaObject,
     QObject,
     Qt,
     QTimer,
@@ -328,17 +329,52 @@ class AppController(AppControllerProxyMixin, QObject):
             lambda: self.refreshSkills("file-watcher", False)
         )
 
-        watch_paths = self._sources.copy()
+        def _resolve_watch_target(path_str: str) -> list[str]:
+            p = Path(path_str).expanduser()
+            if not p.is_dir():
+                return [path_str]
+            agents = p / ".agents"
+            if agents.is_dir():
+                skills = agents / "skills"
+                commands = agents / "commands"
+                targets: list[str] = []
+                if skills.is_dir():
+                    targets.append(str(skills))
+                if commands.is_dir():
+                    targets.append(str(commands))
+                if targets:
+                    return targets
+                return [str(agents)]
+            return [path_str]
+
+        raw_watch_paths = self._sources.copy()
         for src in self._update_packages:
             pkg_path = (
                 src.get("resolved_package_path") or src.get("package_path") or src.get("local_path")
             )
             if pkg_path:
-                watch_paths.append(pkg_path)
+                raw_watch_paths.append(pkg_path)
+
+        watch_paths: list[str] = []
+        for raw in raw_watch_paths:
+            watch_paths.extend(_resolve_watch_target(raw))
+
+        def _on_watch_event(_path: str) -> None:
+            try:
+                QMetaObject.invokeMethod(
+                    self._watcher_debounce_timer,
+                    b"start",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+            except Exception:
+                import contextlib
+
+                with contextlib.suppress(Exception):
+                    self._watcher_debounce_timer.start()
 
         self._watcher = SkillFolderWatcher(
             paths=watch_paths,
-            callback=lambda _: self._watcher_debounce_timer.start(),
+            callback=_on_watch_event,
         )
 
         # In tests, we often want to skip the initial background discovery

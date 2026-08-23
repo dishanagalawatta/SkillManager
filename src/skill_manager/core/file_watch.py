@@ -65,17 +65,44 @@ class SkillFolderEventHandler(FileSystemEventHandler):
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _is_relevant_path(src_path: str) -> bool:
+        """Return True only for `.agents` relative paths.
+
+        SkillManager only cares about ``<project>/.agents/skills``,
+        ``<project>/.agents/commands`` and ``<project>/.agents/screenshots``.
+        All other project subdirectories (frontend, backend, tests, etc.)
+        must be ignored to avoid noisy inotify floods.
+        """
+        lower = str(src_path).lower().replace("\\", "/")
+        # Allow any path containing /.agents/ or ending with /.agents
+        # Batch coalesced callbacks use literal "batch" — always relevant.
+        if lower == "batch":
+            return True
+        return "/.agents/" in lower or lower.endswith("/.agents") or "/.agents" in lower
+
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.is_directory or str(event.src_path).lower().endswith(".md"):
+        src = str(event.src_path)
+        if not self._is_relevant_path(src):
+            return
+        if event.is_directory or src.lower().endswith(".md"):
             self._fire_or_schedule(event)
 
     def on_deleted(self, event: FileSystemEvent) -> None:
         # Always fire on deletions — catches skill-folder removal even
         # when watchdog reports it as a non-directory event on Windows.
+        src = str(event.src_path)
+        if not self._is_relevant_path(src):
+            return
         self._fire_or_schedule(event)
 
     def on_moved(self, event: FileSystemEvent) -> None:
         # Always fire on moves/renames — catches folder renames.
+        src = str(event.src_path)
+        # For moves also check dest_path when relevant
+        dest = str(getattr(event, "dest_path", "") or "")
+        if not self._is_relevant_path(src) and not self._is_relevant_path(dest):
+            return
         self._fire_or_schedule(event)
 
     def _fire_or_schedule(self, event: FileSystemEvent) -> None:
@@ -117,6 +144,30 @@ class SkillFolderWatcher:
     dynamically register discovered skill directories after initial startup.
     """
 
+    @staticmethod
+    def _expand_watch_paths(paths: list[str]) -> list[Path]:
+        expanded: list[Path] = []
+        for raw in paths:
+            if not raw:
+                continue
+            p = Path(raw).expanduser()
+            agents = p / ".agents"
+            if p.is_dir() and agents.is_dir():
+                skills = agents / "skills"
+                commands = agents / "commands"
+                has_target = False
+                if skills.is_dir():
+                    expanded.append(skills)
+                    has_target = True
+                if commands.is_dir():
+                    expanded.append(commands)
+                    has_target = True
+                if not has_target:
+                    expanded.append(agents)
+                continue
+            expanded.append(p)
+        return expanded
+
     def __init__(
         self,
         paths: list[str],
@@ -124,7 +175,7 @@ class SkillFolderWatcher:
         debounce_ms: int = 300,
         debounce_scale: int = DEFAULT_DEBOUNCE_SCALE,
     ):
-        self._paths = [Path(path).expanduser() for path in paths if path]
+        self._paths = self._expand_watch_paths([p for p in paths if p])
         self._handler = SkillFolderEventHandler(
             callback, debounce_ms=debounce_ms, debounce_scale=debounce_scale
         )
@@ -156,12 +207,17 @@ class SkillFolderWatcher:
         Safe to call multiple times with the same path — watchdog
         deduplicates internally.  No-op if the observer is not running
         or the path does not exist.
+
+        If *path* is a project root containing ``.agents``, the watch is
+        transparently expanded to ``.agents/skills`` and
+        ``.agents/commands`` so that unrelated subdirectories (frontend,
+        tests, etc.) never generate inotify events.
         """
         if not self.started or self._observer is None:
             return
-        p = Path(path).expanduser()
-        if p.is_dir():
-            self._observer.schedule(self._handler, str(p), recursive=False)
+        for p in self._expand_watch_paths([path]):
+            if p.is_dir():
+                self._observer.schedule(self._handler, str(p), recursive=False)
 
     def remove_path(self, path: str) -> None:
         """Unregister a directory from watching.
