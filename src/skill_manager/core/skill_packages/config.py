@@ -328,7 +328,7 @@ def _apply_npx_defaults(source: dict[str, Any]):
             source["repository_url"] = f"https://github.com/{package_name}"
         source.setdefault("latest_version_command", "")
     else:
-        source["latest_version_command"] = f"npm view {package_name} version"
+        source["latest_version_command"] = f"npm view -- {package_name} version"
 
 
 def _apply_git_defaults(source: dict[str, Any]):
