@@ -164,14 +164,17 @@ class SearchEngine:
                 for qt in query_tokens:
                     if qt not in index_data["full_text"]:
                         continue
-                    # We have a substring match, so max_token_match will be at least 100
-                    max_token_match = 100
+                    # We have a substring match, so max_token_match will be at least 65
+                    # to pass the relevance gate, but we shouldn't falsely assign 100
+                    if max_token_match < 65:
+                        max_token_match = 65
                     # Exact token match allows us to break early
                     if qt in all_doc_tokens:
+                        max_token_match = 100
                         break
 
                 # Slow path: only evaluate fuzzy matches if no fast-path match was found
-                if max_token_match == 0:
+                if max_token_match < 100:
                     for qt in query_tokens:
                         if process is not None:
                             # Perf: C-optimized best match instead of nested Python iteration

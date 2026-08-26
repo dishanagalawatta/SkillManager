@@ -11,3 +11,6 @@
 ## 2024-05-18 - Optimized file tree traversal for fast fingerprinting
 **Learning:** `pathlib.Path.rglob` is significantly slower for file metadata extraction because `stat()` calls create independent system requests without utilizing the cached data from traversal.
 **Action:** Replace `rglob` with an optimized recursive `os.scandir` implementation. Access `entry.stat()` directly to reuse system call results from directory scanning for a 10x performance improvement in `skill_fingerprint`.
+## 2026-08-26 - Fix false 100% score for partial match in search scoring
+**Learning:** In the preliminary fast-path loop for search matching, assigning a score of 100 just because a search string is a substring of the target string artificially inflates the match score and bypasses the fuzzy matcher.
+**Action:** Substring matches should assign a baseline passing score to clear relevance gates (e.g., `max_token_match = max(max_token_match, 65)`), while preserving the slow-path (e.g., `if max_token_match < 100:`) so `fuzz.ratio` can accurately score the partial match.
