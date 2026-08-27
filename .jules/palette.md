@@ -36,3 +36,6 @@
 ## 2026-07-26 - SkillInspector collapse handle keyboard accessibility
 **Learning:** In QML, when refactoring a `MouseArea` to make a previously mouse-only UI element (like a collapse handle) keyboard accessible, the `Accessible` roles and names must be moved to the element that can actually receive active focus (e.g., the parent `Rectangle`). Additionally, a visual focus indicator (`border.color`) should be bound to `activeFocus`.
 **Action:** Always move `Accessible.*` properties to the focusable parent `Item`/`Rectangle` when replacing `MouseArea` click behavior with keyboard shortcuts, and ensure tooltips combine `hovered` and `activeFocus` for visibility.
+## 2024-05-18 - FilterPill Accessibility Improvement
+**Learning:** In PySide6 QML, custom components functioning as toggleable buttons (like `FilterPill` which maintains an `isActive` state) need explicit `Accessible.CheckBox` roles instead of `Accessible.Button` to properly convey their state to screen readers.
+**Action:** When auditing custom toggle controls (e.g., custom switches, pills, or checkable items built on generic `Item` or `Button` types), always ensure `Accessible.role: Accessible.CheckBox`, `Accessible.checkable: true`, and bind `Accessible.checked` to the component's internal active state to ensure state changes are announced.
