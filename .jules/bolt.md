@@ -1,13 +1,3 @@
-## 2024-06-22 - rapidfuzz process.extractOne early-exit regression
-**Learning:** `rapidfuzz.process.extractOne` evaluates the entire sequence to find the absolute maximum match. If the existing Python loop optimizes large list evaluations with an early exit (e.g. `if max_score > 70: break`), replacing it blindly with `extractOne` can actually cause performance regressions and functional differences.
-**Action:** Always verify if the original looping logic relies on early termination thresholds. If it does, and the list size is significant, avoid `extractOne` and instead optimize the Python loop using fast-path exact substring checks before invoking expensive `fuzz.ratio` operations.
-## 2026-07-10 - Fast-path exact match with list membership
-**Learning:** Checking `if qt in all_doc_tokens:` where `all_doc_tokens` is a list of pre-computed string tokens acts as a fast, exact match check evaluated in C, whereas `qt in string` is a substring check. This is an optimal, fully isolated fast-path prior to executing expensive `fuzz.ratio` loops that rely on early-exit thresholds.
-**Action:** When replacing loops that require early termination (`max_score > 70: break`), use list membership (`qt in list`) to short-circuit exact matches in a preliminary loop before executing the nested `fuzz.ratio` loops.
-## 2025-02-14 - Cache path calculations in quick_copy.py
-**Learning:** During the file discovery process and quick copying operations, `project_root_for_project` and `skill_base_relative` are called heavily on the same paths, which adds redundant path resolution overhead. Applying `@lru_cache` significantly reduces this overhead.
-**Action:** Use `@lru_cache` on repetitive path resolution functions like `project_root_for_project` and `skill_base_relative` to memoize the results for hot paths.
-
-## 2024-05-18 - Optimized file tree traversal for fast fingerprinting
-**Learning:** `pathlib.Path.rglob` is significantly slower for file metadata extraction because `stat()` calls create independent system requests without utilizing the cached data from traversal.
-**Action:** Replace `rglob` with an optimized recursive `os.scandir` implementation. Access `entry.stat()` directly to reuse system call results from directory scanning for a 10x performance improvement in `skill_fingerprint`.
+## 2024-05-19 - Fix search fast-path substring scoring
+**Learning:** The preliminary fast-path loop in `SearchEngine._calculate_score` was incorrectly assigning `max_token_match = 100` for partial substring matches. This bypassed the slow-path fuzzy evaluation entirely, leading to functional bugs where partial matches were given perfect scores, and short prefixes were inappropriately skipping the fuzzy matcher due to the `max_token_match == 0` check.
+**Action:** Always assign a baseline passing score (e.g. `65`) for substring matches in the fast-path so that they pass the relevance gate but still fall through to the slow-path evaluation via `if max_token_match < 100:`. Exact matches should still assign `100` and short-circuit.
