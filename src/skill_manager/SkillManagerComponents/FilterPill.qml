@@ -24,7 +24,7 @@ Button {
 
             Text {
                 text: control.iconText
-                font.pixelSize: 14
+                font.pixelSize: Theme.sizeBody
                 color: Theme.secondaryLabel
                 visible: control.iconText !== ""
                 horizontalAlignment: Text.AlignHCenter
@@ -35,7 +35,7 @@ Button {
             Text {
                 text: control.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: Theme.sizeMetadata
                 font.weight: control.isActive ? Font.Bold : Font.Normal
                 color: Theme.label
                 horizontalAlignment: Text.AlignHCenter
@@ -58,6 +58,8 @@ Button {
 
     onClicked: control.activeChanged(control.isActive)
 
-    Accessible.role: Accessible.Button
+    Accessible.role: Accessible.CheckBox
+    Accessible.checkable: true
+    Accessible.checked: control.isActive
     Accessible.name: control.text
 }
