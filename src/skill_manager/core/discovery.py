@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 from collections.abc import Callable
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,7 @@ from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=2048)
 def _canonical_path(p: str | Path) -> str:
     """Canonical resolved path for storage (preserves case).
 
@@ -47,6 +49,7 @@ def _canonical_path(p: str | Path) -> str:
             return str(p)
 
 
+@lru_cache(maxsize=2048)
 def _canonical_key(p: str | Path) -> str:
     """Case-insensitive canonical key for dedup/comparison."""
     cp = _canonical_path(p)

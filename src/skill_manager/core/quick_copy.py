@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers  # noqa: E402
 
 
+@lru_cache(maxsize=2048)
 def canonical_path(p: str | Path) -> str:
     """Return canonical resolved path string (preserves case).
 
@@ -31,6 +32,7 @@ def canonical_path(p: str | Path) -> str:
             return str(p)
 
 
+@lru_cache(maxsize=2048)
 def canonical_key(p: str | Path) -> str:
     """Case-insensitive canonical key for dedup/comparison."""
     cp = canonical_path(p)
