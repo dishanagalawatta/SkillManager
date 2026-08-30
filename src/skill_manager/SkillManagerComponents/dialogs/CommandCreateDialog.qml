@@ -173,7 +173,7 @@ Dialog {
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.sizeCaption
                             font.weight: Font.Medium
-                            color: resetEmojiHover.containsMouse ? Theme.accent : Theme.secondaryLabel
+                            color: resetEmojiHover.hovered ? Theme.accent : Theme.secondaryLabel
                             visible: root.pendingEmoji !== "\u26A1"
 
                             HoverHandler {
@@ -192,12 +192,23 @@ Dialog {
                         spacing: 8
 
                         Rectangle {
+                            id: emojiBtnRect
                             width: cmdNameInput.implicitHeight
                             height: cmdNameInput.implicitHeight
                             radius: Theme.radiusField
-                            color: emojiBtnHover.containsMouse ? Theme.glassHover : Theme.glassPill
-                            border.color: emojiBtnHover.containsMouse ? Theme.accent : Theme.glassBorder
+                            color: emojiBtnHover.hovered || activeFocus ? Theme.glassHover : Theme.glassPill
+                            border.color: emojiBtnHover.hovered || activeFocus ? Theme.accent : Theme.glassBorder
                             border.width: 1
+                            activeFocusOnTab: true
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Change Emoji"
+
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    emojiPicker.open()
+                                    event.accepted = true
+                                }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
@@ -216,7 +227,7 @@ Dialog {
                             
                             SleekToolTip {
                                 text: "Change Emoji"
-                                visible: emojiBtnHover.containsMouse === true
+                                visible: emojiBtnHover.hovered || emojiBtnRect.activeFocus
                             }
                         }
 
