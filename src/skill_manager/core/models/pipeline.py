@@ -159,9 +159,12 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    changed = False
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
+                        if self._filtered_skills[idx] != new_list[j1 + (idx - i1)]:
+                            self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
+                            changed = True
+                    if changed and i2 > i1:
                         self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
@@ -201,9 +204,12 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    changed = False
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
+                        if self._filtered_skills[idx] != new_list[j1 + (idx - i1)]:
+                            self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
+                            changed = True
+                    if changed and i2 > i1:
                         self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
