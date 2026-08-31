@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.6.2] - 2026-08-31
+
+### Changes
+- Release version bump.
+
 ## [2.6.1] - 2026-08-30
 
 ### Changes
