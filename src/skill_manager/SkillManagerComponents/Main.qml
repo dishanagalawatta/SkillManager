@@ -198,7 +198,7 @@ Window {
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutCopyEnabled; sequence: AppController.config_controller.shortcutCopy; onActivated: AppController.ops_controller.copyCurrentSelectionOrFocusedSkill() }
 
     // --- Skill Ops ---
-    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills("keyboard-shortcut", false) }
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutRefreshEnabled; sequence: AppController.config_controller.shortcutRefresh; onActivated: AppController.refreshSkills("keyboard-shortcut", true) }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutArchiveEnabled; sequence: AppController.config_controller.shortcutArchive; onActivated: AppController.ops_controller.archiveSelectedSkills() }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutDeleteEnabled; sequence: AppController.config_controller.shortcutDelete; onActivated: AppController.ops_controller.deleteSelectedSkills() }
 

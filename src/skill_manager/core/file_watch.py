@@ -85,7 +85,7 @@ class SkillFolderEventHandler(FileSystemEventHandler):
         src = str(event.src_path)
         if not self._is_relevant_path(src):
             return
-        if event.is_directory or src.lower().endswith(".md"):
+        if event.is_directory or src.lower().endswith((".md", ".png", ".jpg", ".jpeg")):
             self._fire_or_schedule(event)
 
     def on_deleted(self, event: FileSystemEvent) -> None:
@@ -155,15 +155,19 @@ class SkillFolderWatcher:
             if p.is_dir() and agents.is_dir():
                 skills = agents / "skills"
                 commands = agents / "commands"
-                has_target = False
+                screenshots = agents / "screenshots"
+                # Always watch the .agents dir itself to catch creation of
+                # new sub-directories (e.g. screenshots) that did not exist
+                # at startup.  In addition watch any existing child dirs
+                # so file events inside them are caught without needing
+                # recursive watching.
+                expanded.append(agents)
                 if skills.is_dir():
                     expanded.append(skills)
-                    has_target = True
                 if commands.is_dir():
                     expanded.append(commands)
-                    has_target = True
-                if not has_target:
-                    expanded.append(agents)
+                if screenshots.is_dir():
+                    expanded.append(screenshots)
                 continue
             expanded.append(p)
         return expanded

@@ -78,9 +78,83 @@ def _hash_child_names(dir_path: Path) -> str:
         return ""
 
 
-# In-process memo: normcase(dir) -> (prefix_tuple, child_names_hash, fp).
+def _snap_fingerprint(dir_path: Path) -> tuple[int, float, str]:
+    """Return (count, max_mtime, names_hash) for .agents/screenshots.
+
+    Looks up ``dir_path/.agents/screenshots`` and hashes image file names.
+    Returns (0, 0.0, "") when the directory does not exist so callers
+    always have a deterministic tuple to mix into the main fingerprint.
+    """
+    snap_dir = dir_path / ".agents" / "screenshots"
+    try:
+        if not snap_dir.is_dir():
+            return (0, 0.0, "")
+        count = 0
+        max_mtime = 0.0
+        names: list[str] = []
+        with os.scandir(snap_dir) as entries:
+            for entry in entries:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                lower = entry.name.lower()
+                if not lower.endswith((".png", ".jpg", ".jpeg")):
+                    continue
+                count += 1
+                names.append(entry.name)
+                try:
+                    mtime = entry.stat(follow_symlinks=False).st_mtime
+                    if mtime > max_mtime:
+                        max_mtime = mtime
+                except OSError:
+                    pass
+        names_hash = (
+            hashlib.sha1("\n".join(sorted(names)).encode()).hexdigest()[:16] if names else ""
+        )
+        return (count, max_mtime, names_hash)
+    except OSError:
+        return (0, 0.0, "")
+
+
+def _commands_fingerprint(dir_path: Path) -> tuple[int, float, str]:
+    """Return (count, max_mtime, names_hash) for .agents/commands.
+
+    Used so command file additions are reflected in the fingerprint.
+    """
+    cmd_dir = dir_path / ".agents" / "commands"
+    try:
+        if not cmd_dir.is_dir():
+            return (0, 0.0, "")
+        count = 0
+        max_mtime = 0.0
+        names: list[str] = []
+        with os.scandir(cmd_dir) as entries:
+            for entry in entries:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                if not entry.name.lower().endswith(".md"):
+                    continue
+                count += 1
+                names.append(entry.name)
+                try:
+                    mtime = entry.stat(follow_symlinks=False).st_mtime
+                    if mtime > max_mtime:
+                        max_mtime = mtime
+                except OSError:
+                    pass
+        names_hash = (
+            hashlib.sha1("\n".join(sorted(names)).encode()).hexdigest()[:16] if names else ""
+        )
+        return (count, max_mtime, names_hash)
+    except OSError:
+        return (0, 0.0, "")
+
+
+# In-process memo: normcase(dir) -> (prefix_tuple, child_names_hash, snap_tuple, cmd_tuple, fp).
 # Keyed by normcase so Windows paths differing only in case share an entry.
-_fp_memo: dict[str, tuple[tuple[float, int, int, float], str, str]] = {}
+_fp_memo: dict[
+    str,
+    tuple[tuple[float, int, int, float], str, tuple[int, float, str], tuple[int, float, str], str],
+] = {}
 
 
 def compute_dir_fingerprint(dir_path: Path) -> str:
@@ -119,13 +193,25 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
         prefix_tuple = (stat.st_mtime, stat.st_size, skill_count, max_sub_mtime)
         key = _canonical_key(str(dir_path))
         child_names_hash = _hash_child_names(dir_path)
+        snap_tuple = _snap_fingerprint(dir_path)
+        cmd_tuple = _commands_fingerprint(dir_path)
         cached = _fp_memo.get(key)
-        if cached is not None and cached[0] == prefix_tuple and cached[1] == child_names_hash:
-            return cached[2]
+        if (
+            cached is not None
+            and cached[0] == prefix_tuple
+            and cached[1] == child_names_hash
+            and cached[2] == snap_tuple
+            and cached[3] == cmd_tuple
+        ):
+            return cached[4]
 
-        raw = f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}"
+        raw = (
+            f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}:"
+            f"{snap_tuple[0]}:{snap_tuple[1]}:{snap_tuple[2]}:"
+            f"{cmd_tuple[0]}:{cmd_tuple[1]}:{cmd_tuple[2]}"
+        )
         fp = hashlib.md5(raw.encode()).hexdigest()
-        _fp_memo[key] = (prefix_tuple, child_names_hash, fp)
+        _fp_memo[key] = (prefix_tuple, child_names_hash, snap_tuple, cmd_tuple, fp)
         return fp
     except OSError as e:
         logger.debug("[DISCOVERY] Fingerprint error for %s: %s", dir_path, e)
