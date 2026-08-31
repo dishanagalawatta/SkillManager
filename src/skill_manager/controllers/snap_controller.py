@@ -426,6 +426,12 @@ class SnapController(QObject):
         """
         save_dir = os.path.join(project_path, ".agents", "screenshots")
         os.makedirs(save_dir, exist_ok=True)
+        try:
+            watcher = getattr(self.app, "_watcher", None)
+            if watcher is not None and watcher.started:
+                watcher.add_path(save_dir)
+        except Exception:
+            logger.debug("Failed to register screenshots watcher for %s", save_dir, exc_info=True)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Screenshot_{timestamp}.png"

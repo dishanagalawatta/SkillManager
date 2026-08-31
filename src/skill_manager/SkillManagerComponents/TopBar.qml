@@ -196,7 +196,7 @@ Rectangle {
                 buttonSize: 32
                 iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
                 tooltipText: "Refresh skill library"
-                onClicked: (mouse) => AppController.refreshSkills("manual-button", false)
+                onClicked: (mouse) => AppController.refreshSkills("manual-button", true)
                 background: Rectangle {
                     radius: 16
                     color: topRefreshBtn.hovered ? Theme.glassHover : "transparent"
@@ -226,7 +226,7 @@ Rectangle {
                     GlassMenuItem {
                         text: "Refresh"
                         iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
-                        onTriggered: AppController.refreshSkills("manual-button", false)
+                        onTriggered: AppController.refreshSkills("manual-button", true)
                     }
                     GlassMenuItem {
                         text: "Settings"

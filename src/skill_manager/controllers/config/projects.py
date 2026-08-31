@@ -220,6 +220,17 @@ class ProjectsMixin:
             if watcher is not None:
                 watcher.add_path(str(get_skills_dir(project_path)))
                 watcher.add_path(str(get_commands_dir(project_path)))
+                # Also watch .agents/screenshots so manual png drops trigger refresh
+                from pathlib import Path as _P  # noqa: N814
+
+                _snap_dir = _P(project_path) / ".agents" / "screenshots"
+                if _snap_dir.is_dir():
+                    watcher.add_path(str(_snap_dir))
+                else:
+                    # Watch parent .agents to catch creation of screenshots dir
+                    _agents = _P(project_path) / ".agents"
+                    if _agents.is_dir():
+                        watcher.add_path(str(_agents))
         except Exception as exc:
             logger.warning("[CONFIG] Failed to register watcher paths: %s", exc)
 

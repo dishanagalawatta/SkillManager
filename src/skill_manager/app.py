@@ -337,14 +337,15 @@ class AppController(AppControllerProxyMixin, QObject):
             if agents.is_dir():
                 skills = agents / "skills"
                 commands = agents / "commands"
-                targets: list[str] = []
+                screenshots = agents / "screenshots"
+                targets: list[str] = [str(agents)]
                 if skills.is_dir():
                     targets.append(str(skills))
                 if commands.is_dir():
                     targets.append(str(commands))
-                if targets:
-                    return targets
-                return [str(agents)]
+                if screenshots.is_dir():
+                    targets.append(str(screenshots))
+                return targets
             return [path_str]
 
         raw_watch_paths = self._sources.copy()

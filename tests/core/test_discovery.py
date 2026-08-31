@@ -288,13 +288,19 @@ def test_fingerprint_matches_unmemoized_formula(tmp_path: Path) -> None:
 
     # Compute the expected raw string using only the public building blocks,
     # independent of the memoization path inside compute_dir_fingerprint.
+    from skill_manager.core.discovery import _commands_fingerprint, _snap_fingerprint
+
     stat = d.stat()
     skill_dirs = [c for c in d.iterdir() if c.is_dir() and (c / "SKILL.md").is_file()]
     skill_count = len(skill_dirs)
     max_sub_mtime = max(s.stat().st_mtime for s in skill_dirs) if skill_dirs else 0.0
     child_names_hash = _hash_child_names(d)
+    snap_tuple = _snap_fingerprint(d)
+    cmd_tuple = _commands_fingerprint(d)
     expected_raw = (
-        f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}"
+        f"{stat.st_mtime}:{stat.st_size}:{skill_count}:{max_sub_mtime}:{child_names_hash}:"
+        f"{snap_tuple[0]}:{snap_tuple[1]}:{snap_tuple[2]}:"
+        f"{cmd_tuple[0]}:{cmd_tuple[1]}:{cmd_tuple[2]}"
     )
     expected_fp = hashlib.md5(expected_raw.encode()).hexdigest()
 
