@@ -159,10 +159,23 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    # Perf: Only emit dataChanged if the underlying object actually mutated;
+                    # batch contiguous rows to prevent signal storms.
+                    changed_start = -1
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                        new_item = new_list[j1 + (idx - i1)]
+                        if self._filtered_skills[idx] != new_item:
+                            self._filtered_skills[idx] = new_item
+                            if changed_start == -1:
+                                changed_start = idx
+                        else:
+                            if changed_start != -1:
+                                self.dataChanged.emit(
+                                    self.index(changed_start, 0), self.index(idx - 1, 0)
+                                )
+                                changed_start = -1
+                    if changed_start != -1:
+                        self.dataChanged.emit(self.index(changed_start, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
             self._update_selection_counts()
@@ -201,10 +214,23 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    # Perf: Only emit dataChanged if the underlying object actually mutated;
+                    # batch contiguous rows to prevent signal storms.
+                    changed_start = -1
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                        new_item = new_list[j1 + (idx - i1)]
+                        if self._filtered_skills[idx] != new_item:
+                            self._filtered_skills[idx] = new_item
+                            if changed_start == -1:
+                                changed_start = idx
+                        else:
+                            if changed_start != -1:
+                                self.dataChanged.emit(
+                                    self.index(changed_start, 0), self.index(idx - 1, 0)
+                                )
+                                changed_start = -1
+                    if changed_start != -1:
+                        self.dataChanged.emit(self.index(changed_start, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
             self._update_selection_counts()
