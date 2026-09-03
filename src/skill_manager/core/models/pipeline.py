@@ -159,10 +159,23 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    # Perf: Only emit dataChanged for contiguous items that actually mutated to prevent signal storms.
+                    changed_start = None
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                        old_obj = self._filtered_skills[idx]
+                        new_obj = new_list[j1 + (idx - i1)]
+                        self._filtered_skills[idx] = new_obj
+                        if old_obj != new_obj:
+                            if changed_start is None:
+                                changed_start = idx
+                        else:
+                            if changed_start is not None:
+                                self.dataChanged.emit(
+                                    self.index(changed_start, 0), self.index(idx - 1, 0)
+                                )
+                                changed_start = None
+                    if changed_start is not None:
+                        self.dataChanged.emit(self.index(changed_start, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
             self._update_selection_counts()
@@ -201,10 +214,23 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
+                    # Perf: Only emit dataChanged for contiguous items that actually mutated to prevent signal storms.
+                    changed_start = None
                     for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                        old_obj = self._filtered_skills[idx]
+                        new_obj = new_list[j1 + (idx - i1)]
+                        self._filtered_skills[idx] = new_obj
+                        if old_obj != new_obj:
+                            if changed_start is None:
+                                changed_start = idx
+                        else:
+                            if changed_start is not None:
+                                self.dataChanged.emit(
+                                    self.index(changed_start, 0), self.index(idx - 1, 0)
+                                )
+                                changed_start = None
+                    if changed_start is not None:
+                        self.dataChanged.emit(self.index(changed_start, 0), self.index(i2 - 1, 0))
 
             self.structureMutated.emit()
             self._update_selection_counts()
