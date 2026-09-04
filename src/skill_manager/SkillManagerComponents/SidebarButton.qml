@@ -11,6 +11,7 @@ Button {
     property string iconText: ""
     property string iconSource: ""
     property string labelText: ""
+    property string tooltipText: labelText
 
     Layout.fillWidth: true
     Layout.preferredHeight: 40
@@ -19,7 +20,7 @@ Button {
     SleekToolTip {
         id: btnToolTip
         visible: (control.hovered || control.visualFocus) && control.collapsed
-        text: control.labelText
+        text: control.tooltipText
     }
 
     contentItem: Item {
@@ -90,7 +91,7 @@ Button {
         border.width: control.visualFocus ? 2 : 0
     }
     Accessible.role: Accessible.Button
-    Accessible.name: control.labelText
+    Accessible.name: control.tooltipText
 
     HoverHandler {
         cursorShape: Qt.PointingHandCursor
