@@ -247,7 +247,22 @@ sequenceDiagram
 
 1. **Strict Project Boundary Enforcement**: Any skill residing inside an `.agents/skills` or `.agents/commands` folder is explicitly identified as `is_package = False`. Even if the workspace root or parent folder is registered in `sources`, the project boundary prevents misclassifying project copies as Master Library packages.
 2. **Package Label Invariance**: In `addOrUpdateSkills`, `project_label` recomputation is scoped exclusively to project skills (`not skill.is_package`), permanently preserving `"Master Library"` for package records.
-3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization.
+3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization. `equal` blocks are synced via `PipelineMixin._sync_equal_block()`, which reassigns only rows whose objects actually mutated (`!=`, preserving identity for identical items) and batches contiguous changed rows into single `dataChanged(topLeft, bottomRight)` emissions to prevent signal storms.
+
+```mermaid
+flowchart TD
+    A["equal block i1..i2"] --> B["idx in range?"]
+    B -- no --> G["changed_start set?"]
+    B -- yes --> C["row != new item?"]
+    C -- yes --> D["reassign row, open/extend batch"]
+    D --> B
+    C -- no --> E["batch open?"]
+    E -- yes --> F["emit dataChanged batch, close batch"]
+    F --> B
+    E -- no --> B
+    G -- yes --> H["emit trailing dataChanged"]
+    G -- no --> I["emit nothing"]
+```
 
 ---
 
