@@ -5,8 +5,6 @@ import App 1.0
 Menu {
     id: root
 
-
-
     topPadding: 6
     bottomPadding: 6
     leftPadding: 6
@@ -15,6 +13,12 @@ Menu {
     background: Item {
         implicitWidth: 200
         implicitHeight: 40
+
+        // AT exposure for the menu surface: Menu itself is a Popup (not an
+        // Item), so Qt forbids attaching Accessible to it directly. The
+        // background Item fills the popup, making it the AT-visible host.
+        Accessible.role: Accessible.PopupMenu
+        Accessible.name: root.title !== "" ? root.title : "Menu"
 
         Rectangle {
             id: bgRect

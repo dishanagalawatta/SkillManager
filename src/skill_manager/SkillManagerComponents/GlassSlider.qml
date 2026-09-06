@@ -108,5 +108,5 @@ Item {
     }
 
     Accessible.role: Accessible.Slider
-    Accessible.name: control.accessibleName
+    Accessible.name: (control.accessibleName !== "" ? control.accessibleName : qsTr("Slider")) + ": " + control.value
 }

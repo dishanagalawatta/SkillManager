@@ -69,6 +69,9 @@
 - **Roles**: Use `role: "primary-outline"` instead of solid filled `role: "primary"` for secondary or auxiliary actions to reduce visual weight.
 - **Toggles**: Use `IconButton` with dynamic `iconSource` (e.g., swapping between `bold-duotone` and `broken`) instead of `GlassToggleButton`.
 - **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
+- **Accessible roles**: Persistent toggles → `Accessible.CheckBox` + `checkable`/`checked`; mutually-exclusive tabs/views → `Accessible.PageTab`; momentary buttons keep `Button`. Every toggle needs `onPressAction` + `onToggleAction` calling the click slot. See `DESIGN.md` § Accessibility (ADR-0031).
+- **Focus properties**: `visualFocus`/`hovered` are `Control`/`HoverHandler`-only. On `Item`/`Rectangle`/`MouseArea` use `activeFocus`/`containsMouse` — `visualFocus` on an `Item` is `undefined` and fails the QML diagnostic suite.
+- **Accessible names**: Never empty — fallback `tooltipText || iconText || labelText || text`. Tooltips must surface on keyboard focus, not hover alone.
 
 ### Testing
 

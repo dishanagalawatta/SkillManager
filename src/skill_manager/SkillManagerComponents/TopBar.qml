@@ -212,6 +212,8 @@ Rectangle {
                 iconText: "⋮"
                 iconSize: 24
                 buttonSize: 32
+                // AT matrix: overflow action => tooltipText "More actions" as Accessible name (never the bare glyph).
+                tooltipText: "More actions"
                 Layout.alignment: Qt.AlignVCenter
                 background: Rectangle {
                     radius: 16

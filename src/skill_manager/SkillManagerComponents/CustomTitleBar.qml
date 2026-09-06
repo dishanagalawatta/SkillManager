@@ -11,6 +11,7 @@ Rectangle {
     property var window: Window.window
 
     TapHandler {
+        // Double-tap maximize/restore duplicates the Maximize/Restore TitleBarButton below; keyboard users use that button.
         onDoubleTapped: {
             if (window.visibility === Window.Maximized)
                 window.showNormal()
@@ -20,6 +21,7 @@ Rectangle {
     }
 
     DragHandler {
+        // Title-bar drag moves the window; keyboard users move via OS window keys or the Min/Max/Close TitleBarButtons below.
         target: null
         onActiveChanged: {
             if (active) {

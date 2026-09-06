@@ -153,6 +153,13 @@ Rectangle {
                     customIconColor: (root._sel && root._sel.is_starred) ? Theme.accent : Theme.secondaryLabel
                     iconSize: 22
                     flat: true
+                    checkable: true
+                    checked: (root._sel && root._sel.is_starred) || false
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.checkable: true
+                    Accessible.checked: checked
+                    Accessible.onPressAction: AppController.ops_controller.toggleCurrentSkillStarred()
+                    Accessible.onToggleAction: AppController.ops_controller.toggleCurrentSkillStarred()
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     visible: root._sel && root._sel.local_path !== undefined
@@ -273,8 +280,28 @@ Rectangle {
                 property bool isExpanded: true
 
                 Item {
+                    id: docHeaderItem
                     Layout.fillWidth: true
                     implicitHeight: docHeaderRow.implicitHeight
+                    activeFocusOnTab: true
+
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            docSection.isExpanded = !docSection.isExpanded
+                            event.accepted = true
+                        } else {
+                            event.accepted = false
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        color: docHeaderItem.activeFocus ? Theme.glassActive : (docHeaderHover.hovered ? Theme.glassHover : "transparent")
+                        radius: Theme.radiusSmall
+                        border.color: docHeaderItem.activeFocus ? Theme.accent : "transparent"
+                        border.width: docHeaderItem.activeFocus ? 2 : 0
+                    }
 
                     RowLayout {
                         id: docHeaderRow
@@ -296,18 +323,34 @@ Rectangle {
                             buttonSize: 18
                             iconSize: 12
                             role: "ghost"
-                            tooltipText: docSection.isExpanded ? "Collapse Documentation" : "Expand Documentation"
+                            focusPolicy: Qt.NoFocus
+                            tooltipText: "" // Handled by docHeaderItem
                             iconSource: docSection.isExpanded ?
                                 AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
                                 AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
                         }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: docSection.isExpanded = !docSection.isExpanded
+                    TapHandler {
+                        onTapped: docSection.isExpanded = !docSection.isExpanded
                     }
+
+                    HoverHandler {
+                        id: docHeaderHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    SleekToolTip {
+                        visible: docHeaderHover.hovered || docHeaderItem.activeFocus
+                        text: docSection.isExpanded ? "Collapse Documentation" : "Expand Documentation"
+                    }
+
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.checkable: true
+                    Accessible.checked: docSection.isExpanded
+                    Accessible.name: docSection.isExpanded ? "Collapse Documentation" : "Expand Documentation"
+                    Accessible.onPressAction: docSection.isExpanded = !docSection.isExpanded
+                    Accessible.onToggleAction: docSection.isExpanded = !docSection.isExpanded
                 }
 
                 Flow {
@@ -480,6 +523,7 @@ Rectangle {
 
         Accessible.role: Accessible.Button
         Accessible.name: "Expand Inspector"
+        Accessible.onPressAction: root.isCollapsed = false
 
         Text {
             anchors.centerIn: parent
@@ -498,7 +542,7 @@ Rectangle {
 
             SleekToolTip {
                 text: "Expand Inspector"
-                visible: parent.containsMouse || collapseHandleRect.activeFocus
+                visible: collapseMouseArea.containsMouse || collapseHandleRect.activeFocus
             }
         }
     }

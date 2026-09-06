@@ -9,7 +9,7 @@ Button {
     property string iconSource: ""
     property string role: "secondary" // secondary, primary, destructive, ghost
     property string tooltipText: ""
-    property string accessibleName: tooltipText !== "" ? tooltipText : iconText
+    property string accessibleName: tooltipText !== "" ? tooltipText : (iconText !== "" ? iconText : text)
     property int buttonSize: 32
     property int iconSize: 15
     property color customIconColor: "transparent"

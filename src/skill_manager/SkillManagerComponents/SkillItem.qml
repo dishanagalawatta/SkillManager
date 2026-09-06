@@ -41,11 +41,23 @@ Item {
             width: parent.width
             height: 34
             visible: root.isFirstInSub && !root.isMainCollapsed
+            activeFocusOnTab: true
+
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
+                    event.accepted = true
+                } else {
+                    event.accepted = false
+                }
+            }
 
             Rectangle {
                 anchors.fill: parent
-                color: subCatHover.hovered ? Theme.glassHover : "transparent"
+                color: subHeader.activeFocus ? Theme.glassActive : (subCatHover.hovered ? Theme.glassHover : "transparent")
                 radius: Theme.radiusSmall
+                border.color: subHeader.activeFocus ? Theme.accent : "transparent"
+                border.width: subHeader.activeFocus ? 2 : 0
                 anchors.leftMargin: 24 // Start Level 1 Background
                 anchors.rightMargin: 2
                 anchors.topMargin: 2
@@ -116,8 +128,13 @@ Item {
                 text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
             }
 
-            Accessible.role: Accessible.Button
+            Accessible.role: Accessible.CheckBox
+            Accessible.checkable: true
+            // checked is true when expanded (inverse of isSubCollapsed)
+            Accessible.checked: !root.isSubCollapsed
             Accessible.name: subCatToolTip.text
+            Accessible.onPressAction: Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
+            Accessible.onToggleAction: Qt.callLater(AppController.skillModel.toggleCategory, model && model.sectionName ? model.sectionName : "")
         }
 
         // --- SKILL ITEM CONTENT ---
@@ -135,8 +152,8 @@ Item {
                 anchors.bottomMargin: root.compactRows ? 2 : 4
                 radius: Theme.radiusCard
                 color: root.isSelected ? (mouseArea.containsMouse ? Theme.selectedRowHover : Theme.selectedRow) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
-                border.width: (mouseArea.containsMouse || root.isSelected) ? 1 : 0
-                border.color: root.isSelected ? Theme.selectedRowBorder : Theme.glassOuterBorder
+                border.color: mouseArea.activeFocus ? Theme.accent : (root.isSelected ? Theme.selectedRowBorder : Theme.glassOuterBorder)
+                border.width: mouseArea.activeFocus ? 2 : ((mouseArea.containsMouse || root.isSelected) ? 1 : 0)
                 opacity: model && model.isArchived ? 0.5 : 1.0
 
                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -146,6 +163,15 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    activeFocusOnTab: true
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            root.clicked()
+                            event.accepted = true
+                        } else {
+                            event.accepted = false
+                        }
+                    }
                     onClicked: (mouse) => {
                         if (mouse.button === Qt.RightButton) {
                             root.rightClicked()
@@ -158,9 +184,11 @@ Item {
                     Accessible.role: Accessible.Button
                     Accessible.name: (model && model.name ? model.name : "Item")
                     Accessible.description: "Skill item"
+                    Accessible.onPressAction: root.clicked()
 
                     Loader {
-                        active: mouseArea.containsMouse && model && model.isSnap && model.path
+                        // Keyboard focus opens the preview as well as hover.
+                        active: mouseArea.containsMouse && model && model.isSnap && model.path || mouseArea.activeFocus && model && model.isSnap && model.path
                         asynchronous: false
                         sourceComponent: ToolTip {
                             id: snapTooltip
@@ -222,7 +250,8 @@ Item {
                             return "";
                         }
                         
-                        active: mouseArea.containsMouse && previewText.length > 0
+                        // Keyboard focus opens the preview as well as hover.
+                        active: mouseArea.containsMouse && previewText.length > 0 || mouseArea.activeFocus && previewText.length > 0
                         asynchronous: false
                         sourceComponent: ToolTip {
                             id: textPreviewTooltip
@@ -263,12 +292,18 @@ Item {
 
                     // Multi-select Checkbox
                     Rectangle {
+                        id: checkboxRect
                         width: root.compactRows ? 16 : 20
                         height: root.compactRows ? 16 : 20
                         radius: Theme.radiusSmall
                         color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
-                        border.width: model && model.isSelected ? 0 : 1
-                        border.color: model && model.isSelected ? "transparent" : (Theme.darkMode ? "#3F3F46" : "#A1A1AA")
+                        border.width: activeFocus ? 2 : (model && model.isSelected ? 0 : 1)
+                        border.color: activeFocus ? Theme.accent : (model && model.isSelected ? "transparent" : (Theme.darkMode ? "#3F3F46" : "#A1A1AA"))
+                        activeFocusOnTab: true
+
+                        Keys.onSpacePressed: (event) => { AppController.skillModel.toggleSelection(index); event.accepted = true; }
+                        Keys.onReturnPressed: (event) => { AppController.skillModel.toggleSelection(index); event.accepted = true; }
+                        Keys.onEnterPressed: (event) => { AppController.skillModel.toggleSelection(index); event.accepted = true; }
                         
                         Text {
                             anchors.centerIn: parent
@@ -293,7 +328,11 @@ Item {
                         }
 
                         Accessible.role: Accessible.CheckBox
+                        Accessible.checkable: true
+                        Accessible.checked: model && model.isSelected
                         Accessible.name: (model && model.isSelected) ? "Deselect " + (model && model.name ? model.name : "Item") : "Select " + (model && model.name ? model.name : "Item")
+                        Accessible.onPressAction: AppController.skillModel.toggleSelection(index)
+                        Accessible.onToggleAction: AppController.skillModel.toggleSelection(index)
                     }
 
                     // Icon Section
@@ -372,7 +411,8 @@ Item {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
                         flat: true
-                        visible: root.showInlineDelete && mouseArea.containsMouse
+                        // Keyboard focus anywhere in the row (or on the button itself) reveals delete so it stays Tab-reachable.
+                        visible: root.showInlineDelete && mouseArea.containsMouse || root.showInlineDelete && (mouseArea.activeFocus || checkboxRect.activeFocus || deleteBtn.activeFocus)
                         onClicked: (mouse) => {
                             if (model && model.path) {
                                 root.deleteRequested(model.name, model.path, model.isCommand === true)

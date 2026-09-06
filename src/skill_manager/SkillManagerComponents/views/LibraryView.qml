@@ -216,6 +216,12 @@ Item {
                             border.color: Theme.alpha(Theme.label, 0.15)
                             border.width: 1
                         }
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.checkable: true
+                        Accessible.checked: AppController.libraryModel.isAllExpanded
+                        Accessible.name: lv_toggleAllBtn.tooltipText
+                        Accessible.onPressAction: AppController.libraryModel.toggleAll()
+                        Accessible.onToggleAction: AppController.libraryModel.toggleAll()
                     }
 
                     GlassCheckBox {
@@ -376,6 +382,12 @@ Item {
                             AppController.ui_controller.getAssetUri("ui/box-bold-duotone.svg")
                         tooltipText: AppController.libraryModel.showArchived ? "Hide Archived" : "Show Archived"
                         onClicked: (mouse) => AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.checkable: true
+                        Accessible.checked: AppController.libraryModel.showArchived
+                        Accessible.name: lv_showArchived.tooltipText
+                        Accessible.onPressAction: AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived
+                        Accessible.onToggleAction: AppController.libraryModel.showArchived = !AppController.libraryModel.showArchived
                     }
                     }
 

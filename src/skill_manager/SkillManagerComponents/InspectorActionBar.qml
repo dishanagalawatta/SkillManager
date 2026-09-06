@@ -58,6 +58,13 @@ RowLayout {
         Layout.preferredWidth: 32
         Layout.preferredHeight: 32
         visible: root.showStarButton
+        checkable: true
+        checked: (root.selectedSkill && root.selectedSkill.is_starred) || false
+        Accessible.role: Accessible.CheckBox
+        Accessible.checkable: true
+        Accessible.checked: checked
+        Accessible.onPressAction: root.starClicked()
+        Accessible.onToggleAction: root.starClicked()
         onClicked: (mouse) => root.starClicked()
         tooltipText: (root.selectedSkill && root.selectedSkill.is_starred) ? "Unstar Skill" : "Star Skill"
 

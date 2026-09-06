@@ -174,7 +174,8 @@ def test_inspector_metadata_row_has_collapsible_is_expanded_property() -> None:
     assert "activeFocusOnTab: true" in meta_row
     assert "root.isExpanded = !root.isExpanded" in meta_row
     assert 'text: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
-    assert "Accessible.role: Accessible.Button" in meta_row
+    assert "Accessible.role: Accessible.CheckBox" in meta_row
+    assert "Accessible.checked: root.isExpanded" in meta_row
     assert 'Accessible.name: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"' in meta_row
 
 

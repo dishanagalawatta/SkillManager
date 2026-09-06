@@ -74,6 +74,14 @@ IconButton {
 }
 ```
 
+### Accessibility (screen readers + keyboard, ADR-0031)
+
+- **Role matrix**: persistent on/off toggle (`Button{checkable:true}`, filter pills, star/archive, expanders) → `Accessible.CheckBox` + `checkable` + `checked`; mutually-exclusive tab/view switch → `Accessible.PageTab` + `checked`; single-choice format list → `RadioButton`; momentary buttons, combos, sliders, text fields keep their native roles. Never expose bare visual highlight as AT state — `checked` must equal click-toggles-off.
+- **Handlers**: every `CheckBox`/`RadioButton`/`PageTab` needs BOTH `Accessible.onPressAction` and `Accessible.onToggleAction` invoking the same slot as click — Qt advertises the AT toggle action only when the handler is connected.
+- **Focus properties**: `visualFocus`/`hovered` exist ONLY on `Control`/`HoverHandler`. On bare `Item`/`Rectangle`/`MouseArea` targets use `activeFocus` (`MouseArea` hover state is `containsMouse`). Referencing `visualFocus` on an `Item` yields `Unable to assign [undefined] to bool` engine warnings (fails `test_qml_comprehensive_diagnostic.py`).
+- **Tooltips**: keyboard focus must surface them — `(hovered || visualFocus)` on Controls, `(containsMouse || activeFocus)` on Items. `Accessible.name` must never resolve to `""` — fallback chain `tooltipText || iconText || labelText || text`.
+- **Gate**: `test_qml_comprehensive_diagnostic.py` (zero QML warnings), `test_qml_qol_contract.py`, `test_library_inspector_overlay.py` must pass; contract tests pin roles, so intentional role changes update the test, never the reverse.
+
 ## Architectural Patterns
 
 ### 1. Controller Layer
