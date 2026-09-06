@@ -36,3 +36,6 @@
 ## 2026-07-26 - SkillInspector collapse handle keyboard accessibility
 **Learning:** In QML, when refactoring a `MouseArea` to make a previously mouse-only UI element (like a collapse handle) keyboard accessible, the `Accessible` roles and names must be moved to the element that can actually receive active focus (e.g., the parent `Rectangle`). Additionally, a visual focus indicator (`border.color`) should be bound to `activeFocus`.
 **Action:** Always move `Accessible.*` properties to the focusable parent `Item`/`Rectangle` when replacing `MouseArea` click behavior with keyboard shortcuts, and ensure tooltips combine `hovered` and `activeFocus` for visibility.
+## 2026-09-02 - GlassToggleButton Role Fix
+**Learning:** In QML, when implementing toggleable buttons (e.g. functioning as a switch/toggle), ensure proper accessibility by setting `Accessible.role: Accessible.CheckBox`, `Accessible.checkable: true`, and binding `Accessible.checked` to the component's active state instead of using the generic `Accessible.Button` role.
+**Action:** Always verify if a component functions as a toggle. If so, assign the `Accessible.CheckBox` role and wire `checkable` and `checked` properties to accurately reflect its state to screen readers.
