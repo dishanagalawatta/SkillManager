@@ -106,6 +106,27 @@ class PipelineMixin:
             return
         self._do_apply_filter_with_diff_now()
 
+    def _sync_equal_block(self, i1: int, i2: int, j1: int, new_list: list[Skill]):
+        """Sync an 'equal' diff block, emitting batched dataChanged only for mutated rows.
+
+        Only reassigns rows whose objects actually mutated (``!=``) to preserve
+        identity for identical items, and batches contiguous changed rows into
+        single ``dataChanged(topLeft, bottomRight)`` emissions to prevent
+        QML signal storms on large lists.
+        """
+        changed_start = -1
+        for idx in range(i1, i2):
+            new_item = new_list[j1 + (idx - i1)]
+            if self._filtered_skills[idx] != new_item:
+                self._filtered_skills[idx] = new_item
+                if changed_start == -1:
+                    changed_start = idx
+            elif changed_start != -1:
+                self.dataChanged.emit(self.index(changed_start, 0), self.index(idx - 1, 0))
+                changed_start = -1
+        if changed_start != -1:
+            self.dataChanged.emit(self.index(changed_start, 0), self.index(i2 - 1, 0))
+
     def _do_apply_filter_with_diff_now(self):
         """Applies filters but uses list diffing to emit correct Qt signals for sleek animations (deferred)."""
         if self._reset_pending:
@@ -159,10 +180,7 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
-                    for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                    self._sync_equal_block(i1, i2, j1, new_list)
 
             self.structureMutated.emit()
             self._update_selection_counts()
@@ -201,10 +219,7 @@ class PipelineMixin:
                     self._filtered_skills[i1:i1] = new_list[j1:j2]
                     self.endInsertRows()
                 elif tag == "equal":
-                    for idx in range(i1, i2):
-                        self._filtered_skills[idx] = new_list[j1 + (idx - i1)]
-                    if i2 > i1:
-                        self.dataChanged.emit(self.index(i1, 0), self.index(i2 - 1, 0))
+                    self._sync_equal_block(i1, i2, j1, new_list)
 
             self.structureMutated.emit()
             self._update_selection_counts()
