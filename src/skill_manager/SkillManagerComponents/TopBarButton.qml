@@ -101,8 +101,12 @@ Button {
             color: Theme.accent
         }
     }
-    Accessible.role: Accessible.Button
+    // AT matrix: mutually-exclusive view switch => PageTab role + checked (click selects, never toggles off; active/glassActive visuals unchanged).
+    Accessible.role: Accessible.PageTab
+    Accessible.checkable: true
+    Accessible.checked: control.active
     Accessible.name: control.tooltipText
+    Accessible.onPressAction: control.clicked()
 
     HoverHandler {
         cursorShape: Qt.PointingHandCursor

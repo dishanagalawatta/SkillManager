@@ -11,6 +11,11 @@ MenuItem {
     property bool isCompact: false
     property bool colorizeIcon: true
 
+    Accessible.role: Accessible.MenuItem
+    Accessible.name: control.text
+    Accessible.description: control.shortcut !== "" ? "Shortcut: " + control.shortcut : ""
+    Accessible.selected: control.highlighted
+
     implicitWidth: 200
     implicitHeight: 40
 

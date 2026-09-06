@@ -133,6 +133,11 @@ Item {
         text: root.isMainCollapsed ? "Expand " + root.mainCatName : "Collapse " + root.mainCatName
     }
 
-    Accessible.role: Accessible.Button
+    Accessible.role: Accessible.CheckBox
+    Accessible.checkable: true
+    // checked is true when expanded (inverse of isMainCollapsed)
+    Accessible.checked: !root.isMainCollapsed
     Accessible.name: headerToolTip.text
+    Accessible.onPressAction: Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
+    Accessible.onToggleAction: Qt.callLater(AppController.skillModel.toggleCategory, root.mainCatName)
 }

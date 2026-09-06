@@ -84,6 +84,13 @@ Item {
                     Layout.fillHeight: true
                     checked: settingsTab === 0
                     onClicked: settingsTab = 0
+                    // AT matrix: mutually-exclusive settings tab => PageTab role + checked (click selects, never toggles off).
+                    Accessible.role: Accessible.PageTab
+                    Accessible.checkable: true
+                    Accessible.checked: settingsTab === 0
+                    Accessible.name: "General"
+                    Accessible.onPressAction: generalTab.clicked()
+                    Accessible.onToggleAction: generalTab.clicked()
                     
                     contentItem: Text {
                         text: parent.text
@@ -106,6 +113,13 @@ Item {
                     Layout.fillHeight: true
                     checked: settingsTab === 1
                     onClicked: settingsTab = 1
+                    // AT matrix: mutually-exclusive settings tab => PageTab role + checked (click selects, never toggles off).
+                    Accessible.role: Accessible.PageTab
+                    Accessible.checkable: true
+                    Accessible.checked: settingsTab === 1
+                    Accessible.name: "Shortcuts"
+                    Accessible.onPressAction: shortcutsTab.clicked()
+                    Accessible.onToggleAction: shortcutsTab.clicked()
                     
                     contentItem: Text {
                         text: parent.text
@@ -128,6 +142,13 @@ Item {
                     Layout.fillHeight: true
                     checked: settingsTab === 2
                     onClicked: settingsTab = 2
+                    // AT matrix: mutually-exclusive settings tab => PageTab role + checked (click selects, never toggles off).
+                    Accessible.role: Accessible.PageTab
+                    Accessible.checkable: true
+                    Accessible.checked: settingsTab === 2
+                    Accessible.name: "About"
+                    Accessible.onPressAction: aboutTab.clicked()
+                    Accessible.onToggleAction: aboutTab.clicked()
                     
                     contentItem: Text {
                         text: parent.text

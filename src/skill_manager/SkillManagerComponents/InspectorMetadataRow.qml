@@ -70,6 +70,7 @@ ColumnLayout {
                 role: "ghost"
                 focusPolicy: Qt.NoFocus
                 tooltipText: "" // Handled by headerItem
+                accessibleName: "" // Name lives on headerItem; suppress empty inner AT node
                 iconSource: root.isExpanded ?
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
@@ -90,8 +91,12 @@ ColumnLayout {
             text: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"
         }
 
-        Accessible.role: Accessible.Button
+        Accessible.role: Accessible.CheckBox
+        Accessible.checkable: true
+        Accessible.checked: root.isExpanded
         Accessible.name: root.isExpanded ? "Collapse Metadata" : "Expand Metadata"
+        Accessible.onPressAction: root.isExpanded = !root.isExpanded
+        Accessible.onToggleAction: root.isExpanded = !root.isExpanded
     }
 
     Flow {

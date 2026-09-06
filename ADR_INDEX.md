@@ -25,6 +25,7 @@
 | [ADR-0028](docs/adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md) | Non-Blocking Package Versioning and NPX / GitHub Shorthand Resolution | Accepted | 2026-08-19 | @DIKKA |
 | [ADR-0029](docs/adr/ADR-0029-package-deletion-storage-cleanup.md) | Package Deletion and Local Storage Cleanup Lifecycle | Accepted | 2026-08-20 | @DIKKA |
 | [ADR-0030](docs/adr/ADR-0030-project-skill-classification-and-diff-model-sync.md) | Project Skill Classification & Differential Model Synchronization | Accepted | 2026-08-20 | @DIKKA |
+| [ADR-0031](docs/adr/ADR-0031-qml-accessibility-role-matrix.md) | QML Accessibility Role Matrix and Keyboard Contract | Accepted | 2026-09-06 | @DIKKA |
 
 
 ## Template

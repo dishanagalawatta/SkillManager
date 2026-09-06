@@ -212,8 +212,35 @@ Rectangle {
                 property bool isExpanded: true
 
                 Item {
+                    id: depHeaderItem
                     Layout.fillWidth: true
                     implicitHeight: depHeaderRow.implicitHeight
+                    activeFocusOnTab: true
+
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            depSection.isExpanded = !depSection.isExpanded
+                            event.accepted = true
+                        } else {
+                            event.accepted = false
+                        }
+                    }
+
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.checkable: true
+                    Accessible.checked: depSection.isExpanded
+                    Accessible.name: depSection.isExpanded ? "Collapse Skill Dependencies" : "Expand Skill Dependencies"
+                    Accessible.onPressAction: depSection.isExpanded = !depSection.isExpanded
+                    Accessible.onToggleAction: depSection.isExpanded = !depSection.isExpanded
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        color: depHeaderItem.activeFocus ? Theme.glassActive : "transparent"
+                        radius: Theme.radiusSmall
+                        border.color: depHeaderItem.activeFocus ? Theme.accent : "transparent"
+                        border.width: depHeaderItem.activeFocus ? 2 : 0
+                    }
 
                     RowLayout {
                         id: depHeaderRow
@@ -421,6 +448,7 @@ Rectangle {
 
         Accessible.role: Accessible.Button
         Accessible.name: "Expand Inspector"
+        Accessible.onPressAction: root.isCollapsed = false
 
         Text {
             anchors.centerIn: parent
@@ -428,6 +456,11 @@ Rectangle {
             rotation: 180
             font.pixelSize: 24
             color: Theme.secondaryLabel
+        }
+
+        HoverHandler {
+            id: collapseHover
+            cursorShape: Qt.PointingHandCursor
         }
 
         MouseArea {
@@ -440,7 +473,7 @@ Rectangle {
             SleekToolTip {
                 id: expCmdToolTip
                 text: "Expand Inspector"
-                visible: collapseMouseArea.containsMouse || collapseHandleRect.activeFocus
+                visible: collapseHover.hovered || collapseHandleRect.activeFocus
             }
         }
     }

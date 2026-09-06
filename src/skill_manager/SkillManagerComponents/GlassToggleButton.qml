@@ -125,6 +125,8 @@ Button {
     }
     Accessible.role: Accessible.CheckBox
     Accessible.checkable: true
-    Accessible.checked: checked
+    Accessible.checked: control.checked
     Accessible.name: tooltipText !== "" ? tooltipText : text
+    Accessible.onPressAction: control.clicked()
+    Accessible.onToggleAction: control.clicked()
 }

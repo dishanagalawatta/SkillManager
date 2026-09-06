@@ -242,12 +242,30 @@ Rectangle {
 
     // --- Collapse Handle ---
     Rectangle {
+        id: collapseHandleRect
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 32
         visible: root.isCollapsed
         color: "transparent"
+
+        activeFocusOnTab: true
+        border.color: activeFocus ? Theme.accent : "transparent"
+        border.width: activeFocus ? 2 : 0
+
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.isCollapsed = false
+                event.accepted = true
+            } else {
+                event.accepted = false
+            }
+        }
+
+        Accessible.role: Accessible.Button
+        Accessible.name: "Expand Inspector"
+        Accessible.onPressAction: root.isCollapsed = false
 
         Text {
             anchors.centerIn: parent
@@ -258,9 +276,16 @@ Rectangle {
         }
 
         MouseArea {
+            id: collapseMouseArea
             anchors.fill: parent
+            hoverEnabled: true
             onClicked: () => root.isCollapsed = false
             cursorShape: Qt.PointingHandCursor
+
+            SleekToolTip {
+                text: "Expand Inspector"
+                visible: collapseMouseArea.containsMouse || collapseHandleRect.activeFocus
+            }
         }
     }
 
@@ -398,7 +423,17 @@ Rectangle {
                                             id: itemMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            activeFocusOnTab: true
                                             cursorShape: Qt.PointingHandCursor
+                                            Keys.onPressed: (event) => {
+                                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                    root.zoomLevel = modelData / 100.0
+                                                    zoomPopup.close()
+                                                    event.accepted = true
+                                                } else {
+                                                    event.accepted = false
+                                                }
+                                            }
                                             onClicked: {
                                                 root.zoomLevel = modelData / 100.0
                                                 zoomPopup.close()
@@ -551,6 +586,8 @@ Rectangle {
             color: Qt.rgba(0, 0, 0, 0.3)
             radius: Theme.radiusSmall
             clip: true
+            border.color: drawArea.activeFocus ? Theme.accent : "transparent"
+            border.width: drawArea.activeFocus ? 2 : 0
 
             Flickable {
                 id: flickable
@@ -685,6 +722,8 @@ Rectangle {
                                         width: 8; height: 8
                                         radius: 4
                                         color: Theme.accent
+                                        border.color: resizeHandleMouse.activeFocus ? Theme.label : "transparent"
+                                        border.width: resizeHandleMouse.activeFocus ? 1 : 0
                                         x: {
                                             if (handleIdx === 0 || handleIdx === 6 || handleIdx === 7) return parent.x - 4
                                             if (handleIdx === 1 || handleIdx === 5) return parent.x + parent.width / 2 - 4
@@ -697,7 +736,26 @@ Rectangle {
                                         }
 
                                         MouseArea {
+                                            id: resizeHandleMouse
                                             anchors.fill: parent
+                                            activeFocusOnTab: true
+                                            Keys.onPressed: (event) => {
+                                                if (annData.width === undefined || annData.height === undefined) {
+                                                    event.accepted = false
+                                                    return
+                                                }
+                                                var step = (event.modifiers & Qt.ShiftModifier) ? 10 : 2
+                                                var sized = JSON.parse(JSON.stringify(annData))
+                                                if (event.key === Qt.Key_Left) sized.width = Math.max(5, sized.width - step)
+                                                else if (event.key === Qt.Key_Right) sized.width = sized.width + step
+                                                else if (event.key === Qt.Key_Up) sized.height = Math.max(5, sized.height - step)
+                                                else if (event.key === Qt.Key_Down) sized.height = sized.height + step
+                                                else { event.accepted = false; return }
+                                                var sizedList = root.annotations.slice()
+                                                sizedList[annDelegate.annIndex] = sized
+                                                root.annotations = sizedList
+                                                event.accepted = true
+                                            }
                                             cursorShape: {
                                                 if (handleIdx === 0 || handleIdx === 4) return Qt.SizeFDiagCursor
                                                 if (handleIdx === 2 || handleIdx === 6) return Qt.SizeBDiagCursor
@@ -1078,6 +1136,51 @@ Rectangle {
                         anchors.fill: parent
                         z: 200
                         enabled: root.activeTool !== "none" || root.selectedIndex >= 0
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Annotation canvas"
+                        Accessible.description: root.selectedIndex >= 0 ? ("Selected annotation " + (root.selectedIndex + 1) + " of " + root.annotations.length) : "No annotation selected"
+                        Accessible.onPressAction: {
+                            if (root.annotations.length > 0)
+                                root.selectedIndex = (root.selectedIndex + 1) % root.annotations.length
+                        }
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                if (root.annotations.length > 0)
+                                    root.selectedIndex = (root.selectedIndex + 1) % root.annotations.length
+                                event.accepted = true
+                            } else if ((event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) && root.selectedIndex >= 0) {
+                                var removed = root.annotations.slice()
+                                removed.splice(root.selectedIndex, 1)
+                                root.annotations = removed
+                                root.selectedIndex = -1
+                                event.accepted = true
+                            } else if (root.selectedIndex >= 0 && (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
+                                var step = (event.modifiers & Qt.ShiftModifier) ? 10 : 1
+                                var dx = 0, dy = 0
+                                if (event.key === Qt.Key_Left) dx = -step
+                                else if (event.key === Qt.Key_Right) dx = step
+                                else if (event.key === Qt.Key_Up) dy = -step
+                                else dy = step
+                                var moved = root.annotations.slice()
+                                var ann = JSON.parse(JSON.stringify(moved[root.selectedIndex]))
+                                if (ann.type === "arrow") {
+                                    ann.x1 += dx; ann.y1 += dy
+                                    ann.x2 += dx; ann.y2 += dy
+                                } else if (ann.type === "freehand" && ann.points) {
+                                    for (var fi = 0; fi < ann.points.length; fi++) {
+                                        ann.points[fi] = { x: ann.points[fi].x + dx, y: ann.points[fi].y + dy }
+                                    }
+                                } else {
+                                    ann.x += dx; ann.y += dy
+                                }
+                                moved[root.selectedIndex] = ann
+                                root.annotations = moved
+                                event.accepted = true
+                            } else {
+                                event.accepted = false
+                            }
+                        }
                         cursorShape: {
                             if (root.activeTool === "text") return Qt.IBeamCursor
                             if (root.activeTool === "eraser") return Qt.ClosedHandCursor
@@ -1417,12 +1520,22 @@ Rectangle {
                         border.width: 1
 
                         MouseArea {
+                            id: colorBtnMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
+                            activeFocusOnTab: true
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    colorPopup.open()
+                                    event.accepted = true
+                                } else {
+                                    event.accepted = false
+                                }
+                            }
                             onClicked: colorPopup.open()
                             SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: colorBtnMouse.containsMouse || colorBtnMouse.activeFocus
                             text: "Select Color"
                         }
                         }
@@ -1479,11 +1592,22 @@ Rectangle {
                                     }
 
                                     MouseArea {
+                                        id: colorPresetMouse
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
+                                        activeFocusOnTab: true
+                                        Keys.onPressed: (event) => {
+                                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                root.activeColor = Qt.color(modelData)
+                                                colorPopup.close()
+                                                event.accepted = true
+                                            } else {
+                                                event.accepted = false
+                                            }
+                                        }
                                         SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: colorPresetMouse.containsMouse || colorPresetMouse.activeFocus
                             text: modelData
                         }
                                         onClicked: {
@@ -1526,12 +1650,22 @@ Rectangle {
                         }
 
                         MouseArea {
+                            id: sizeBtnMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
+                            activeFocusOnTab: true
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    sizePopup.open()
+                                    event.accepted = true
+                                } else {
+                                    event.accepted = false
+                                }
+                            }
                             onClicked: sizePopup.open()
                             SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: sizeBtnMouse.containsMouse || sizeBtnMouse.activeFocus
                             text: "Select Size"
                         }
                         }
@@ -1571,11 +1705,22 @@ Rectangle {
                                     }
 
                                     MouseArea {
+                                        id: sizePresetMouse
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
+                                        activeFocusOnTab: true
+                                        Keys.onPressed: (event) => {
+                                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                root.strokeWidth = modelData
+                                                sizePopup.close()
+                                                event.accepted = true
+                                            } else {
+                                                event.accepted = false
+                                            }
+                                        }
                                         SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: sizePresetMouse.containsMouse || sizePresetMouse.activeFocus
                             text: "Size " + modelData
                         }
                                         onClicked: {
@@ -1621,12 +1766,22 @@ Rectangle {
                         }
 
                         MouseArea {
+                            id: eraserBtnMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
+                            activeFocusOnTab: true
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    eraserSizePopup.open()
+                                    event.accepted = true
+                                } else {
+                                    event.accepted = false
+                                }
+                            }
                             onClicked: eraserSizePopup.open()
                             SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: eraserBtnMouse.containsMouse || eraserBtnMouse.activeFocus
                             text: "Eraser Size"
                         }
                         }
@@ -1667,8 +1822,19 @@ Rectangle {
                                     }
 
                                     MouseArea {
+                                        id: eraserPresetMouse
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
+                                        activeFocusOnTab: true
+                                        Keys.onPressed: (event) => {
+                                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                root.eraserRadius = modelData
+                                                eraserSizePopup.close()
+                                                event.accepted = true
+                                            } else {
+                                                event.accepted = false
+                                            }
+                                        }
                                         onClicked: {
                                             root.eraserRadius = modelData
                                             eraserSizePopup.close()
@@ -1703,12 +1869,22 @@ Rectangle {
                         }
 
                         MouseArea {
+                            id: fontBtnMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
+                            activeFocusOnTab: true
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    fontSizePopup.open()
+                                    event.accepted = true
+                                } else {
+                                    event.accepted = false
+                                }
+                            }
                             onClicked: fontSizePopup.open()
                             SleekToolTip {
-                            visible: parent.containsMouse
+                            visible: fontBtnMouse.containsMouse || fontBtnMouse.activeFocus
                             text: "Text Size"
                         }
                         }
@@ -1747,8 +1923,19 @@ Rectangle {
                                     }
 
                                     MouseArea {
+                                        id: fontPresetMouse
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
+                                        activeFocusOnTab: true
+                                        Keys.onPressed: (event) => {
+                                            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                root.activeFontSize = modelData
+                                                fontSizePopup.close()
+                                                event.accepted = true
+                                            } else {
+                                                event.accepted = false
+                                            }
+                                        }
                                         onClicked: {
                                             root.activeFontSize = modelData
                                             fontSizePopup.close()

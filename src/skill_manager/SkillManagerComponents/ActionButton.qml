@@ -10,7 +10,7 @@ Button {
     property string labelText: text
     property string role: "secondary" // primary, secondary, destructive, danger
     property string tooltipText: ""
-    property string accessibleName: labelText !== "" ? labelText : tooltipText
+    property string accessibleName: tooltipText !== "" ? tooltipText : (iconText !== "" ? iconText : (labelText !== "" ? labelText : text))
     property int buttonHeight: 36
     property bool iconOnlyMode: false
     readonly property bool effectiveIconOnly: iconOnlyMode && (iconSource !== "" || iconText !== "")

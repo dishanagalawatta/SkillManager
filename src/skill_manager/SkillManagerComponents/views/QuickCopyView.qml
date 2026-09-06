@@ -663,6 +663,19 @@ Item {
                                     buttonSize: 32
                                     property bool isSelected: modelData === AppController.clientFormat
                                     onClicked: (mouse) => AppController.ui_controller.setClientFormat(modelData)
+                                    // AT DECISION (Qt matrix): clientFormat is single-choice (exactly one
+                                    // of AppController.clientFormats active) => RadioButton group semantics
+                                    // with checked === isSelected. Click on the selected option re-sets the
+                                    // same format (no toggle-off), so AT checked stays true — consistent.
+                                    // FLAG: no RadioButton group container added (RowLayout parent left
+                                    // without an Accessible group role for zero visual delta); add grouping
+                                    // on the parent if AT group navigation is required.
+                                    Accessible.role: Accessible.RadioButton
+                                    Accessible.checkable: true
+                                    Accessible.checked: clientBtn.isSelected
+                                    Accessible.name: modelData
+                                    Accessible.onPressAction: AppController.ui_controller.setClientFormat(modelData)
+                                    Accessible.onToggleAction: AppController.ui_controller.setClientFormat(modelData)
                                     contentItem: Item {
                                         implicitWidth: clientBtn.buttonSize
                                         implicitHeight: clientBtn.buttonSize

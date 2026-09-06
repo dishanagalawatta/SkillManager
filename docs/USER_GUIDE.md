@@ -134,6 +134,25 @@ SkillManager includes a powerful screenshots and redaction feature.
 
 ---
 
+## Screen Reader & Keyboard Operation
+
+SkillManager is fully operable without a mouse, and screen readers announce control state:
+
+- **Toggles announce state**: select checkboxes, star/unstar, Show Archived, category expanders,
+  and Settings switches all report checked/expanded on/off — not just "button".
+- **Full keyboard flow**: `Tab` moves through lists, headers, checkboxes, and toolbar controls;
+  `Space`/`Enter` activates the focused control; revealed-on-focus delete buttons and
+  tooltip previews work from the keyboard, not just hover.
+- **Tabs & formats**: Library/QuickCopy/Updates/Settings nav and the Settings
+  General/Shortcuts/About tabs expose the selected tab; the QuickCopy client-format
+  picker exposes the active format.
+- **Annotation canvas**: the screenshot canvas, color/size/eraser presets, and resize handles
+  are keyboard reachable (arrows nudge, `Delete` removes, `Space` cycles selection).
+
+---
+
+---
+
 ## Environment Variables
 
 SkillManager reads environment variables from `.env` at startup.

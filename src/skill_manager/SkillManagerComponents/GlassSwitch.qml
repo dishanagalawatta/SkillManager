@@ -71,7 +71,9 @@ Item {
     }
 
     Accessible.role: Accessible.CheckBox
-    Accessible.name: text
+    Accessible.name: text !== "" ? text : qsTr("Switch")
     Accessible.checkable: true
     Accessible.checked: checked
+    Accessible.onPressAction: { control.forceActiveFocus(); control.checked = !control.checked; }
+    Accessible.onToggleAction: { control.forceActiveFocus(); control.checked = !control.checked; }
 }

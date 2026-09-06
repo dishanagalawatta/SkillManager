@@ -121,8 +121,11 @@ Item {
         visible: (mouseArea.containsMouse || control.activeFocus) && control.tooltipText !== ""
         text: control.tooltipText
     }
-    
+
     Accessible.role: Accessible.CheckBox
     Accessible.name: tooltipText
     Accessible.checked: checkState === Qt.Checked || checkState === Qt.PartiallyChecked
+    Accessible.checkable: true
+    Accessible.onPressAction: control.toggled()
+    Accessible.onToggleAction: control.toggled()
 }
