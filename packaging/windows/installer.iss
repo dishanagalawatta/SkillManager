@@ -1,5 +1,5 @@
 #define MyAppName "SkillManager"
-#define MyAppVersion "2.6.2"
+#define MyAppVersion "2.6.3"
 #define MyAppPublisher "dishanagalawatta"
 #define MyAppURL "https://github.com/dishanagalawatta/SkillManager"
 #define MyAppExeName "SkillManager.exe"
