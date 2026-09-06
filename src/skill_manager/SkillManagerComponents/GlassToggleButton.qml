@@ -123,6 +123,8 @@ Button {
         visible: (control.hovered || control.visualFocus) && control.tooltipText !== ""
         text: control.tooltipText
     }
-    Accessible.role: Accessible.Button
+    Accessible.role: Accessible.CheckBox
+    Accessible.checkable: true
+    Accessible.checked: checked
     Accessible.name: tooltipText !== "" ? tooltipText : text
 }
