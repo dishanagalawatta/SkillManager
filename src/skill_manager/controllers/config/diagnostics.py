@@ -1,8 +1,9 @@
 """Cache persistence and agent-accessible diagnostic slots for the ConfigController facade."""
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import QUrl, Slot
+from PySide6.QtGui import QDesktopServices
 
-from skill_manager.core.diagnostics import get_diagnostic_logger
+from skill_manager.core.diagnostics import build_report_issue_url, get_diagnostic_logger
 
 
 class DiagnosticsMixin:
@@ -78,3 +79,33 @@ class DiagnosticsMixin:
 
         events = get_diagnostic_logger().get_recent_events_human(count)
         return json.dumps(events, ensure_ascii=False)
+
+    @Slot(result=str)
+    @Slot(str, result=str)
+    @Slot(str, str, result=str)
+    def getReportIssueUrl(self, summary: str = "", body: str = "") -> str:
+        """Build a prefilled GitHub issues/new URL with diagnostics.
+
+        Local-only: no network calls. QML opens/copies the returned URL
+        and attaches the exported bundle manually.
+        """
+        return build_report_issue_url(summary, body)
+
+    @Slot(result=str)
+    @Slot(str, result=str)
+    def getReportBundlePath(self, output_dir: str = "") -> str:
+        """Export a diagnostic bundle for manual issue attachment.
+
+        Args:
+            output_dir: Directory to write the zip. Defaults to log dir.
+
+        Returns:
+            Path to the created zip, or empty string on failure.
+        """
+        return self.exportDiagnosticBundle(output_dir)
+
+    @Slot(str)
+    def openReportIssue(self, url: str) -> None:
+        """Open a prefilled report-issue URL in the default browser."""
+        if url:
+            QDesktopServices.openUrl(QUrl(url))

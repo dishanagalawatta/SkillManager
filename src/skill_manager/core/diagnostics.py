@@ -188,15 +188,16 @@ class DiagnosticLogger:
             self._initialized = False
 
     def set_enabled(self, enabled: bool) -> None:
-        """Enable or disable diagnostic logging at runtime.
+        """Enable or disable diagnostic file logging at runtime.
 
-        When disabled, log_event() returns immediately — no ring buffer,
-        no file I/O, no JSON serialization.
+        The in-memory ring buffer always captures events regardless of
+        this flag, so get_recent_events() works in production. This flag
+        only gates JSON-line file I/O.
         """
         self._enabled = bool(enabled)
 
     def is_enabled(self) -> bool:
-        """Return True if diagnostic logging is currently enabled."""
+        """Return True if diagnostic file logging is currently enabled."""
         return self._enabled
 
     def rotate_if_needed(self) -> None:
@@ -233,15 +234,17 @@ class DiagnosticLogger:
     ) -> None:
         """Log a structured diagnostic event.
 
+        The in-memory ring buffer (last 1000 events) always captures the
+        event, even when file logging is disabled. File output is written
+        only when file logging was opted in via set_enabled(True) and the
+        logger was initialized.
+
         Args:
             level: Log level (DEBUG, INFO, WARNING, ERROR).
             category: Event category (use CATEGORY_* constants).
             msg: Human-readable message.
             data: Optional additional structured data.
         """
-        if not self._enabled:
-            return
-
         if level.upper() == "DEBUG" and self.log_level != "DEBUG":
             return
 
@@ -255,11 +258,15 @@ class DiagnosticLogger:
         if data:
             event["data"] = data
 
-        # Ring buffer (always, even if not initialized)
+        # Ring buffer (always, even when file logging is disabled or
+        # the logger is not initialized)
         with self._lock:
             self.ring.append(event)
 
-        # File output
+        # File output (opt-in via set_enabled)
+        if not self._enabled:
+            return
+
         if not self._initialized:
             return
 
@@ -442,6 +449,68 @@ def get_diagnostic_logger() -> DiagnosticLogger:
 # ---------------------------------------------------------------------------
 # Dev mode detection
 # ---------------------------------------------------------------------------
+
+
+def build_report_issue_url(summary: str = "", body: str = "") -> str:
+    """Build a prefilled GitHub ``issues/new`` URL with diagnostics.
+
+    Local-only: gathers app version, OS, health status, event counts,
+    and log path into the issue body template. Performs no network I/O —
+    the caller opens/copies the URL and attaches the exported bundle
+    manually.
+
+    Args:
+        summary: Short issue title supplied by the user (may be empty).
+        body: Longer user description (may be empty).
+
+    Returns:
+        Fully encoded ``https://github.com/<repo>/issues/new?...`` URL.
+    """
+    from urllib.parse import urlencode
+
+    try:
+        from skill_manager.core import release_check_service
+
+        repo_slug = release_check_service.GITHUB_REPO
+    except Exception:
+        repo_slug = "dishanagalawatta/SkillManager"
+
+    diag = get_diagnostic_logger()
+    try:
+        health = diag.get_health_status()
+    except Exception:
+        health = "unknown"
+    try:
+        counts = diag.get_diagnostic_counts()
+    except Exception:
+        counts = {}
+    try:
+        log_path = diag.get_log_path()
+    except Exception:
+        log_path = ""
+    info = platform_info()
+    version = app_version()
+    qt = qt_version()
+
+    summary = (summary or "").strip()
+    title = summary if summary else f"Bug report (SkillManager {version})"
+
+    counts_str = ", ".join(f"{k}={v}" for k, v in counts.items()) if counts else "n/a"
+    user_body = (body or "").strip() or "_Describe the issue here._"
+    template = (
+        f"{user_body}\n\n"
+        "---\n"
+        "**Diagnostics (auto-filled, local only — attach bundle manually)**\n"
+        f"- App version: {version}\n"
+        f"- OS: {info.get('os', '')} {info.get('os_version', '')} "
+        f"({info.get('platform', '')})\n"
+        f"- Python: {info.get('python', '')}, Qt: {qt}\n"
+        f"- Health: {health}\n"
+        f"- Event counts: {counts_str}\n"
+        f"- Log path: {log_path}\n"
+    )
+    query = urlencode({"title": title, "body": template})
+    return f"https://github.com/{repo_slug}/issues/new?{query}"
 
 
 def is_dev_mode() -> bool:

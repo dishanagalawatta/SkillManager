@@ -345,4 +345,21 @@ class AppControllerProxyMixin:
         """QML-callable diagnostic logger — emits to the structured ring buffer."""
         get_diagnostic_logger().log_event(level, category, msg)
 
+    @Slot(result=str)
+    @Slot(str, result=str)
+    @Slot(str, str, result=str)
+    def getReportIssueUrl(self, summary: str = "", body: str = "") -> str:
+        """Prefilled GitHub issues/new URL (local-only, no network)."""
+        return self.config_mgr.getReportIssueUrl(summary, body)
+
+    @Slot(result=str)
+    @Slot(str, result=str)
+    def getReportBundlePath(self, output_dir: str = "") -> str:
+        """Export a diagnostic bundle for manual issue attachment."""
+        return self.config_mgr.getReportBundlePath(output_dir)
+
+    @Slot(str)
+    def openReportIssue(self, url: str) -> None:
+        self.config_mgr.openReportIssue(url)
+
     # --- Slots ---

@@ -801,6 +801,42 @@ Item {
                                 }
                             }
 
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Theme.separator
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "Found a bug? Export diagnostics and open a prefilled issue."
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.sizeBody
+                                    color: Theme.secondaryLabel
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                ActionButton {
+                                    objectName: "aboutReportIssueButton"
+                                    Layout.preferredHeight: 32
+                                    labelText: "Report Issue"
+                                    role: "secondary"
+                                    iconSource: AppController.ui_controller ? AppController.ui_controller.getAssetUri("ui/tool-external-link.svg") : ""
+                                    tooltipText: "Expand diagnostics and open a prefilled issue"
+                                    onClicked: {
+                                        if (diagnosticsPane) diagnosticsPane.expanded = true
+                                        if (AppController.config_controller) {
+                                            var url = AppController.config_controller.getReportIssueUrl("", "")
+                                            AppController.config_controller.openReportIssue(url)
+                                        }
+                                    }
+                                }
+                            }
+
                         }
                     }
 
