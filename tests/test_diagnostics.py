@@ -252,13 +252,14 @@ def test_disabled_by_default(tmp_path):
 
 
 def test_log_event_skipped_when_disabled(tmp_path):
-    """When disabled, log_event() must not write to the ring buffer or file."""
+    """When file logging is disabled, ring buffer still captures but no file is written."""
     logger = DiagnosticLogger(log_dir=tmp_path / "logs")
     logger.initialize(log_level="INFO")
     # _enabled starts False — log something
-    logger.log_event("INFO", "test", "should be ignored")
+    logger.log_event("INFO", "test", "should be in ring only")
 
-    assert logger.get_recent_events() == []
+    assert len(logger.get_recent_events()) == 1
+    assert logger.get_recent_events()[0]["msg"] == "should be in ring only"
     assert not (tmp_path / "logs" / "diagnostic.log").exists()
 
 
@@ -277,25 +278,30 @@ def test_log_event_works_when_enabled(tmp_path):
 
 
 def test_set_enabled_toggle(tmp_path):
-    """Toggling enabled at runtime takes effect immediately for subsequent calls."""
+    """Toggling file logging at runtime gates file I/O; ring buffer always captures."""
     logger = DiagnosticLogger(log_dir=tmp_path / "logs")
     logger.initialize(log_level="INFO")
 
-    # Disabled → event ignored
-    logger.log_event("INFO", "cat", "ignored")
-    assert logger.get_recent_events() == []
+    # Disabled → ring records, file untouched
+    logger.log_event("INFO", "cat", "ring only")
+    assert len(logger.get_recent_events()) == 1
+    assert not (tmp_path / "logs" / "diagnostic.log").exists()
 
-    # Enable → event recorded
+    # Enable → event recorded to ring and file
     logger.set_enabled(True)
     logger.log_event("INFO", "cat", "recorded")
     events = logger.get_recent_events()
-    assert len(events) == 1
-    assert events[0]["msg"] == "recorded"
+    assert len(events) == 2
+    assert events[-1]["msg"] == "recorded"
+    assert (tmp_path / "logs" / "diagnostic.log").exists()
 
-    # Disable again → next event ignored
+    # Disable again → ring keeps capturing, file stops growing
+    before_size = (tmp_path / "logs" / "diagnostic.log").stat().st_size
     logger.set_enabled(False)
-    logger.log_event("INFO", "cat", "also ignored")
-    assert len(logger.get_recent_events()) == 1  # still only the one from above
+    logger.log_event("INFO", "cat", "also in ring")
+    assert len(logger.get_recent_events()) == 3  # ring always captures
+    assert logger.get_recent_events()[-1]["msg"] == "also in ring"
+    assert (tmp_path / "logs" / "diagnostic.log").stat().st_size == before_size
 
 
 # --- get_diagnostic_counts ---

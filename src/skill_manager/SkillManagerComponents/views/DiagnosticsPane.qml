@@ -16,6 +16,10 @@ Item {
     property string diagnosticLogPath: ""
     property string recentEventsJson: "[]"
     property string bundleExportResult: ""
+    property string reportSummary: ""
+    property string reportDescription: ""
+    property string reportIssueUrl: ""
+    property string reportStatus: ""
     property string healthStatus: "green"
     property int errorCount: 0
     property int warningCount: 0
@@ -479,6 +483,164 @@ Item {
                 color: Theme.secondaryLabel
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
+            }
+
+            // Report Issue divider
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: Theme.separator
+            }
+
+            // Report Issue section
+            ColumnLayout {
+                id: reportLayout
+                Layout.fillWidth: true
+                spacing: 8
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        text: "Report Issue"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeSectionTitle
+                        font.weight: Font.Bold
+                        color: Theme.label
+                        Layout.fillWidth: true
+                    }
+
+                    IconButton {
+                        buttonSize: 28
+                        iconSize: 12
+                        iconSource: AppController.ui_controller ? AppController.ui_controller.getAssetUri("ui/tool-external-link.svg") : ""
+                        role: "primary-outline"
+                        tooltipText: "Open prefilled issue in browser"
+                        onClicked: {
+                            if (AppController.config_controller) {
+                                var url = AppController.config_controller.getReportIssueUrl(root.reportSummary, root.reportDescription)
+                                root.reportIssueUrl = url
+                                AppController.config_controller.openReportIssue(url)
+                                root.reportStatus = "Opened issue draft in browser — attach the exported bundle manually"
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: "Summarize the problem, then export the bundle and copy the prefilled issue URL."
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeCaption
+                    color: Theme.secondaryLabel
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                }
+
+                TextField {
+                    id: reportSummaryField
+                    objectName: "reportSummaryField"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    placeholderText: "Summary (e.g. sync fails on large library)"
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: placeholderText
+                    text: root.reportSummary
+                    onTextChanged: root.reportSummary = text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeBody
+                    color: Theme.label
+                    placeholderTextColor: Theme.secondaryLabel
+                    selectByMouse: true
+                    background: Rectangle {
+                        radius: Theme.radiusField
+                        color: Theme.glassPill
+                        border.color: reportSummaryField.activeFocus ? Theme.accent : Theme.glassBorder
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 96
+                    radius: Theme.radiusField
+                    color: Theme.glassPill
+                    border.color: reportDescriptionArea.activeFocus ? Theme.accent : Theme.glassBorder
+
+                    TextArea {
+                        id: reportDescriptionArea
+                        objectName: "reportDescriptionArea"
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        placeholderText: "What happened? Steps to reproduce…"
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: placeholderText
+                        text: root.reportDescription
+                        onTextChanged: root.reportDescription = text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeBody
+                        color: Theme.label
+                        placeholderTextColor: Theme.secondaryLabel
+                        wrapMode: TextEdit.Wrap
+                        selectByMouse: true
+                        background: null
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    ActionButton {
+                        objectName: "reportExportButton"
+                        Layout.preferredHeight: 32
+                        labelText: "Export Bundle"
+                        role: "secondary"
+                        iconSource: AppController.ui_controller ? AppController.ui_controller.getAssetUri("ui/archive-icon.svg") : ""
+                        tooltipText: "Export diagnostic bundle for issue attachment"
+                        onClicked: {
+                            if (AppController.config_controller) {
+                                var result = AppController.config_controller.exportDiagnosticBundle("")
+                                if (result !== "") {
+                                    bundleExportResult = "Bundle saved: " + result
+                                    root.reportStatus = "Bundle saved — attach it to the GitHub issue"
+                                } else {
+                                    bundleExportResult = "Export failed — check log directory"
+                                    root.reportStatus = "Export failed — check log directory"
+                                }
+                            }
+                        }
+                    }
+
+                    ActionButton {
+                        objectName: "reportCopyUrlButton"
+                        Layout.preferredHeight: 32
+                        labelText: "Copy Issue URL"
+                        role: "secondary"
+                        iconSource: AppController.ui_controller ? AppController.ui_controller.getAssetUri("ui/copy-icon.svg") : ""
+                        tooltipText: "Copy prefilled issue URL with diagnostics"
+                        onClicked: {
+                            if (AppController.config_controller && AppController.ops_controller) {
+                                var url = AppController.config_controller.getReportIssueUrl(root.reportSummary, root.reportDescription)
+                                root.reportIssueUrl = url
+                                AppController.ops_controller.copyTextToClipboard(url)
+                                root.reportStatus = "Issue URL copied — attach the exported bundle manually"
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                Text {
+                    objectName: "reportStatusText"
+                    visible: root.reportStatus !== ""
+                    text: root.reportStatus
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeCaption
+                    color: Theme.secondaryLabel
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                }
             }
         }
     }
