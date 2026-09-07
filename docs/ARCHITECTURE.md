@@ -421,7 +421,15 @@ See [`environments/README.md`](../environments/README.md) and [`docs/ENVIRONMENT
 
 ## 8. Diagnostic Ring Buffer
 
-Uses `core/diagnostics.py` instead of standard `logging`. Events are categorized via `CATEGORY_*` constants:
+Three log outputs share `DATA_DIR` (resolved via `platformdirs`, overridable with `SKILL_MANAGER_DATA_DIR`):
+
+- `skill_manager.log`: stdlib logging via `RotatingFileHandler` in `__main__.setup_logging()` (5 MB x 5).
+- `qml_console.log`: QML `console.log` via stderr redirect in `__main__._redirect_qml_log()` (append mode, truncated once past the 5 MB cap).
+- `diagnostic.log`: structured JSON-line events from `core/diagnostics.py` (5 MB x 5, `diagnostic.log.1` onward). File write is opt-in through Settings General `diagnostic_logging`, always on in dev mode.
+
+`DiagnosticLogger` keeps an in-memory ring (`deque`, `maxlen=1000`) that always captures `log_event()` calls, even when file logging is off. `set_enabled()` only gates JSON-line file I/O. `SKILL_MANAGER_LOG_LEVEL` controls both sides (`_resolve_log_level()` for stdlib, `_resolve_diag_log_level()` for diag, `DEBUG` in dev mode else `INFO`).
+
+Events are categorized via `CATEGORY_*` constants:
 
 | Category | Purpose |
 |----------|---------|
@@ -429,6 +437,43 @@ Uses `core/diagnostics.py` instead of standard `logging`. Events are categorized
 | `CATEGORY_WINDOW_STATE` | Window visibility/position tracking |
 | `CATEGORY_COMMAND_CARRY_*` | Command-skill carry decisions (ADR-0017) |
 | `CATEGORY_REFRESH_*` | Background refresh lifecycle |
+
+### Logging Outputs
+
+```mermaid
+flowchart TD
+    Callers["log_event() callers\nPython controllers / QML bridge / MCP"] --> Ring["Ring buffer\ndeque maxlen 1000, always on"]
+    Ring --> Gate{"File-write gate\nset_enabled opt-in?"}
+    Gate -- "Yes" --> DiagFile["diagnostic.log\nJSON lines, 5 MB x 5"]
+    Gate -- "No" --> RingOnly["No file write\nring only"]
+    DiagFile --> Rot["Rotated files\ndiagnostic.log.1 and up"]
+    Stdlib["stdlib logger\nskill_manager.*"] --> RotHandler["RotatingFileHandler\nskill_manager.log, 5 MB x 5"]
+    QmlErr["QML console.log\nstderr"] --> QmlFile["qml_console.log\nappend, 5 MB cap"]
+```
+
+### Report Issue Flow
+
+`export_bundle()` zips a manifest (`app_version`, `qt_version`, OS, Python, `log_level`, 50 recent events, `exported_at`) plus the current and rotated `diagnostic.log` files. `DiagnosticsMixin` exposes `exportDiagnosticBundle` / `getReportBundlePath`, `getReportIssueUrl` (local only, builds a prefilled `issues/new` URL with version, health status from `get_health_status()`, level counts from `get_diagnostic_counts()`, and log path), and `openReportIssue` (opens the URL via `QDesktopServices`). The user attaches the bundle manually.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as User
+    participant Pane as DiagnosticsPane
+    participant Cfg as ConfigController DiagnosticsMixin
+    participant Diag as DiagnosticLogger
+    participant Browser as Browser
+    User->>Pane: Fill summary and description
+    Pane->>Cfg: exportDiagnosticBundle()
+    Cfg->>Diag: export_bundle() zip
+    Diag-->>Pane: Bundle path with manifest plus logs
+    Pane->>Cfg: getReportIssueUrl(summary, body)
+    Cfg->>Diag: build_report_issue_url() with version, health, counts
+    Diag-->>Pane: issues/new URL
+    Pane->>Cfg: openReportIssue(url)
+    Cfg->>Browser: QDesktopServices.openUrl(url)
+    User->>Browser: Attach bundle manually and submit
+```
 
 ---
 
