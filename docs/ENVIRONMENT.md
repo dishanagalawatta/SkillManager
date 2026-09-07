@@ -24,7 +24,7 @@ changes. `.env` overrides process environment.
 | `SKILL_MANAGER_TESTING` | test only | unset | Skip analytics/network/state-restore. |
 | `SKILL_MANAGER_SKIP_INITIAL_LOAD` | test only | unset | Skip initial skill load. |
 | `SKILL_MANAGER_DATA_DIR` | optional | platformdirs | Override user data dir. |
-| `SKILL_MANAGER_LOG_LEVEL` | optional | `INFO` | QML console bridge log level. |
+| `SKILL_MANAGER_LOG_LEVEL` | optional | `INFO` | Stdlib + diagnostic log level (`DEBUG`/`INFO`/`WARNING`/`ERROR`, case-insensitive; invalid falls back to dev-mode default: `DEBUG` in dev, `INFO` otherwise). |
 | `SKILL_MANAGER_DIAG` | debug only | unset | Set to `1` to enable shutdown diagnostics (`<data>/shutdown_diag.log`). Leave unset in production. |
 
 ## Telemetry
@@ -53,6 +53,12 @@ details and file paths.
 | `POSTHOG_PROJECT_TOKEN` | (empty) | (empty) | (required) |
 | `POSTHOG_HOST` | (empty) | (empty) | (required) |
 | `SENTRY_DSN` | (empty) | (empty) | (required) |
+
+## Logging
+
+- `skill_manager.log` rotates at 5 MB x 5 with format `%(asctime)s - %(name)s - %(levelname)s - %(message)s`.
+- `qml_console.log` appends across restarts; truncated only when over the 5 MB cap.
+- Diagnostic ring buffer keeps the last 1000 events in memory; file write stays opt-in via Settings.
 
 ## Conventions
 
