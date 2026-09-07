@@ -290,3 +290,145 @@ def test_check_skill_package_versions_npx_github_shorthand(mock_git_tag):
     mock_git_tag.assert_called_with(
         "https://github.com/sickn33/agentic-awesome-skills", is_remote=True, token=""
     )
+
+
+class TestPostUpdatePromotion:
+    """Post-update reconciliation: a successful update leaves an npx/custom
+    package AT latest, but those sources cannot observe their installed
+    version, so current must be promoted or the Update button never clears."""
+
+    def _find_skills_source(self):
+        return {
+            "source_type": "npx",
+            "name": "Find Skills",
+            "package_name": "skills",
+            "package_args": "add vercel-labs/skills --all -y",
+            "repository_url": "https://github.com/vercel-labs/skills",
+            "update_command": "npx --yes -- skills add vercel-labs/skills --all -y",
+            "current_version": "1.5.23",
+            "latest_version": "1.5.24",
+        }
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_npx_post_update_promotes_stale_current(self, mock_git_tag, mock_run_version):
+        mock_git_tag.return_value = "v1.5.24"
+        mock_run_version.return_value = "1.5.24"
+
+        updated = check_skill_package_versions(
+            self._find_skills_source(),
+            force_refresh=True,
+            promote_current_to_latest=True,
+        )
+        assert updated["latest_version"] == "1.5.24"
+        assert updated["current_version"] == "1.5.24"
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_promote_skipped_without_flag_keeps_scan_semantics(
+        self, mock_git_tag, mock_run_version
+    ):
+        mock_git_tag.return_value = "v1.5.24"
+        mock_run_version.return_value = "1.5.24"
+
+        updated = check_skill_package_versions(self._find_skills_source(), force_refresh=True)
+        assert updated["latest_version"] == "1.5.24"
+        assert updated["current_version"] == "1.5.23"
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    def test_promote_respects_explicit_current_version_command(self, mock_run_version):
+        mock_run_version.side_effect = ["v1.0.0", "v2.0.0"]
+        source = {
+            "source_type": "custom",
+            "current_version_command": "echo v1.0.0",
+            "latest_version_command": "echo v2.0.0",
+            "current_version": "1.0.0",
+            "latest_version": "2.0.0",
+        }
+
+        updated = check_skill_package_versions(
+            source, force_refresh=True, promote_current_to_latest=True
+        )
+        assert updated["current_version"] == "1.0.0"
+        assert updated["latest_version"] == "2.0.0"
+
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_promote_skips_git_with_local_detection(self, mock_git_tag, tmp_path):
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        mock_git_tag.side_effect = ["v2.0.0", "v1.5.0", "v2.0.0"]
+
+        source = {
+            "source_type": "git",
+            "repository_url": "https://github.com/user/repo.git",
+            "clone_path": str(tmp_path),
+            "current_version": "1.0.0",
+            "latest_version": "1.5.0",
+        }
+
+        updated = check_skill_package_versions(
+            source, force_refresh=True, promote_current_to_latest=True
+        )
+        assert updated["current_version"] == "1.5.0"
+        assert updated["latest_version"] == "2.0.0"
+
+
+class TestNpxLatestPrecedence:
+    """A bare commit hash from the git HEAD fallback must never clobber an
+    npm-derived semver latest, and plain npm names must reach the registry."""
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_commit_hash_never_overwrites_npm_version(self, mock_git_tag, mock_run_version):
+        mock_run_version.return_value = "1.5.24"
+        mock_git_tag.return_value = "abc1234"
+        source = {
+            "source_type": "npx",
+            "name": "Find Skills",
+            "package_name": "skills",
+            "repository_url": "https://github.com/vercel-labs/skills",
+            "current_version": "1.5.23",
+            "latest_version": "",
+        }
+
+        updated = check_skill_package_versions(source, force_refresh=True)
+        assert updated["latest_version"] == "1.5.24"
+        assert updated["current_version"] == "1.5.23"
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    @patch("skill_manager.core.skill_packages.versioning.fetch_npm_registry_version")
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_hash_accepted_as_last_resort_for_untagged_repo(
+        self, mock_git_tag, mock_fetch, mock_run_version
+    ):
+        mock_git_tag.return_value = "abc1234"
+        mock_fetch.return_value = ""
+        mock_run_version.return_value = ""
+        source = {
+            "source_type": "npx",
+            "package_name": "owner/repo",
+            "current_version": "",
+            "latest_version": "",
+        }
+
+        updated = check_skill_package_versions(source, sync_current_to_latest=True)
+        assert updated["latest_version"] == "abc1234"
+        assert updated["current_version"] == "abc1234"
+
+    @patch("skill_manager.core.skill_packages.versioning.run_version_command")
+    @patch("skill_manager.core.skill_packages.versioning.fetch_npm_registry_version")
+    @patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+    def test_plain_npm_name_reaches_registry(self, mock_git_tag, mock_fetch, mock_run_version):
+        mock_git_tag.return_value = ""
+        mock_fetch.return_value = "9.9.9"
+        mock_run_version.return_value = ""
+        source = {
+            "source_type": "npx",
+            "package_name": "some-plain-pkg",
+            "current_version": "",
+            "latest_version": "",
+        }
+
+        updated = check_skill_package_versions(source)
+        assert updated["latest_version"] == "9.9.9"
+        mock_fetch.assert_called_once()

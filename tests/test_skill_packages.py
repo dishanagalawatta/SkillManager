@@ -231,6 +231,46 @@ def test_run_skill_package_update_with_npx_relocation(
     )
 
 
+@patch("skill_manager.core.skill_packages.versioning.run_version_command")
+@patch("skill_manager.core.skill_packages.versioning.fetch_npm_registry_version")
+@patch("skill_manager.core.skill_packages.versioning.get_git_tag")
+@patch("skill_manager.core.skill_packages.updater.run_process")
+@patch("skill_manager.core.skill_packages.updater.relocate_packages_from_output")
+def test_run_skill_package_update_promotes_version_on_success(
+    mock_relocate_from_output,
+    mock_run,
+    mock_git_tag,
+    mock_fetch,
+    mock_run_version,
+    temp_dir,
+):
+    package_path = temp_dir / "skills_dest"
+    package_path.mkdir()
+
+    source = {
+        "name": "Find Skills",
+        "source_type": "npx",
+        "package_name": "skills",
+        "package_args": "add vercel-labs/skills --all -y",
+        "repository_url": "https://github.com/vercel-labs/skills",
+        "package_path": str(package_path),
+        "managed_folders": ["find-skills"],
+        "current_version": "1.5.23",
+        "latest_version": "1.5.24",
+    }
+
+    mock_relocate_from_output.return_value = ["find-skills"]
+    mock_git_tag.return_value = "v1.5.24"
+    mock_fetch.return_value = ""
+    mock_run_version.return_value = "1.5.24"
+
+    updated = run_skill_package_update(source)
+
+    assert updated["managed_folders"] == ["find-skills"]
+    assert updated["latest_version"] == "1.5.24"
+    assert updated["current_version"] == "1.5.24"
+
+
 @patch("skill_manager.core.skill_packages.versioning.cmd.Git")
 def test_get_git_tag_remote(mock_git_class, mock_run):
     mock_git = mock_git_class.return_value

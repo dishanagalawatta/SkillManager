@@ -274,7 +274,9 @@ def run_skill_package_update(
         emit(output_callback, f"Verifying {source['name']}...")
         run_shell_command(source["verify_command"], output_callback)
 
-    updated_source_info = check_skill_package_versions(source, force_refresh=True)
+    updated_source_info = check_skill_package_versions(
+        source, force_refresh=True, promote_current_to_latest=True
+    )
     source.update(updated_source_info)
 
     source["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
