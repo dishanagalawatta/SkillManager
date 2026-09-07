@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import urllib.parse
@@ -14,6 +15,16 @@ from git import Repo, cmd
 from .config import normalize_skill_package_config
 
 logger = logging.getLogger(__name__)
+
+# Bare short/long hex commit ids produced by the get_git_tag HEAD fallback.
+# These are content pointers, not comparable releases, and must never
+# overwrite a real (semver-like) latest_version for npm-identity packages.
+_COMMIT_HASH_RE = re.compile(r"\A[0-9a-f]{7,40}\Z")
+
+
+def _looks_like_commit_hash(value: str) -> bool:
+    """True when value is a bare hex commit id rather than a release version."""
+    return bool(_COMMIT_HASH_RE.fullmatch(str(value or "").strip().lower()))
 
 
 def detect_git_remote(package_path: str | None) -> str:
@@ -195,7 +206,17 @@ def check_skill_package_versions(
     source: dict[str, Any],
     force_refresh: bool = False,
     sync_current_to_latest: bool = False,
+    promote_current_to_latest: bool = False,
 ) -> dict[str, Any]:
+    """Reconcile current_version/latest_version for a skill package record.
+
+    Scan (default) only refreshes an empty latest_version. ``force_refresh``
+    re-probes latest. ``sync_current_to_latest`` snaps current to latest on
+    add/edit when no local detection exists. ``promote_current_to_latest``
+    is the post-update transition: after a *successful* update of an
+    npx/custom package (which has no local current detection), the stored
+    current is stale by construction, so it is promoted to latest.
+    """
     source = normalize_skill_package_config(source)
 
     current_version = source.get("current_version", "")
@@ -224,7 +245,12 @@ def check_skill_package_versions(
     token = source.get("github_token")
     if repo_url and ("github.com" in repo_url or "gitlab.com" in repo_url):
         git_latest = get_git_tag(repo_url, is_remote=True, token=token)
-        if git_latest:
+        hash_would_clobber = (
+            source.get("source_type") in ("npx", "custom")
+            and _looks_like_commit_hash(git_latest)
+            and bool(latest_version)
+        )
+        if git_latest and not hash_would_clobber:
             latest_version = clean_v(git_latest)
 
     if source.get("source_type") == "git":
@@ -245,34 +271,34 @@ def check_skill_package_versions(
         package_name = str(source.get("package_name") or "").strip()
         repo_url = str(source.get("repository_url") or "").strip()
 
-        # 1. If repository_url is set or package_name is owner/repo, probe GitHub repo
+        probed_git = ""
         if repo_url and "github.com" in repo_url:
             git_url = repo_url if repo_url.endswith(".git") else f"{repo_url}.git"
-            git_latest = get_git_tag(git_url, is_remote=True, token=token)
-            if git_latest:
-                latest_version = clean_v(git_latest)
+            probed_git = get_git_tag(git_url, is_remote=True, token=token)
         elif package_name and "/" in package_name and not package_name.startswith("@"):
             git_url = f"https://github.com/{package_name}.git"
-            git_latest = get_git_tag(git_url, is_remote=True, token=token)
-            if git_latest:
-                latest_version = clean_v(git_latest)
+            probed_git = get_git_tag(git_url, is_remote=True, token=token)
 
-            # 2. Fast direct HTTP registry lookup
-            if not latest_version:
-                npm_version = fetch_npm_registry_version(package_name, timeout=3.0)
-                if npm_version:
-                    latest_version = clean_v(npm_version)
+        if not latest_version:
+            registry_version = fetch_npm_registry_version(package_name, timeout=3.0)
+            if registry_version:
+                latest_version = clean_v(registry_version)
 
-            # 3. Fallback to npm view if npm binary is locally available
-            if not latest_version:
-                import shutil
+        if not latest_version:
+            import shutil
 
-                if shutil.which("npm"):
-                    detected_latest = run_version_command(
-                        f"npm view -- {package_name} version", timeout=3.0
-                    )
-                    if detected_latest:
-                        latest_version = clean_v(detected_latest)
+            if package_name and shutil.which("npm"):
+                detected_latest = run_version_command(
+                    f"npm view -- {package_name} version", timeout=3.0
+                )
+                if detected_latest:
+                    latest_version = clean_v(detected_latest)
+
+        if not latest_version and probed_git:
+            if _looks_like_commit_hash(probed_git):
+                latest_version = probed_git.strip()
+            else:
+                latest_version = clean_v(probed_git)
 
     # After a successful update (force_refresh) or on initial add
     # (sync_current_to_latest), snap current_version to latest_version
@@ -281,6 +307,18 @@ def check_skill_package_versions(
         current_version = _sync_current_to_latest_if_applicable(
             current_version, latest_version, source
         )
+
+    # Post-update reconciliation for sources with no local current detection.
+    # npx/custom packages never observe their installed version, so without
+    # this the stored current stays stale forever and the UI keeps offering
+    # the same update after every successful run.
+    if (
+        promote_current_to_latest
+        and latest_version
+        and not source.get("current_version_command")
+        and source.get("source_type") in ("npx", "custom")
+    ):
+        current_version = latest_version
 
     if current_version:
         source["current_version"] = clean_v(current_version)
