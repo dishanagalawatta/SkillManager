@@ -254,11 +254,25 @@ Dialog {
                                     id: expandToggle
                                     text: modelData.detailsExpanded ? "▲" : "▼"
                                     font.pixelSize: 10
-                                    color: Theme.secondaryLabel
+                                    color: activeFocus ? Theme.accent : Theme.secondaryLabel
+                                    activeFocusOnTab: true
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: (modelData.detailsExpanded ? "Collapse details for " : "Expand details for ") + modelData.project
+
+                                    Keys.onPressed: (event) => {
+                                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                            root.toggleDetails(index)
+                                            event.accepted = true
+                                        }
+                                    }
+
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.toggleDetails(index)
+                                        onClicked: {
+                                            expandToggle.forceActiveFocus()
+                                            root.toggleDetails(index)
+                                        }
                                     }
                                 }
                             }

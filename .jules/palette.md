@@ -39,3 +39,6 @@
 ## 2026-09-02 - GlassToggleButton Role Fix
 **Learning:** In QML, when implementing toggleable buttons (e.g. functioning as a switch/toggle), ensure proper accessibility by setting `Accessible.role: Accessible.CheckBox`, `Accessible.checkable: true`, and binding `Accessible.checked` to the component's active state instead of using the generic `Accessible.Button` role.
 **Action:** Always verify if a component functions as a toggle. If so, assign the `Accessible.CheckBox` role and wire `checkable` and `checked` properties to accurately reflect its state to screen readers.
+## 2024-05-18 - MissingSkillsDialog toggle button accessibility
+**Learning:** Adding fully accessible interactive toggles in custom QML delegates requires binding color to `activeFocus`, adding `Accessible.role: Accessible.Button`, `activeFocusOnTab: true`, and explicitly handling `Keys.onPressed` with `event.accepted = true` for `Space`/`Enter`/`Return` keys.
+**Action:** Always check custom `Text` or `Item` elements with `MouseArea` in list delegates (e.g., expand/collapse toggles) to ensure they are keyboard focusable and provide context-aware `Accessible.name` strings.
