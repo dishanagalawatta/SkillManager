@@ -17,3 +17,6 @@
 ## 2026-09-01 - Optimize dataChanged emissions in difflib equal blocks
 **Learning:** When using `difflib` to synchronize QAbstractListModels with custom dataclasses, items matched in the 'equal' block share a diff key but may still have internal property mutations. Unconditionally emitting `dataChanged` for the entire block forces QML to re-evaluate bindings for identical items, causing signal storms and UI jank.
 **Action:** Iterate over the 'equal' block, explicitly check object equality (`if old_obj != new_item:`), reassign only if mutated, and batch contiguous changed rows into a single `dataChanged(topLeft, bottomRight)` emission to optimize Qt Quick performance.
+## 2026-09-11 - Fast os.scandir tree traversal with relative paths
+**Learning:** When replacing `pathlib.Path.rglob` with an iterative `os.scandir` stack to optimize file traversal, extracting relative paths by slicing the string path (`entry.path[base_len:]`) is drastically faster than yielding `pathlib.Path` objects or calling `.relative_to()`. However, care must be taken to initialize required variables (e.g., `files = []`) and match the native OS path separators if replacing the return values.
+**Action:** Initialize accumulator lists before branches that populate them, and use string slicing (`base_len = len(path_str) + 1`) rather than `Path` instantiation inside hot `os.scandir` loops.
