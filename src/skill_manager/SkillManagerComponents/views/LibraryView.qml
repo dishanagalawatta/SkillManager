@@ -496,6 +496,9 @@ Item {
         }
 
         // Skill List
+        // Scroll preservation (collapse/expand restore, refresh blink,
+        // incubation coordination) lives in SmoothListView — see
+        // preserveOnCollapse/collapseModel there. Do not duplicate it here.
         SmoothListView {
             id: lv_listView
             objectName: "libraryList"
@@ -504,110 +507,8 @@ Item {
                 model: null
                 clip: true
                 spacing: 0
-                
-                // Visual Blink: Dips opacity slightly during background refresh to mask micro-jumps
-                opacity: (AppController.isLoading && _restoringScroll) ? 0.0 : 1.0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                property real savedScrollPos: 0
-                property bool _restoringScroll: false
-
-                function _restoreScroll() {
-                    if (AppController.isLoading && savedScrollPos > 0) {
-                        _restoringScroll = true
-                        
-                        // Force immediate layout to ensure contentHeight is valid for restore
-                        lv_listView.forceLayout()
-                        lv_listView.contentY = savedScrollPos
-                        
-                        // Second pass: Ensure it stuck (sometimes required for large additions)
-                        Qt.callLater(() => {
-                            if (lv_listView.contentY !== savedScrollPos) {
-                                lv_listView.forceLayout()
-                                lv_listView.contentY = savedScrollPos
-                            }
-                            _restoringScroll = false
-                        })
-                    }
-                }
-
-                Connections {
-                    target: AppController.libraryModel
-                    function onLayoutAboutToBeChanged() {
-                        lv_listView.savedScrollPos = lv_listView.contentY
-                        lv_listView.cacheBuffer = 0 // Safely abort active incubators
-                    }
-                    function onLayoutChanged() {
-                        // Defer the restore while the model is still incubating:
-                        // the reset fires mid-incubation, so restoring cacheBuffer
-                        // here re-triggers a delegate burst that races the in-flight
-                        // one ("Object or context destroyed during incubation").
-                        // The restore is performed in onIncubatingChanged instead.
-                        if (!AppController.libraryModel.incubating) {
-                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                            lv_listView._restoreScroll()
-                        }
-                    }
-                    function onModelAboutToBeReset() {
-                        lv_listView.savedScrollPos = lv_listView.contentY
-                        lv_listView.cacheBuffer = 0
-                    }
-                    function onModelReset() {
-                        if (!AppController.libraryModel.incubating) {
-                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                            lv_listView._restoreScroll()
-                        }
-                    }
-                    function onRowsAboutToBeRemoved() {
-                        lv_listView.savedScrollPos = lv_listView.contentY
-                        lv_listView.cacheBuffer = 0
-                    }
-                    function onRowsRemoved() {
-                        if (lv_listView.model && !AppController.libraryModel.incubating) {
-                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                            lv_listView._restoreScroll()
-                        }
-                    }
-                    function onRowsAboutToBeInserted() {
-                        lv_listView.savedScrollPos = lv_listView.contentY
-                        lv_listView.cacheBuffer = 0
-                    }
-                    function onRowsInserted() {
-                        if (lv_listView.model && !AppController.libraryModel.incubating) {
-                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                            lv_listView._restoreScroll()
-                        }
-                    }
-                    function onAboutToMutateStructure() {
-                        lv_listView.savedScrollPos = lv_listView.contentY
-                        lv_listView.cacheBuffer = 0
-                    }
-                    function onStructureMutated() {
-                        if (!AppController.libraryModel.incubating) {
-                            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                            lv_listView._restoreScroll()
-                        }
-                    }
-                }
-
-                // Incubation coordination: when incubating transitions to False,
-                // tell the model to replay deferred layout signals.
-                Connections {
-                    target: AppController.libraryModel
-                    function onIncubatingChanged() {
-                        if (!AppController.libraryModel.incubating) {
-                            AppController.libraryModel.onIncubationReady()
-                            // Incubation finished: now safe to re-enable the
-                            // off-screen cache buffer without racing live delegates.
-                            if (lv_listView.model) {
-                                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-                                lv_listView._restoreScroll()
-                            }
-                        } else {
-                            lv_listView.cacheBuffer = 0
-                        }
-                    }
-                }
+                preserveOnCollapse: true
+                collapseModel: AppController.libraryModel
 
                 section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
