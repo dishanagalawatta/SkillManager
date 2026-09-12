@@ -149,6 +149,87 @@ def testmerge_and_move_lockfile_handles_exception(tmp_path):
         merge_and_move_lockfile(src, tmp_path / "dest.json", None)
 
 
+def test_relocate_packages_from_output_global_store_accepted(tmp_path, monkeypatch):
+    """Regression: `npx skills add <repo> -g` installs to ~/.agents/skills.
+
+    The global store sits outside the staging temp dir, so the relocation
+    security gate must accept it (copy into isolated storage) instead of
+    dropping it as "outside of staging directory" (archify partial-install).
+    """
+    from skill_manager.core.skill_packages import relocator as reloc_mod
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    fake_home = tmp_path / "home"
+    global_store = fake_home / ".agents" / "skills"
+    archify = global_store / "archify"
+    archify.mkdir(parents=True)
+    (archify / "SKILL.md").write_text("# archify")
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    monkeypatch.setattr(reloc_mod, "known_global_skill_dirs", lambda: [global_store])
+
+    messages: list[str] = []
+    result = relocate_packages_from_output(
+        [f"Installed to {archify}"],
+        str(dest),
+        messages.append,
+        base_path=str(staging),
+    )
+    assert result == ["archify"]
+    assert (dest / "archify" / "SKILL.md").is_file()
+    # Global install is preserved (copy, not move).
+    assert (archify / "SKILL.md").is_file()
+    assert not any("outside of staging" in m for m in messages)
+
+
+def test_relocate_packages_from_output_global_container_accepted(tmp_path, monkeypatch):
+    """A detected global container dir is iterated like any skills container."""
+    from skill_manager.core.skill_packages import relocator as reloc_mod
+    from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
+
+    global_store = tmp_path / "ghost" / ".agents" / "skills"
+    skill = global_store / "my-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# my-skill")
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    monkeypatch.setattr(reloc_mod, "known_global_skill_dirs", lambda: [global_store])
+
+    result = relocate_packages_from_output(
+        [f"Installed to {global_store}"],
+        str(dest),
+        None,
+        base_path=str(staging),
+    )
+    assert result == ["my-skill"]
+    assert (dest / "my-skill" / "SKILL.md").is_file()
+
+
+def test_verify_command_quoting_is_well_formed(tmp_path):
+    """Regression: verify_command had a broken quote (`echo "Skills installed in "{path}`)."""
+    from skill_manager.core.skill_packages.config import normalize_skill_package_config
+
+    pkg = normalize_skill_package_config(
+        {
+            "name": "Archify",
+            "source_type": "npx",
+            "package_name": "skills",
+            "package_args": "add tt-a1i/archify -g -y --all",
+            "package_path": str(tmp_path / "archify-pkg"),
+        }
+    )
+    cmd = pkg["verify_command"]
+    assert cmd.count('"') % 2 == 0
+    assert '""' not in cmd
+    assert "Skills installed in " in cmd
+
+
 def test_relocate_packages_from_output_no_target(tmp_path):
     from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
 

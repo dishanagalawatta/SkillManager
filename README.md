@@ -259,6 +259,13 @@ uv run skill-manager-build
 uv run skill-manager-build linux
 ```
 
+### 6. Update Installed App from Local Source (Offline)
+
+```bash
+# Build the .deb from your working tree and install it — no GitHub download
+bash scripts/update-local.sh
+```
+
 ---
 
 ## 🏗️ Architecture
