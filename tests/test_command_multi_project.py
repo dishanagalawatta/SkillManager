@@ -374,8 +374,9 @@ class TestUpdateMultiProject:
             project_aliases=aliases,
         )
 
-        # projA should get "Already up to date" from the canonical result (Phase 1)
-        # since projA already has CmdNew.md with identical content.
+        # projB is the original holder, so it stays canonical and is renamed
+        # in place; projA already holds identical CmdNew.md content, so the
+        # fan-out skips it.
         ok_results = [r for r in results if r.ok]
         a_result = next(
             (r for r in ok_results if r.path and str(proj_a) in str(r.path)),
@@ -385,23 +386,29 @@ class TestUpdateMultiProject:
         assert "Already up to date" in a_result.message, (
             f"Expected 'Already up to date' for projA, got: {a_result.message}"
         )
-        assert a_result.set_membership == "canonical", (
-            f"Expected set_membership='canonical', got: {a_result.set_membership}"
+        assert a_result.set_membership == "fanout_skip", (
+            f"Expected set_membership='fanout_skip', got: {a_result.set_membership}"
         )
+        b_result = next(
+            (r for r in ok_results if r.set_membership == "canonical"),
+            None,
+        )
+        assert b_result is not None, "Expected canonical result for projB (original holder)"
+        assert b_result.path is not None and str(proj_b) in str(b_result.path)
 
-    def test_update_multi_project_warns_on_different_content(self, tmp_path):
-        """When target project has different content, conflict is raised.
+    def test_update_multi_project_syncs_diverged_keep_content(self, tmp_path):
+        """When a checked project holds diverged content, an edit synchronises it.
 
-        Both projects already hold the command, so add_set is empty and the
-        fan-out has nothing to do.  The canonical update targets the original
-        project (projB) and succeeds.  projA is an existing holder that keeps
-        its own file — it is NOT overwritten by the fan-out.
+        Both projects already hold the command, so add_set is empty. The
+        canonical update targets the original project (projB) and the
+        fan-out overwrites projA's diverged copy — editing a command
+        with projects checked means "make them all this content".
         """
         proj_a = _make_project(tmp_path, "projA")
         proj_b = _make_project(tmp_path, "projB")
 
         cmd_b = _write_command(proj_b / ".agents" / "commands", "Cmd", "new-body")
-        # Pre-populate A with different content
+        # Pre-populate A with diverged content
         (proj_a / ".agents" / "commands" / "Cmd.md").write_text(
             "---\nname: Cmd\n---\ndifferent-body", encoding="utf-8"
         )
@@ -418,14 +425,99 @@ class TestUpdateMultiProject:
             project_paths=[str(proj_a), str(proj_b)],
         )
 
-        # Canonical update targets projB (original project) and succeeds.
-        # Fan-out has nothing to do (add_set empty). projA keeps its file.
+        # Canonical update targets projB (original project) plus one
+        # canonical_sync fan-out to projA.
         ok_results = [r for r in results if r.ok]
-        assert len(ok_results) == 1, f"Expected 1 ok result, got {len(ok_results)}"
-        assert "Cmd.md" in ok_results[0].message
-        # projA's file is NOT overwritten
+        assert len(ok_results) == 2, f"Expected 2 ok results, got {len(ok_results)}"
+        memberships = sorted(r.set_membership for r in ok_results)
+        assert memberships == ["canonical", "canonical_sync"], (
+            f"Unexpected memberships: {memberships}"
+        )
+        # Both projects now carry the edited body.
         a_content = (proj_a / ".agents" / "commands" / "Cmd.md").read_text(encoding="utf-8")
-        assert "different-body" in a_content
+        assert "new-body" in a_content
+        assert "different-body" not in a_content
+        b_content = (proj_b / ".agents" / "commands" / "Cmd.md").read_text(encoding="utf-8")
+        assert "new-body" in b_content
+
+    def test_update_multi_project_body_edit_fans_out_to_all_holders(self, tmp_path):
+        """Editing the body updates every checked project holding the command."""
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        cmd_a = _write_command(proj_a / ".agents" / "commands", "Cmd", "old-body")
+        _write_command(proj_b / ".agents" / "commands", "Cmd", "old-body")
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_a),
+            name="Cmd",
+            body="brand-new-body",
+            category="Commands",
+            project_labels=[label_a, label_b],
+            project_paths=[str(proj_a), str(proj_b)],
+        )
+
+        assert all(r.ok for r in results)
+        for proj in (proj_a, proj_b):
+            content = (proj / ".agents" / "commands" / "Cmd.md").read_text(encoding="utf-8")
+            assert "brand-new-body" in content, f"{proj} missing edited body"
+
+    def test_update_multi_project_rename_propagates_everywhere(self, tmp_path):
+        """Renaming moves the file in every checked project, leaving no orphans."""
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        cmd_a = _write_command(proj_a / ".agents" / "commands", "Cmd", "body")
+        _write_command(proj_b / ".agents" / "commands", "Cmd", "body")
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_a),
+            name="CmdRenamed",
+            body="body",
+            category="Commands",
+            project_labels=[label_a, label_b],
+            project_paths=[str(proj_a), str(proj_b)],
+        )
+
+        assert all(r.ok for r in results), [r.message for r in results]
+        for proj in (proj_a, proj_b):
+            assert (proj / ".agents" / "commands" / "CmdRenamed.md").is_file()
+            assert not (proj / ".agents" / "commands" / "Cmd.md").exists(), (
+                f"Orphan old filename left in {proj}"
+            )
+
+    def test_update_multi_project_rename_plus_removal_cleans_old_file(self, tmp_path):
+        """Renaming while unchecking a project removes its old file, not the new name."""
+        proj_a = _make_project(tmp_path, "projA")
+        proj_b = _make_project(tmp_path, "projB")
+
+        cmd_a = _write_command(proj_a / ".agents" / "commands", "Cmd", "body")
+        _write_command(proj_b / ".agents" / "commands", "Cmd", "body")
+
+        label_a = _compute_label(proj_a)
+        label_b = _compute_label(proj_b)
+
+        results = update_custom_command_file_multi(
+            local_path=str(cmd_a),
+            name="CmdRenamed",
+            body="body",
+            category="Commands",
+            project_labels=[label_a],
+            project_paths=[str(proj_a), str(proj_b)],
+            confirmed_removals=[label_b],
+        )
+
+        assert all(r.ok for r in results), [r.message for r in results]
+        assert (proj_a / ".agents" / "commands" / "CmdRenamed.md").is_file()
+        assert not (proj_a / ".agents" / "commands" / "Cmd.md").exists()
+        assert not (proj_b / ".agents" / "commands" / "Cmd.md").exists()
+        assert not (proj_b / ".agents" / "commands" / "CmdRenamed.md").exists()
 
 
 # ---------------------------------------------------------------------------
