@@ -28,6 +28,7 @@
 | [ADR-0031](docs/adr/ADR-0031-qml-accessibility-role-matrix.md) | QML Accessibility Role Matrix and Keyboard Contract | Accepted | 2026-09-06 | @DIKKA |
 | [ADR-0032](docs/adr/ADR-0032-report-issue-bundle.md) | Local-Only Prefilled GitHub Issue URL with Manual Diagnostic Bundle Attach | Accepted | 2026-09-07 | @DIKKA |
 | [ADR-0033](docs/adr/ADR-0033-global-npx-relocation-sources.md) | Global npx Skill Installs as Relocation Sources | Proposed | 2026-09-08 | @DIKKA |
+| [ADR-0034](docs/adr/ADR-0034-keyboard-reorder-dialog.md) | Keyboard-Operable List Reorder in ProjectReorderDialog | Accepted | 2026-09-12 | @DIKKA |
 
 
 ## Template

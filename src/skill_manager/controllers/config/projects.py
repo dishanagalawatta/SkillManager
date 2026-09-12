@@ -104,12 +104,14 @@ class ProjectsMixin:
             or to_index < 0
             or to_index >= len(projects)
         ):
+            logger.debug("[PROJECTS] reorderProjects ignored: %s -> %s", from_index, to_index)
             return
 
         project = projects.pop(from_index)
         projects.insert(to_index, project)
         self.config.set("projects", projects)
         self._emit_projects_changed()
+        logger.info("[PROJECTS] reordered project '%s': %s -> %s", project, from_index, to_index)
 
     @Slot(int)
     def removeUpdateProject(self, index: int):
