@@ -48,6 +48,19 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 > rm -f ~/.local/bin/skill-manager
 > ```
 
+### Update from Local Source (Offline, No GitHub Download)
+
+Build and install the app from your local working tree instead of downloading
+a release. Useful when testing uncommitted changes:
+
+```bash
+bash scripts/update-local.sh
+```
+
+This runs PyInstaller on the local source, packages `dist/skill-manager_*_amd64.deb`,
+installs it with `dpkg`, and removes a shadowing `~/.local/bin/skill-manager`
+if present. Requires `sudo` for the `dpkg -i` step.
+
 ### Installing a Specific Version (incl. Dev Builds)
 
 ```bash

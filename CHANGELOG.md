@@ -10,6 +10,15 @@
 ### Changes
 - Release version bump.
 
+## [Unreleased]
+
+### Fixes
+- Fix silent partial install for `npx skills add <repo> -g`: known global skills stores are now accepted as relocation copy sources instead of rejected as outside the staging directory (ADR-0033).
+- Fix unbalanced quoting in generated package `verify_command`.
+
+### Added
+- Add `scripts/update-local.sh`: build the `.deb` from local source and install it in one command, with no GitHub download.
+
 ## [2.6.3] - 2026-09-06
 
 ### Changes

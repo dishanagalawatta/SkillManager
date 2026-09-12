@@ -381,9 +381,7 @@ def detect_package_config(data: dict[str, Any]) -> dict[str, Any]:
     if verify_target_path and not source.get("verify_command"):
         expanded = os.path.expanduser(verify_target_path)
         quoted_path = shlex.quote(expanded)
-        source["verify_command"] = (
-            f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}'
-        )
+        source["verify_command"] = f'test -d {quoted_path} && echo "Skills installed in {expanded}"'
 
     return source
 
@@ -410,7 +408,7 @@ def normalize_skill_package_config(data: dict[str, Any]) -> dict[str, Any]:
     if target_path:
         expanded = os.path.expanduser(target_path)
         quoted_path = shlex.quote(expanded)
-        verify_cmd = f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}'
+        verify_cmd = f'test -d {quoted_path} && echo "Skills installed in {expanded}"'
     else:
         verify_cmd = str(detected.get("verify_command") or "").strip()
         if verify_cmd:

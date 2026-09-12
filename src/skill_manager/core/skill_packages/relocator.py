@@ -40,6 +40,51 @@ def is_safe_relative_to(path: Path, base_path: Path) -> bool:
         return False
 
 
+def known_global_skill_dirs() -> list[Path]:
+    """Return the well-known global agent-skills stores.
+
+    ``npx skills add <repo> -g/--global`` bypasses the staging temp dir and
+    installs straight into the user's global store (``~/.agents/skills`` plus
+    per-agent symlinks such as ``~/.claude/skills``). The relocation security
+    gate must accept these locations as safe copy sources — the copy preserves
+    the global install while mirroring it into isolated package storage.
+    """
+    home = Path(os.path.expanduser("~"))
+    candidates = [
+        home / ".agents" / "skills",
+        home / ".claude" / "skills",
+        home / ".codex" / "skills",
+        home / ".cursor" / "skills",
+        home / ".gemini" / "skills",
+        home / ".config" / "opencode" / "skills",
+        home / ".opencode" / "skills",
+    ]
+    xdg_data = os.environ.get("XDG_DATA_HOME")
+    if xdg_data:
+        candidates.append(Path(xdg_data) / "skills")
+    return candidates
+
+
+def is_allowed_global_source(path: Path) -> bool:
+    """True when *path* is (or sits inside) a known global skills store."""
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    for store in known_global_skill_dirs():
+        try:
+            resolved.relative_to(store.resolve())
+            return True
+        except (ValueError, OSError):
+            continue
+        try:
+            if resolved == store.resolve():
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def merge_and_move_lockfile(
     source_lock: Path, target_lock: Path, output_callback: Callable[[str], None] | None
 ):
@@ -210,11 +255,17 @@ def relocate_packages_from_output(
                 expanded = candidate.resolve()
                 if expanded.is_dir():
                     if base_path and not is_safe_relative_to(expanded, resolve_base):
-                        emit(
-                            output_callback,
-                            f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                        )
-                        continue
+                        if is_allowed_global_source(expanded):
+                            emit(
+                                output_callback,
+                                f"[DEBUG] Global store path accepted: {expanded}",
+                            )
+                        else:
+                            emit(
+                                output_callback,
+                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                            )
+                            continue
                     detected_paths.add(expanded)
                     emit(output_callback, f"[DEBUG] Detected path: {expanded}")
                     match_found = True
@@ -229,11 +280,17 @@ def relocate_packages_from_output(
                     expanded = Path(os.path.expanduser(raw_path)).resolve()
                     if expanded.is_dir():
                         if base_path and not is_safe_relative_to(expanded, resolve_base):
-                            emit(
-                                output_callback,
-                                f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
-                            )
-                            continue
+                            if is_allowed_global_source(expanded):
+                                emit(
+                                    output_callback,
+                                    f"[DEBUG] Global store path accepted: {expanded}",
+                                )
+                            else:
+                                emit(
+                                    output_callback,
+                                    f"[WARNING] Security: Ignored path outside of staging directory: {expanded}",
+                                )
+                                continue
                         detected_paths.add(expanded)
                         emit(output_callback, f"[DEBUG] Fallback detected path: {expanded}")
                 except Exception:
