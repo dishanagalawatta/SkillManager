@@ -439,6 +439,44 @@ def delete_package_storage(
     }
 
 
+def iter_relative_files(path: Path) -> list[str]:
+    """List all files under *path* as `/`-separated relative strings.
+
+    Iterative ``os.scandir`` walk with ``pathlib.Path.rglob`` parity:
+    ``DirEntry`` objects carry cached ``stat`` results from the directory
+    scan, avoiding per-file filesystem round trips. Symlinked files are
+    listed (matching ``Path.is_file()``), but symlinked directories are not
+    recursed into (matching ``Path.rglob``). Output is sorted by relative
+    path parts (case-insensitive on Windows) for deterministic ordering.
+    """
+    records: list[str] = []
+    path_str = str(path)
+    base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
+    stack = [path_str]
+
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append(entry.path)
+                elif entry.is_file(follow_symlinks=True):
+                    records.append(entry.path[base_len:].replace(os.sep, "/"))
+            except OSError:
+                continue
+
+    if os.name == "nt":
+        records.sort(key=lambda r: tuple(p.lower() for p in r.split("/")))
+    else:
+        records.sort(key=lambda r: r.split("/"))
+    return records
+
+
 def skill_fingerprint(path: Path) -> str:
     """Fast fingerprint using file metadata (mtime, size, name).
 
