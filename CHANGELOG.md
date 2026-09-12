@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.7.1] - 2026-09-12
+
+### Changes
+- Release version bump.
+
 ## [2.7.0] - 2026-09-07
 
 ### Changes
