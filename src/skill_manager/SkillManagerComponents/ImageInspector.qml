@@ -425,6 +425,12 @@ Rectangle {
                                             hoverEnabled: true
                                             activeFocusOnTab: true
                                             cursorShape: Qt.PointingHandCursor
+                                            Accessible.role: Accessible.Button
+                                            Accessible.name: "Set zoom to " + modelData + "%"
+                                            Accessible.onPressAction: {
+                                                root.zoomLevel = modelData / 100.0
+                                                zoomPopup.close()
+                                            }
                                             Keys.onPressed: (event) => {
                                                 if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                                     root.zoomLevel = modelData / 100.0

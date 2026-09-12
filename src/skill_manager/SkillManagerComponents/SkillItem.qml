@@ -125,6 +125,7 @@ Item {
 
             SleekToolTip {
                 id: subCatToolTip
+                visible: subCatHover.hovered || subHeader.activeFocus
                 text: root.isSubCollapsed ? "Expand " + root.subCat : "Collapse " + root.subCat
             }
 
@@ -324,6 +325,7 @@ Item {
 
                         SleekToolTip {
                             id: selToolTip
+                            visible: checkboxHover.hovered || checkboxRect.activeFocus
                             text: (model && model.isSelected) ? "Deselect" : "Select"
                         }
 
@@ -411,6 +413,7 @@ Item {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
                         flat: true
+                        tooltipText: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         // Keyboard focus anywhere in the row (or on the button itself) reveals delete so it stays Tab-reachable.
                         visible: root.showInlineDelete && mouseArea.containsMouse || root.showInlineDelete && (mouseArea.activeFocus || checkboxRect.activeFocus || deleteBtn.activeFocus)
                         onClicked: (mouse) => {
@@ -430,9 +433,6 @@ Item {
                             color: deleteBtn.hovered ? Theme.glassHover : "transparent"
                             border.width: deleteBtn.hovered ? 1 : 0
                             border.color: Theme.glassBorder
-                        }
-                        SleekToolTip {
-                            text: "Delete " + (model && (model.isCommand === true) ? "Command" : "Skill")
                         }
                     }
                 }

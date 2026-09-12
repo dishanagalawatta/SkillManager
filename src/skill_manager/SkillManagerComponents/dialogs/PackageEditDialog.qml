@@ -221,6 +221,7 @@ Dialog {
                 
                 IconButton {
                     text: "✕"
+                    tooltipText: "Close"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
@@ -594,6 +595,7 @@ Dialog {
                                 }
                                 IconButton {
                                     text: "📁"
+                                    tooltipText: "Choose folder"
                                     Layout.preferredWidth: 44
                                     Layout.preferredHeight: 44
                                     onClicked: folderPicker.open()

@@ -73,6 +73,7 @@ Dialog {
                 
                 IconButton {
                     text: "✕"
+                    tooltipText: "Close"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
