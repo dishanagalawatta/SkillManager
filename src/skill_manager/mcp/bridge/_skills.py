@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from skill_manager.core.skill_packages.storage import iter_relative_files
+
 from ._controller import _controller_or_none
 from ._telemetry import _log_call, logger
 
@@ -152,7 +154,8 @@ def get_skill(skill_id: str) -> dict[str, Any]:
             content = folder.read_text(encoding="utf-8", errors="replace")
             files = [folder.name]
         elif folder.is_dir():
-            files = [str(f.relative_to(folder)) for f in folder.rglob("*") if f.is_file()]
+            files = iter_relative_files(folder)
+
             for cand_file in ("SKILL.md", "skill.md", "README.md"):
                 p = folder / cand_file
                 if p.is_file():
