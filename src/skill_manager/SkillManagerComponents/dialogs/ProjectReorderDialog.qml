@@ -19,6 +19,30 @@ Dialog {
     property int dragSourceIndex: -1
     property int dragTargetIndex: -1
     property bool dropAbove: true
+    // Row that should receive keyboard focus after a keyboard-initiated
+    // move rebuilds the delegates. -1 means no pending focus restore.
+    property int pendingFocusIndex: -1
+
+    function moveProject(fromIdx: int, delta: int) {
+        var toIdx = fromIdx + delta
+        if (toIdx < 0 || toIdx >= projectList.count) {
+            return
+        }
+        root.pendingFocusIndex = toIdx
+        // Defer python call to avoid destroying delegate during script execution
+        Qt.callLater(AppController.reorderProjects, fromIdx, toIdx)
+    }
+
+    function focusRow(idx: int): bool {
+        var kids = projectList.contentItem.children
+        for (var i = 0; i < kids.length; i++) {
+            if (kids[i].index === idx) {
+                kids[i].forceActiveFocus()
+                return true
+            }
+        }
+        return false
+    }
 
     parent: Overlay.overlay
     anchors.centerIn: Overlay.overlay
@@ -106,7 +130,7 @@ Dialog {
 
         // Subtitle
         Text {
-            text: "Drag items to change the display order"
+            text: "Drag items, or focus an item and press Alt+\u2191/\u2193 to change the display order"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sizeCaption
             color: Theme.secondaryLabel
@@ -139,6 +163,31 @@ Dialog {
 
                 width: projectList.width
                 height: 44
+                activeFocusOnTab: true
+
+                Keys.onPressed: (event) => {
+                    var moveUp = (event.key === Qt.Key_Up && (event.modifiers & (Qt.AltModifier | Qt.ControlModifier)))
+                    var moveDown = (event.key === Qt.Key_Down && (event.modifiers & (Qt.AltModifier | Qt.ControlModifier)))
+                    if (moveUp) {
+                        root.moveProject(delegateWrapper.index, -1)
+                        event.accepted = true
+                    } else if (moveDown) {
+                        root.moveProject(delegateWrapper.index, 1)
+                        event.accepted = true
+                    } else {
+                        event.accepted = false
+                    }
+                }
+
+                Accessible.role: Accessible.ListItem
+                Accessible.name: delegateWrapper.modelData + ", " + (delegateWrapper.index + 1) + " of " + projectList.count + ". Press Alt Up or Alt Down to move."
+
+                Component.onCompleted: {
+                    if (root.pendingFocusIndex === delegateWrapper.index) {
+                        root.pendingFocusIndex = -1
+                        delegateWrapper.forceActiveFocus()
+                    }
+                }
 
                 Rectangle {
                     id: delegateRoot
@@ -146,8 +195,8 @@ Dialog {
                     height: delegateWrapper.height
                     radius: 8
                     color: dragArea.containsDrag ? Theme.alpha(Theme.accent, 0.15) : Theme.glassHover
-                    border.color: dragArea.containsDrag ? Theme.accent : "transparent"
-                    border.width: dragArea.containsDrag ? 2 : 1
+                    border.color: (dragArea.containsDrag || delegateWrapper.activeFocus) ? Theme.accent : "transparent"
+                    border.width: (dragArea.containsDrag || delegateWrapper.activeFocus) ? 2 : 1
 
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -193,6 +242,7 @@ Dialog {
                                 drag.axis: Drag.YAxis
 
                                 onPressed: (mouse) => {
+                                    delegateWrapper.forceActiveFocus()
                                     root.dragSourceIndex = delegateWrapper.index
                                     root.dragTargetIndex = delegateWrapper.index
                                     root.dropAbove = true
