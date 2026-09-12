@@ -76,6 +76,7 @@ Dialog {
                 IconButton {
                     text: "\u2715"
                     flat: true
+                    tooltipText: "Close"
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     onClicked: root.reject()

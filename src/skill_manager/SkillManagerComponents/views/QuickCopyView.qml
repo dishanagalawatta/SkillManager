@@ -344,6 +344,7 @@ Item {
                         id: qcv_overflowBtn
                         visible: !qcv_root.isEditingCollection && qcv_root._collapsePhase >= 1
                         iconText: "⋮"
+                        tooltipText: "More actions"
                         iconSize: 20
                         buttonSize: 28
                         role: "ghost"

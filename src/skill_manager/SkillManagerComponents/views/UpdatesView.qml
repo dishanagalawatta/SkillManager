@@ -621,6 +621,7 @@ Item {
                 }
                 IconButton {
                     text: "✕"
+                    tooltipText: "Close Inspector"
                     onClicked: (mouse) => uv_inspector.close()
                     flat: true
                 }

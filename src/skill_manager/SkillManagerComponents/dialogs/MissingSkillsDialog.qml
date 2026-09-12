@@ -156,6 +156,7 @@ Dialog {
                 
                 IconButton {
                     text: "✕"
+                    tooltipText: "Close"
                     flat: true
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
@@ -256,13 +257,19 @@ Dialog {
                                     font.pixelSize: 10
                                     color: activeFocus ? Theme.accent : Theme.secondaryLabel
                                     activeFocusOnTab: true
-                                    Accessible.role: Accessible.Button
+                                    Accessible.role: Accessible.CheckBox
+                                    Accessible.checkable: true
+                                    Accessible.checked: modelData.detailsExpanded
                                     Accessible.name: (modelData.detailsExpanded ? "Collapse details for " : "Expand details for ") + modelData.project
+                                    Accessible.onPressAction: root.toggleDetails(index)
+                                    Accessible.onToggleAction: root.toggleDetails(index)
 
                                     Keys.onPressed: (event) => {
                                         if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                             root.toggleDetails(index)
                                             event.accepted = true
+                                        } else {
+                                            event.accepted = false
                                         }
                                     }
 
@@ -321,6 +328,7 @@ Dialog {
 
                                         IconButton {
                                             text: "📋"
+                                            tooltipText: "Copy details to clipboard"
                                             flat: true
                                             Layout.preferredWidth: 24
                                             Layout.preferredHeight: 24
