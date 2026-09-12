@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
+
+from skill_manager.core.skill_packages.storage import iter_relative_files
 
 from ._controller import _controller_or_none
 from ._telemetry import _log_call, logger
@@ -153,24 +154,7 @@ def get_skill(skill_id: str) -> dict[str, Any]:
             content = folder.read_text(encoding="utf-8", errors="replace")
             files = [folder.name]
         elif folder.is_dir():
-            path_str = str(folder)
-            base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
-            stack = [path_str]
-            while stack:
-                current = stack.pop()
-                try:
-                    with os.scandir(current) as it:
-                        entries = list(it)
-                except OSError:
-                    continue
-                for entry in entries:
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            stack.append(entry.path)
-                        elif entry.is_file(follow_symlinks=True):
-                            files.append(entry.path[base_len:])
-                    except OSError:
-                        continue
+            files = iter_relative_files(folder)
 
             for cand_file in ("SKILL.md", "skill.md", "README.md"):
                 p = folder / cand_file
