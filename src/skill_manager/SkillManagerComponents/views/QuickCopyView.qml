@@ -812,6 +812,9 @@ Item {
             Layout.fillHeight: true
 
             // Skill List
+            // Scroll preservation (collapse/expand restore, refresh blink,
+            // incubation coordination) lives in SmoothListView — see
+            // preserveOnCollapse/collapseModel there. Do not duplicate it here.
             SmoothListView {
                 id: qcv_skillList
                 objectName: "quickCopyList"
@@ -821,114 +824,8 @@ Item {
 
                 clip: true
                 spacing: 0
-                
-                // Visual Blink: Dips opacity slightly during background refresh to mask micro-jumps
-                opacity: (AppController.isLoading && _restoringScroll) ? 0.0 : 1.0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                property real savedScrollPos: 0
-                property bool _restoringScroll: false
-
-                function _restoreScroll() {
-                    if (AppController.isLoading && savedScrollPos > 0) {
-                        _restoringScroll = true
-                        
-                        // Force immediate layout to ensure contentHeight is valid for restore
-                        qcv_skillList.forceLayout()
-                        qcv_skillList.contentY = savedScrollPos
-                        
-                        // Second pass: Ensure it stuck (sometimes required for large additions)
-                        Qt.callLater(() => {
-                            if (qcv_skillList.contentY !== savedScrollPos) {
-                                qcv_skillList.forceLayout()
-                                qcv_skillList.contentY = savedScrollPos
-                            }
-                            _restoringScroll = false
-                        })
-                    }
-                }
-
-                Connections {
-                    target: AppController.quickCopyModel
-                    function onLayoutAboutToBeChanged() {
-                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                        qcv_skillList.cacheBuffer = 0
-                    }
-                    function onLayoutChanged() {
-                        // Only re-enable incubation while the list is still live.
-                        // After cleanup() sets model = null (view teardown), a stray
-                        // layout signal must NOT restore cacheBuffer, or incubated
-                        // delegates race against the dying context.
-                        // Also defer the restore while the model is still incubating:
-                        // the reset fires mid-incubation, so restoring cacheBuffer
-                        // here re-triggers a delegate burst that races the in-flight
-                        // one ("Object or context destroyed during incubation").
-                        // The restore is performed in onIncubatingChanged instead.
-                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
-                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                            qcv_skillList._restoreScroll()
-                        }
-                    }
-                    function onModelAboutToBeReset() {
-                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                        qcv_skillList.cacheBuffer = 0
-                    }
-                    function onModelReset() {
-                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
-                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                            qcv_skillList._restoreScroll()
-                        }
-                    }
-                    function onRowsAboutToBeRemoved() {
-                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                        qcv_skillList.cacheBuffer = 0
-                    }
-                    function onRowsRemoved() {
-                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
-                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                            qcv_skillList._restoreScroll()
-                        }
-                    }
-                    function onRowsAboutToBeInserted() {
-                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                        qcv_skillList.cacheBuffer = 0
-                    }
-                    function onRowsInserted() {
-                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
-                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                            qcv_skillList._restoreScroll()
-                        }
-                    }
-                    function onAboutToMutateStructure() {
-                        qcv_skillList.savedScrollPos = qcv_skillList.contentY
-                        qcv_skillList.cacheBuffer = 0
-                    }
-                    function onStructureMutated() {
-                        if (qcv_skillList.model && !AppController.quickCopyModel.incubating) {
-                            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                            qcv_skillList._restoreScroll()
-                        }
-                    }
-                }
-
-                // Incubation coordination: when incubating transitions to False,
-                // tell the model to replay deferred layout signals.
-                Connections {
-                    target: AppController.quickCopyModel
-                    function onIncubatingChanged() {
-                        if (!AppController.quickCopyModel.incubating) {
-                            AppController.quickCopyModel.onIncubationReady()
-                            // Incubation finished: now safe to re-enable the
-                            // off-screen cache buffer without racing live delegates.
-                            if (qcv_skillList.model) {
-                                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-                                qcv_skillList._restoreScroll()
-                            }
-                        } else {
-                            qcv_skillList.cacheBuffer = 0
-                        }
-                    }
-                }
+                preserveOnCollapse: true
+                collapseModel: AppController.quickCopyModel
 
                 section.property: "mainCategoryName"
                 section.criteria: ViewSection.FullString
