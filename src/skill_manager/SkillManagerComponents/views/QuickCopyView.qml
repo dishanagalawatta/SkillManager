@@ -393,6 +393,10 @@ Item {
                                         qcv_root.isEditingCollection = true
                                         qcv_root.editingCollectionName = ""
                                         qcv_root.editingCollectionProjects = []
+                                        // Explicit resync: user toggles replace the child's
+                                        // selectedValues array (dropping its one-way binding),
+                                        // so push the fresh value on every edit session start.
+                                        qcv_colProjectSelect.selectedValues = []
                                     }
                                 }
                             }
@@ -456,6 +460,8 @@ Item {
                                 qcv_root.isEditingCollection = true
                                 qcv_root.editingCollectionName = collectionName
                                 qcv_root.editingCollectionProjects = AppController.config_controller.getCollectionProjects(collectionName)
+                                // Explicit resync (see "+ Collection" handler above).
+                                qcv_colProjectSelect.selectedValues = qcv_root.editingCollectionProjects.slice()
                                 qcv_root._isInternalSelectionChange = true
                                 AppController.config_controller.applyCollectionSelection(collectionName)
                                 AppController.ui_controller.setViewFilterForView("QuickCopy", "collection", "")
@@ -587,7 +593,7 @@ Item {
                                 selectedValues: qcv_root.editingCollectionProjects
                                 placeholderText: "Select projects..."
                                 allLabel: "All Projects"
-                                onSelectionChanged: qcv_root.editingCollectionProjects = selectedValues
+                                onSelectionChanged: qcv_root.editingCollectionProjects = qcv_colProjectSelect.selectedValues.slice()
                             }
 
                             IconButton {
