@@ -22,6 +22,26 @@ Item {
 
     signal selectionChanged()
 
+    function openPopup() {
+        popup.open()
+    }
+
+    function focusRow(idx: int): bool {
+        if (idx === -1 && allRow.visible) {
+            allRow.forceActiveFocus()
+            return true
+        }
+        var target = idx >= 0 && idx < root.model.length ? root.model[idx] : undefined
+        var kids = listContent.children
+        for (var i = 0; i < kids.length; i++) {
+            if (target !== undefined && kids[i].modelData === target) {
+                kids[i].forceActiveFocus()
+                return true
+            }
+        }
+        return false
+    }
+
     implicitWidth: root.iconOnlyMode ? 36 : 160
     implicitHeight: 36
 
@@ -157,10 +177,30 @@ Item {
                 spacing: 0
 
             Rectangle {
+                id: allRow
                 Layout.fillWidth: true
                 Layout.preferredHeight: 32
                 color: allHover.containsMouse ? Theme.glassHover : "transparent"
+                border.color: allRow.activeFocus ? Theme.accent : "transparent"
+                border.width: allRow.activeFocus ? 2 : 0
                 visible: root.model.length > 1
+                activeFocusOnTab: true
+
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        allCheck.toggled()
+                        event.accepted = true
+                    } else {
+                        event.accepted = false
+                    }
+                }
+
+                Accessible.role: Accessible.CheckBox
+                Accessible.checkable: true
+                Accessible.checked: root.allSelected
+                Accessible.name: (root.allSelected ? "Deselect all, " : "Select all, ") + root.allLabel
+                Accessible.onPressAction: allCheck.toggled()
+                Accessible.onToggleAction: allCheck.toggled()
 
                 RowLayout {
                     anchors.fill: parent
@@ -172,6 +212,7 @@ Item {
                         id: allCheck
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
+                        activeFocusOnTab: false
                         checkState: root.allSelected ? Qt.Checked : Qt.Unchecked
                         iconSize: 9
                         onToggled: root.toggleAll(checkState !== Qt.Checked)
@@ -192,7 +233,10 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: allCheck.toggled()
+                    onClicked: {
+                        allRow.forceActiveFocus()
+                        allCheck.toggled()
+                    }
                 }
             }
 
@@ -214,6 +258,25 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
                     color: itemHover.containsMouse ? Theme.glassHover : "transparent"
+                    border.color: delegateRoot.activeFocus ? Theme.accent : "transparent"
+                    border.width: delegateRoot.activeFocus ? 2 : 0
+                    activeFocusOnTab: true
+
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            itemCheck.toggled()
+                            event.accepted = true
+                        } else {
+                            event.accepted = false
+                        }
+                    }
+
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.checkable: true
+                    Accessible.checked: root.selectedValues.indexOf(delegateRoot.modelData) >= 0
+                    Accessible.name: (root.selectedValues.indexOf(delegateRoot.modelData) >= 0 ? "Deselect " : "Select ") + delegateRoot.modelData
+                    Accessible.onPressAction: itemCheck.toggled()
+                    Accessible.onToggleAction: itemCheck.toggled()
 
                     RowLayout {
                         anchors.fill: parent
@@ -225,6 +288,7 @@ Item {
                             id: itemCheck
                             Layout.preferredWidth: 20
                             Layout.preferredHeight: 20
+                            activeFocusOnTab: false
                             checkState: root.selectedValues.indexOf(delegateRoot.modelData) >= 0 ? Qt.Checked : Qt.Unchecked
                             iconSize: 9
                             onToggled: root.toggleItem(delegateRoot.modelData)
@@ -245,7 +309,10 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: itemCheck.toggled()
+                        onClicked: {
+                            delegateRoot.forceActiveFocus()
+                            itemCheck.toggled()
+                        }
                     }
                 }
             }
