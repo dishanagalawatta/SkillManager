@@ -117,6 +117,24 @@ def setup_logging():
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
+def _enable_qml_binding_removal_warnings():
+    """Surface QML binding-break diagnostics (dev/DEBUG only).
+
+    The QML engine drops a property binding on the first imperative
+    assignment — the root cause of stale multi-select checkboxes fixed in
+    CommandCreateDialog/QuickCopyView. Enabling this category turns future
+    occurrences into visible engine warnings instead of silent stale UI.
+    Must run before the QML engine loads; process-global and dev-only so
+    release logs stay quiet.
+    """
+    try:
+        from PySide6.QtCore import QLoggingCategory
+
+        QLoggingCategory.setFilterRules("qt.qml.binding.removal.info=true")
+    except Exception:
+        pass  # best-effort: never block startup on diagnostics
+
+
 def _redirect_qml_log():
     """Redirect stderr (QML console.log goes here) to a log file.
 
@@ -148,6 +166,8 @@ def main():
 
     setup_logging()
     _redirect_qml_log()
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        _enable_qml_binding_removal_warnings()
 
     # Initialize diagnostic logger
     from skill_manager.core.config import ConfigManager

@@ -47,6 +47,14 @@ Dialog {
     property var removalDialog: null
     property string pendingEmoji: "\u26A1"
 
+    // Safety net: whenever the dialog becomes visible, push the source of
+    // truth (editProjectLabels) into the multi-select. User toggles replace
+    // the child's selectedValues array (breaking its one-way binding), so
+    // without this the popup would show stale checkboxes on re-open.
+    onOpened: {
+        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
+    }
+
     function openWithContext() {
         editMode = false
         editLocalPath = ""
@@ -57,6 +65,10 @@ Dialog {
         pendingEmoji = "\u26A1"
         cmdNameInput.text = ""
         cmdBodyInput.text = ""
+        // Re-sync the multi-select: its selectedValues binding is
+        // intentionally broken by user toggles (QML drops the binding on
+        // first imperative assignment), so push the fresh value explicitly.
+        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
         open()
     }
 
@@ -72,7 +84,7 @@ Dialog {
             var pl = skill.project_label || (AppController.currentProject ? AppController.currentProject : "")
             holders = pl ? [pl] : []
         }
-        editProjectLabels = holders
+        editProjectLabels = holders.slice()
         editCategoryValue = skill.category || ""
         orphanCategory = (skill.category
                           && AppController.categories.indexOf(skill.category) === -1)
@@ -81,6 +93,9 @@ Dialog {
         pendingEmoji = AppController.getCommandEmoji(skill.local_path || "")
         cmdNameInput.text = skill.name || ""
         cmdBodyInput.text = skill.body_content || ""
+        // Re-sync the multi-select explicitly (see openWithContext): the
+        // selectedValues binding is dropped after the first user toggle.
+        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
         open()
     }
 
@@ -307,7 +322,7 @@ Dialog {
                         selectedValues: root.editProjectLabels
                         placeholderText: "Select projects..."
                         allLabel: "All Projects"
-                        onSelectionChanged: root.editProjectLabels = selectedValues
+                        onSelectionChanged: root.editProjectLabels = projectMultiSelect.selectedValues.slice()
                     }
                 }
             }
@@ -643,7 +658,8 @@ Dialog {
                 cmdNameInput.text = root.pendingArgs.name
                 cmdBodyInput.text = root.pendingArgs.body
                 root.editCategoryValue = root.pendingArgs.category
-                root.editProjectLabels = root.pendingArgs.projectLabels
+                root.editProjectLabels = root.pendingArgs.projectLabels.slice()
+                if (projectMultiSelect) projectMultiSelect.selectedValues = root.editProjectLabels.slice()
                 root.open()
             }
             conflictDialog.open()

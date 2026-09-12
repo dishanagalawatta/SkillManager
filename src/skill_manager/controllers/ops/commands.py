@@ -317,7 +317,12 @@ class CommandsMixin:
                     sel_path = selected.get("local_path")
                 target_path = str(updated[0].path)
                 if sel_path == target_path and body:
-                    if hasattr(selected, "insert"):
+                    if hasattr(selected, "setSelection"):
+                        # SelectedSkillController (QObject): push through
+                        # property setters so change signals fire.
+                        selected.body_content = body
+                        selected.name = name
+                    elif hasattr(selected, "insert"):
                         selected.insert("body_content", body)
                     elif isinstance(selected, dict):
                         selected["body_content"] = body

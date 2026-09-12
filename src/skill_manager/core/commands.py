@@ -24,7 +24,9 @@ class CommandUpdateResult:
     suggested_rename: str | None = None
     needs_confirm: bool = False
     pending_removals: list[str] = field(default_factory=list)
-    set_membership: str = ""  # "canonical" | "fanout_add" | "fanout_skip" | "removal"
+    set_membership: str = (
+        ""  # "canonical" | "fanout_add" | "canonical_sync" | "fanout_skip" | "removal"
+    )
 
 
 def find_project_path_by_label(
@@ -285,16 +287,22 @@ def update_custom_command_file_multi(
     """Update a command across multiple projects.
 
     - Computes which projects currently hold the command and determines
-      ``add_set``, ``keep_set``, and ``remove_set``.
+      ``add_set``, ``keep_set``, and ``remove_set``. Holders are resolved
+      from the *old* file stem (``local_path``) unioned with holders of the
+      *new* ``name`` so renames neither lose track of existing copies nor
+      orphan the old filename.
     - Canonical project is chosen from ``keep_set`` (first label) or,
       if empty, from ``add_set`` (first label).
     - If ``remove_set`` is non-empty and ``confirmed_removals`` is None,
       returns early with ``needs_confirm=True`` and ``pending_removals``
       set — no files are deleted.
     - If ``confirmed_removals`` is provided, deletes files for the
-      intersection ``remove_set ∩ confirmed_removals``.
-    - Fan-out copies go to ``add_set`` only; ``keep_set`` labels are
-      skipped.
+      intersection ``remove_set ∩ confirmed_removals`` (both old and new
+      filenames, so renames clean up fully).
+    - Fan-out writes the canonical content to every other selected
+      project (``add_set`` and ``keep_set`` alike): editing a command
+      synchronises all checked projects. Identical files are skipped.
+      On rename, stale old-filename copies in synced projects are removed.
 
     Returns a list of results — one per project.
     """
@@ -303,12 +311,20 @@ def update_custom_command_file_multi(
     if not project_labels:
         return [CommandUpdateResult(False, "No projects selected")]
 
-    current_holders = find_command_holder_projects(
-        name, project_paths, project_aliases=project_aliases
+    old_stem = Path(local_path).stem
+    old_holders = find_command_holder_projects(
+        old_stem, project_paths, project_aliases=project_aliases
     )
-    add_set = sorted(set(project_labels) - set(current_holders))
-    keep_set = sorted(set(current_holders) & set(project_labels))
-    remove_set = sorted(set(current_holders) - set(project_labels))
+    new_holders = find_command_holder_projects(name, project_paths, project_aliases=project_aliases)
+    known_holders = sorted(set(old_holders) | set(new_holders))
+    renamed = build_command_filename(old_stem).lower() != build_command_filename(name).lower()
+    add_set = sorted(set(project_labels) - set(known_holders))
+    keep_set = sorted(set(known_holders) & set(project_labels))
+    # Only old holders can leave orphans behind: a project holding the *new*
+    # name while unchecked may own an unrelated same-named command, so it
+    # must never be auto-deleted — the canonical phase raises a conflict
+    # for that case instead.
+    remove_set = sorted(set(old_holders) - set(project_labels))
 
     # Guard: need confirmation before any deletions
     if remove_set and confirmed_removals is None:
@@ -370,12 +386,15 @@ def update_custom_command_file_multi(
         )
     )
 
-    # Phase 2: fan-out to all new target project labels (add_set only, except canonical_label).
-    # Projects that already hold the command (keep_set) keep their existing files and are
-    # NOT overwritten — this preserves per-project content that may have diverged.
+    # Phase 2: fan-out the canonical content to every other selected project
+    # (add_set and keep_set alike). An edit in the dialog is an explicit
+    # synchronise intent: all checked projects end up with the new body,
+    # category, and filename. Identical files are skipped; on rename the
+    # stale old-filename copy in each synced project is removed.
     if canonical.ok and canonical.path and canonical.path.is_file():
         new_content = canonical.path.read_text(encoding="utf-8")
-        target_labels = sorted(set(add_set) - {canonical_label})
+        old_filename = build_command_filename(old_stem)
+        target_labels = sorted(set(add_set) | set(keep_set) - {canonical_label})
         for label in target_labels:
             target = find_project_path_by_label(
                 label, project_paths, project_aliases=project_aliases
@@ -399,19 +418,26 @@ def update_custom_command_file_multi(
                                 True,
                                 f"Already up to date: {target_file.name}",
                                 target_file,
-                                set_membership="fanout_skip"
-                                if label in add_set
-                                else "canonical_keep",
+                                set_membership="fanout_skip",
                             )
                         )
+                        # Still drop a stale old-filename twin on rename.
+                        if renamed:
+                            stale_old = target_dir / old_filename
+                            if stale_old.is_file() and stale_old != target_file:
+                                stale_old.unlink()
                         continue
                 target_file.write_text(new_content, encoding="utf-8")
+                if renamed:
+                    stale_old = target_dir / old_filename
+                    if stale_old.is_file() and stale_old != target_file:
+                        stale_old.unlink()
                 results.append(
                     CommandUpdateResult(
                         True,
                         f"Updated command: {target_file.name}",
                         target_file,
-                        set_membership="fanout_add" if label in add_set else "canonical_update",
+                        set_membership="fanout_add" if label in add_set else "canonical_sync",
                     )
                 )
             except Exception as exc:
@@ -434,14 +460,25 @@ def update_custom_command_file_multi(
                 )
                 continue
             commands_dir = project_root_for_project(target) / ".agents" / "commands"
-            removal_target = commands_dir / build_command_filename(name)
+            # On rename the removed project holds the old filename; a
+            # previously synced one could hold the new filename. Delete
+            # whichever exists so no orphan is left behind.
+            candidates = [commands_dir / build_command_filename(name)]
+            if renamed:
+                old_candidate = commands_dir / build_command_filename(old_stem)
+                if old_candidate not in candidates:
+                    candidates.append(old_candidate)
             try:
-                if removal_target.is_file():
-                    removal_target.unlink()
+                removed_any = False
+                for removal_target in candidates:
+                    if removal_target.is_file():
+                        removal_target.unlink()
+                        removed_any = True
+                if removed_any:
                     results.append(
                         CommandUpdateResult(
                             True,
-                            f"Removed command from {label}: {removal_target.name}",
+                            f"Removed command from {label}: {candidates[0].name}",
                             set_membership="removal",
                         )
                     )
