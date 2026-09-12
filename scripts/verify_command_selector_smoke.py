@@ -62,6 +62,10 @@ os.environ["SKILL_MANAGER_TESTING"] = "1"
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["XDG_DATA_HOME"] = str(Path("data/test_xdg_data").resolve())
 os.environ["XDG_CONFIG_HOME"] = str(Path("data/test_xdg_config").resolve())
+# ConfigManager in test mode refuses the production data dir (XDG vars do
+# not redirect it on Windows) — point it at an isolated path instead,
+# same as tests/conftest.py.
+os.environ["SKILL_MANAGER_DATA_DIR"] = str(Path("data/test_xdg_data/smoke_datadir").resolve())
 
 import sentry_sdk
 
