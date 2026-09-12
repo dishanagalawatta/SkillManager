@@ -324,6 +324,7 @@ Item {
                         id: lv_overflowBtn
                         visible: lv_root._libPhase >= 2
                         iconText: "⋮"
+                        tooltipText: "More actions"
                         iconSize: 20
                         buttonSize: 28
                         role: "ghost"

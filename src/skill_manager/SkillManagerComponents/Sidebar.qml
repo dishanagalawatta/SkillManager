@@ -89,8 +89,12 @@ Rectangle {
                     }
                 }
 
-                Accessible.role: Accessible.Button
+                Accessible.role: Accessible.CheckBox
+                Accessible.checkable: true
+                Accessible.checked: !root.isCollapsed
                 Accessible.name: sidebarToolTip.text
+                Accessible.onPressAction: root.isCollapsed = !root.isCollapsed
+                Accessible.onToggleAction: root.isCollapsed = !root.isCollapsed
             }
             
             Text {
