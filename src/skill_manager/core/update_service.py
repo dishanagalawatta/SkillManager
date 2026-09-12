@@ -110,11 +110,31 @@ def _relative_file_map(root: Path) -> dict[str, Path]:
     mapping: dict[str, Path] = {}
     if not root.is_dir():
         return mapping
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames.sort()
-        for filename in sorted(filenames):
-            full = Path(dirpath) / filename
-            mapping[full.relative_to(root).as_posix()] = full
+    path_str = str(root)
+    base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
+    stack = [path_str]
+
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                entries = list(it)
+        except OSError:
+            continue
+
+        if os.name == "nt":
+            entries.sort(key=lambda e: e.name.lower())
+        else:
+            entries.sort(key=lambda e: e.name)
+
+        for entry in entries:
+            if entry.is_file(follow_symlinks=True):
+                mapping[entry.path[base_len:].replace(os.sep, "/")] = Path(entry.path)
+
+        for entry in reversed(entries):
+            if entry.is_dir(follow_symlinks=False):
+                stack.append(entry.path)
+
     return mapping
 
 
