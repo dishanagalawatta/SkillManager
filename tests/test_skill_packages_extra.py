@@ -230,6 +230,43 @@ def test_verify_command_quoting_is_well_formed(tmp_path):
     assert "Skills installed in " in cmd
 
 
+def test_verify_command_adversarial_path_is_fully_quoted(tmp_path):
+    """Sentinel HIGH: verify_command must never interpolate a raw path into shell syntax.
+
+    A package path containing quotes and shell metacharacters must appear in the
+    generated command only in shlex.quote'd form, and the command must round-trip
+    through intercept_cross_platform_command without executing anything.
+    """
+    import shlex
+
+    from skill_manager.core.skill_packages.config import (
+        detect_package_config,
+        normalize_skill_package_config,
+    )
+
+    evil = tmp_path / 'a"b $(touch pwned);touch evil #'
+    evil.mkdir()
+    expanded = str(evil)
+    quoted = shlex.quote(expanded)
+    assert quoted != expanded  # guard: fixture path must actually need quoting
+
+    for cmd in (
+        detect_package_config({"package_path": expanded})["verify_command"],
+        normalize_skill_package_config({"name": "Evil", "package_path": expanded})[
+            "verify_command"
+        ],
+    ):
+        # Raw attacker-controlled string must not appear outside its quoted form.
+        assert expanded not in cmd.replace(quoted, "")
+        assert quoted in cmd
+
+    messages: list[str] = []
+    assert intercept_cross_platform_command(cmd, messages.append) is True
+    assert any(expanded in m for m in messages)
+    assert not (tmp_path / "pwned").exists()
+    assert not (tmp_path / "evil").exists()
+
+
 def test_relocate_packages_from_output_no_target(tmp_path):
     from skill_manager.core.skill_packages.relocator import relocate_packages_from_output
 
