@@ -110,6 +110,59 @@ def test_static_analyze_missing_path(tmp_path: Any, monkeypatch: pytest.MonkeyPa
     assert matches == []
 
 
+def test_static_analyze_skips_junk_dirs_at_any_depth(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_walk prunes junk directories wherever they appear in the tree."""
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
+    (tmp_path / "keep.py").write_text("MARKER = 1\n", encoding="utf-8")
+    (tmp_path / "sub" / "node_modules" / "deep").mkdir(parents=True)
+    (tmp_path / "sub" / "node_modules" / "deep" / "lib.py").write_text(
+        "MARKER = 2\n", encoding="utf-8"
+    )
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "hooks.py").write_text("MARKER = 3\n", encoding="utf-8")
+
+    matches = bridge.static_analyze(pattern="MARKER", path=".")
+
+    assert {m["file"] for m in matches} == {"keep.py"}
+
+
+def test_static_analyze_keeps_file_sharing_junk_name(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Skip rules apply to directories only: a file named like junk is grepped."""
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
+    (tmp_path / "build").write_text("MARKER = 1\n", encoding="utf-8")
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "build").mkdir()
+    (tmp_path / "pkg" / "build" / "out.py").write_text("MARKER = 2\n", encoding="utf-8")
+
+    matches = bridge.static_analyze(pattern="MARKER", path=".")
+
+    assert {m["file"] for m in matches} == {"build"}
+
+
+def test_static_analyze_skips_non_regular_files(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FIFOs and broken symlinks are never yielded, so grep cannot block on them."""
+    import os
+
+    monkeypatch.setattr(bridge_static, "_REPO_ROOT", tmp_path)
+    (tmp_path / "real.py").write_text("MARKER = 1\n", encoding="utf-8")
+    try:
+        os.mkfifo(tmp_path / "pipe")
+        (tmp_path / "dangling.py").symlink_to(tmp_path / "missing.py")
+    except (OSError, AttributeError):
+        # AttributeError: os.mkfifo does not exist on Windows.
+        pytest.skip("fifos/symlinks not permitted on this platform")
+
+    matches = bridge.static_analyze(pattern="MARKER", path=".")
+
+    assert {m["file"] for m in matches} == {"real.py"}
+
+
 def _clear_injection_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Simulate a real desktop session so the guard can reach its target check."""
     """Simulate a real desktop session so the guard can reach its target check."""
