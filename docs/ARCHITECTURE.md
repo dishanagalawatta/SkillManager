@@ -545,6 +545,7 @@ flowchart TD
 - **Cancellation**: Generation counter (`_refresh_generation`) for cooperative cancellation
 - **Debounce**: 400 ms `QTimer` trailing-edge debounce for filesystem events
 - **Self-Healing Storage**: Automatically cleans missing leading slashes (`home/...` -> `/home/...`) and nested duplicated roots before watcher registration.
+- **Canonical Filesystem Walk** (ADR-0037): every tree listing in `src/` goes through `iter_relative_files()` (`core/skill_packages/storage.py`) — iterative `os.scandir`, `/`-separated sorted output, symlinked files listed, symlinked directories never recursed, non-regular files excluded. Consumers (`skill_fingerprint`, `_relative_file_map`, MCP `static_analyze`) adapt it; no second inline walk may be added.
 
 ### Add-Time Hooks
 

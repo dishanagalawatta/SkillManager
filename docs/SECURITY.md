@@ -16,6 +16,27 @@ Every release publishes a `SHA256SUMS` manifest alongside its artifacts (`.deb`,
   over TLS from GitHub Releases.
 - Windows (`winget`) installs are verified by Microsoft's package index.
 
+## Shell Command Construction
+
+Package `verify_command` strings are generated from user-influenced paths
+and must follow three rules (see ADR-0038; fixed in PR #285, hardened
+in PR #288):
+
+- **Quote every interpolation**: all generated paths go through
+  `shlex.quote()` — including paths inside `echo` text, where double
+  quotes alone do not stop shell breakout.
+- **Never execute through a shell**: `run_shell_command` parses
+  `test -d ... && echo ...` in pure Python
+  (`intercept_cross_platform_command`) and otherwise uses
+  `shlex.split(...)` with `shell=False`. There is no `shell=True` path.
+- **Parse without escape processing**: the interceptor uses
+  `_split_shell_like()`, which keeps backslashes literal so Windows
+  paths survive on every platform. Do not "simplify" it back to
+  `shlex.split` — POSIX mode eats backslashes (`C:\foo` → `C:foo`).
+  Note `shlex.quote` output is POSIX-style; it is safe here precisely
+  because nothing is ever executed by a real shell (it is documented
+  as unsafe for `cmd.exe` / PowerShell under `shell=True`).
+
 ## Suppressed CVEs
 
 The following CVEs are known in pinned dependencies but are **not exploitable
