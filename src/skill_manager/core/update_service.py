@@ -4,7 +4,6 @@ Update service for handling background skill updates and project syncing.
 
 import filecmp
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -34,6 +33,7 @@ from skill_manager.core.skill_packages import (
     scan_package_inventory,
 )
 from skill_manager.core.skill_packages.process import sanitize_token
+from skill_manager.core.skill_packages.storage import iter_relative_files
 from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
 
 logger = logging.getLogger(__name__)
@@ -106,36 +106,15 @@ def update_single_package(
 
 
 def _relative_file_map(root: Path) -> dict[str, Path]:
-    """Map relative file paths (posix separators) to absolute paths under ``root``."""
-    mapping: dict[str, Path] = {}
+    """Map relative file paths (posix separators) to absolute paths under ``root``.
+
+    Built on the shared :func:`iter_relative_files` walk in
+    ``core.skill_packages.storage`` rather than a second inline ``os.scandir``
+    traversal, so walk performance and symlink semantics live in one place.
+    """
     if not root.is_dir():
-        return mapping
-    path_str = str(root)
-    base_len = len(path_str) + (0 if path_str.endswith(os.sep) else 1)
-    stack = [path_str]
-
-    while stack:
-        current = stack.pop()
-        try:
-            with os.scandir(current) as it:
-                entries = list(it)
-        except OSError:
-            continue
-
-        if os.name == "nt":
-            entries.sort(key=lambda e: e.name.lower())
-        else:
-            entries.sort(key=lambda e: e.name)
-
-        for entry in entries:
-            if entry.is_file(follow_symlinks=True):
-                mapping[entry.path[base_len:].replace(os.sep, "/")] = Path(entry.path)
-
-        for entry in reversed(entries):
-            if entry.is_dir(follow_symlinks=False):
-                stack.append(entry.path)
-
-    return mapping
+        return {}
+    return {rel: root / rel for rel in iter_relative_files(root)}
 
 
 def _folder_contents_equal(path_a, path_b) -> bool:
