@@ -84,6 +84,12 @@ All tools return structured JSON, names prefixed `sm_`.
 - `sm_list_skills` — from `AppController._library_model`.
 - `sm_list_sources` / `sm_list_projects` — configured sources & deploy targets.
 - `sm_static_analyze` — safe in-repo symbol/pattern search (respects `.gitignore`).
+  File walk reuses the canonical `iter_relative_files()` (ADR-0037): junk
+  directories (`.git`, `__pycache__`, `.venv`, `node_modules`, `build`,
+  `dist`) are pruned at any depth — directory parts only, so a *file*
+  sharing a junk name is still searched — and non-regular files (FIFOs,
+  sockets, broken symlinks) are never yielded, so grep cannot block on
+  them. Results arrive in deterministic sorted order.
 
 **Monitor** (always on)
 - `sm_get_diagnostics` — from `get_diagnostic_logger()` buffer.

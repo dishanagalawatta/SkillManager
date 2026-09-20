@@ -156,6 +156,24 @@ The Release workflow depends on the following repo-level setting (Settings → A
 
 ## Troubleshooting
 
+### Windows CI fixture rules
+
+The test jobs run on `windows-latest`, so pytest fixtures must be
+portable — Linux-green tests have repeatedly broken CI:
+
+- **No backslashes or double quotes in fixture file/dir names.**
+  Backslash is a path separator on Windows (`Path("a\\b")` creates two
+  levels) and `"` is illegal in Windows names (`WinError 123`). Cover
+  backslash-sensitive parsing with platform-independent unit tests and
+  guard fixture round-trips with
+  `@pytest.mark.skipif(os.name == "nt", reason=...)`.
+- **Guard `os.mkfifo` with `(OSError, AttributeError)`.** `os.mkfifo`
+  does not exist on Windows — access raises `AttributeError`, not
+  `OSError`.
+- **Prefer the shared walk in tests too.** When asserting traversal
+  behavior, compare against `iter_relative_files()` rather than a
+  second inline `os.walk` reference where possible.
+
 ### Coverage below threshold
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
 

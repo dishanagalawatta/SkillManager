@@ -31,6 +31,8 @@
 | [ADR-0034](docs/adr/ADR-0034-keyboard-reorder-dialog.md) | Keyboard-Operable List Reorder in ProjectReorderDialog | Accepted | 2026-09-12 | @DIKKA |
 | [ADR-0035](docs/adr/ADR-0035-multiselect-single-tab-stop.md) | Single-Tab-Stop Rows in GlassMultiSelect | Accepted | 2026-09-12 | @DIKKA |
 | [ADR-0036](docs/adr/ADR-0036-batched-command-skill-carry.md) | Batched Command Skill Carry | Accepted | 2026-09-13 | @DIKKA |
+| [ADR-0037](docs/adr/ADR-0037-canonical-scandir-walk.md) | Single Canonical Filesystem Walk | Accepted | 2026-09-20 | @DIKKA |
+| [ADR-0038](docs/adr/ADR-0038-verify-command-cross-platform-parsing.md) | Cross-Platform `verify_command` Parsing Without Shell Escapes | Accepted | 2026-09-20 | @DIKKA |
 
 
 ## Template
