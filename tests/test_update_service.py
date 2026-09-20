@@ -501,3 +501,88 @@ def test_link_exact_match_skips_different_file_sets(tmp_path):
     ownership = load_project_skill_ownership()
     project_key = UpdateService.ownership_project_key(str(skills_dir.resolve()))
     assert "alpha" not in ownership.get(project_key, {})
+
+
+def _build_walk_fixture(root: Path) -> None:
+    (root / "top.txt").write_text("top", encoding="utf-8")
+    (root / ".hidden").write_text("hidden", encoding="utf-8")
+    (root / "dir with spaces").mkdir()
+    (root / "dir with spaces" / "nested.txt").write_text("nested", encoding="utf-8")
+    (root / "ünicode").mkdir()
+    (root / "ünicode" / "deep").mkdir()
+    (root / "ünicode" / "deep" / "leaf.md").write_text("leaf", encoding="utf-8")
+
+
+def _os_walk_reference(root: Path) -> dict[str, Path]:
+    import os
+
+    mapping: dict[str, Path] = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        for filename in sorted(filenames):
+            full = Path(dirpath) / filename
+            mapping[full.relative_to(root).as_posix()] = full
+    return mapping
+
+
+def test_relative_file_map_matches_os_walk_parity(tmp_path):
+    from skill_manager.core.update_service import _relative_file_map
+
+    root = tmp_path / "tree"
+    root.mkdir()
+    _build_walk_fixture(root)
+
+    mapping = _relative_file_map(root)
+    expected = _os_walk_reference(root)
+    assert set(mapping) == set(expected)
+    for rel, full in mapping.items():
+        assert full.read_bytes() == expected[rel].read_bytes()
+
+    assert _relative_file_map(tmp_path / "does-not-exist") == {}
+
+
+def test_relative_file_map_symlink_semantics(tmp_path):
+    from skill_manager.core.update_service import _relative_file_map
+
+    root = tmp_path / "links"
+    (root / "real").mkdir(parents=True)
+    (root / "real" / "file.txt").write_text("data", encoding="utf-8")
+    try:
+        (root / "file-link.txt").symlink_to(root / "real" / "file.txt")
+        (root / "dir-link").symlink_to(root / "real", target_is_directory=True)
+        (root / "broken-link.txt").symlink_to(root / "real" / "missing.txt")
+    except OSError:
+        pytest.skip("symlinks not permitted on this platform")
+
+    mapping = _relative_file_map(root)
+    # Symlinked files resolve like regular files; symlinked dirs are not
+    # recursed into, so their contents appear exactly once.
+    assert mapping["real/file.txt"].read_text(encoding="utf-8") == "data"
+    assert mapping["file-link.txt"].read_text(encoding="utf-8") == "data"
+    assert "dir-link/file.txt" not in mapping
+    assert "broken-link.txt" not in mapping
+
+
+def test_folder_contents_equal_detects_changes(tmp_path):
+    import shutil
+
+    from skill_manager.core.update_service import _folder_contents_equal
+
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    dir_a.mkdir()
+    _build_walk_fixture(dir_a)
+    shutil.copytree(dir_a, dir_b)
+
+    assert _folder_contents_equal(dir_a, dir_b) is True
+    assert _folder_contents_equal(dir_a, dir_a) is True
+
+    (dir_b / "top.txt").write_text("changed", encoding="utf-8")
+    assert _folder_contents_equal(dir_a, dir_b) is False
+
+    (dir_b / "top.txt").write_text("top", encoding="utf-8")
+    (dir_b / "extra.txt").write_text("extra", encoding="utf-8")
+    assert _folder_contents_equal(dir_a, dir_b) is False
+
+    assert _folder_contents_equal("", dir_b) is False
+    assert _folder_contents_equal(dir_a, tmp_path / "missing") is False
