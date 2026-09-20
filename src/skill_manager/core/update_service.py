@@ -4,7 +4,6 @@ Update service for handling background skill updates and project syncing.
 
 import filecmp
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -34,6 +33,7 @@ from skill_manager.core.skill_packages import (
     scan_package_inventory,
 )
 from skill_manager.core.skill_packages.process import sanitize_token
+from skill_manager.core.skill_packages.storage import iter_relative_files
 from skill_manager.utils.task_runner import BackgroundTaskRunner, TaskRunner
 
 logger = logging.getLogger(__name__)
@@ -106,16 +106,15 @@ def update_single_package(
 
 
 def _relative_file_map(root: Path) -> dict[str, Path]:
-    """Map relative file paths (posix separators) to absolute paths under ``root``."""
-    mapping: dict[str, Path] = {}
+    """Map relative file paths (posix separators) to absolute paths under ``root``.
+
+    Built on the shared :func:`iter_relative_files` walk in
+    ``core.skill_packages.storage`` rather than a second inline ``os.scandir``
+    traversal, so walk performance and symlink semantics live in one place.
+    """
     if not root.is_dir():
-        return mapping
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames.sort()
-        for filename in sorted(filenames):
-            full = Path(dirpath) / filename
-            mapping[full.relative_to(root).as_posix()] = full
-    return mapping
+        return {}
+    return {rel: root / rel for rel in iter_relative_files(root)}
 
 
 def _folder_contents_equal(path_a, path_b) -> bool:
