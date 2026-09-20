@@ -1,0 +1,32 @@
+# Zizmor configuration — see https://docs.zizmor.sh/configuration/
+#
+# Policy: the reusable CI gate in _lint.yml runs zizmor on every PR, so this
+# file is the allowlist for findings that are accepted risks. Each entry must
+# keep its justification comment. Do not add blanket ignores.
+
+rules:
+  # release-build.yml sets workflow-wide `contents: write` because the
+  # publish-release job must create GitHub Releases and upload artifacts.
+  # Accepted: narrowing this to per-job permissions would risk breaking
+  # artifact upload in ways that are only observable during a real release
+  # run, so the split is deferred until it can be verified end-to-end.
+  excessive-permissions:
+    ignore:
+      - release-build.yml
+
+  # auto-release.yml must keep its checkout credential: scripts/release.py
+  # pushes the version-bump commit and tags back to origin (git push origin
+  # main --tags), which requires the persisted token. Only dist/* globs from
+  # release-build.yml are ever uploaded as artifacts, so no credential
+  # material can persist into a published artifact from this job.
+  artipacked:
+    ignore:
+      - auto-release.yml
+
+  # Line-scoped: the publish-release step could use `gh release create`
+  # instead of softprops/action-gh-release, but swapping release-publishing
+  # machinery is only observable during a real release run. Deferred until it
+  # can be verified end-to-end against a (pre)release tag.
+  superfluous-actions:
+    ignore:
+      - release-build.yml:191

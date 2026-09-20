@@ -578,11 +578,19 @@ Item {
     CommandCarrySkillsDialog {
         id: lv_carrySkillsDialog
         onCarryConfirmed: (confirmedSkills) => {
-            AppController.confirmCommandSkillsCarry(
-                lv_carrySkillsDialog.projectPath,
-                JSON.stringify(lv_carrySkillsDialog.commandPaths),
-                JSON.stringify(confirmedSkills)
-            )
+            if (lv_carrySkillsDialog.batchJson !== "") {
+                AppController.confirmCommandSkillsCarryBatch(
+                    lv_carrySkillsDialog.batchJson,
+                    JSON.stringify(confirmedSkills)
+                )
+                lv_carrySkillsDialog.batchJson = ""
+            } else {
+                AppController.confirmCommandSkillsCarry(
+                    lv_carrySkillsDialog.projectPath,
+                    JSON.stringify(lv_carrySkillsDialog.commandPaths),
+                    JSON.stringify(confirmedSkills)
+                )
+            }
         }
     }
 
@@ -592,6 +600,10 @@ Item {
             var cmdPaths = JSON.parse(commandPathsJson || "[]")
             var skills = JSON.parse(missingSkillsJson || "[]")
             lv_carrySkillsDialog.openWithContext(cmdPaths, projectPath, skills)
+        }
+        function onCommandSkillsCarryBatchPrompt(batchJson) {
+            var batch = JSON.parse(batchJson || "[]")
+            lv_carrySkillsDialog.openWithBatch(batch)
         }
     }
 

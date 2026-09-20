@@ -72,7 +72,7 @@ jobs:
         if: steps.release.outputs.RELEASED == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.NEW_TAG }}
         run: |
-          TAG="${{ steps.release.outputs.NEW_TAG }}"
           echo "Triggering release-build.yml for tag: $TAG"
           gh workflow run release-build.yml --ref "$TAG" || echo "::warning::gh workflow run failed — trigger release-build manually for $TAG"

@@ -21,11 +21,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
+        # Security: no enable-cache here — caching on tag-push release events
+        # admits poisoned caches into release artifacts (setup-uv 'auto' omits it).
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
 
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -77,11 +79,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
+        # Security: no enable-cache here — caching on tag-push release events
+        # admits poisoned caches into release artifacts (setup-uv 'auto' omits it).
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
 
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -130,6 +134,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Download installer
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -149,8 +155,10 @@ jobs:
 
       - name: Determine prerelease flag
         id: prerelease
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          if [[ "$VERSION" == *-dev.* ]]; then
           if [[ "$VERSION" == *-dev.* ]]; then
             echo "IS_PRERELEASE=true" >> "$GITHUB_OUTPUT"
           else
@@ -194,7 +202,9 @@ jobs:
           generate_release_notes: true
 
       - name: Echo SHA256
+        env:
+          HASH: ${{ steps.sha256.outputs.HASH }}
         run: |
-          echo "Installer SHA256: ${{ steps.sha256.outputs.HASH }}"
+          echo "Installer SHA256: $HASH"
           echo "Checksums: dist/SHA256SUMS"
           echo "Use this hash in winget manifest installer.yaml"

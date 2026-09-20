@@ -19,6 +19,7 @@ class OpsController(QObject):
     minimizeAppRequested: ClassVar[SignalInstance]
     commandPendingRemovals: ClassVar[SignalInstance]  # str, list
     commandSkillsCarryPrompt: ClassVar[SignalInstance]  # str, str, str
+    commandSkillsCarryBatchPrompt: ClassVar[SignalInstance]  # str (JSON batch)
 
     # State
     app: AppController
@@ -64,6 +65,9 @@ class OpsController(QObject):
     def confirmCommandSkillsCarry(
         self, project_path: str, command_paths_json: str, confirmed_skills_json: str
     ) -> None: ...
+    def confirmCommandSkillsCarryBatch(
+        self, batch_json: str, confirmed_skills_json: str
+    ) -> None: ...
 
     # ── Clipboard ──────────────────────────────────────────────────────
     def copySkillToClipboard(self, path: str) -> None: ...
@@ -96,6 +100,8 @@ class OpsController(QObject):
     def _emit_missing_skills_prompt(
         self, proj_root: Path, command_path: Path, body: str, tag: str
     ) -> None: ...
+    def _collect_missing_skills_batch(self, pairs: list, body: str, tag: str) -> list: ...
+    def _emit_missing_skills_batch(self, batch: list) -> None: ...
 
     # ── Inspector ──────────────────────────────────────────────────────
     def getReferencedSkillsForCommand(self, command_path: str) -> list: ...

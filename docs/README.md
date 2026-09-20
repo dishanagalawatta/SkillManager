@@ -35,7 +35,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system architecture with data flow diagrams |
 | [../DESIGN.md](../DESIGN.md) | Design system, patterns, threading model, QML conventions |
 | [../ADR_INDEX.md](../ADR_INDEX.md) | Architecture Decision Records index |
-| [adr/](adr/) | Individual ADR files (`ADR-0010` through `ADR-0025`) |
+| [adr/](adr/) | Individual ADR files (`ADR-0010` through `ADR-0036`) |
 | [SNAP_CAPTURE_VALIDATION.md](SNAP_CAPTURE_VALIDATION.md) | Screenshot capture validation procedure (MCP/CI) |
 | [RIBBON_COLLAPSE.md](RIBBON_COLLAPSE.md) | GlassPill ribbon collapse specification |
 

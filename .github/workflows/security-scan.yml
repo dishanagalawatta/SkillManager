@@ -15,4 +15,4 @@ concurrency:
 jobs:
   security:
     name: Security
-    uses: ./.github/workflows/_security-scan.yml
+    uses: $/.github/workflows/_security-scan.yml

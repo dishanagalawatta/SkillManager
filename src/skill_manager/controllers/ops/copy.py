@@ -256,6 +256,87 @@ class CopyMixin:
 
         self.app.task_runner.run(_run)
 
+    @Slot(str, str)
+    def confirmCommandSkillsCarryBatch(self, batch_json: str, confirmed_skills_json: str):
+        import json
+
+        from skill_manager.core.copier import (
+            copy_commands_with_skill_carry,
+            find_missing_skills_for_commands,
+        )
+
+        try:
+            batch = json.loads(batch_json or "[]")
+        except Exception:
+            batch = []
+        try:
+            confirmed_skills = json.loads(confirmed_skills_json or "[]")
+        except Exception:
+            confirmed_skills = []
+
+        def _run():
+            total_cmds = 0
+            total_skills = 0
+            total_failed = 0
+            refreshed_roots: set[str] = set()
+            all_discovered: list[dict] = []
+            for entry in batch:
+                project_path = entry.get("project_path", "")
+                command_paths = entry.get("command_paths", [])
+                if not project_path or not command_paths:
+                    continue
+                commands = [{"local_path": p, "name": Path(p).stem} for p in command_paths]
+                still_missing = find_missing_skills_for_commands(
+                    commands,
+                    project_path,
+                    self.app._library_model._all_skills,  # type: ignore[attr-defined]
+                )
+                missing_folders = {
+                    (s.get("folder_name") or "").lower()
+                    for s in still_missing
+                    if isinstance(s, dict)
+                }
+                applicable = [
+                    s
+                    for s in confirmed_skills
+                    if (s.get("folder_name") or s.get("name") or "").lower() in missing_folders
+                    or not missing_folders
+                ]
+                result = copy_commands_with_skill_carry(
+                    commands,
+                    project_path,
+                    self.app._library_model._all_skills,  # type: ignore[attr-defined]
+                    confirmed_skills=applicable,
+                )
+                total_cmds += result.get("copied", 0)
+                total_skills += result.get("skills_copied", 0)
+                total_failed += result.get("skills_failed", 0)
+                if result.get("skills_copied", 0) > 0:
+                    refreshed_roots.add(project_path)
+            msg = f"Copied {total_cmds} command(s) and {total_skills} skill(s) to {len(batch)} project(s)."
+            if total_failed > 0:
+                msg += f" ({total_failed} skill(s) failed)"
+            if refreshed_roots:
+                from skill_manager.core.quick_copy import project_root_for_project
+
+                service = _build_discovery_service(self.app)
+                for rp in refreshed_roots:
+                    try:
+                        all_discovered.extend(
+                            service.discover_project(project_root_for_project(Path(rp)))
+                        )
+                    except Exception as exc:
+                        logger.error("[CARRY BATCH] Failed rescan of %s: %s", rp, exc)
+
+            def _apply():
+                self.app._set_status(msg)
+                if all_discovered:
+                    self._apply_targeted_refresh({Path(p) for p in refreshed_roots}, all_discovered)
+
+            QTimer.singleShot(0, self, _apply)
+
+        self.app.task_runner.run(_run)
+
     @Slot(str, str, str)
     def confirmCommandSkillsCarry(
         self, project_path: str, command_paths_json: str, confirmed_skills_json: str
