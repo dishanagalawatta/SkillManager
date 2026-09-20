@@ -43,6 +43,8 @@ Dialog {
     property var missingSkills: []          // array of skill dicts from Python
     property string projectPath: ""
     property var commandPaths: []
+    property var projectPaths: []
+    property string batchJson: ""
     // Internal: track checked state per skill
     property var _checked: ({})
 
@@ -58,7 +60,40 @@ Dialog {
     function openWithContext(cmdPaths, projPath, skills) {
         commandPaths = cmdPaths
         projectPath = projPath
+        projectPaths = [projPath]
+        batchJson = ""
         missingSkills = skills
+        open()
+    }
+
+    function openWithBatch(batch) {
+        var paths = []
+        var unionSkills = {}
+        var unionList = []
+        var allCmds = []
+        for (var i = 0; i < batch.length; i++) {
+            var entry = batch[i]
+            paths.push(entry.project_path)
+            var cmds = entry.command_paths || []
+            for (var c = 0; c < cmds.length; c++) {
+                if (allCmds.indexOf(cmds[c]) === -1) {
+                    allCmds.push(cmds[c])
+                }
+            }
+            var skills = entry.missing_skills || []
+            for (var s = 0; s < skills.length; s++) {
+                var key = skills[s].folder_name || skills[s].name || ("skill_" + s)
+                if (!unionSkills[key]) {
+                    unionSkills[key] = true
+                    unionList.push(skills[s])
+                }
+            }
+        }
+        commandPaths = allCmds
+        projectPaths = paths
+        projectPath = paths.length === 1 ? paths[0] : ""
+        batchJson = JSON.stringify(batch)
+        missingSkills = unionList
         open()
     }
 
@@ -127,7 +162,7 @@ Dialog {
         spacing: 16
 
         Text {
-            text: "This command references " + root.missingSkills.length + " skill(s) not installed in the target project:"
+            text: root.projectPaths.length > 1 ? "This command references " + root.missingSkills.length + " skill(s) missing in " + root.projectPaths.length + " projects:" : "This command references " + root.missingSkills.length + " skill(s) not installed in the target project:"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sizeBody
             color: Theme.secondaryLabel

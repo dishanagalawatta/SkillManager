@@ -72,13 +72,16 @@ class CommandsMixin:
                 except Exception as exc:
                     logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
-        # Check for missing skill dependencies
+        # Check for missing skill dependencies (batched: one prompt total,
+        # so multi-project creates never overwrite each other in QML).
         from skill_manager.core.quick_copy import project_root_for_project
 
-        for result in created:
-            if result.path:
-                project_path = project_root_for_project(result.path)
-                self._emit_missing_skills_prompt(project_path, result.path, body, "CREATE")
+        pairs = [
+            (project_root_for_project(result.path), result.path)
+            for result in created
+            if result.path
+        ]
+        self._emit_missing_skills_batch(self._collect_missing_skills_batch(pairs, body, "CREATE"))
 
         return str(created[0].path) if created else ""
 
@@ -128,6 +131,79 @@ class CommandsMixin:
                 elif not lp and s not in skills:
                     skills.append(s)
         return skills
+
+    def _collect_missing_skills_batch(
+        self, pairs: "list[tuple[Path, Path]]", body: str, tag: str
+    ) -> list[dict]:
+        """Return per-project missing-skills entries for *pairs*.
+
+        Each entry is ``{"project_path": str, "command_paths": [str],
+        "missing_skills": [dict]}`` — only projects with non-empty missing
+        are included. Shared filesystem check makes the result idempotent:
+        once skills are carried to every project, a re-edit yields ``[]``.
+        """
+        from dataclasses import asdict
+
+        from skill_manager.core.copier import find_missing_skills_for_commands
+
+        all_known = self._get_all_known_skills()
+        batch: list[dict] = []
+        for proj_root, command_path in pairs:
+            cmd_dict = {
+                "local_path": str(command_path),
+                "body": body,
+                "name": command_path.stem,
+            }
+            logger.info(
+                "[CARRY %s] Checking missing skills for command: %s in project: %s",
+                tag,
+                command_path,
+                proj_root,
+            )
+            missing = find_missing_skills_for_commands([cmd_dict], proj_root, all_known)
+            logger.info("[CARRY %s] Found missing skills: %s", tag, missing)
+            if not missing:
+                continue
+            missing_dicts = [
+                asdict(m)
+                if hasattr(m, "__dataclass_fields__")
+                else (m.to_dict() if hasattr(m, "to_dict") else dict(m))
+                for m in missing
+            ]
+            batch.append(
+                {
+                    "project_path": str(proj_root),
+                    "command_paths": [str(command_path)],
+                    "missing_skills": missing_dicts,
+                }
+            )
+        return batch
+
+    def _emit_missing_skills_batch(self, batch: list[dict]):
+        """Emit a single batched carry prompt (no-op when empty).
+
+        A single emission replaces the old per-project loop, which
+        overwrote the single-instance QML dialog (last-writer-wins) so
+        only the last project ever received carried skills.
+        """
+        import json
+
+        if not batch:
+            return
+        if len(batch) == 1:
+            entry = batch[0]
+            QTimer.singleShot(
+                0,
+                self,
+                lambda e=entry: self.commandSkillsCarryPrompt.emit(
+                    json.dumps(e["command_paths"]),
+                    e["project_path"],
+                    json.dumps(e["missing_skills"]),
+                ),
+            )
+            return
+        payload = json.dumps(batch)
+        QTimer.singleShot(0, self, lambda p=payload: self.commandSkillsCarryBatchPrompt.emit(p))
 
     def _emit_missing_skills_prompt(self, proj_root: Path, command_path: Path, body: str, tag: str):
         """Check *command_path* for missing skill dependencies and prompt the carry dialog.
@@ -344,10 +420,10 @@ class CommandsMixin:
             # Check for missing skill dependencies after merge
             from skill_manager.core.quick_copy import project_root_for_project
 
-            for r in updated:
-                if r.path:
-                    proj_root = project_root_for_project(r.path)
-                    self._emit_missing_skills_prompt(proj_root, r.path, body, "UPDATE")
+            pairs = [(project_root_for_project(r.path), r.path) for r in updated if r.path]
+            self._emit_missing_skills_batch(
+                self._collect_missing_skills_batch(pairs, body, "UPDATE")
+            )
 
         QTimer.singleShot(0, _apply_merge)
 

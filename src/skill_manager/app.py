@@ -151,6 +151,7 @@ class AppController(AppControllerProxyMixin, QObject):
     commandUpdateConflict = Signal(str, str, str)  # oldPath, conflictPath, suggestedRename
     commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
     commandSkillsCarryPrompt = Signal(str, str, str)
+    commandSkillsCarryBatchPrompt = Signal(str)
     commandPendingRemovals = Signal(str, list)
 
     def __init__(self, skip_initial_load=False, config=None):
@@ -273,6 +274,7 @@ class AppController(AppControllerProxyMixin, QObject):
 
         self.ops.commandPendingRemovals.connect(self.commandPendingRemovals.emit)
         self.ops.commandSkillsCarryPrompt.connect(self.commandSkillsCarryPrompt.emit)
+        self.ops.commandSkillsCarryBatchPrompt.connect(self.commandSkillsCarryBatchPrompt.emit)
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery

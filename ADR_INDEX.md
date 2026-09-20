@@ -30,6 +30,7 @@
 | [ADR-0033](docs/adr/ADR-0033-global-npx-relocation-sources.md) | Global npx Skill Installs as Relocation Sources | Proposed | 2026-09-08 | @DIKKA |
 | [ADR-0034](docs/adr/ADR-0034-keyboard-reorder-dialog.md) | Keyboard-Operable List Reorder in ProjectReorderDialog | Accepted | 2026-09-12 | @DIKKA |
 | [ADR-0035](docs/adr/ADR-0035-multiselect-single-tab-stop.md) | Single-Tab-Stop Rows in GlassMultiSelect | Accepted | 2026-09-12 | @DIKKA |
+| [ADR-0036](docs/adr/ADR-0036-batched-command-skill-carry.md) | Batched Command Skill Carry | Accepted | 2026-09-13 | @DIKKA |
 
 
 ## Template

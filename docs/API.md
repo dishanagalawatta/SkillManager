@@ -83,6 +83,7 @@ a property on `AppController` and is independently testable.
 | `deleteSkill(skillId)` | `None` | Permanent delete. Asks for confirmation via the UI. |
 | `syncProject(projectId)` | `None` | Pull latest from the project's update source. |
 | `confirmCommandSkillsCarry(projectPath, cmdJson, skillsJson)` | `None` | Carry confirmed skills alongside commands to a project. |
+| `confirmCommandSkillsCarryBatch(batchJson, skillsJson)` | `None` | Carry confirmed union skills per batched project entry (see ADR-0036). |
 | `copyCommandsToProjectWithCarry(projectPath, cmdJson)` | `None` | Copy commands; prompt if skills are missing. |
 | `createCustomCommand(n: str, b: str, project_labels: QStringList, cat: str)` | `str` | Create a custom command deployed to all listed projects. |
 | `updateCustomCommandFull(lp: str, n: str, b: str, cat: str, project_labels: QStringList, on_conflict: str)` | `str` | Update a custom command; rewrites every project copy. |
@@ -121,6 +122,7 @@ and
 | `isLoadingChanged()` | — | `isLoading` property changed. |
 | `projectSynced(projectId, ok)` | `str, bool` | A background sync completed. |
 | `commandSkillsCarryPrompt(cmdJson, projPath, skillsJson)` | `str, str, str` | Commands copied; skills missing in target. Show carry dialog. |
+| `commandSkillsCarryBatchPrompt(batchJson)` | `str` | Multi-project carry batch; union skills in one dialog (see ADR-0036). |
 | `currentProjectChanged()` | — | `currentProject` changed (selection or cycle swap). |
 | `lastProjectChanged()` | — | `lastProject` changed (new previous project recorded or cycle swap). |
 

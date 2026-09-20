@@ -288,6 +288,10 @@ class AppControllerProxyMixin:
     def confirmCommandSkillsCarry(self, project_path, command_paths_json, confirmed_skills_json):
         self.ops.confirmCommandSkillsCarry(project_path, command_paths_json, confirmed_skills_json)
 
+    @Slot(str, str)
+    def confirmCommandSkillsCarryBatch(self, batch_json, confirmed_skills_json):
+        self.ops.confirmCommandSkillsCarryBatch(batch_json, confirmed_skills_json)
+
     @Slot(str, list)
     def deleteSkillFromProjects(self, path, projects):
         self.ops.deleteSkillFromProjects(path, projects)

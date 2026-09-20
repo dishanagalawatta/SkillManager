@@ -31,6 +31,7 @@ class OpsController(
 
     minimizeAppRequested = Signal()
     commandSkillsCarryPrompt = Signal(str, str, str)
+    commandSkillsCarryBatchPrompt = Signal(str)
     commandPendingRemovals = Signal(str, list)
 
     _pending_command_update: dict | None = None

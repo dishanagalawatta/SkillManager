@@ -1,7 +1,7 @@
 # SkillManager Architecture
 
 > Status: **Accepted** | Last reviewed: 2026-08-20
-> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md), [ADR-0028](adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md), [ADR-0029](adr/ADR-0029-package-deletion-storage-cleanup.md), [ADR-0030](adr/ADR-0030-project-skill-classification-and-diff-model-sync.md)
+> Related ADRs: [ADR-0010](adr/ADR-0010-drop-tuf.md), [ADR-0019](adr/ADR-0019-multiprocessing-joblib.md), [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md), [ADR-0025](adr/ADR-0025-selection-persistence-shutdown-sync.md), [ADR-0027](adr/ADR-0027-path-self-healing-and-two-phase-incubation.md), [ADR-0028](adr/ADR-0028-non-blocking-package-versioning-and-npx-resolution.md), [ADR-0029](adr/ADR-0029-package-deletion-storage-cleanup.md), [ADR-0030](adr/ADR-0030-project-skill-classification-and-diff-model-sync.md), [ADR-0036](adr/ADR-0036-batched-command-skill-carry.md)
 
 
 SkillManager is a Windows desktop application designed to manage, organize, and synchronize reusable agent skills across multiple project repositories. It is built using Python for the core logic and PySide6/QML for a modern, hardware-accelerated user interface.
@@ -248,6 +248,41 @@ sequenceDiagram
 1. **Strict Project Boundary Enforcement**: Any skill residing inside an `.agents/skills` or `.agents/commands` folder is explicitly identified as `is_package = False`. Even if the workspace root or parent folder is registered in `sources`, the project boundary prevents misclassifying project copies as Master Library packages.
 2. **Package Label Invariance**: In `addOrUpdateSkills`, `project_label` recomputation is scoped exclusively to project skills (`not skill.is_package`), permanently preserving `"Master Library"` for package records.
 3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization. `equal` blocks are synced via `PipelineMixin._sync_equal_block()`, which reassigns only rows whose objects actually mutated (`!=`, preserving identity for identical items) and batches contiguous changed rows into single `dataChanged(topLeft, bottomRight)` emissions to prevent signal storms.
+
+#### Batched Command Skill Carry (ADR-0036)
+
+Editing a command deployed to several projects fans out the write,
+then collects missing skills per project into one batch and emits a
+single carry prompt (union skill list, one user decision). A 1-entry
+batch falls back to the legacy single-project signal.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Command Dialog (QML)
+    participant Ops as OpsController (CommandsMixin)
+    participant Core as commands.py (multi fan-out)
+    participant Disc as DiscoveryService
+    participant QML as CommandCarrySkillsDialog
+    participant Copy as CopyMixin
+
+    UI->>Ops: updateCustomCommandFull(...)
+    Ops->>Core: update_custom_command_file_multi(...)
+    Core-->>Ops: Per-project write results
+    Ops->>Disc: discover_project() per affected project
+    Ops->>Ops: _collect_missing_skills_batch(pairs, body, UPDATE)
+    Ops->>Ops: _emit_missing_skills_batch(batch)
+    alt Multi-project batch
+        Ops->>QML: commandSkillsCarryBatchPrompt(batchJson)
+        QML->>QML: CommandCarrySkillsDialog.openWithBatch(batch)
+        QML->>Copy: confirmCommandSkillsCarryBatch(batchJson, skillsJson)
+    else Single-project entry
+        Ops->>QML: commandSkillsCarryPrompt(cmdJson, projPath, skillsJson)
+    else No missing skills
+        Ops-->>UI: Silent (no prompt)
+    end
+    Copy->>Copy: Per-project still-missing filter + copy + rescan
+```
 
 ```mermaid
 flowchart TD

@@ -50,7 +50,7 @@ The Quick Copy view is designed for daily workflow efficiency when working withi
 - **Custom Collections**: Create custom groups of skills for quick batch reference copying.
 - **Manual Input**: Add raw text references or notes alongside your skill references.
 - **Starred Items**: Starred skills and commands are shown as first-class items in the Quick Copy workflow.
-- **Command Skill Carry**: When you copy a command to another project, SkillManager automatically detects which skills the command references (e.g., `/git-pr`, `@cavecrew`). If any of those skills are missing in the target project, a carry dialog appears listing them. You can toggle individual skills, carry all, or skip and copy commands only. This ensures commands work in every project without manual dependency tracking.
+- **Command Skill Carry**: When you copy a command to another project, SkillManager automatically detects which skills the command references (e.g., `/git-pr`, `@cavecrew`). If any of those skills are missing in the target project, a carry dialog appears listing them. You can toggle individual skills, carry all, or skip and copy commands only. This ensures commands work in every project without manual dependency tracking. When a command edit spans multiple projects, the missing skills are merged into a single prompt (one union list for all projects, copied per project on confirm). Re-editing after a full carry stays silent — if nothing is missing, no dialog appears.
 
 ---
 

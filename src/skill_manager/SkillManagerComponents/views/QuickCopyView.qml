@@ -896,11 +896,19 @@ Item {
     CommandCarrySkillsDialog {
         id: qcv_carrySkillsDialog
         onCarryConfirmed: (confirmedSkills) => {
-            AppController.confirmCommandSkillsCarry(
-                qcv_carrySkillsDialog.projectPath,
-                JSON.stringify(qcv_carrySkillsDialog.commandPaths),
-                JSON.stringify(confirmedSkills)
-            )
+            if (qcv_carrySkillsDialog.batchJson !== "") {
+                AppController.confirmCommandSkillsCarryBatch(
+                    qcv_carrySkillsDialog.batchJson,
+                    JSON.stringify(confirmedSkills)
+                )
+                qcv_carrySkillsDialog.batchJson = ""
+            } else {
+                AppController.confirmCommandSkillsCarry(
+                    qcv_carrySkillsDialog.projectPath,
+                    JSON.stringify(qcv_carrySkillsDialog.commandPaths),
+                    JSON.stringify(confirmedSkills)
+                )
+            }
         }
     }
 
@@ -910,6 +918,10 @@ Item {
             var cmdPaths = JSON.parse(commandPathsJson || "[]")
             var skills = JSON.parse(missingSkillsJson || "[]")
             qcv_carrySkillsDialog.openWithContext(cmdPaths, projectPath, skills)
+        }
+        function onCommandSkillsCarryBatchPrompt(batchJson) {
+            var batch = JSON.parse(batchJson || "[]")
+            qcv_carrySkillsDialog.openWithBatch(batch)
         }
     }
 }
