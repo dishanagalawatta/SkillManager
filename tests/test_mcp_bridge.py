@@ -154,7 +154,8 @@ def test_static_analyze_skips_non_regular_files(
     try:
         os.mkfifo(tmp_path / "pipe")
         (tmp_path / "dangling.py").symlink_to(tmp_path / "missing.py")
-    except OSError:
+    except (OSError, AttributeError):
+        # AttributeError: os.mkfifo does not exist on Windows.
         pytest.skip("fifos/symlinks not permitted on this platform")
 
     matches = bridge.static_analyze(pattern="MARKER", path=".")
