@@ -455,6 +455,27 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
 
 
+def test_intercept_cross_platform_backslash_path(temp_dir):
+    # Backslashes must survive unquoting verbatim (Windows paths). POSIX-mode
+    # shlex.split would eat them as escape characters (C:\foo -> C:foo).
+    weird = temp_dir / "a\\b dir"
+    weird.mkdir()
+
+    messages = []
+    assert intercept_cross_platform_command(
+        f'test -d "{weird}" && echo "Skills installed in "{weird}', messages.append
+    )
+    assert messages[-1] == f"Skills installed in {weird}"
+
+
+def test_intercept_cross_platform_bare_backslash_path(temp_dir):
+    # A bare (unquoted) backslash path must pass through untouched.
+    weird = temp_dir / "plain\\name"
+    weird.mkdir()
+
+    assert intercept_cross_platform_command(f"test -d {weird}", None) is True
+
+
 def test_intercept_cross_platform_echo_and_tilde_typo(temp_dir, monkeypatch):
     home = temp_dir / "home"
     target = home / ".agents"
