@@ -1,4 +1,5 @@
 import json
+import os
 from unittest.mock import patch
 
 import pytest
@@ -230,6 +231,7 @@ def test_verify_command_quoting_is_well_formed(tmp_path):
     assert "Skills installed in " in cmd
 
 
+@pytest.mark.skipif(os.name == "nt", reason='" is illegal in Windows filenames')
 def test_verify_command_adversarial_path_is_fully_quoted(tmp_path):
     """Sentinel HIGH: verify_command must never interpolate a raw path into shell syntax.
 

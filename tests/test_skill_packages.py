@@ -1,3 +1,4 @@
+import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -453,6 +454,43 @@ def test_intercept_cross_platform_quoted_path_with_apostrophe(temp_dir):
         f'test -d {quoted_path} && echo "Skills installed in "{quoted_path}', messages.append
     )
     assert messages[-1] == f"Skills installed in {dir_with_apostrophe}"
+
+
+def test_split_shell_like_keeps_backslashes_verbatim():
+    # Backslashes must survive unquoting verbatim (Windows paths). POSIX-mode
+    # shlex.split would eat them as escape characters (C:\foo -> C:foo).
+    # Pure-function test: runs identically on every platform.
+    from skill_manager.core.skill_packages.updater import _split_shell_like
+
+    assert _split_shell_like("test -d 'C:\\foo bar'") == ["test", "-d", "C:\\foo bar"]
+    assert _split_shell_like('"C:\\a\\b dir"') == ["C:\\a\\b dir"]
+    assert _split_shell_like("'a'b") == ["ab"]
+    assert _split_shell_like("\"Skills installed in \" 'C:\\x'") == [
+        "Skills installed in ",
+        "C:\\x",
+    ]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="backslash is a path separator on Windows")
+def test_intercept_cross_platform_backslash_path(temp_dir):
+    # End-to-end round trip with a backslash fixture (POSIX-only construction).
+    weird = temp_dir / "a\\b dir"
+    weird.mkdir()
+
+    messages = []
+    assert intercept_cross_platform_command(
+        f'test -d "{weird}" && echo "Skills installed in "{weird}', messages.append
+    )
+    assert messages[-1] == f"Skills installed in {weird}"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="backslash is a path separator on Windows")
+def test_intercept_cross_platform_bare_backslash_path(temp_dir):
+    # A bare (unquoted) backslash path must pass through untouched.
+    weird = temp_dir / "plain\\name"
+    weird.mkdir()
+
+    assert intercept_cross_platform_command(f"test -d {weird}", None) is True
 
 
 def test_intercept_cross_platform_echo_and_tilde_typo(temp_dir, monkeypatch):

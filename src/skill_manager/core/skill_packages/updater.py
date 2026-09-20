@@ -114,6 +114,40 @@ def run_npx_update(
     run_process(command, output_callback, cwd=cwd, env=env)
 
 
+def _split_shell_like(text: str) -> list[str]:
+    """Split *text* on unquoted whitespace, dropping quote characters.
+
+    Same word-concatenation semantics as POSIX ``shlex.split`` (adjacent
+    quoted and bare sections form one word) but backslashes are always
+    literal, so Windows paths (``C:\\...``) survive on every platform.
+    """
+    words: list[str] = []
+    buf: list[str] = []
+    quote: str | None = None
+    started = False
+    for ch in text:
+        if quote is not None:
+            if ch == quote:
+                quote = None
+            else:
+                buf.append(ch)
+            started = True
+        elif ch in ("'", '"'):
+            quote = ch
+            started = True
+        elif ch.isspace():
+            if started:
+                words.append("".join(buf))
+                buf = []
+                started = False
+        else:
+            buf.append(ch)
+            started = True
+    if started:
+        words.append("".join(buf))
+    return words
+
+
 def intercept_cross_platform_command(
     command: str, output_callback: Callable[[str], None] | None
 ) -> bool:
@@ -129,15 +163,9 @@ def intercept_cross_platform_command(
 
     path = test_part[len("test -d ") :].strip()
     if "'" in path or '"' in path:
-        try:
-            path_tokens = shlex.split(path)
-            if path_tokens:
-                path = "".join(path_tokens)
-        except ValueError:
-            if (path.startswith('"') and path.endswith('"')) or (
-                path.startswith("'") and path.endswith("'")
-            ):
-                path = path[1:-1]
+        path_tokens = _split_shell_like(path)
+        if path_tokens:
+            path = "".join(path_tokens)
 
     if path.startswith("~."):
         path = "~/" + path[1:]
@@ -154,15 +182,9 @@ def intercept_cross_platform_command(
         if echo_part.startswith("echo "):
             msg = echo_part[len("echo ") :].strip()
             if "'" in msg or '"' in msg:
-                try:
-                    msg_tokens = shlex.split(msg)
-                    if msg_tokens:
-                        msg = " ".join(msg_tokens)
-                except ValueError:
-                    if (msg.startswith('"') and msg.endswith('"')) or (
-                        msg.startswith("'") and msg.endswith("'")
-                    ):
-                        msg = msg[1:-1]
+                msg_tokens = _split_shell_like(msg)
+                if msg_tokens:
+                    msg = " ".join(msg_tokens)
             emit(output_callback, msg)
 
     return True
