@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+
+from skill_manager.core.skill_packages.storage import iter_relative_files
 
 from ._telemetry import _log_call
 
@@ -77,10 +80,18 @@ def _load_gitignore(root: Path) -> Any | None:  # noqa: ARG001
         return None
 
 
-def _walk(root: Path) -> Any:
-    """Yield files under root, skipping .git and obvious junk dirs."""
+def _walk(root: Path) -> Iterator[Path]:
+    """Yield files under root, skipping .git and obvious junk dirs.
+
+    Built on the shared :func:`iter_relative_files` walk in
+    ``core.skill_packages.storage`` instead of a bespoke ``os.walk`` loop.
+    Skip entries apply to directory parts only, so a *file* that happens to
+    share a junk name (e.g. ``./build``) is still yielded. Non-regular files
+    (FIFOs, sockets, broken symlinks) are never yielded, so callers cannot
+    block opening them.
+    """
     skip_dirs = {".git", "__pycache__", ".venv", "venv", "node_modules", "build", "dist"}
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
-        for fname in filenames:
-            yield Path(dirpath) / fname
+    for rel in iter_relative_files(root):
+        if any(part in skip_dirs for part in rel.split("/")[:-1]):
+            continue
+        yield root / rel
