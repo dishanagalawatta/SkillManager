@@ -23,3 +23,6 @@
 ## 2026-09-12 - [Perf] Replace os.walk with os.scandir in update_service.py
 **Learning:** Re-implementing `os.walk` functionality via a custom `os.scandir` traversal using an explicit stack is significantly faster, especially when using slicing on strings instead of instantiating `pathlib.Path` objects inside the hot loop to find relative paths. The performance can improve by almost 20x.
 **Action:** When a file traversal needs relative paths without symlink directory recursion, use `os.scandir` with an iterative stack and string slicing `entry.path[base_len:].replace(os.sep, '/')` to extract relative paths instead of relying on `pathlib.Path` instantiation.
+## 2026-09-21 - Optimize list diffing fallback keys
+**Learning:** Avoid unnecessary string allocations for fallback keys when diffing lists with `difflib.SequenceMatcher` (e.g. `old_keys = [s.path or id(s) for s in old_list]`). Python's SequenceMatcher natively supports comparing mixed string and integer (ID) keys safely.
+**Action:** Use the integer `id(obj)` directly rather than `str(id(obj))` whenever generating fallback identity keys for list diffs.
