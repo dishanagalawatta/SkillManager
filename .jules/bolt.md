@@ -23,3 +23,6 @@
 ## 2026-09-12 - [Perf] Replace os.walk with os.scandir in update_service.py
 **Learning:** Re-implementing `os.walk` functionality via a custom `os.scandir` traversal using an explicit stack is significantly faster, especially when using slicing on strings instead of instantiating `pathlib.Path` objects inside the hot loop to find relative paths. The performance can improve by almost 20x.
 **Action:** When a file traversal needs relative paths without symlink directory recursion, use `os.scandir` with an iterative stack and string slicing `entry.path[base_len:].replace(os.sep, '/')` to extract relative paths instead of relying on `pathlib.Path` instantiation.
+## 2025-02-28 - Optimized discovery with os.scandir
+**Learning:** Replacing pathlib.Path.iterdir() with os.scandir() avoids implicit stat() calls on DirEntry.is_dir() evaluations.
+**Action:** Default to os.scandir() for any performance-sensitive codebase paths performing directory iteration.

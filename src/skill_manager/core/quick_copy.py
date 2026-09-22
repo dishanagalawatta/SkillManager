@@ -180,9 +180,18 @@ def discover_package_skills(sources, parse_skill_md, categorize_skill, build_sea
     def scan_source(resolved_source):
         source_skills = []
         ignore_spec = load_ignore_spec(resolved_source)
-        for child in sorted(resolved_source.iterdir(), key=lambda item: item.name.lower()):
-            if not child.is_dir():
+
+        # Perf: os.scandir yields DirEntry objects with cached attributes, avoiding a stat() call per file
+        with os.scandir(resolved_source) as it:
+            entries = list(it)
+
+        # Explicit sorting by name.lower() for cross-platform functional parity
+        entries.sort(key=lambda e: e.name.lower())
+
+        for entry in entries:
+            if not entry.is_dir():
                 continue
+            child = resolved_source / entry.name
             if is_ignored(child, resolved_source, ignore_spec):
                 continue
             skill_md_path = child / "SKILL.md"
@@ -265,9 +274,17 @@ def discover_single_project(
     skills = []
     ignore_spec = load_ignore_spec(resolved_project)
 
-    for child in sorted(resolved_project.iterdir(), key=lambda item: item.name.lower()):
-        if not child.is_dir():
+    # Perf: os.scandir yields DirEntry objects with cached attributes, avoiding a stat() call per file
+    with os.scandir(resolved_project) as it:
+        entries = list(it)
+
+    # Explicit sorting by name.lower() for cross-platform functional parity
+    entries.sort(key=lambda e: e.name.lower())
+
+    for entry in entries:
+        if not entry.is_dir():
             continue
+        child = resolved_project / entry.name
         if is_ignored(child, resolved_project, ignore_spec):
             continue
         skill_md_path = child / "SKILL.md"
