@@ -96,7 +96,7 @@ def _make_config(projects, aliases=None):
         "client_format": "Antigravity",
         "skills": [],
         "custom_collections": {},
-        "skill_package_auto_update_mode": "off",
+        "skill_package_auto_update": False,
         "collapsed_categories": [],
         "show_archived": False,
         "category_filter": "",

@@ -251,8 +251,8 @@ def test_config_controller_properties_setters(config_controller, mock_app):
     config_controller.scrollSpeedMultiplier = 2.0
     mock_app._config.set.assert_any_call("scroll_speed_multiplier", 2.0)
 
-    config_controller.skillPackageAutoUpdateMode = "silent"
-    mock_app._config.set.assert_any_call("skill_package_auto_update_mode", "silent")
+    config_controller.skillPackageAutoUpdate = True
+    mock_app._config.set.assert_any_call("skill_package_auto_update", True)
 
     config_controller.autoMinimizeOnSnap = True
     mock_app._config.set.assert_any_call("auto_minimize_on_snap", True)
@@ -511,16 +511,15 @@ def test_scroll_speed_multiplier_validation(config_controller, mock_app):
     mock_app._config.set.assert_called_with("scroll_speed_multiplier", 3.14)
 
 
-def test_update_mode_validation(config_controller, mock_app):
+def test_auto_update_bool_validation(config_controller, mock_app):
     # Valid
-    config_controller.skillPackageAutoUpdateMode = "silent"
-    mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "silent")
+    config_controller.skillPackageAutoUpdate = True
+    mock_app._config.set.assert_called_with("skill_package_auto_update", True)
 
-    # Invalid -> fallback to "prompt" via validator
+    # Invalid string fails bool validation -> no write
     mock_app._config.reset_mock()
-    config_controller.skillPackageAutoUpdateMode = "invalid_mode"
-    # Our validator returns "prompt" for unknown strings
-    mock_app._config.set.assert_called_with("skill_package_auto_update_mode", "prompt")
+    config_controller.skillPackageAutoUpdate = "invalid_mode"
+    mock_app._config.set.assert_not_called()
 
 
 def test_add_source_path_normalization(config_controller, mock_app):

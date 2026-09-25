@@ -26,7 +26,7 @@ class SettingsMixin:
     """
 
     scrollSpeedMultiplierChanged = Signal()
-    skillPackageAutoUpdateModeChanged = Signal()
+    skillPackageAutoUpdateChanged = Signal()
     autoMinimizeOnSnapChanged = Signal()
     autoMinimizeOnQuickCopyChanged = Signal()
     autoSelectSnapInQuickCopyChanged = Signal()
@@ -58,14 +58,18 @@ class SettingsMixin:
     def scrollSpeedMultiplier(self, value):
         self._set_config_value("scroll_speed_multiplier", value, self.scrollSpeedMultiplierChanged)
 
-    @Property(str, notify=skillPackageAutoUpdateModeChanged)
-    def skillPackageAutoUpdateMode(self):  # type: ignore[reportRedeclaration]
-        return self.config.get("skill_package_auto_update_mode", "prompt")
+    @Property(bool, notify=skillPackageAutoUpdateChanged)
+    def skillPackageAutoUpdate(self):  # type: ignore[reportRedeclaration]
+        value = self.config.get("skill_package_auto_update", False)
+        if isinstance(value, bool):
+            return value
+        # Defensive: a stale tri-state string that missed migration.
+        return isinstance(value, str) and value.strip().lower() == "silent"
 
-    @skillPackageAutoUpdateMode.setter  # type: ignore[func-attr]
-    def skillPackageAutoUpdateMode(self, value):
+    @skillPackageAutoUpdate.setter  # type: ignore[func-attr]
+    def skillPackageAutoUpdate(self, value):
         self._set_config_value(
-            "skill_package_auto_update_mode", value, self.skillPackageAutoUpdateModeChanged
+            "skill_package_auto_update", value, self.skillPackageAutoUpdateChanged
         )
 
     @Property(bool, notify=autoMinimizeOnSnapChanged)

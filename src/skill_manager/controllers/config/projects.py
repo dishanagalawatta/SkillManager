@@ -204,6 +204,20 @@ class ProjectsMixin:
         self._cached_update_projects = None
         self._cached_project_labels = None
 
+    def publishProjectSyncState(self):
+        """Republish project sync state after an external ``_syncing_projects`` change.
+
+        ``updateProjects[].is_updating`` derives from ``app._syncing_projects``,
+        but the list is cached.  Mutators outside this mixin (e.g.
+        ``UpdateController.updateNow``/``syncProject``) must call this after
+        changing ``_syncing_projects`` — otherwise the cached list keeps
+        ``is_updating=True`` forever and the Updates-view progress bars spin
+        indefinitely.  Emits ``updateProjectsChanged`` only; callers still own
+        the ``projectsChanged`` emit.
+        """
+        self._invalidate_project_cache()
+        self.updateProjectsChanged.emit()
+
     def _emit_projects_changed(self):
         """Emit both project signals and invalidate cache."""
         self.app.projectsChanged.emit()

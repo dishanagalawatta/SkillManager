@@ -144,10 +144,11 @@ Item {
                     }
 
                     ActionButton {
-                        labelText: "Update All"
-                        role: "primary"
-                        tooltipText: enabled ? "Update every skill currently marked outdated." : "No outdated skills are ready to update."
-                        enabled: !AppController.isLoading && AppController.statsOutdated > 0
+                        property bool hasPendingUpdates: AppController.statsOutdated > 0
+                        labelText: hasPendingUpdates ? "Update All" : "Up to Date"
+                        role: hasPendingUpdates ? "primary" : "secondary"
+                        tooltipText: enabled ? "Update every package currently marked outdated." : "Already up to date"
+                        enabled: !AppController.isLoading && hasPendingUpdates
                         onClicked: (mouse) => AppController.update_controller.updateAllOutdated()
                     }
                 }

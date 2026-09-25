@@ -2,6 +2,7 @@
 Update service for handling background skill updates and project syncing.
 """
 
+import contextlib
 import filecmp
 import logging
 from collections.abc import Callable
@@ -347,6 +348,14 @@ class UpdateService:
             import traceback
 
             traceback.print_exc()
+            # Guarantee completion: the controller clears is_updating /
+            # _syncing_projects only in finalize.  Queue it before the
+            # failure status so the visible message still reports the error.
+            with contextlib.suppress(Exception):
+                completion_callback(
+                    {"merged": 0, "failed": len(self.update_packages), "details": []},
+                    self.update_packages,
+                )
             status_callback(f"Global update failed: {exc}")
 
     def _cleanup_removed_project_skills(
@@ -608,7 +617,12 @@ class UpdateService:
                 if getattr(sys, "is_shutting_down", False):
                     break
                 try:
-                    updated_sources.append(check_skill_package_versions(source))
+                    # Scan must actually probe for new versions.  The default
+                    # (force_refresh=False) only fills an empty latest_version,
+                    # so a package installed at 1.0.0 would never notice 2.0.0.
+                    # force_refresh=True re-queries npm/git/commands on every
+                    # scan — required for Silent/Prompt auto-update to work.
+                    updated_sources.append(check_skill_package_versions(source, force_refresh=True))
                 except Exception as exc:
                     logger.error(
                         "[ERROR] Failed to check versions for %s: %s",
@@ -625,6 +639,11 @@ class UpdateService:
             import traceback
 
             traceback.print_exc()
+            # Guarantee completion: the controller clears _is_loading only in
+            # finalize.  Queue it before the failure status so the visible
+            # message still reports the error.
+            with contextlib.suppress(Exception):
+                completion_callback([], self.update_packages)
             status_callback(f"Scan failed: {exc}")
 
     @staticmethod
@@ -632,6 +651,19 @@ class UpdateService:
         source_skills: list[dict[str, Any]],
         projects_state: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
+        """Compare package skills against project copies.
+
+        Statuses:
+        - ``missing`` — folder absent from at least one project.
+        - ``outdated`` — present everywhere but byte-content differs from
+          the source in at least one project (uses
+          :func:`_folder_contents_equal`, which ignores mtimes).
+        - ``up_to_date`` — present everywhere with identical contents.
+
+        Previously this only ever returned ``up_to_date``/``missing``, so
+        ``statsOutdated`` stayed 0 in production and Silent auto-update
+        never fired even when package versions drifted.
+        """
         source_map = {skill["folder_name"]: skill for skill in source_skills}
         project_skill_maps = [
             {
@@ -645,16 +677,32 @@ class UpdateService:
         for folder_name, source_skill in source_map.items():
             item_projects = []
             item_status = "up_to_date"
+            source_path = source_skill.get("local_path", "")
             for project_map in project_skill_maps:
-                if folder_name in project_map["skills_map"]:
-                    item_projects.append(
-                        {"name": project_map["project_label"], "status": "up_to_date"}
-                    )
-                else:
+                project_skill = project_map["skills_map"].get(folder_name)
+                if project_skill is None:
                     item_status = "missing"
                     item_projects.append(
                         {"name": project_map["project_label"], "status": "missing"}
                     )
+                else:
+                    project_path = project_skill.get("local_path", "")
+                    try:
+                        differs = bool(source_path and project_path) and not _folder_contents_equal(
+                            source_path, project_path
+                        )
+                    except Exception:
+                        differs = False
+                    if differs:
+                        if item_status != "missing":
+                            item_status = "outdated"
+                        item_projects.append(
+                            {"name": project_map["project_label"], "status": "outdated"}
+                        )
+                    else:
+                        item_projects.append(
+                            {"name": project_map["project_label"], "status": "up_to_date"}
+                        )
 
             results.append(
                 {

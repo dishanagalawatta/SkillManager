@@ -152,7 +152,7 @@ class AppConfig(BaseSettings):
     project_aliases: dict[str, str] = Field(default_factory=dict)
     shortcuts: dict[str, str] = Field(default_factory=dict)
     scroll_speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-    skill_package_auto_update_mode: str = "prompt"
+    skill_package_auto_update: bool = False
     auto_minimize_on_snap: bool = False
     auto_minimize_on_quick_copy: bool = False
     auto_select_snap_in_quick_copy: bool = False
@@ -167,14 +167,6 @@ class AppConfig(BaseSettings):
     @classmethod
     def _dict_or_empty(cls, value: Any) -> dict[str, Any]:
         return value if isinstance(value, dict) else {}
-
-    @field_validator("skill_package_auto_update_mode")
-    @classmethod
-    def _validate_update_mode(cls, value: str) -> str:
-        allowed = {"off", "prompt", "silent"}
-        if value not in allowed:
-            return "prompt"
-        return value
 
     @field_validator("scroll_speed_multiplier", mode="before")
     @classmethod
@@ -195,6 +187,18 @@ class AppConfig(BaseSettings):
             migrated["project_aliases"] = migrated.pop("target_aliases")
         else:
             migrated.pop("target_aliases", None)
+        if (
+            "skill_package_auto_update_mode" in migrated
+            and "skill_package_auto_update" not in migrated
+        ):
+            legacy_mode = migrated.pop("skill_package_auto_update_mode")
+            # Only the old "silent" behavior maps to auto-update on;
+            # "prompt"/"off"/unknown become off (notify via toast instead).
+            migrated["skill_package_auto_update"] = legacy_mode is True or (
+                isinstance(legacy_mode, str) and legacy_mode.strip().lower() == "silent"
+            )
+        else:
+            migrated.pop("skill_package_auto_update_mode", None)
         return cls(**migrated)
 
 

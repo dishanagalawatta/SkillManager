@@ -141,8 +141,6 @@ class AppController(AppControllerProxyMixin, QObject):
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
-    skillPackageAutoUpdateChanged = Signal()
-    skillPackageAutoUpdateModeChanged = Signal()
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
@@ -397,16 +395,15 @@ class AppController(AppControllerProxyMixin, QObject):
             self._poll_timer.timeout.connect(self._poll_known_paths)
             self._poll_timer.start(30_000)
 
-            # Skill Package Update Scheduler
+            # Skill Package Update Scheduler (periodic re-scan for both modes)
             self._scheduler = QtScheduler()
             self._scheduler.start()
 
-            # Initial Startup Check
-            if self._config.get("skill_package_auto_update_mode", "prompt") != "off":
-                QTimer.singleShot(2000, self._run_startup_package_scan)
-            self.config_mgr.skillPackageAutoUpdateModeChanged.connect(
-                self._update_package_scheduler
-            )
+            # Initial Startup Check — always scan: Auto Update on applies
+            # updates in the background, off notifies via toast instead.
+            QTimer.singleShot(2000, self._run_startup_package_scan)
+            # Arm the periodic job.
+            self._update_package_scheduler()
 
     def _normalize_paths_on_startup(self):
         """Rewrite stored project, source, and skill package paths to their canonical form and auto-repair malformed paths.
@@ -570,14 +567,38 @@ class AppController(AppControllerProxyMixin, QObject):
         logger.info("Running startup skill package update scan...")
         self.updates.scanForUpdates()
 
-        # If mode is silent, we might want to auto-update if outdated.
-        # But we need to wait for scan to complete.
-        # For now, scanForUpdates handles the logic of finding updates.
-        # We can enhance scanForUpdates completion to check for auto-update mode.
+        # Auto-update handling lives in scanForUpdates' completion
+        # callback (on: background update; off: toast when outdated).
 
     def _update_package_scheduler(self):
-        """Placeholder for periodic skill package updates if we decide to add them later."""
-        pass
+        """Ensure the periodic skill-package re-scan job exists.
+
+        The scan runs for both Auto Update states — on applies updates in
+        the background, off notifies via toast — so the job is unconditional.
+        Interval: 6h (APScheduler ``interval`` trigger, ``replace_existing``
+        so repeated calls never stack jobs).  Defensive: no-op when the
+        scheduler doesn't exist (tests with ``skip_initial_load``).
+        """
+        try:
+            scheduler = getattr(self, "_scheduler", None)
+            if scheduler is None:
+                return
+            job_id = "skill-package-auto-scan"
+            try:
+                scheduler.add_job(
+                    self._run_startup_package_scan,
+                    "interval",
+                    hours=6,
+                    id=job_id,
+                    replace_existing=True,
+                    coalesce=True,
+                    max_instances=1,
+                )
+                logger.info("Skill package auto-scan scheduled (interval=6h).")
+            except Exception as exc:
+                logger.warning("Failed scheduling auto-scan job: %s", exc)
+        except Exception as exc:
+            logger.debug("Auto-scan scheduler update skipped: %s", exc)
 
     # --- Gateway Properties ---
 

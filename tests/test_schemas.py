@@ -87,6 +87,25 @@ class TestAppConfig:
         assert config.shortcuts == {}
         assert config.project_aliases == {}
 
+    def test_auto_update_defaults_off(self):
+        assert AppConfig().skill_package_auto_update is False
+
+    def test_from_legacy_maps_silent_to_auto_update_on(self):
+        config = AppConfig.from_legacy({"skill_package_auto_update_mode": "silent"})
+        assert config.skill_package_auto_update is True
+        assert "skill_package_auto_update_mode" not in config.model_dump()
+
+    def test_from_legacy_maps_prompt_and_off_to_auto_update_off(self):
+        for mode in ("prompt", "off", "bogus"):
+            config = AppConfig.from_legacy({"skill_package_auto_update_mode": mode})
+            assert config.skill_package_auto_update is False
+
+    def test_from_legacy_prefers_current_bool_key(self):
+        config = AppConfig.from_legacy(
+            {"skill_package_auto_update": True, "skill_package_auto_update_mode": "off"}
+        )
+        assert config.skill_package_auto_update is True
+
 
 class TestCacheState:
     def test_cache_state_recursive_validation(self):

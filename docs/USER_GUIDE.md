@@ -71,6 +71,8 @@ When you modify a skill in your central library, you need to push those changes 
 
 
 - **Source Updating**: Run batch updates on all or selected skill packages with real-time status reporting.
+- **Header count & Update All**: The "N updates" badge counts outdated packages 1:1 with the per-package Update buttons. **Update All** installs every pending package update, then flips to **Up to Date** (disabled) as soon as the new versions land.
+- **Update notifications**: With Auto Update on (Settings), a bottom-right popup confirms each background update. With it off, a bottom-right popup with an **Update** button appears whenever updates are found — clicking it opens this view and starts Update All.
 - **Clean Package Removal**: Removing a package via the delete button in the Updates view automatically cleans up its local storage directory (e.g. `~/.agent/skills/<pkg-slug>`), git clone cache under `package_clones/`, lockfiles, and persisted inventory, while simultaneously purging all package skills from the Library and Quick Copy models with zero orphaned disk files.
 - **Instant Discovery on Add**: Adding a project or package folder registers it with the file watcher and triggers a silent background refresh — its skills appear in the Library immediately, with no restart or manual refresh needed.
 - **Automatic Skill Linking**: When you add a project folder, any skill already present there that matches a package skill by name **and** identical file contents is automatically linked to that package. Linked skills are tracked as package-owned, so future updates and syncs manage them correctly without a full update cycle.
@@ -87,8 +89,8 @@ Configure how SkillManager integrates with your system.
 - **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex, Plain Text). This updates the application's logo and reference syntax.
 - **Appearance**: Toggle Dark/Light mode, enable Mica/Acrylic effects (Windows only), reduced motion, compact list rows, and adjust the Scroll Speed Multiplier (0.5x to 5.0x) with real-time UI feedback for customized trackpad and mouse wheel scroll speed across all views.
 - **Shortcuts**: Customize keyboard shortcuts for all major operations (search, copy, archive, delete, refresh, navigation, theme toggle) and per-collection shortcuts for one-keystroke copy+paste.
-- **Updates**: Control auto-update checking, auto-download, and update check interval.
-- **Skill Packages**: Toggle automatic skill package updates and choose update mode.
+- **Updates**: Check for SkillManager app releases (manual download via Releases page).
+- **Skill Packages**: Toggle **Auto Update** on or off. Update checks always run at startup and every 6h. When on, updates install in the background and a bottom-right popup confirms completion. When off, a bottom-right popup with an **Update** button appears whenever updates are available — clicking it opens Updates and starts the update.
 
 ---
 

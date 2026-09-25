@@ -439,8 +439,10 @@ def test_scan_for_updates_top_level_error_reports_status(mock_src, service):
 
     service.scan_for_updates_sync(status_cb, comp_cb)
 
+    # Guaranteed completion: finalize must still run so _is_loading clears.
+    comp_cb.assert_called_once()
+    assert comp_cb.call_args.args[0] == []
     assert status_cb.call_args_list[-1].args[0] == "Scan failed: scan failed"
-    comp_cb.assert_not_called()
 
 
 def _write_skill_folder(root: Path, folder: str, content: str) -> None:

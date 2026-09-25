@@ -537,15 +537,11 @@ Item {
                                 spacing: 12
 
                                 SettingsRow {
-                                    titleText: "Auto Update Mode"
-                                    GlassDropdown {
-                                        width: 100
-                                        property var internalValues: ["off", "prompt", "silent"]
-                                        model: ["Off", "Prompt", "Silent"]
-                                        currentIndex: AppController.config_controller ? Math.max(0, internalValues.indexOf(AppController.config_controller.skillPackageAutoUpdateMode)) : 1
-                                        onActivated: {
-                                            if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdateMode = internalValues[index]
-                                        }
+                                    titleText: "Auto Update"
+                                    descriptionText: "Automatically install skill package updates in the background.\nWhen off, you will be notified when updates are available."
+                                    GlassSwitch {
+                                        checked: AppController.config_controller ? AppController.config_controller.skillPackageAutoUpdate : false
+                                        onCheckedChanged: if (AppController.config_controller) AppController.config_controller.skillPackageAutoUpdate = checked
                                     }
                                 }
                             }

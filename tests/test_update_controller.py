@@ -224,18 +224,35 @@ def test_sync_project_skips_categories_changed_when_no_new_cats(
 
 
 def test_recalculate_stats(update_controller, mock_app):
+    # statsOutdated counts outdated PACKAGES only (1:1 with the Update
+    # buttons); skill-level drift stays out of the header count.
     mock_app._update_results = [
         {"status": "up_to_date"},
         {"status": "outdated"},
         {"status": "missing"},
         {"status": "outdated"},
     ]
+    mock_app._update_packages = [
+        {"name": "A", "current_version": "1.0.0", "latest_version": "2.0.0"},
+        {"name": "B", "current_version": "1.0.0", "latest_version": "1.0.0"},
+    ]
     update_controller.recalculateStats()
 
     assert mock_app._stats_up_to_date == 1
-    assert mock_app._stats_outdated == 2
+    assert mock_app._stats_outdated == 1
     assert mock_app._stats_missing == 1
     mock_app.statsChanged.emit.assert_called_once()
+
+
+def test_recalculate_stats_ignores_skill_drift(update_controller, mock_app):
+    # Hand-edited project copies must not arm the header/Update All button.
+    mock_app._update_results = [{"status": "outdated"}, {"status": "outdated"}]
+    mock_app._update_packages = [
+        {"name": "A", "current_version": "1.0.0", "latest_version": "1.0.0"},
+    ]
+    update_controller.recalculateStats()
+
+    assert mock_app._stats_outdated == 0
 
 
 def test_run_package_update_targeted_refresh(update_controller, mock_app, tmp_path):
@@ -752,15 +769,18 @@ def test_resolve_package_storage_state_recovery(update_controller, mock_app):
 
 
 @patch("skill_manager.controllers.update_controller.UpdateService")
-def test_scan_for_updates_silent_auto_trigger(mock_service_class, update_controller, mock_app):
+def test_scan_for_updates_auto_update_triggers(mock_service_class, update_controller, mock_app):
     mock_service = mock_service_class.return_value
     mock_app._config.get.side_effect = lambda k, default=None: {
-        "skill_package_auto_update_mode": "silent",
+        "skill_package_auto_update": True,
     }.get(k, default)
 
-    # Mock completion callback logic with an outdated result
+    # Package version drift triggers the background auto-update.
     def mock_scan(status_callback, completion_callback):
-        completion_callback([{"status": "outdated"}], [])
+        completion_callback(
+            [],
+            [{"name": "A", "current_version": "1.0.0", "latest_version": "2.0.0"}],
+        )
 
     mock_service.scan_for_updates.side_effect = mock_scan
 
@@ -775,6 +795,36 @@ def test_scan_for_updates_silent_auto_trigger(mock_service_class, update_control
         # recalculateStats should have set stats_outdated = 1
         assert mock_app._stats_outdated == 1
         mock_update_now.assert_called_once()
+
+
+@patch("skill_manager.controllers.update_controller.UpdateService")
+def test_scan_skill_drift_does_not_trigger_auto_update(
+    mock_service_class, update_controller, mock_app
+):
+    mock_service = mock_service_class.return_value
+    mock_app._config.get.side_effect = lambda k, default=None: {
+        "skill_package_auto_update": True,
+    }.get(k, default)
+
+    # Skill content drift alone (packages up to date) must NOT fire Update All.
+    def mock_scan(status_callback, completion_callback):
+        completion_callback(
+            [{"status": "outdated"}],
+            [{"name": "A", "current_version": "1.0.0", "latest_version": "1.0.0"}],
+        )
+
+    mock_service.scan_for_updates.side_effect = mock_scan
+
+    with (
+        patch(
+            "skill_manager.controllers.update_controller.QTimer.singleShot",
+            side_effect=lambda ms, obj, cb: cb(),
+        ),
+        patch.object(update_controller, "updateNow") as mock_update_now,
+    ):
+        update_controller.scanForUpdates()
+        assert mock_app._stats_outdated == 0
+        mock_update_now.assert_not_called()
 
 
 def test_remove_update_package(update_controller, mock_app):
