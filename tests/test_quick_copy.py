@@ -8,6 +8,8 @@ from skill_manager.core.quick_copy import (
     discover_package_skills,
     discover_project_skills,
     format_project_skill_reference,
+    is_ignored,
+    load_ignore_spec,
     looks_like_explicit_reference,
     merge_command_references,
     normalize_command_reference,
@@ -498,3 +500,68 @@ def test_resolve_resilient_path_is_file(monkeypatch, tmp_path):
 def test_resolve_resilient_path_empty_path():
     res = resolve_resilient_path("")
     assert str(res) == "."
+
+
+def _write_ignore_spec(root: Path) -> object:
+    (root / ".gitignore").write_text("*.log\nbuild/\nsecret.txt\n")
+    return load_ignore_spec(root)
+
+
+def test_is_ignored_gitignore_patterns(temp_dir):
+    spec = _write_ignore_spec(temp_dir)
+    assert is_ignored(temp_dir / "sub" / "debug.log", temp_dir, spec) is True
+    assert is_ignored(temp_dir / "build", temp_dir, spec) is True
+    assert is_ignored(temp_dir / "build" / "out.bin", temp_dir, spec) is True
+    assert is_ignored(temp_dir / "secret.txt", temp_dir, spec) is True
+    assert is_ignored(temp_dir / "sub", temp_dir, spec) is False
+    assert is_ignored(temp_dir / "keep.md", temp_dir, spec) is False
+
+
+def test_is_ignored_prefix_collision(temp_dir):
+    # /root2 must not match /root (lexical prefix without separator boundary)
+    spec = _write_ignore_spec(temp_dir)
+    outside = temp_dir.parent / f"{temp_dir.name}-suffix"
+    assert is_ignored(outside / "skill", temp_dir, spec) is False
+
+
+def test_is_ignored_root_itself_and_outside(temp_dir):
+    spec = _write_ignore_spec(temp_dir)
+    assert is_ignored(temp_dir, temp_dir, spec) is False
+    assert is_ignored(temp_dir.parent / "elsewhere", temp_dir, spec) is False
+
+
+def test_is_ignored_trailing_sep_and_str_inputs(temp_dir):
+    spec = _write_ignore_spec(temp_dir)
+    assert is_ignored(str(temp_dir) + "/", temp_dir, spec) is False
+    assert is_ignored(str(temp_dir / "sub"), str(temp_dir), spec) is False
+    assert is_ignored(str(temp_dir / "notes.log"), str(temp_dir), spec) is True
+
+
+def test_is_ignored_none_spec(temp_dir):
+    assert is_ignored(temp_dir / "anything", temp_dir, None) is False
+
+
+def test_discover_package_skills_follows_symlinked_dir(temp_dir):
+    real = temp_dir / "real-skill"
+    real.mkdir()
+    (real / "SKILL.md").write_text("---\nname: Real\n---\n")
+    link = temp_dir / "linked-skill"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except OSError:
+        import pytest
+
+        pytest.skip("symlinks not permitted on this platform")
+
+    def mock_parse(p):
+        return {"name": Path(p).parent.name}
+
+    def mock_cat(n, d, m=None):
+        return {"main_category": "Main", "sub_category": "Cat"}
+
+    def mock_search(s):
+        return "search"
+
+    skills = discover_package_skills([str(temp_dir)], mock_parse, mock_cat, mock_search)
+    names = {s["folder_name"] for s in skills}
+    assert "linked-skill" in names
