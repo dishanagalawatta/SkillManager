@@ -458,6 +458,38 @@ Window {
             }
         }
 
+        // Transient bottom-right notification for skill package auto-update:
+        // update-available action toast (Auto Update off) and background
+        // auto-update finished toast (Auto Update on).  Driven imperatively
+        // from UpdateController signals; stacked above the status pill.
+        UpdateToast {
+            id: updateToast
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 16
+            anchors.bottomMargin: 58
+        }
+
+        Connections {
+            target: AppController.update_controller
+            function onUpdatesAvailable(count) {
+                updateToast.show(
+                    "Skill updates available",
+                    count + (count === 1 ? " package update is ready." : " package updates are ready."),
+                    true
+                )
+            }
+            function onAutoUpdateFinished(updated, failed) {
+                updateToast.show(
+                    "Auto update finished",
+                    failed > 0
+                        ? (updated + " updated, " + failed + " failed.")
+                        : (updated + " package(s) updated."),
+                    false
+                )
+            }
+        }
+
         // Shown while the capture overlay is waiting for the app to become
         // active again (captureAwaitingActivation).  The user must click the
         // desktop notification (or the taskbar entry) so the overlay can map

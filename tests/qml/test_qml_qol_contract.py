@@ -666,3 +666,46 @@ def test_snap_shortcut_not_gated_on_global_hotkey_availability():
         "the portal signal is the only path and must always snap even "
         "while the main window is focused"
     )
+
+
+def test_update_all_button_mirrors_package_up_to_date_state():
+    updates = (QML_DIR / "views" / "UpdatesView.qml").read_text(encoding="utf-8")
+
+    # Bulk button must share one predicate and mirror the per-package
+    # "Up to Date" pattern instead of a permanently-primary "Update All".
+    assert "property bool hasPendingUpdates: AppController.statsOutdated > 0" in updates
+    assert 'labelText: hasPendingUpdates ? "Update All" : "Up to Date"' in updates
+    assert 'role: hasPendingUpdates ? "primary" : "secondary"' in updates
+    assert "enabled: !AppController.isLoading && hasPendingUpdates" in updates
+    assert "AppController.update_controller.updateAllOutdated()" in updates
+    # Parity with the per-package cards in the same file.
+    assert 'isLatest ? "Up to Date" : "Update"' in updates
+
+
+def test_skill_packages_auto_update_is_a_switch():
+    settings = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
+
+    assert 'titleText: "Auto Update"' in settings
+    assert "skillPackageAutoUpdate" in settings
+    assert "GlassSwitch" in settings
+    # Tri-state dropdown must be gone.
+    assert "skillPackageAutoUpdateMode" not in settings
+    assert '["off", "prompt", "silent"]' not in settings
+    assert 'model: ["Off", "Prompt", "Silent"]' not in settings
+
+
+def test_update_toast_contract():
+    toast = (QML_DIR / "UpdateToast.qml").read_text(encoding="utf-8")
+    main = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+    qmldir = (QML_DIR / "qmldir").read_text(encoding="utf-8")
+
+    assert 'objectName: "updateToast"' in toast
+    assert 'objectName: "updateToastActionBtn"' in toast
+    assert 'labelText: "Update"' in toast
+    assert 'window.navigateTo("Updates")' in toast
+    assert "AppController.update_controller.updateAllOutdated()" in toast
+    assert "UpdateToast 1.0 UpdateToast.qml" in qmldir
+    # Host wiring in Main.qml: instance + both signal handlers.
+    assert "UpdateToast {" in main
+    assert "function onUpdatesAvailable(count)" in main
+    assert "function onAutoUpdateFinished(updated, failed)" in main

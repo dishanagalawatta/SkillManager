@@ -49,3 +49,4 @@ SkillInspectorOverlay 1.0 SkillInspectorOverlay.qml
 InspectorMetadataRow 1.0 InspectorMetadataRow.qml
 InspectorActionBar 1.0 InspectorActionBar.qml
 InspectorEmptyState 1.0 InspectorEmptyState.qml
+UpdateToast 1.0 UpdateToast.qml

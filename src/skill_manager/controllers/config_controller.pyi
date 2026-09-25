@@ -28,7 +28,7 @@ class ConfigController(QObject):
     clientFormatsChanged: ClassVar[SignalInstance]
     customCollectionsChanged: ClassVar[SignalInstance]
     scrollSpeedMultiplierChanged: ClassVar[SignalInstance]
-    skillPackageAutoUpdateModeChanged: ClassVar[SignalInstance]
+    skillPackageAutoUpdateChanged: ClassVar[SignalInstance]
     autoMinimizeOnScreenshotChanged: ClassVar[SignalInstance]
     autoMinimizeOnQuickCopyChanged: ClassVar[SignalInstance]
     autoSelectScreenshotInQuickCopyChanged: ClassVar[SignalInstance]
@@ -38,7 +38,7 @@ class ConfigController(QObject):
 
     # Writable properties (have @propname.setter in config_controller.py)
     scrollSpeedMultiplier: float
-    skillPackageAutoUpdateMode: str
+    skillPackageAutoUpdate: bool
     autoMinimizeOnScreenshot: bool
     autoMinimizeOnQuickCopy: bool
     autoSelectScreenshotInQuickCopy: bool

@@ -14,10 +14,10 @@ class TestUIConfigFlow:
             config_mgr.scrollSpeedMultiplier = 2.5
         assert app_controller._config.get("scroll_speed_multiplier") == 2.5
 
-        # 2. Test string mode propagation
-        with qtbot.waitSignal(config_mgr.skillPackageAutoUpdateModeChanged, timeout=1000):
-            config_mgr.skillPackageAutoUpdateMode = "silent"
-        assert app_controller._config.get("skill_package_auto_update_mode") == "silent"
+        # 2. Test auto-update toggle propagation
+        with qtbot.waitSignal(config_mgr.skillPackageAutoUpdateChanged, timeout=1000):
+            config_mgr.skillPackageAutoUpdate = True
+        assert app_controller._config.get("skill_package_auto_update") is True
 
     def test_add_source_project_ui_flow(self, qml_engine, app_controller, qtbot, tmp_path):
         """Verify adding sources and projects via UI slots."""

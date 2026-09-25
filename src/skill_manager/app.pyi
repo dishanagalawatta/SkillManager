@@ -62,8 +62,6 @@ class AppController(AppControllerProxyMixin, QObject):
     rememberFiltersChanged: ClassVar[SignalInstance]
     reducedMotionChanged: ClassVar[SignalInstance]
     compactListRowsChanged: ClassVar[SignalInstance]
-    skillPackageAutoUpdateChanged: ClassVar[SignalInstance]
-    skillPackageAutoUpdateModeChanged: ClassVar[SignalInstance]
     statsChanged: ClassVar[SignalInstance]
     shortcutsChanged: ClassVar[SignalInstance]
     isRecordingShortcutChanged: ClassVar[SignalInstance]

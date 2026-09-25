@@ -8,7 +8,7 @@ import json
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Slot
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -26,6 +26,26 @@ def _safe_single_shot(msec: int, context, functor):
 
 class UpdateController(BaseController):
     """Controller for skill updates and synchronization."""
+
+    # Toast signals consumed by the UpdateToast host in Main.qml.
+    updatesAvailable = Signal(int)  # count of outdated packages
+    autoUpdateFinished = Signal(int, int)  # updated, failed
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._auto_update_in_flight = False
+
+    def _publish_project_sync_state(self):
+        """Publish a ``_syncing_projects`` change to every QML binding.
+
+        ``ConfigController.updateProjects`` is cached and derives
+        ``is_updating`` from ``app._syncing_projects``.  Emitting only
+        ``projectsChanged`` leaves the cache stale, so project progress bars
+        spin forever.  This helper invalidates + emits
+        ``updateProjectsChanged`` first, then ``projectsChanged``.
+        """
+        self.app.config_mgr.publishProjectSyncState()
+        self.app.projectsChanged.emit()
 
     def _resolvePackageStorageState(self):
         """Internal helper to refresh package state from config.
@@ -70,13 +90,21 @@ class UpdateController(BaseController):
     @Slot()
     def updateNow(self):
         """Starts a global update of all skills and projects."""
+        if (
+            any(s.get("is_updating") for s in self.app._update_packages)
+            or self.app._syncing_projects
+        ):
+            self._auto_update_in_flight = False
+            self.app._set_status("Update already in progress...")
+            return
+
         self.app._set_status("Starting global update...")
 
         # Mark projects as syncing
         for p in self.app._projects:
             if p not in self.app._syncing_projects:
                 self.app._syncing_projects.append(p)
-        self.app.projectsChanged.emit()
+        self._publish_project_sync_state()
 
         # Mark sources as updating
         for s in self.app._update_packages:
@@ -102,6 +130,17 @@ class UpdateController(BaseController):
 
         def completion_callback(result, _updated_sources):
             def finalize():
+                # Belt-and-braces: progress callbacks normally clear each
+                # package, but a missed/failed callback must never strand a
+                # spinner.  just_finished is left as delivered per package.
+                for s in self.app._update_packages:
+                    s["is_updating"] = False
+                self.app.updatePackagesChanged.emit()
+                # Refresh the header/button immediately: updated packages
+                # carry promoted versions, so the outdated count drops to 0
+                # without waiting for the next scan.
+                self.recalculateStats()
+
                 self.app.loadInitialData()
                 msg = (
                     f"Global update complete: {result['merged']} updated, {result['failed']} failed"
@@ -114,21 +153,41 @@ class UpdateController(BaseController):
                     {"source_type": "global", "success": result["failed"] == 0},
                 )
 
+                # Notify via toast when this run was auto-triggered; manual
+                # runs already surface the status pill message above.
+                if self._auto_update_in_flight:
+                    self._auto_update_in_flight = False
+                    self.autoUpdateFinished.emit(result["merged"], result["failed"])
+
                 self.config.set("skills", self.app._update_packages)
                 self.app._syncing_projects = []
-                self.app.projectsChanged.emit()
+                self._publish_project_sync_state()
 
             _safe_single_shot(0, self.app, finalize)
 
-        service.run_global_update(
-            status_callback=self.app._set_status,
-            source_progress_callback=source_progress_callback,
-            completion_callback=completion_callback,
-        )
+        try:
+            service.run_global_update(
+                status_callback=self.app._set_status,
+                source_progress_callback=source_progress_callback,
+                completion_callback=completion_callback,
+            )
+        except Exception as e:
+            capture_exception(e)
+            self._auto_update_in_flight = False
+            for s in self.app._update_packages:
+                s["is_updating"] = False
+            self.app.updatePackagesChanged.emit()
+            self.app._syncing_projects = []
+            self._publish_project_sync_state()
+            self.app._set_status(f"Failed to start global update: {e}")
 
     @Slot()
     def scanForUpdates(self):
         """Scans all sources and projects for potential updates."""
+        if self.app._is_loading:
+            self.app._set_status("Update scan already running...")
+            return
+
         self.app._set_status("Scanning for updates...")
         self.app._is_loading = True
         self.app.isLoadingChanged.emit()
@@ -153,19 +212,34 @@ class UpdateController(BaseController):
                     f"Update scan complete: {len(results)} package skills processed"
                 )
 
-                # Handle Silent Auto-Update
-                if (
-                    self.config.get("skill_package_auto_update_mode") == "silent"
-                    and self.app._stats_outdated > 0
-                ):
-                    logger.info("Silent auto-update triggered for outdated skill packages.")
+                # Auto-update decision point: Auto Update on applies updates
+                # in the background; off notifies via toast instead.  Update
+                # checks always run (startup + periodic) in both states.
+                auto_update = self.config.get("skill_package_auto_update", False)
+                if isinstance(auto_update, str):
+                    auto_update = auto_update.strip().lower() == "silent"
+                outdated = getattr(self.app, "_stats_outdated", 0)
+                if outdated <= 0:
+                    return
+                if auto_update:
+                    logger.info("Auto-update triggered for outdated skill packages.")
+                    self._auto_update_in_flight = True
                     self.updateNow()
+                else:
+                    logger.info("Auto-update off: notifying %d available update(s).", outdated)
+                    self.updatesAvailable.emit(outdated)
 
             _safe_single_shot(0, self.app, finalize)
 
-        service.scan_for_updates(
-            status_callback=self.app._set_status, completion_callback=completion_callback
-        )
+        try:
+            service.scan_for_updates(
+                status_callback=self.app._set_status, completion_callback=completion_callback
+            )
+        except Exception as e:
+            capture_exception(e)
+            self.app._is_loading = False
+            self.app.isLoadingChanged.emit()
+            self.app._set_status(f"Failed to start update scan: {e}")
 
     @Slot(str, str)
     def updateSkillInProject(self, skill_name: str, project_name: str):
@@ -218,20 +292,43 @@ class UpdateController(BaseController):
 
     @Slot()
     def recalculateStats(self):
-        """Recalculates the up-to-date/outdated/missing stats."""
+        """Recalculates the up-to-date/outdated/missing stats.
+
+        ``_stats_outdated`` is the single source of truth behind the
+        UpdatesView header (``N updates``), the Update All button, and the
+        Silent/Prompt auto-update triggers — and it counts **outdated
+        packages only** (``current_version != latest_version`` via
+        :func:`is_package_outdated`).
+
+        This 1:1 match with the package cards is intentional: each outdated
+        package renders its own Update button, and Update All applies the
+        same package updates, so the header, the button, and the cards can
+        never disagree.  Skill-level content drift (a project copy edited
+        by hand) stays in ``_update_results`` as inspector detail but does
+        not arm the header — it is invisible in the Updates view (the skill
+        inspector is never opened) and Update All would otherwise stay
+        enabled with nothing actionable to do.
+
+        ``_stats_up_to_date`` / ``_stats_missing`` remain skill-level scan
+        detail for diagnostics and telemetry.
+        """
+        from skill_manager.core.skill_packages.versioning import count_outdated_packages
+
         up_to_date = 0
-        outdated = 0
         missing = 0
         for item in self.app._update_results:
             if item["status"] == "up_to_date":
                 up_to_date += 1
-            elif item["status"] == "outdated":
-                outdated += 1
             elif item["status"] == "missing":
                 missing += 1
 
+        try:
+            package_outdated = count_outdated_packages(getattr(self.app, "_update_packages", []))
+        except Exception:
+            package_outdated = 0
+
         self.app._stats_up_to_date = up_to_date
-        self.app._stats_outdated = outdated
+        self.app._stats_outdated = package_outdated
         self.app._stats_missing = missing
         self.app.statsChanged.emit()
 
@@ -620,6 +717,10 @@ class UpdateController(BaseController):
             # Replace the dict (not mutate in-place) so QML's QVariantMap
             # snapshot is invalidated and delegate bindings re-evaluate.
             source = dict(self.app._update_packages[index])
+            if source.get("is_updating"):
+                self.app._set_status(f"Update already in progress for {source.get('name')}...")
+                return
+            package_id = source.get("package_id")
             source["is_updating"] = True
             source["just_finished"] = False
             source["update_error"] = ""
@@ -704,9 +805,23 @@ class UpdateController(BaseController):
                     def finalize_ui():
                         source["is_updating"] = False
                         source["just_finished"] = True
-                        # Replace dict to force QML re-eval of final state.
-                        self.app._update_packages[index] = dict(source)
-                        self.app.updatePackagesChanged.emit()
+                        # Commit by package_id, not the closed-over index: an
+                        # add/remove while the worker ran shifts positions, and
+                        # a positional write would corrupt a different row (or
+                        # raise IndexError and strand the spinner).
+                        target = self._resolve_package_index(index, package_id)
+                        if target is None:
+                            logger.debug(
+                                "runPackageUpdate: package %r removed mid-flight, skipping commit",
+                                source.get("name"),
+                            )
+                        else:
+                            # Replace dict to force QML re-eval of final state.
+                            self.app._update_packages[target] = dict(source)
+                            self.app.updatePackagesChanged.emit()
+                        # Refresh the header/button: a promoted version clears
+                        # this package from the outdated count immediately.
+                        self.recalculateStats()
                         if not source.get("update_error"):
                             self.app._set_status(f"Update finished for {source.get('name')}")
 
@@ -773,7 +888,32 @@ class UpdateController(BaseController):
 
                     _safe_single_shot(0, self.app, finalize_ui)
 
-            self.app.task_runner.run(run)
+            try:
+                self.app.task_runner.run(run)
+            except Exception as e:
+                capture_exception(e)
+                target = self._resolve_package_index(index, package_id)
+                if target is not None:
+                    self.app._update_packages[target]["is_updating"] = False
+                    self.app.updatePackagesChanged.emit()
+                self.app._set_status(f"Failed to start update for {source.get('name')}: {e}")
+
+    def _resolve_package_index(self, index: int, package_id: str | None) -> int | None:
+        """Resolve the current list position of a package.
+
+        Prefers ``package_id`` match (stable across add/remove/reorder),
+        falls back to the entry-time ``index`` when the record has no id.
+        Returns ``None`` when the package no longer exists.
+        """
+        packages = self.app._update_packages
+        if package_id:
+            for i, p in enumerate(packages):
+                if isinstance(p, dict) and p.get("package_id") == package_id:
+                    return i
+            return None
+        if 0 <= index < len(packages):
+            return index
+        return None
 
     @Slot(str)
     def syncProject(self, path: str):
@@ -784,7 +924,7 @@ class UpdateController(BaseController):
         self.app._set_status(f"Updating {self.app.getProjectLabel(path)}...")
         if path not in self.app._syncing_projects:
             self.app._syncing_projects.append(path)
-            self.app.projectsChanged.emit()
+            self._publish_project_sync_state()
 
         def run_sync():
             try:
@@ -846,9 +986,16 @@ class UpdateController(BaseController):
             finally:
                 if path in self.app._syncing_projects:
                     self.app._syncing_projects.remove(path)
-                _safe_single_shot(0, self.app, self.app.projectsChanged.emit)
+                _safe_single_shot(0, self.app, self._publish_project_sync_state)
 
-        self.app.task_runner.run(run_sync)
+        try:
+            self.app.task_runner.run(run_sync)
+        except Exception as e:
+            capture_exception(e)
+            if path in self.app._syncing_projects:
+                self.app._syncing_projects.remove(path)
+            self._publish_project_sync_state()
+            self.app._set_status(f"Failed to start sync for {path}: {e}")
 
     @Slot()
     def updateAllOutdated(self):

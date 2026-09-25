@@ -202,6 +202,59 @@ def _sync_current_to_latest_if_applicable(
     return current_version
 
 
+def normalize_version(value: Any) -> str:
+    """Normalize a version string for comparison.
+
+    Strips whitespace and a single leading ``v``/``V`` (``v1.2.3`` == ``1.2.3``).
+    Returns ``""`` for empty/None input.  Matches the QML ``isLatest``
+    logic (strict equality after normalization) so Python auto-update
+    decisions stay consistent with the UpdatesView Update buttons.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if len(text) > 1 and text[0] in ("v", "V"):
+        text = text[1:].strip()
+    return text
+
+
+def is_package_outdated(package: dict[str, Any] | Any) -> bool:
+    """True when a package record has a known newer version available.
+
+    Conservative by design (no false auto-update loops):
+    - both ``current_version`` and ``latest_version`` must be non-empty
+    - the ``"latest"`` sentinel (detection fallback) never counts as outdated
+    - comparison is normalized string inequality (matches QML ``isLatest``)
+
+    Accepts dicts or objects with ``current_version``/``latest_version`` attrs.
+    """
+    if isinstance(package, dict):
+        current = package.get("current_version", "")
+        latest = package.get("latest_version", "")
+    else:
+        current = getattr(package, "current_version", "")
+        latest = getattr(package, "latest_version", "")
+    current_n = normalize_version(current)
+    latest_n = normalize_version(latest)
+    if not current_n or not latest_n:
+        return False
+    if current_n.casefold() == "latest" or latest_n.casefold() == "latest":
+        return False
+    return current_n != latest_n
+
+
+def get_outdated_packages(packages: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Return the subset of package records with a newer version available."""
+    if not packages:
+        return []
+    return [p for p in packages if is_package_outdated(p)]
+
+
+def count_outdated_packages(packages: list[dict[str, Any]] | None) -> int:
+    """Count packages with a newer version available (0 for None/empty)."""
+    return len(get_outdated_packages(packages))
+
+
 def check_skill_package_versions(
     source: dict[str, Any],
     force_refresh: bool = False,
