@@ -30,7 +30,7 @@ Wayland portal (denied, wrong region in multiscreen/headless environments).
 | File | Change |
 |------|--------|
 | `src/skill_manager/controllers/command_channel.py` | Fixed `_normalize_capture_image()` (line 23) — internal window-only capture |
-| `src/skill_manager/controllers/screenshot_controller.py` | Fixed `takeScreenshot()` capture region (line 295); notification signals `notifyCapturePending`/`notifyCaptureActivation` |
+| `src/skill_manager/controllers/snap_controller.py` | Fixed `captureScreen()` capture region (line 292); notification signals `notifyCapturePending`/`notifyCaptureActivation` |
 | `src/skill_manager/mcp/bridge/_capture.py` | Uses the fixed internal capture path |
 | `src/skill_manager/utils/notifications.py` | D-Bus capture-pending notification (enabled only outside pytest/offscreen) |
 | `src/skill_manager/utils/portal_capture.py` | Portal path retained for read-only fallback only |
