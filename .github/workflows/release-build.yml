@@ -159,7 +159,6 @@ jobs:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           if [[ "$VERSION" == *-dev.* ]]; then
-          if [[ "$VERSION" == *-dev.* ]]; then
             echo "IS_PRERELEASE=true" >> "$GITHUB_OUTPUT"
           else
             echo "IS_PRERELEASE=false" >> "$GITHUB_OUTPUT"

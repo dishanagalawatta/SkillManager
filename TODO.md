@@ -1,5 +1,3 @@
-ytp
-
 # 1. Project Metadata
 
 * **Project Name:** CourseBar
@@ -15,29 +13,29 @@ ytp
 
 ---
 
-# 2. High-Level Milestones
+## 2. High-Level Milestones
 
 * **Goal A:**
 * **Goal B:**
 
 ---
 
-# 3. Active Task Tracker
+## 3. Active Task Tracker
 
-## To Do (Ready for Pickup)
+### To Do (Ready for Pickup)
 
-* [ ] Update readme FIle
+* [ ] Update readme FI
 * [ ] PostHog implementation review.
 * [ ] Reduce the size of list row(normal mode)
 
-## In Progress
+### In Progress
 
 ---
 
-# 4. Bug Tracker
+## 4. Bug Tracker
 
 * [ ] remember window position - tried to bug. need further investigations (Not urgent)
 
 ---
 
-# 5. Icebox / Backlog
+## 5. Icebox / Backlog

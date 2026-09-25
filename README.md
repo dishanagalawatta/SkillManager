@@ -45,12 +45,12 @@ Modern AI coding agents (**Claude Code**, **Antigravity**, **Cursor**, **Gemini 
 
 However, managing agent skills and multimodal context across multiple project repositories quickly becomes fragmented and painful:
 
-| The Problem (Without SkillManager) | The Solution (With SkillManager) |
-|---|---|
-| ❌ **Skill Drift:** Improved prompts in one repo stay trapped there; other repos run stale skills. | ✅ **Central Library & Surgical Sync:** One unified source of truth. Updates propagate across repos in milliseconds. |
-| ❌ **Manual Copy-Paste Overhead:** Manually copying `.agents/skills/` folders and forgetting required dependencies. | ✅ **1-Click Multi-Deploy:** Deploy single skills, custom collections, or `.md` commands to multiple projects simultaneously. |
-| ❌ **Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE. | ✅ **Quick Copy Companion:** Global hotkey (`Ctrl+Shift+S`) to copy ready-to-paste references formatted for your active agent. |
-| ❌ **Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅ **Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies the relative path for instant `Ctrl+V` into your TUI/CLI agent. |
+| The Problem (Without SkillManager)                                                                                                                                                 | The Solution (With SkillManager)                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ❌**Skill Drift:** Improved prompts in one repo stay trapped there; other repos run stale skills.                                                                            | ✅**Central Library & Surgical Sync:** One unified source of truth. Updates propagate across repos in milliseconds.                                                                                                          |
+| ❌**Manual Copy-Paste Overhead:** Manually copying `.agents/skills/` folders and forgetting required dependencies.                                                         | ✅**1-Click Multi-Deploy:** Deploy single skills, custom collections, or `.md` commands to multiple projects simultaneously.                                                                                               |
+| ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Quick Copy Companion:** Global hotkey (`Ctrl+Shift+S`) to copy ready-to-paste references formatted for your active agent.                                                                                              |
+| ❌**Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅**Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies the relative path for instant `Ctrl+V` into your TUI/CLI agent. |
 
 ---
 
@@ -95,6 +95,7 @@ winget upgrade --id dishanagalawatta.SkillManager
 # Uninstall
 winget uninstall --id dishanagalawatta.SkillManager
 ```
+
 *(Alternatively, download `SkillManager_Setup.exe` directly from [GitHub Releases](https://github.com/dishanagalawatta/SkillManager/releases)).*
 
 ---
@@ -122,6 +123,7 @@ flowchart LR
 ## 🌟 Core Capabilities
 
 ### 1. Central Skill Library & Inspector
+
 Manage thousands of agent skills with instant fuzzy search, automatic category detection, and deep Markdown inspection.
 
 <p align="center">
@@ -136,6 +138,7 @@ Manage thousands of agent skills with instant fuzzy search, automatic category d
 ---
 
 ### 2. Quick Copy & Format Switcher
+
 Your daily companion during active development sessions.
 
 <p align="center">
@@ -149,6 +152,7 @@ Your daily companion during active development sessions.
 ---
 
 ### 3. Surgical Git Synchronization
+
 Keep your skill ecosystem synchronized without manual pulling or broken symlinks.
 
 - **Intelligent Diff & Sync**: Compares version fingerprints across your central library and all connected projects to pinpoint exactly which skills are outdated.
@@ -158,6 +162,7 @@ Keep your skill ecosystem synchronized without manual pulling or broken symlinks
 ---
 
 ### 4. 📸 "Snap to Project": Instant Visual Context for TUI & Terminal Agents
+
 Modern terminal and TUI coding agents (**Claude Code**, **Antigravity**, **Gemini CLI**, **OpenCode**, **Codex**) have powerful multimodal capabilities—but getting visual screenshots into terminal prompts without friction used to be painful.
 
 SkillManager solves this with a dedicated **Snap-to-Project** workflow:
@@ -181,14 +186,14 @@ flowchart LR
 
 SkillManager formats references to match whatever AI toolchain your team uses:
 
-| Agent / Tool | Skill Reference Syntax | Snap / Screenshot Syntax |
-|---|---|---|
-| **Antigravity** | `@.agents/skills/<name>/SKILL.md` | `@.agents/screenshots/Screenshot_<ts>.png` |
-| **Claude Code & Desktop** | `.agents/skills/<name>/SKILL.md` | `.agents/screenshots/Screenshot_<ts>.png` |
-| **Cursor & VS Code** | `@<skill-name>` | `@.agents/screenshots/Screenshot_<ts>.png` |
-| **Gemini CLI** | `/path/to/skill` | `/.agents/screenshots/Screenshot_<ts>.png` |
-| **OpenCode & Codex** | `/command-name` | `.agents/screenshots/Screenshot_<ts>.png` |
-| **Plaintext / Custom** | Standard file paths | Full file path |
+| Agent / Tool                    | Skill Reference Syntax              | Snap / Screenshot Syntax                     |
+| ------------------------------- | ----------------------------------- | -------------------------------------------- |
+| **Antigravity**           | `@.agents/skills/<name>/SKILL.md` | `@.agents/screenshots/Screenshot_<ts>.png` |
+| **Claude Code & Desktop** | `.agents/skills/<name>/SKILL.md`  | `.agents/screenshots/Screenshot_<ts>.png`  |
+| **Cursor & VS Code**      | `@<skill-name>`                   | `@.agents/screenshots/Screenshot_<ts>.png` |
+| **Gemini CLI**            | `/path/to/skill`                  | `/.agents/screenshots/Screenshot_<ts>.png` |
+| **OpenCode & Codex**      | `/command-name`                   | `.agents/screenshots/Screenshot_<ts>.png`  |
+| **Plaintext / Custom**    | Standard file paths                 | Full file path                               |
 
 ---
 
@@ -196,17 +201,17 @@ SkillManager formats references to match whatever AI toolchain your team uses:
 
 All shortcuts can be re-mapped in **Settings**:
 
-| Shortcut (Default) | Action | Context |
-|---|---|---|
-| `Ctrl+Shift+S` | **Snap to Project & Color Redact (Global)** | Global Desktop / App |
-| `Ctrl+F` | **Focus Search Bar** | Library & Quick Copy |
-| `Ctrl+C` | **Copy Formatted Reference** | Focused Skill |
-| `Ctrl+A` | **Select All Visible Skills** | Library View |
-| `Alt+1` / `Alt+2` | **Switch between Quick Copy & Library** | Global in App |
-| `Alt+3` / `Alt+4` | **Switch between Updates & Settings** | Global in App |
-| `Ctrl+T` | **Toggle Dark / Light Theme** | Global in App |
-| `Ctrl+Shift+X` | **Archive Selected Skills** | Library View |
-| `F5` | **Trigger Manual Cache Refresh** | All Views |
+| Shortcut (Default)    | Action                                            | Context              |
+| --------------------- | ------------------------------------------------- | -------------------- |
+| `Ctrl+Shift+S`      | **Snap to Project & Color Redact (Global)** | Global Desktop / App |
+| `Ctrl+F`            | **Focus Search Bar**                        | Library & Quick Copy |
+| `Ctrl+C`            | **Copy Formatted Reference**                | Focused Skill        |
+| `Ctrl+A`            | **Select All Visible Skills**               | Library View         |
+| `Alt+1` / `Alt+2` | **Switch between Quick Copy & Library**     | Global in App        |
+| `Alt+3` / `Alt+4` | **Switch between Updates & Settings**       | Global in App        |
+| `Ctrl+T`            | **Toggle Dark / Light Theme**               | Global in App        |
+| `Ctrl+Shift+X`      | **Archive Selected Skills**                 | Library View         |
+| `F5`                | **Trigger Manual Cache Refresh**            | All Views            |
 
 ---
 
@@ -215,6 +220,7 @@ All shortcuts can be re-mapped in **Settings**:
 If you want to contribute, build from source, or customize SkillManager:
 
 ### 1. Prerequisites
+
 - **Python ≥ 3.12**
 - **[uv](https://github.com/astral-sh/uv)** (fast Python package manager)
 - *(Linux only)* Qt 6 system libraries:
@@ -223,6 +229,7 @@ If you want to contribute, build from source, or customize SkillManager:
   ```
 
 ### 2. Clone & Run Locally
+
 ```bash
 git clone https://github.com/dishanagalawatta/SkillManager.git
 cd SkillManager
@@ -231,6 +238,7 @@ uv run skill-manager
 ```
 
 ### 3. Run Quality Suite
+
 ```bash
 # Run linting and formatting
 uv run ruff check src tests --fix
@@ -244,13 +252,17 @@ python scripts/dev_test.py
 ```
 
 ### 4. Internal Developer Tooling (MCP Bridge)
+
 For automated testing, controller introspection, and headless workflows during development, SkillManager includes an internal stdio MCP server bridge:
+
 ```bash
 uv run skill-manager --mcp
 ```
+
 See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for the internal tool reference and developer architecture.
 
 ### 5. Build Binaries
+
 ```bash
 # Build standalone executable with PyInstaller
 uv run skill-manager-build
@@ -309,13 +321,13 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [DESIGN.md](DESIGN.md) for 
 
 SkillManager works out of the box with sensible defaults. Optional settings can be configured via `.env`:
 
-| Variable | Default | Description |
-|---|---|---|
-| `SKILL_MANAGER_LOG_LEVEL` | `INFO` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `SKILL_MANAGER_DATA_DIR` | (system default) | Custom directory for user settings and local database |
-| `QT_QPA_PLATFORM` | native | Set `offscreen` for headless CI runs |
-| `POSTHOG_PROJECT_TOKEN` | *(empty)* | Optional opt-in analytics token |
-| `SENTRY_DSN` | *(empty)* | Optional opt-in crash reporting DSN |
+| Variable                    | Default          | Description                                                     |
+| --------------------------- | ---------------- | --------------------------------------------------------------- |
+| `SKILL_MANAGER_LOG_LEVEL` | `INFO`         | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `SKILL_MANAGER_DATA_DIR`  | (system default) | Custom directory for user settings and local database           |
+| `QT_QPA_PLATFORM`         | native           | Set`offscreen` for headless CI runs                           |
+| `POSTHOG_PROJECT_TOKEN`   | *(empty)*      | Optional opt-in analytics token                                 |
+| `SENTRY_DSN`              | *(empty)*      | Optional opt-in crash reporting DSN                             |
 
 See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for full environment documentation.
 
@@ -327,25 +339,31 @@ See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for full environment documentatio
 <summary><strong>Q: Linux shows "Could not load the Qt platform plugin 'xcb'"</strong></summary>
 
 Install the missing XCB cursor library:
+
 ```bash
 sudo apt install -y libxcb-cursor0
 ```
+
 </details>
 
 <details>
 <summary><strong>Q: Global screenshot hotkey isn't responding on Wayland</strong></summary>
 
 Wayland requires the desktop portal backend for global shortcut capture:
+
 ```bash
 sudo apt install -y xdg-desktop-portal xdg-desktop-portal-gnome # or -kde
 ```
+
 You can also trigger screenshots directly via the camera icon in the SkillManager top bar.
+
 </details>
 
 <details>
 <summary><strong>Q: How do I backup my custom collections and project links?</strong></summary>
 
 All configuration is stored locally as standard JSON under your user data directory (`~/.config/SkillManager` on Linux or `%APPDATA%\SkillManager` on Windows). You can back up or migrate this directory at any time.
+
 </details>
 
 <details>
@@ -354,9 +372,11 @@ All configuration is stored locally as standard JSON under your user data direct
 A leftover binary from a previous AppImage install (or a development symlink) at `~/.local/bin/skill-manager`
 takes precedence over the system package whenever `~/.local/bin` is before `/usr/bin` in your `PATH`.
 Remove it to use the updated packaged version:
+
 ```bash
 rm -f ~/.local/bin/skill-manager
 ```
+
 </details>
 
 ---

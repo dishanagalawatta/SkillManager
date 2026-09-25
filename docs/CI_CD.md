@@ -75,13 +75,13 @@ All third-party actions are pinned to full commit SHAs (not floating tags). Depe
 
 | Action | SHA | Version |
 |---|---|---|
-| `actions/checkout` | `11bd7190...` | v4.2.2 |
-| `actions/setup-python` | `a26af69b...` | v5.6.0 |
-| `astral-sh/setup-uv` | `6b9c6063...` | v6.0.1 |
-| `actions/upload-artifact` | `4cec3d8a...` | v4.6.1 |
-| `actions/download-artifact` | `d3f86a10...` | v4.3.0 |
-| `softprops/action-gh-release` | `da05d552...` | v2.2.2 |
-| `peaceiris/actions-gh-pages` | `4f9cc660...` | v4.0.0 |
+| `actions/checkout` | `3d3c42e5...` | v7.0.1 |
+| `actions/setup-python` | `5fda3b95...` | v7.0.0 |
+| `astral-sh/setup-uv` | `c18668ad...` | v10.2.0 |
+| `actions/upload-artifact` | `043fb46d...` | v7.0.1 |
+| `actions/download-artifact` | `3e5f45b2...` | v8 |
+| `softprops/action-gh-release` | `efb35369...` | v3 |
+| `zizmorcore/zizmor-action` | `cc914d7f...` | v0.6.4 |
 
 ---
 
