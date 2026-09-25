@@ -121,3 +121,42 @@ def test_filter_engine_build_visible_rows_collapsed(engine):
     assert len(visible) == 2
     assert visible[0].main_category_name == "Cat A"
     assert visible[1].name == "S3"
+
+
+def test_diff_fallback_keys_mixed_int_str_match_all_str():
+    """Mixed str/int diff keys must diff identically to all-str keys.
+
+    Guards the pipeline optimization that uses ``s.local_path or id(s)``
+    instead of ``s.local_path if s.local_path else str(id(s))``:
+    ``difflib.SequenceMatcher`` compares by equality, and ``str`` never
+    equals ``int``, so fallback ids can never collide with real paths.
+    """
+    import difflib
+
+    old_list = [
+        Skill(name="S1", local_path="/a"),
+        Skill(name="S2", local_path=""),
+        Skill(name="S3", local_path="/b"),
+    ]
+    new_list = [
+        Skill(name="S1", local_path="/a"),
+        Skill(name="S4", local_path=""),
+        Skill(name="S3", local_path="/b"),
+    ]
+
+    str_keys = (
+        [s.local_path if s.local_path else str(id(s)) for s in old_list],
+        [s.local_path if s.local_path else str(id(s)) for s in new_list],
+    )
+    mixed_keys = (
+        [s.local_path or id(s) for s in old_list],
+        [s.local_path or id(s) for s in new_list],
+    )
+
+    old_opcodes = difflib.SequenceMatcher(None, *str_keys).get_opcodes()
+    new_opcodes = difflib.SequenceMatcher(None, *mixed_keys).get_opcodes()
+    assert [tag for tag, *_ in old_opcodes] == [tag for tag, *_ in new_opcodes]
+    # Distinct objects without paths never match each other in either scheme.
+    assert ("equal", 1, 2, 1, 2) not in [
+        (tag, i1, i2, j1, j2) for tag, i1, i2, j1, j2 in new_opcodes
+    ]

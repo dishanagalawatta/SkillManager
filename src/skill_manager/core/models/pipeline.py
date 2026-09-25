@@ -158,8 +158,9 @@ class PipelineMixin:
 
             import difflib
 
-            old_keys = [s.local_path if s.local_path else str(id(s)) for s in old_list]
-            new_keys = [s.local_path if s.local_path else str(id(s)) for s in new_list]
+            # Perf: Avoid string allocations by using the object id() integer directly as a fallback key
+            old_keys = [s.local_path or id(s) for s in old_list]
+            new_keys = [s.local_path or id(s) for s in new_list]
 
             matcher = difflib.SequenceMatcher(None, old_keys, new_keys)
 
@@ -197,8 +198,9 @@ class PipelineMixin:
 
             import difflib
 
-            old_keys = [s.local_path if s.local_path else str(id(s)) for s in old_list]
-            new_keys = [s.local_path if s.local_path else str(id(s)) for s in new_list]
+            # Perf: Avoid string allocations by using the object id() integer directly as a fallback key
+            old_keys = [s.local_path or id(s) for s in old_list]
+            new_keys = [s.local_path or id(s) for s in new_list]
 
             matcher = difflib.SequenceMatcher(None, old_keys, new_keys)
 
