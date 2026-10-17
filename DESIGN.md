@@ -228,7 +228,13 @@ src/skill_manager/mcp/
     ├── build.py         ← sm_build, sm_lint, sm_run_tests, sm_job_status
     ├── debug.py         ← sm_dump_state, sm_inspect_controller, sm_capture_errors, sm_toggle_debug_overlay
     ├── monitor.py       ← sm_get_health, sm_get_diagnostics, sm_tail_events, sm_profile
-    ├── screenshot.py    ← sm_screenshot
+    ├── screenshot.py    ← sm_screenshot (live-gui / native / headless-qml)
+    ├── ui_inspection.py ← sm_inspect_qml_tree, sm_get_current_view, sm_get_pixel_color
+    ├── accessibility.py ← sm_accessibility_audit
+    ├── frame_timing.py  ← sm_get_frame_timing
+    ├── performance.py   ← sm_measure_startup_time, sm_get_performance_metrics
+    ├── bug_detection.py ← sm_detect_qml_errors, sm_find_visual_issues,
+    │                       sm_compare_screenshot, sm_run_ui_scenario
     ├── gui.py           ← sm_navigate, sm_get_window_info, sm_mouse_move, sm_mouse_click, sm_type_text
     └── write.py         ← sm_create_skill, sm_update_skill, sm_deploy, sm_delete_skill
 ```

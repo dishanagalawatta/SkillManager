@@ -36,6 +36,14 @@ def _ensure_qapp() -> None:
     QApplication([])  # type: ignore[arg-type]
 
 
+def _sync_controller() -> None:
+    """Best-effort initial skill sync so model-backed tools see data immediately."""
+    with contextlib.suppress(Exception):
+        from ._skills import sync_skills  # function-local: breaks _skills<->_controller cycle
+
+        sync_skills()
+
+
 def get_app_controller() -> Any:
     """Return the cached headless ``AppController``, constructing it on first use.
 
@@ -61,11 +69,64 @@ def get_app_controller() -> Any:
         raise RuntimeError(f"Failed to construct AppController: {exc}") from exc
 
     _APP_CONTROLLER = controller
-    with contextlib.suppress(Exception):
-        from ._skills import sync_skills  # function-local: breaks _skills<->_controller cycle
-
-        sync_skills()
+    _sync_controller()
     return _APP_CONTROLLER
+
+
+def set_app_controller(controller: Any, *, sync: bool = True) -> None:
+    """Register *controller* as the bridge's shared controller singleton.
+
+    The MCP stdio launcher builds its own ``AppController`` (the one it hands to
+    ``QGuiApplication`` and, later, the headless QML engine) and registers it
+    here so every tool reuses that instance instead of lazily constructing a
+    second, engine-less controller.
+
+    Args:
+        controller: The controller instance to share.
+        sync: Run the initial skill sync so model-backed tools see data.
+
+    Raises:
+        ValueError: If *controller* is ``None``.
+    """
+    global _APP_CONTROLLER, _APP_CONTROLLER_ERROR  # noqa: PLW0603
+
+    if controller is None:
+        raise ValueError("controller must not be None")
+
+    _APP_CONTROLLER_ERROR = None
+    _APP_CONTROLLER = controller
+    if sync:
+        _sync_controller()
+
+
+def reset_app_controller() -> None:
+    """Drop the cached controller and any cached construction error (teardown/tests)."""
+    global _APP_CONTROLLER, _APP_CONTROLLER_ERROR  # noqa: PLW0603
+
+    _APP_CONTROLLER = None
+    _APP_CONTROLLER_ERROR = None
+
+
+def get_qml_engine(controller: Any | None = None) -> Any | None:
+    """Return the Qt QML engine attached to *controller* (or the shared one).
+
+    ``AppController`` stores the engine as ``_qml_engine`` (set by
+    ``bootstrap._load_qml_engine``). Alternative attribute names are accepted as
+    fallbacks so the lookup stays robust across refactors. Returns ``None``
+    instead of raising when no engine is present.
+    """
+    try:
+        if controller is None:
+            controller = _controller_or_none()
+        if controller is None:
+            return None
+        for name in ("_qml_engine", "qml_engine", "engine"):
+            engine = getattr(controller, name, None)
+            if engine is not None and hasattr(engine, "rootObjects"):
+                return engine
+    except Exception:  # noqa: BLE001 - pure lookup, never fatal
+        return None
+    return None
 
 
 def _controller_or_none() -> Any | None:

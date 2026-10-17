@@ -1,8 +1,9 @@
 """Read-only ``sm_screenshot`` MCP tool for the SkillManager MCP server.
 
-Captures the live SkillManager GUI window (title "Skill Manager") cross-process
-via Win32 and returns a base64 PNG. Optionally navigates the running GUI to
-a section first through the file-based IPC channel in ``skill_manager.mcp.bridge``.
+Captures the SkillManager window (live GUI, platform-native, or the headless
+offscreen QML render) and returns a base64 PNG. Optionally navigates to a
+section first — in-process in headless ``--mcp`` mode, over the file-based IPC
+channel when a GUI runs in another process.
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ from typing import Any
 
 from skill_manager.core.analytics import capture_event
 from skill_manager.mcp.bridge import (
-    capture_app_window as _bridge_capture_app_window,
-    send_navigation_command as _bridge_send_navigation_command,
+    capture_app_window_info as _bridge_capture_app_window_info,
+    navigate_view as _bridge_navigate_view,
 )
 from skill_manager.mcp.models import ToolResult, err, ok
 
@@ -26,9 +27,10 @@ VALID_VIEWS: tuple[str, ...] = ("QuickCopy", "Library", "Updates", "Settings")
 # Repo root for the optional PNG save dir (.agents/screenshots).
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
-# Settle delay (seconds) after a fire-and-forget navigation command so the
-# GUI's CommandChannel QTimer (200ms interval) picks up the command, switches
-# the view, and the UI repaints before we capture.
+# Settle delay (seconds) after a cross-process navigation command so the GUI's
+# CommandChannel QTimer picks up the command, switches the view, and the UI
+# repaints before we capture. In-process (headless) navigation needs no delay:
+# the view is already set and verified when the bridge call returns.
 _SETTLE_DELAY = 0.6
 
 
@@ -37,7 +39,7 @@ _SETTLE_DELAY = 0.6
 # ---------------------------------------------------------------------------
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "sm_screenshot": {
-        "description": "Capture the live SkillManager GUI window (title 'Skill Manager') as a base64 PNG. Optionally navigate the running GUI to a section first. Read-only. Returns ok:false if the GUI is not running or the window cannot be found.",
+        "description": "Capture the SkillManager UI as a base64 PNG. Prefers the live GUI window (title 'Skill Manager'), falling back to a headless offscreen render when no GUI is running. Optionally navigate the GUI to a section first. Read-only. The result's 'source' field reports which strategy produced the image ('live-gui', 'native' or 'headless-qml').",
         "annotations": {
             "readOnlyHint": True,
             "destructiveHint": False,
@@ -50,7 +52,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "navigate": {
                     "type": "string",
                     "enum": ["QuickCopy", "Library", "Updates", "Settings"],
-                    "description": "Optional: navigate the live GUI to this section before capture.",
+                    "description": (
+                        "Optional: switch to this section before capture. Applied in-process when "
+                        "this process owns the offscreen window (headless --mcp); otherwise the "
+                        "live GUI is asked over IPC and must acknowledge."
+                    ),
                 },
                 "save": {
                     "type": "boolean",
@@ -111,20 +117,31 @@ def _handle_screenshot(
         if navigate:
             if navigate not in VALID_VIEWS:
                 return err("sm_screenshot", f"invalid navigate view: {navigate!r}")
-            _bridge_send_navigation_command(navigate)
-            time.sleep(_SETTLE_DELAY)
+            nav = _bridge_navigate_view(navigate)
+            if not nav.get("ok"):
+                return err(
+                    "sm_screenshot",
+                    f"navigation to {navigate!r} failed: {nav.get('error') or 'no acknowledgement'}",
+                )
+            if not nav.get("in_process"):
+                time.sleep(_SETTLE_DELAY)
 
-        b64, captured_w, captured_h = _bridge_capture_app_window(
+        info = _bridge_capture_app_window_info(
             resize_width=width,
             resize_height=height,
         )
+        b64 = info.get("image_b64")
         if b64 is None:
-            return err("sm_screenshot", "SkillManager GUI not running or window not found")
+            return err(
+                "sm_screenshot",
+                "SkillManager GUI not running and no headless QML render available",
+            )
 
         data: dict[str, Any] = {
             "image_b64": b64,
-            "width": captured_w,
-            "height": captured_h,
+            "width": info.get("width", 0),
+            "height": info.get("height", 0),
+            "source": info.get("source"),
             "resize_requested": width is not None and height is not None,
             "view": navigate if navigate else _current_view(),
         }

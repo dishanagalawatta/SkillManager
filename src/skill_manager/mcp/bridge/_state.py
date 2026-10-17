@@ -30,6 +30,10 @@ def capture_errors(limit: int = 100) -> list[dict[str, Any]]:
 def get_health() -> dict[str, Any]:
     """Return a health snapshot: Qt loop alive, controller present, model counts.
 
+    Also reports ``qml`` — whether the QML engine is attached, whether lazy
+    headless loading is enabled, and the failure reason if a load was attempted
+    and failed (see ``skill_manager.mcp.bridge._qml_headless``).
+
     Never raises — on any failure it returns a degraded health dict.
     """
     _log_call("get_health")
@@ -40,6 +44,7 @@ def get_health() -> dict[str, Any]:
         "diagnostic_health": "",
         "model_counts": {},
         "recent_errors": 0,
+        "qml": {},
         "degraded_reason": None,
     }
 
@@ -57,6 +62,13 @@ def get_health() -> dict[str, Any]:
         return health
 
     health["controller_present"] = True
+
+    try:
+        from ._qml_headless import qml_engine_status
+
+        health["qml"] = qml_engine_status()
+    except Exception:  # noqa: BLE001
+        pass
 
     try:
         diag = get_diagnostic_logger()

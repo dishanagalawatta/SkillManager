@@ -285,3 +285,26 @@ def test_ui_controller_is_monochrome_logo(ui_controller):
     assert ui_controller.isMonochromeLogo("Gemini CLI") is False
     assert ui_controller.isMonochromeLogo("Codex") is False
     assert ui_controller.isMonochromeLogo(None) is False
+
+
+def test_disable_state_persistence_blocks_all_ui_state_writes(ui_controller, mock_app):
+    """Headless observers must never persist the user's UI state."""
+    mock_app._config.set.reset_mock()
+    ui_controller.disable_state_persistence()
+
+    ui_controller.currentView = "QuickCopy"
+    ui_controller.windowWidth = 1400
+    ui_controller.saveUiState()
+    ui_controller.triggerSave()
+
+    assert mock_app._config.set.call_count == 0
+
+
+def test_disable_state_persistence_stops_pending_save(ui_controller, mock_app):
+    """A debounced save armed before disabling does not fire afterwards."""
+    ui_controller.triggerSave()
+    assert ui_controller._save_timer.isActive() is True
+
+    ui_controller.disable_state_persistence()
+
+    assert ui_controller._save_timer.isActive() is False

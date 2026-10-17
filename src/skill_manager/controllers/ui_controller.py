@@ -3,6 +3,7 @@ Purpose: Manages UI state, window geometry, themes, and system shell actions.
 Usage: Accessed via AppController.ui
 """
 
+import contextlib
 import logging
 import os
 import subprocess
@@ -62,6 +63,23 @@ class UIController(BaseController):
         self._save_timer = QTimer()
         self._save_timer.setSingleShot(True)
         self._save_timer.timeout.connect(self.saveUiState)
+
+        # Headless observers (the MCP server) disable persistence so rendering
+        # Main.qml offscreen never overwrites the user's saved UI state.
+        self._state_persistence_enabled = True
+
+    def disable_state_persistence(self) -> None:
+        """Stop this controller from writing ``ui_state`` to the user's config.
+
+        Used by the headless MCP server: it loads ``Main.qml`` offscreen to
+        inspect the UI, and that offscreen window would otherwise report its own
+        geometry back through ``Main.qml``'s ``onXChanged``/``onWidthChanged``
+        handlers (persisting e.g. ``window_x = 0`` over the user's real window
+        position).
+        """
+        self._state_persistence_enabled = False
+        with contextlib.suppress(Exception):
+            self._save_timer.stop()
 
     @Property(str, notify=currentViewChanged)
     def currentView(self):  # type: ignore[reportRedeclaration]
@@ -255,11 +273,15 @@ class UIController(BaseController):
     @Slot()
     def triggerSave(self):
         """Triggers a debounced save of the UI state."""
+        if not self._state_persistence_enabled:
+            return
         self._save_timer.start(1000)
 
     @Slot()
     def saveUiState(self):
         """Saves current window geometry and UI preferences to config."""
+        if not self._state_persistence_enabled:
+            return
         self.config.set("ui_state", self.state.model_dump())
 
     @Slot()

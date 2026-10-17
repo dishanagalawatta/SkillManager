@@ -45,9 +45,20 @@
 | `sm_dump_state` | read | Export safe subset of controller state |
 | `sm_inspect_controller` | read | Introspect sub-controller methods/signals |
 | `sm_capture_errors` | read | Return error diagnostic buffer |
-| `sm_screenshot` | read | Capture live GUI window as base64 PNG |
+| `sm_screenshot` | read | Capture the window (live GUI, native, or headless offscreen render) as base64 PNG |
 | `sm_navigate` | read | Navigate the GUI to a view/skill |
 | `sm_get_window_info` | read | Return live GUI window geometry |
+| `sm_get_current_view` | read | Return the active app view |
+| `sm_inspect_qml_tree` | read | Traverse the QML object tree (lazily loads Main.qml offscreen in `--mcp`) |
+| `sm_get_pixel_color` | read | Sample RGB/hex color at a pixel of the captured window |
+| `sm_measure_startup_time` | read | Time headless controller access |
+| `sm_get_performance_metrics` | read | Return memory, CPU, thread, and uptime metrics |
+| `sm_detect_qml_errors` | read | Scan diagnostic buffer for QML/JavaScript errors |
+| `sm_compare_screenshot` | read | Diff baseline vs current screenshot |
+| `sm_find_visual_issues` | read | Scan an image (or the current window) for clipping/contrast issues |
+| `sm_run_ui_scenario` | read | Run a navigation scenario, verifying each step took effect |
+| `sm_get_frame_timing` | read | Capture QML render frames; report mode, FPS and frame timing |
+| `sm_accessibility_audit` | read | Audit QML tree for missing roles/names, unlabeled buttons |
 | `sm_mouse_move` | read* | Move system cursor (Windows; input-guarded) |
 | `sm_mouse_click` | read* | Send mouse click (Windows; input-guarded) |
 | `sm_type_text` | read* | Type text into focused window (Windows; input-guarded) |

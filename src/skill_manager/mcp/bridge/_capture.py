@@ -200,25 +200,57 @@ def capture_app_window(
     resize_width: int | None = None,
     resize_height: int | None = None,
 ) -> tuple[str | None, int, int]:
-    """Capture the live SkillManager GUI window cross-process.
+    """Capture the SkillManager UI and return ``(base64_png, width, height)``.
 
-    Primary method: file-based IPC to the live Qt GUI — the
-    ``CommandChannel._capture_screenshot`` handler calls
-    ``QQuickWindow::grabWindow()`` which renders the scene graph to a PNG
-    regardless of window visibility state (works minimised, no colour cast).
+    Tries, in order: file-based IPC to the live GUI, the platform-native window
+    capture, and finally an offscreen render of ``Main.qml`` inside this process
+    (``--mcp`` mode only — see ``capture_app_window_info`` for provenance).
 
-    Fallback: Win32 PrintWindow + CreateDIBSection capture. Used when the
-    IPC path fails (e.g. GUI not running, command channel unavailable).
-
-    Returns ``(base64_png, width, height)`` or ``(None, 0, 0)`` on failure.
-
-    If ``resize_width`` and ``resize_height`` are provided, the window is
-    temporarily resized before capture and restored afterward (Win32 fallback
-    only — IPC capture always grabs at the window's current resolution).
+    Returns ``(None, 0, 0)`` when every strategy fails.
     """
     _log_call("capture_app_window")
 
-    # ── Primary: IPC capture via live Qt GUI CommandChannel ──────────
+    info = capture_app_window_info(resize_width=resize_width, resize_height=resize_height)
+    return (info["image_b64"], info["width"], info["height"])
+
+
+def _capture_result(b64: str, width: int, height: int, source: str) -> dict[str, Any]:
+    """Build the capture result envelope for *source*."""
+    return {
+        "image_b64": b64,
+        "width": int(width),
+        "height": int(height),
+        "source": source,
+        "error": None,
+    }
+
+
+def capture_app_window_info(
+    resize_width: int | None = None,
+    resize_height: int | None = None,
+) -> dict[str, Any]:
+    """Capture the SkillManager UI and report which strategy produced the image.
+
+    Strategies, in order:
+
+    1. ``"live-gui"`` — file-based IPC to the running Qt GUI, whose
+       ``CommandChannel._capture_screenshot`` handler calls
+       ``QQuickWindow::grabWindow()`` (works minimised, no colour cast). Used
+       when no resize is requested.
+    2. ``"native"`` — Win32 PrintWindow + CreateDIBSection (Windows only; the
+       Linux implementation is a no-op because Wayland forbids cross-process
+       grabs without a portal).
+    3. ``"headless-qml"`` — offscreen render of ``Main.qml`` inside this
+       process, available when the MCP launcher enabled the lazy headless QML
+       engine. This is what makes ``--mcp`` screenshots work with no GUI
+       running.
+
+    Returns a dict with ``image_b64``, ``width``, ``height``, ``source`` and
+    ``error`` (``source`` is ``None`` when every strategy failed).
+    """
+    _log_call("capture_app_window_info")
+
+    # ── 1. Primary: IPC capture via live Qt GUI CommandChannel ──────────
     # IPC writes a JSON command file that the Qt GUI picks up via QTimer
     # polling — no platform-specific window handles needed.  On Linux we
     # always try it first since _find_skill_manager_window() uses Win32
@@ -241,7 +273,7 @@ def capture_app_window(
                     img = Image.open(capture_path)
                     b64 = _pil_image_to_base64(img)
                     if b64:
-                        return (b64, img.width, img.height)
+                        return _capture_result(b64, img.width, img.height, "live-gui")
                 except Exception as exc:  # noqa: BLE001 — bad PNG, fall through
                     get_diagnostic_logger().log_event(
                         "WARN",
@@ -250,12 +282,23 @@ def capture_app_window(
                     )
                     pass
 
-    # ── Fallback: platform-native capture ────────────────────────────
+    # ── 2. Platform-native capture ────────────────────────────────────
     if sys.platform == "win32":
-        result = _fallback_capture_win32(resize_width, resize_height)
+        b64, width, height = _fallback_capture_win32(resize_width, resize_height)
     else:
-        result = _fallback_capture_linux()
-    return result
+        b64, width, height = _fallback_capture_linux()
+    if b64:
+        return _capture_result(b64, width, height, "native")
+
+    # ── 3. Headless in-process render (MCP mode, no GUI required) ──────
+    from ._qml_headless import capture_headless_window, headless_qml_enabled
+
+    if headless_qml_enabled():
+        b64, width, height = capture_headless_window(resize_width, resize_height)
+        if b64:
+            return _capture_result(b64, width, height, "headless-qml")
+
+    return {"image_b64": None, "width": 0, "height": 0, "source": None, "error": "capture_failed"}
 
 
 def _fallback_capture_win32(

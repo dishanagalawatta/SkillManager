@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -15,6 +16,18 @@ from ._telemetry import _log_call
 _MCP_ROOT = Path(__file__).resolve().parents[4] / "data" / "mcp"
 MCP_COMMANDS_DIR = _MCP_ROOT / "commands"
 MCP_ACKS_DIR = _MCP_ROOT / "acks"
+
+# Set to 1/true/yes/on to disable cross-process IPC entirely: the senders then
+# refuse without writing a command file, so nothing can drive a live GUI. Used
+# by the test suite and available to anyone who does not want an MCP server to
+# touch the running app (the GUI side is unaffected — it only consumes).
+_IPC_DISABLE_ENV = "SKILL_MANAGER_MCP_NO_IPC"
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def ipc_enabled() -> bool:
+    """Return ``False`` when cross-process IPC is disabled by the environment."""
+    return os.environ.get(_IPC_DISABLE_ENV, "").strip().lower() not in _TRUTHY
 
 
 def _wait_for_ack(cmd_id: str, acks_dir: Path, timeout: float) -> dict[str, Any]:
@@ -62,6 +75,8 @@ def send_navigation_command(
     Best-effort: returns ``{"ok": False, "error": ...}`` on any failure.
     """
     _log_call("send_navigation_command")
+    if not ipc_enabled():
+        return {"ok": False, "error": "ipc_disabled"}
     try:
         commands_dir = MCP_COMMANDS_DIR
         acks_dir = MCP_ACKS_DIR
@@ -96,6 +111,8 @@ def send_capture_command(
     Best-effort: returns ``{"ok": False, "error": ...}`` on any failure.
     """
     _log_call("send_capture_command")
+    if not ipc_enabled():
+        return {"ok": False, "error": "ipc_disabled"}
     try:
         commands_dir = MCP_COMMANDS_DIR
         acks_dir = MCP_ACKS_DIR
@@ -128,6 +145,8 @@ def send_debug_overlay_command(
     Returns ``{"ok": False, "error": ...}`` on any failure.
     """
     _log_call("send_debug_overlay_command")
+    if not ipc_enabled():
+        return {"ok": False, "error": "ipc_disabled"}
     try:
         commands_dir = MCP_COMMANDS_DIR
         acks_dir = MCP_ACKS_DIR

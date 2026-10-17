@@ -294,8 +294,26 @@ def load_app_icon(app: QGuiApplication) -> tuple[QIcon, str]:  # pragma: no cove
     return app_icon, loaded_icon_path
 
 
-def _load_qml_engine(controller, font_bridge) -> QQmlApplicationEngine:  # pragma: no cover
-    """Create the QML engine, register the image provider and load Main.qml."""
+def _load_qml_engine(  # pragma: no cover
+    controller,
+    font_bridge,
+    *,
+    event_name: str = "app_opened",
+    exit_on_failure: bool = True,
+) -> QQmlApplicationEngine:
+    """Create the QML engine, register the image provider and load Main.qml.
+
+    Args:
+        controller: The ``AppController`` to expose to QML; receives the engine
+            as ``controller._qml_engine``.
+        font_bridge: The ``FontDatabaseBridge`` singleton instance.
+        event_name: Analytics event emitted after a successful load. GUI startup
+            uses the default ``"app_opened"``; the headless MCP server passes a
+            distinct name so it never inflates app-open metrics.
+        exit_on_failure: When ``True`` (GUI startup) a load that produces no root
+            objects terminates the process. When ``False`` (headless MCP) the
+            engine is returned for the caller to inspect and report.
+    """
     engine = QQmlApplicationEngine()
     controller._qml_engine = engine
     engine.addImageProvider("snap", controller.snap_provider)
@@ -308,13 +326,16 @@ def _load_qml_engine(controller, font_bridge) -> QQmlApplicationEngine:  # pragm
     qml_file = qml_dir / "Main.qml"
     engine.load(str(qml_file))
     if not engine.rootObjects():
-        logger.error("CRITICAL: Failed to load QML root objects!")
-        sys.exit(-1)
+        if exit_on_failure:
+            logger.error("CRITICAL: Failed to load QML root objects!")
+            sys.exit(-1)
+        logger.warning("QML load produced no root objects; returning empty engine")
+        return engine
     diag = get_diagnostic_logger()
     diag.log_event(
         "INFO", "window_state", f"QML loaded, {len(engine.rootObjects())} root object(s)"
     )
-    capture_event("app_opened")
+    capture_event(event_name)
     return engine
 
 

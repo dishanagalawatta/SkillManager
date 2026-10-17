@@ -115,6 +115,46 @@ def test_send_navigation_command_timeout_returns_ok_false(tmp_path, monkeypatch)
 
 
 # ---------------------------------------------------------------------------
+# bridge.ipc_enabled() — kill-switch that keeps tests/CI off a live GUI
+# ---------------------------------------------------------------------------
+def test_ipc_enabled_by_default(monkeypatch):
+    """Cross-process IPC is on unless the environment says otherwise."""
+    monkeypatch.delenv("SKILL_MANAGER_MCP_NO_IPC", raising=False)
+    assert bridge.ipc_enabled() is True
+    monkeypatch.setenv("SKILL_MANAGER_MCP_NO_IPC", "0")
+    assert bridge.ipc_enabled() is True
+
+
+def test_ipc_disabled_refuses_without_writing(tmp_path, monkeypatch):
+    """SKILL_MANAGER_MCP_NO_IPC=1 makes every sender refuse and write nothing.
+
+    This is what keeps a test (or CI) run from driving the developer's live GUI
+    through the repo-relative drop-dir.
+    """
+    commands_dir = tmp_path / "commands"
+    acks_dir = tmp_path / "acks"
+    monkeypatch.setattr(bridge_ipc, "MCP_COMMANDS_DIR", commands_dir)
+    monkeypatch.setattr(bridge_ipc, "MCP_ACKS_DIR", acks_dir)
+    monkeypatch.setenv("SKILL_MANAGER_MCP_NO_IPC", "1")
+
+    assert bridge.ipc_enabled() is False
+    assert bridge.send_navigation_command("Library", wait=True, timeout=0.05) == {
+        "ok": False,
+        "error": "ipc_disabled",
+    }
+    assert bridge.send_capture_command(wait=True, timeout=0.05) == {
+        "ok": False,
+        "error": "ipc_disabled",
+    }
+    assert bridge.send_debug_overlay_command(True, wait=True, timeout=0.05) == {
+        "ok": False,
+        "error": "ipc_disabled",
+    }
+    assert not commands_dir.exists()
+    assert not acks_dir.exists()
+
+
+# ---------------------------------------------------------------------------
 # app.CommandChannel (file-based IPC consumer)
 # ---------------------------------------------------------------------------
 def test_command_channel_handles_navigate(tmp_path):
@@ -187,11 +227,19 @@ def test_handler_capture_success(monkeypatch):
     b64 = _make_png_b64()
     monkeypatch.setattr(
         tools_screenshot,
-        "_bridge_capture_app_window",
-        lambda *a, **kw: (b64, 10, 10),
+        "_bridge_capture_app_window_info",
+        lambda *a, **kw: {
+            "image_b64": b64,
+            "width": 10,
+            "height": 10,
+            "source": "live-gui",
+            "error": None,
+        },
     )
     monkeypatch.setattr(
-        tools_screenshot, "_bridge_send_navigation_command", lambda v: {"ok": True, "view": v}
+        tools_screenshot,
+        "_bridge_navigate_view",
+        lambda v: {"ok": True, "view": v, "in_process": True, "verified": True},
     )
     handlers = tools_screenshot.get_handlers()
     result = handlers["sm_screenshot"]({"navigate": "Library"})
@@ -202,12 +250,65 @@ def test_handler_capture_success(monkeypatch):
     assert result.data["image_b64"] == b64
     assert result.data["width"] == 10
     assert result.data["height"] == 10
+    assert result.data["source"] == "live-gui"
     assert result.data["view"] == "Library"
+
+
+def test_handler_headless_source_reported(monkeypatch):
+    """sm_screenshot reports the headless offscreen render as its source."""
+    b64 = _make_png_b64()
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window_info",
+        lambda *a, **kw: {
+            "image_b64": b64,
+            "width": 800,
+            "height": 600,
+            "source": "headless-qml",
+            "error": None,
+        },
+    )
+    handlers = tools_screenshot.get_handlers()
+    result = handlers["sm_screenshot"]({})
+
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data["source"] == "headless-qml"
+
+
+def test_handler_navigation_failure_prevents_capture(monkeypatch):
+    """A failed navigation fails the call instead of capturing the wrong view."""
+    captures: list[int] = []
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_navigate_view",
+        lambda v: {"ok": False, "error": "not acknowledged by GUI"},
+    )
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window_info",
+        lambda *a, **kw: captures.append(1),
+    )
+
+    result = tools_screenshot.get_handlers()["sm_screenshot"]({"navigate": "Settings"})
+
+    assert result.ok is False
+    assert result.error is not None
+    assert "not acknowledged" in result.error
+    assert captures == []
 
 
 def test_handler_no_gui_returns_ok_false(monkeypatch):
     monkeypatch.setattr(
-        tools_screenshot, "_bridge_capture_app_window", lambda *a, **kw: (None, 0, 0)
+        tools_screenshot,
+        "_bridge_capture_app_window_info",
+        lambda *a, **kw: {
+            "image_b64": None,
+            "width": 0,
+            "height": 0,
+            "source": None,
+            "error": "capture_failed",
+        },
     )
     handlers = tools_screenshot.get_handlers()
     result = handlers["sm_screenshot"]({})
@@ -217,7 +318,11 @@ def test_handler_no_gui_returns_ok_false(monkeypatch):
 
 
 def test_handler_invalid_view(monkeypatch):
-    monkeypatch.setattr(tools_screenshot, "_bridge_capture_app_window", lambda: (None, 0, 0))
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window_info",
+        lambda **kw: {"image_b64": None, "width": 0, "height": 0, "source": None},
+    )
     handlers = tools_screenshot.get_handlers()
     result = handlers["sm_screenshot"]({"navigate": "Bogus"})
 
@@ -229,11 +334,19 @@ def test_handler_save_true_writes_png(monkeypatch, tmp_path):
     b64 = _make_png_b64()
     monkeypatch.setattr(
         tools_screenshot,
-        "_bridge_capture_app_window",
-        lambda *a, **kw: (b64, 10, 10),
+        "_bridge_capture_app_window_info",
+        lambda *a, **kw: {
+            "image_b64": b64,
+            "width": 10,
+            "height": 10,
+            "source": "native",
+            "error": None,
+        },
     )
     monkeypatch.setattr(
-        tools_screenshot, "_bridge_send_navigation_command", lambda v: {"ok": True, "view": v}
+        tools_screenshot,
+        "_bridge_navigate_view",
+        lambda v: {"ok": True, "view": v, "in_process": True, "verified": True},
     )
     monkeypatch.setattr(tools_screenshot, "_REPO_ROOT", tmp_path)
     handlers = tools_screenshot.get_handlers()

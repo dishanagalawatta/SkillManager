@@ -512,3 +512,343 @@ class JobStatusResponse(BaseModel):
     """Async job status/result."""
 
     job: Job
+
+
+# ---------------------------------------------------------------------------
+# sm_get_current_view
+# ---------------------------------------------------------------------------
+class GetCurrentViewRequest(BaseModel):
+    """Report the currently active QML view (Library / QuickCopy / Settings / …)."""
+
+    pass
+
+
+class GetCurrentViewResponse(BaseModel):
+    """Current view snapshot."""
+
+    view: str
+    ok: bool
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_inspect_qml_tree
+# ---------------------------------------------------------------------------
+class InspectQmlTreeRequest(BaseModel):
+    """Capture a bounded snapshot of the QML object tree."""
+
+    max_depth: int = Field(
+        default=5, ge=1, le=20, description="Maximum recursion depth into children."
+    )
+
+
+class QmlNode(BaseModel):
+    """A single node in the QML tree snapshot."""
+
+    object_name: str
+    class_name: str
+    visible: bool
+    enabled: bool
+    x: int
+    y: int
+    width: int
+    height: int
+    children: list[QmlNode] = Field(default_factory=list)
+
+
+class InspectQmlTreeResponse(BaseModel):
+    """QML tree inspection result."""
+
+    ok: bool
+    root_count: int
+    tree: list[QmlNode]
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_get_pixel_color
+# ---------------------------------------------------------------------------
+class GetPixelColorRequest(BaseModel):
+    """Read the pixel color at a screen coordinate (real GUI only)."""
+
+    x: int = Field(description="X coordinate of the pixel to sample.")
+    y: int = Field(description="Y coordinate of the pixel to sample.")
+
+
+class GetPixelColorResponse(BaseModel):
+    """Pixel color sample result."""
+
+    ok: bool
+    color: str = Field(description="Hex color in #RRGGBB format.")
+    r: int = Field(description="Red channel (0-255).")
+    g: int = Field(description="Green channel (0-255).")
+    b: int = Field(description="Blue channel (0-255).")
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_get_performance_metrics
+# ---------------------------------------------------------------------------
+class GetPerformanceMetricsRequest(BaseModel):
+    """Snapshot process-level performance metrics (memory, CPU, threads)."""
+
+    pass
+
+
+class PerformanceMetricsResponse(BaseModel):
+    """Performance metrics snapshot."""
+
+    ok: bool
+    memory_mb: float = Field(description="Resident memory in megabytes.")
+    cpu_percent: float = Field(description="CPU usage percent (0-100).")
+    thread_count: int = Field(description="Number of live threads.")
+    process_id: int = Field(description="OS process identifier.")
+    uptime_seconds: float = Field(description="Process uptime in seconds.")
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_measure_startup_time
+# ---------------------------------------------------------------------------
+class MeasureStartupTimeRequest(BaseModel):
+    """Measure application startup time."""
+
+    pass
+
+
+class MeasureStartupTimeResponse(BaseModel):
+    """Startup timing result."""
+
+    ok: bool
+    startup_ms: float = Field(description="Startup duration in milliseconds.")
+    timestamp: str = Field(description="ISO-8601 timestamp of the measurement.")
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_detect_qml_errors
+# ---------------------------------------------------------------------------
+class DetectQmlErrorsRequest(BaseModel):
+    """Collect recent QML/JavaScript error messages from the Qt message handler."""
+
+    limit: int = Field(default=50, ge=1, le=500, description="Max number of errors to return.")
+
+
+class QmlError(BaseModel):
+    """A single QML error/log entry."""
+
+    ts: str = Field(description="ISO-8601 timestamp of the error.")
+    level: str = Field(description="Severity level (debug, info, warning, critical, fatal).")
+    msg: str = Field(description="Error message text.")
+    file: str | None = Field(default=None, description="Source file where the error occurred.")
+    line: int | None = Field(default=None, description="Source line number, if available.")
+    column: int | None = Field(default=None, description="Source column number, if available.")
+
+
+class DetectQmlErrorsResponse(BaseModel):
+    """QML error detection result."""
+
+    ok: bool
+    count: int
+    errors: list[QmlError]
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_compare_screenshot
+# ---------------------------------------------------------------------------
+class CompareScreenshotRequest(BaseModel):
+    """Compare a baseline screenshot against the current (or supplied) GUI screenshot."""
+
+    baseline_b64: str = Field(description="Base64-encoded PNG of the baseline image.")
+    current_b64: str | None = Field(
+        default=None,
+        description="Base64-encoded PNG of the current image; null = capture live GUI.",
+    )
+    threshold: float = Field(
+        default=0.95, ge=0, le=1, description="Similarity threshold (0-1) for pass/fail."
+    )
+
+
+class CompareScreenshotResponse(BaseModel):
+    """Screenshot comparison result."""
+
+    ok: bool
+    similarity: float = Field(description="Structural similarity score (0-1).")
+    diff_pixels: int = Field(description="Number of differing pixels.")
+    total_pixels: int = Field(description="Total pixel count of the images.")
+    within_threshold: bool = Field(description="True when similarity >= threshold.")
+    issues: list[str] = Field(default_factory=list)
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_find_visual_issues
+# ---------------------------------------------------------------------------
+class VisualIssueType(StrEnum):
+    """Category of a detected visual issue."""
+
+    CLIPPING = "clipping"
+    CONTRAST = "contrast"
+    OVERLAP = "overlap"
+    EMPTY = "empty"
+    UNKNOWN = "unknown"
+
+
+class VisualIssueSeverity(StrEnum):
+    """Severity of a detected visual issue."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class VisualIssue(BaseModel):
+    """A single detected visual issue."""
+
+    type: str = Field(description="Issue category (clipping, contrast, overlap, empty, unknown).")
+    severity: str = Field(description="Severity (low, medium, high).")
+    description: str = Field(description="Human-readable description of the issue.")
+    location: dict | None = Field(
+        default=None, description="Normalized location {x, y, width, height} or null."
+    )
+
+
+class FindVisualIssuesRequest(BaseModel):
+    """Scan an image for common visual issues (clipping, contrast, overlap)."""
+
+    image_b64: str = Field(description="Base64-encoded PNG image to inspect.")
+    check_clipping: bool = Field(default=True, description="Check for text/UI clipping at edges.")
+    check_contrast: bool = Field(default=True, description="Check for insufficient color contrast.")
+    check_overlap: bool = Field(default=True, description="Check for overlapping UI elements.")
+
+
+class FindVisualIssuesResponse(BaseModel):
+    """Visual issue detection result."""
+
+    ok: bool
+    issue_count: int
+    issues: list[VisualIssue]
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_run_ui_scenario
+# ---------------------------------------------------------------------------
+class UiScenario(StrEnum):
+    """Named UI navigation scenarios for automated walkthroughs."""
+
+    NAVIGATE_LIBRARY = "navigate_library"
+    NAVIGATE_QUICKCOPY = "navigate_quickcopy"
+    NAVIGATE_UPDATES = "navigate_updates"
+    NAVIGATE_SETTINGS = "navigate_settings"
+    FULL_TOUR = "full_tour"
+
+
+class ScenarioStep(BaseModel):
+    """A single step within a UI scenario walkthrough."""
+
+    step: int = Field(description="1-based step index within the scenario.")
+    action: str = Field(description="Action performed (click, navigate, wait, …).")
+    target: str = Field(description="QML object or view targeted by the action.")
+    ok: bool = Field(description="Whether the step completed successfully.")
+    error: str | None = Field(default=None, description="Error message if the step failed.")
+    screenshot: str | None = Field(
+        default=None, description="Base64 PNG captured after the step, if any."
+    )
+
+
+class RunUiScenarioRequest(BaseModel):
+    """Execute a predefined UI navigation scenario against the live GUI."""
+
+    scenario: UiScenario = Field(description="Scenario to run.")
+    params: dict | None = Field(default=None, description="Optional scenario-specific parameters.")
+
+
+class RunUiScenarioResponse(BaseModel):
+    """UI scenario execution result."""
+
+    ok: bool
+    scenario: str
+    steps: list[ScenarioStep]
+    result: str = Field(description="Outcome: 'passed' or 'failed'.")
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_compare_screenshot (baseline name support)
+# ---------------------------------------------------------------------------
+# baseline_name is an optional addition to CompareScreenshotRequest.
+# Declared here as a separate model for clarity; the request model above
+# already accepts baseline_b64. Clients may supply baseline_name instead of
+# (or in addition to) baseline_b64 — the server resolves it under
+# .agents/screenshots/<baseline_name>.png.
+
+
+# ---------------------------------------------------------------------------
+# sm_get_frame_timing (QML render performance)
+# ---------------------------------------------------------------------------
+class FrameSample(BaseModel):
+    """A single QML render frame timing sample."""
+
+    frame_index: int = Field(description="0-based frame index within the sample window.")
+    duration_ms: float = Field(description="Frame render duration in milliseconds.")
+    timestamp: str = Field(description="ISO-8601 timestamp of the sample.")
+
+
+class GetFrameTimingRequest(BaseModel):
+    """Capture QML render frame timings over a sampling window."""
+
+    duration_s: float = Field(
+        default=2.0, ge=0.5, le=30.0, description="Sampling window in seconds."
+    )
+
+
+class GetFrameTimingResponse(BaseModel):
+    """QML frame-timing measurement result."""
+
+    ok: bool
+    duration_s: float
+    frame_count: int
+    fps: float
+    avg_frame_ms: float
+    p95_frame_ms: float
+    max_frame_ms: float
+    dropped_frames: int
+    samples: list[FrameSample] = Field(default_factory=list)
+    error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# sm_accessibility_audit (QML accessibility issues)
+# ---------------------------------------------------------------------------
+class A11yIssue(BaseModel):
+    """A single accessibility issue found in the QML tree."""
+
+    object_name: str = Field(description="QML objectName of the offending element.")
+    class_name: str = Field(description="QML class name of the element.")
+    issue_type: str = Field(
+        description="Category: missing_role, missing_name, no_keyboard_focus, "
+        "unlabeled_button, unannounced_change, low_contrast_text."
+    )
+    severity: str = Field(description="Severity: low, medium, high.")
+    description: str = Field(description="Human-readable description of the issue.")
+    suggestion: str | None = Field(
+        default=None, description="Suggested fix (e.g. set Accessible.name)."
+    )
+
+
+class AccessibilityAuditRequest(BaseModel):
+    """Audit the QML tree for accessibility issues."""
+
+    max_depth: int = Field(default=10, ge=1, le=30, description="Maximum QML tree depth to audit.")
+
+
+class AccessibilityAuditResponse(BaseModel):
+    """Accessibility audit result."""
+
+    ok: bool
+    element_count: int
+    issue_count: int
+    issues: list[A11yIssue] = Field(default_factory=list)
+    error: str | None = None

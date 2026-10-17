@@ -73,10 +73,32 @@ All tools use the prefix `sm_`. Every response is wrapped in a uniform JSON enve
 | Tool | Args | Description |
 |------|------|-------------|
 | `sm_static_analyze` | `{pattern, path?}` | Regex grep over codebase (gitignore-aware). |
-| `sm_get_health` | `{}` | Application & bridge health status snapshot. |
+| `sm_get_health` | `{}` | Application & bridge health status snapshot (includes `qml.enabled/loaded/error`). |
 | `sm_get_diagnostics` | `{limit?}` | Read recent diagnostic ring-buffer entries. |
 | `sm_dump_state` | `{}` | Export safe subset of controller & model configuration state. |
-| `sm_screenshot` | `{navigate?, save?}` | Capture live GUI app window screenshot as base64 PNG. |
+| `sm_detect_qml_errors` | `{limit?}` | Scan the diagnostic buffer for QML/JavaScript errors. |
+| `sm_get_performance_metrics` | `{}` | Memory, CPU, thread count, PID, uptime. |
+
+### UI Inspection & Visual Verification
+These work with **no GUI running**: in `--mcp` mode the first call lazily loads
+`Main.qml` on the offscreen platform plugin (~1.7 s, one-time) and renders it
+headlessly. Nothing is ever painted on your desktop, and the headless process
+never writes your UI state back to `config.json`. Set `SKILL_MANAGER_MCP_NO_IPC=1`
+to keep the server from talking to a running GUI at all (it then refuses with
+`ipc_disabled` and uses the headless render).
+
+| Tool | Args | Description |
+|------|------|-------------|
+| `sm_screenshot` | `{navigate?, save?, width?, height?}` | Capture the window as base64 PNG. `data.source` is `live-gui`, `native` or `headless-qml`. |
+| `sm_inspect_qml_tree` | `{max_depth?}` | QML object tree (names, classes, geometry, `child_count`); returns `root_count`/`node_count`. |
+| `sm_accessibility_audit` | `{max_depth?}` | Audit the tree for missing roles/names and unlabeled buttons. |
+| `sm_get_current_view` | `{}` | Active view (`Library` / `QuickCopy` / `Updates` / `Settings`). |
+| `sm_get_pixel_color` | `{x, y}` | RGB/hex color of a pixel in the captured window. |
+| `sm_find_visual_issues` | `{image_b64?, check_*?}` | Clipping/contrast/overlap scan; omit `image_b64` to analyse the current window. |
+| `sm_compare_screenshot` | `{baseline_b64?/baseline_name?, current_b64?, threshold?}` | Structural + perceptual (pHash) diff against a baseline. |
+| `sm_run_ui_scenario` | `{scenario}` | Run `navigate_library` / `navigate_quickcopy` / `navigate_updates` / `navigate_settings` / `full_tour`, verifying each step (`in_process`, `verified`). |
+| `sm_get_frame_timing` | `{duration_s?, force_render?}` | Frame durations; `mode` is `natural` / `forced_60hz` / `unavailable` / `invalid`. Idle UIs report 0 frames unless `force_render=true`. |
+| `sm_measure_startup_time` | `{}` | Time headless controller access; ms + timestamp. |
 
 ## Safety & Exclusion Rules
 
