@@ -69,7 +69,9 @@ def test_update_multi_project_emits_single_batch(tmp_path: Path, qtbot):
         category="General",
         project_labels=[project_label(p) for p in (proj_a, proj_b, proj_c)],
     )
-    qtbot.wait(150)
+    # Wait for the batch prompt instead of racing a fixed sleep: under parallel
+    # test load 150 ms was not always enough and the test flaked.
+    qtbot.waitUntil(lambda: len(batches) == 1, timeout=5000)
 
     # Only ONE prompt total; batch path used for >1 project missing.
     assert len(singles) == 0, f"expected no single prompts, got {singles}"
