@@ -380,11 +380,27 @@ def _no_ipc(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _set_native_capture(
+    monkeypatch: pytest.MonkeyPatch, result: tuple[str | None, int, int]
+) -> None:
+    """Force the outcome of the platform-native capture on whichever OS runs.
+
+    ``capture_app_window_info`` dispatches on ``sys.platform``, so patching only
+    ``_fallback_capture_linux`` silently stopped working on the Windows CI
+    runner (it calls ``_fallback_capture_win32``).
+    """
+    monkeypatch.setattr(bridge_capture, "_fallback_capture_linux", lambda *a, **kw: result)
+    monkeypatch.setattr(bridge_capture, "_fallback_capture_win32", lambda *a, **kw: result)
+
+
 def test_capture_info_reports_live_gui(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """An IPC capture is labelled ``live-gui``."""
     image_path = tmp_path / "shot.png"
     Image.new("RGB", (12, 7), "blue").save(image_path)
     _no_ipc(monkeypatch)
+    # On Windows the IPC strategy is skipped unless a window handle exists, so
+    # supply one: provenance must not depend on which OS runs the suite.
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: 4242)
     monkeypatch.setattr(
         bridge_capture,
         "send_capture_command",
@@ -401,7 +417,7 @@ def test_capture_info_reports_live_gui(monkeypatch: pytest.MonkeyPatch, tmp_path
 def test_capture_info_reports_native(monkeypatch: pytest.MonkeyPatch) -> None:
     """A platform-native capture is labelled ``native``."""
     _no_ipc(monkeypatch)
-    monkeypatch.setattr(bridge_capture, "_fallback_capture_linux", lambda: ("NATIVE", 20, 10))
+    _set_native_capture(monkeypatch, ("NATIVE", 20, 10))
     monkeypatch.setattr(qh, "headless_qml_enabled", lambda: False)
 
     info = bridge_capture.capture_app_window_info()
@@ -413,7 +429,7 @@ def test_capture_info_reports_native(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_capture_info_falls_back_to_headless_qml(monkeypatch: pytest.MonkeyPatch) -> None:
     """With no GUI, an enabled headless engine provides the render."""
     _no_ipc(monkeypatch)
-    monkeypatch.setattr(bridge_capture, "_fallback_capture_linux", lambda: (None, 0, 0))
+    _set_native_capture(monkeypatch, (None, 0, 0))
     monkeypatch.setattr(qh, "headless_qml_enabled", lambda: True)
     monkeypatch.setattr(qh, "capture_headless_window", lambda *a, **kw: ("HEADLESS", 800, 600))
 
@@ -426,7 +442,7 @@ def test_capture_info_falls_back_to_headless_qml(monkeypatch: pytest.MonkeyPatch
 def test_capture_info_skips_headless_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Headless rendering is opt-in, so the bridge stays inert outside --mcp."""
     _no_ipc(monkeypatch)
-    monkeypatch.setattr(bridge_capture, "_fallback_capture_linux", lambda: (None, 0, 0))
+    _set_native_capture(monkeypatch, (None, 0, 0))
     called: list[int] = []
     monkeypatch.setattr(qh, "headless_qml_enabled", lambda: False)
     monkeypatch.setattr(qh, "capture_headless_window", lambda *a, **kw: called.append(1))
@@ -436,6 +452,33 @@ def test_capture_info_skips_headless_when_disabled(monkeypatch: pytest.MonkeyPat
     assert info["source"] is None
     assert info["error"] == "capture_failed"
     assert called == []
+
+
+def test_capture_info_windows_requires_a_window_handle_for_ipc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On Windows the IPC strategy is skipped unless a window handle exists.
+
+    Pinned deliberately: CI runs these tests on ``windows-latest``, where the
+    guard below decides which strategies are reachable at all. Emulating the
+    platform inside the module keeps the contract tested on Linux too.
+    """
+    monkeypatch.setattr(bridge_capture, "sys", SimpleNamespace(platform="win32"))
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: None)
+    _set_native_capture(monkeypatch, (None, 0, 0))
+    monkeypatch.setattr(qh, "headless_qml_enabled", lambda: False)
+    ipc_calls: list[int] = []
+    monkeypatch.setattr(
+        bridge_capture,
+        "send_capture_command",
+        lambda **kwargs: ipc_calls.append(1) or {"ok": False},
+    )
+
+    info = bridge_capture.capture_app_window_info()
+
+    assert ipc_calls == [], "Windows must not send an IPC capture command without a window"
+    assert info["source"] is None
+    assert info["error"] == "capture_failed"
 
 
 def test_capture_app_window_still_returns_tuple(monkeypatch: pytest.MonkeyPatch) -> None:
