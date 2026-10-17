@@ -128,14 +128,22 @@ sequenceDiagram
 - One more code path to keep correct: `QQuickStyle`/`QSurfaceFormat` ordering and
   the `show()` requirement are load-bearing and would fail subtly (black images)
   if reordered.
+- The accessibility classifier only half-works on real QML trees: its class lists
+  hold plain Qt names (`qpushbutton`, `text`, …) but QML-defined types report
+  `Foo_QMLTYPE_<n>`, so `missing_name` / `missing_role` never fire and only the
+  `"button"` substring check does — 8 `unlabeled_button` issues on
+  `DialogButtonBox_QMLTYPE_52` instances at `max_depth=12`. "App components are
+  clean" therefore cannot be concluded from it; the classifier needs
+  QML-type-aware matching (follow-up, documented in `docs/MCP_SERVER.md`).
 
 ### Neutral
 
 - `--mcp-light` is unchanged (no `QGuiApplication`, no UI tools).
 - `SKILL_MANAGER_MCP_PLATFORM` overrides the pinned offscreen platform for
   debugging, e.g. to run the server against a real X11 display.
-- The audit surfaces Qt-internal dialog buttons (`DialogButtonBox` from Qt Quick
-  Dialogs) as `unlabeled_button`; app components are clean.
+- The audit surfaces `DialogButtonBox` instances (Qt Quick Dialogs' button box,
+  instantiated by the app's dialogs) as `unlabeled_button`; the class-name
+  matching limitation above is why nothing else is classified.
 
 ## Alternatives Considered
 

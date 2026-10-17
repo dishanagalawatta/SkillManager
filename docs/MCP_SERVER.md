@@ -211,9 +211,14 @@ All tools return structured JSON, names prefixed `sm_`.
 - `sm_accessibility_audit` — traverse the QML object tree and flag
   accessibility issues: missing Accessible roles, missing accessible names,
   unlabeled buttons, and elements without keyboard focus support. Read-only;
-  loads `Main.qml` offscreen on demand in headless mode. (Qt-internal dialog
-  buttons are reported as `unlabeled_button`; those come from Qt Quick Dialogs,
-  not app components.)
+  loads `Main.qml` offscreen on demand in headless mode.
+  **Verified limitation:** the class lists hold plain Qt names (`qpushbutton`,
+  `text`, …) while QML-defined types report `Foo_QMLTYPE_<n>`, so the
+  `missing_name` / `missing_role` checks currently match nothing in a real
+  `Main.qml` tree — only the `"button"` substring check fires, which also
+  catches containers. Against a stock library view (`max_depth=12`) that
+  yields 8 `unlabeled_button` issues, all on `DialogButtonBox_QMLTYPE_52`
+  instances sharing the auto-generated name `dialogbuttonbox_qmltype_52`.
 
 **Bug Detection** (always on, read-only)
 - `sm_detect_qml_errors` — scan the diagnostic ring buffer for QML/JavaScript
