@@ -881,7 +881,13 @@ def test_save_screenshot_success(controller, mock_app, tmp_path):
     assert screenshots_dir.exists()
 
     files = list(screenshots_dir.glob("Screenshot_*.png"))
-    assert len(files) == 1
+    assert len(files) == 1, (
+        f"saveSnap produced {len(files)} screenshot file(s). "
+        f"_set_status calls: {mock_app._set_status.call_args_list!r}. "
+        "'Failed to save snap.' means QPixmap.save() failed (e.g. a transient "
+        "filesystem error under load); an empty status list means the file was "
+        "written and then disappeared."
+    )
 
     # Check model updates
     mock_app._library_model.addOrUpdateSkills.assert_called_once()
