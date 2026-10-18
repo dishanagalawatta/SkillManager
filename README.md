@@ -2,26 +2,6 @@
   <img src="assets/brand/logo.png" alt="SkillManager Logo" width="110" />
   <h1>SkillManager</h1>
   <p><strong>The desktop command center for organizing, syncing, and deploying AI agent skills across your repositories.</strong></p>
-
-  <p>
-    <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.12%2B-3776AB.svg?logo=python&logoColor=white" alt="Python 3.12+" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT" /></a>
-    <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-2.12.1-orange.svg" alt="Version" /></a>
-    <a href="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml"><img src="https://github.com/dishanagalawatta/SkillManager/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-    <a href="https://github.com/dishanagalawatta/SkillManager/releases"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-blue.svg" alt="Platforms" /></a>
-    <a href="https://qt.io"><img src="https://img.shields.io/badge/UI-PySide6%20%7C%20Qt%206%20QML-41CD52.svg?logo=qt&logoColor=white" alt="Qt 6 QML" /></a>
-  </p>
-
-  <p>
-    <a href="#-1-command-installation--updates"><strong>Install in 1 Command</strong></a> •
-    <a href="#-see-it-in-action-demo"><strong>Watch Demo</strong></a> •
-    <a href="#️-quick-start-your-first-60-seconds"><strong>First 60s Guide</strong></a> •
-    <a href="#-core-capabilities"><strong>Key Features</strong></a> •
-    <a href="#-snap-to-project-instant-visual-context-for-tui--terminal-agents"><strong>Snap to Project</strong></a> •
-    <a href="#-supported-ai-agents--reference-formats"><strong>Agent Formats</strong></a> •
-    <a href="#-developer--contributor-quickstart"><strong>Developer Guide</strong></a> •
-    <a href="docs/README.md"><strong>Full Docs</strong></a>
-  </p>
 </div>
 
 ---
@@ -49,8 +29,8 @@ However, managing agent skills and multimodal context across multiple project re
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ❌**Skill Drift:** Improved prompts in one repo stay trapped there; other repos run stale skills.                                                                            | ✅**Central Library & Surgical Sync:** One unified source of truth. Updates propagate across repos in milliseconds.                                                                                                          |
 | ❌**Manual Copy-Paste Overhead:** Manually copying `.agents/skills/` folders and forgetting required dependencies.                                                         | ✅**1-Click Multi-Deploy:** Deploy single skills, custom collections, or `.md` commands to multiple projects simultaneously.                                                                                               |
-| ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Quick Copy Companion:** Global hotkey (`Ctrl+Shift+S`) to copy ready-to-paste references formatted for your active agent.                                                                                              |
-| ❌**Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅**Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies the relative path for instant `Ctrl+V` into your TUI/CLI agent. |
+| ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Quick Copy Companion:** Copy ready-to-paste references formatted for your active agent in a click (`Ctrl+C` on a focused skill, or the **Copy Reference** button).                                                                                              |
+| ❌**Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅**Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies a client-formatted reference for instant `Ctrl+V` into your TUI/CLI agent. |
 
 ---
 
@@ -106,12 +86,12 @@ Get productive in 4 straightforward steps:
 
 ```mermaid
 flowchart LR
-    A["1. Launch App\n(Ctrl+Shift+S)"] --> B["2. Connect Sources\n(Git repo or local skills)"]
+    A["1. Launch App\n(from your launcher)"] --> B["2. Connect Sources\n(Git repo or local skills)"]
     B --> C["3. Deploy / Quick Copy\n(1-Click to Project)"]
     C --> D["4. Supercharge Agent\n(Claude, Cursor, Antigravity)"]
 ```
 
-1. **Launch SkillManager**: Open the app from your application launcher or press the global shortcut (`Ctrl+Shift+S`).
+1. **Launch SkillManager**: Open the app from your application launcher. (Note: the global hotkey `Ctrl+Shift+S` does not launch the app — it captures a screenshot; see [Snap to Project](#4--snap-to-project-instant-visual-context-for-tui--terminal-agents).)
 2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into **Updates**), connect your central skills Git repository and local project folders.
 3. **Deploy or Copy Reference**:
    - In **Library**, select skills and click **Copy to Projects** to install them.
@@ -175,7 +155,7 @@ flowchart LR
 ```
 
 - **Auto-Saved Directly to Active Project**: When you snap an area of your screen, SkillManager saves the image directly inside your project repository at `<project_path>/.agents/screenshots/Screenshot_<timestamp>.png`.
-- **Instant Path Copied to Clipboard**: SkillManager automatically puts the exact client-formatted relative path (e.g. `@.agents/screenshots/Screenshot_20260819_190000.png` or `/.agents/screenshots/...`) straight onto your clipboard.
+- **Client-Formatted Path on the Clipboard**: Snaps are copied in your active client format — the relative path (e.g. `.agents/screenshots/Screenshot_20260819_190000.png`), or the `@`-prefixed form for **Gemini CLI** (`@.agents/screenshots/…`). Turn on **Copy Snap in Client Format** in **Settings** to always copy the path rather than the image.
 - **1-Keystroke Terminal Prompting**: Switch to your terminal/TUI coding platform and press `Ctrl+V`. The AI agent immediately has direct filesystem access to read the image—zero file hunting or dragging needed.
 - **Pixel-Level Color PII Redaction**: Isolate and scrub specific pixel colors (passwords, tokens, customer names) before saving, ensuring private data never leaks to LLMs.
 - **Library & Quick Copy Integration**: All captured snaps are automatically indexed under the **Snaps** category for quick recall and cross-project reuse.
@@ -184,16 +164,17 @@ flowchart LR
 
 ## 🔌 Supported AI Agents & Reference Formats
 
-SkillManager formats references to match whatever AI toolchain your team uses:
+SkillManager formats references to match your active **client format**, selected from the top-bar selector (defaults: Plain Text, Gemini CLI, Antigravity, Codex):
 
-| Agent / Tool                    | Skill Reference Syntax              | Snap / Screenshot Syntax                     |
-| ------------------------------- | ----------------------------------- | -------------------------------------------- |
-| **Antigravity**           | `@.agents/skills/<name>/SKILL.md` | `@.agents/screenshots/Screenshot_<ts>.png` |
-| **Claude Code & Desktop** | `.agents/skills/<name>/SKILL.md`  | `.agents/screenshots/Screenshot_<ts>.png`  |
-| **Cursor & VS Code**      | `@<skill-name>`                   | `@.agents/screenshots/Screenshot_<ts>.png` |
-| **Gemini CLI**            | `/path/to/skill`                  | `/.agents/screenshots/Screenshot_<ts>.png` |
-| **OpenCode & Codex**      | `/command-name`                   | `.agents/screenshots/Screenshot_<ts>.png`  |
-| **Plaintext / Custom**    | Standard file paths                 | Full file path                               |
+| Client Format   | Skill Reference Syntax                  | Snap / Screenshot Syntax                            |
+| --------------- | --------------------------------------- | --------------------------------------------------- |
+| **Antigravity** | `/<skill-name>`                       | `.agents/screenshots/Screenshot_<ts>.png`         |
+| **OpenCode**    | `/<skill-name>`                       | `.agents/screenshots/Screenshot_<ts>.png`         |
+| **Gemini CLI**  | `@.agents/skills/<name>/SKILL.md`     | `@.agents/screenshots/Screenshot_<ts>.png`        |
+| **Codex**       | `[$<skill-name>](<path/to/SKILL.md>)` | `[$Screenshot_<ts>.png](<path/to/screenshot.png>)` |
+| **Plain Text**  | `.agents/skills/<name>/SKILL.md`      | `.agents/screenshots/Screenshot_<ts>.png`         |
+
+Commands are emitted in the same client syntax (Codex `[$name](…)`, Antigravity/OpenCode `/<name>`, Gemini CLI `@<name>`). Agents that read plain paths — for example Claude Code and Cursor — use the **Plain Text** format's `.agents/skills/<name>/SKILL.md` reference.
 
 ---
 
@@ -207,6 +188,11 @@ All shortcuts can be re-mapped in **Settings**:
 | `Ctrl+F`            | **Focus Search Bar**                        | Library & Quick Copy |
 | `Ctrl+C`            | **Copy Formatted Reference**                | Focused Skill        |
 | `Ctrl+A`            | **Select All Visible Skills**               | Library View         |
+| `Esc`               | **Clear Selection**                         | Library & Quick Copy |
+| `Delete`            | **Delete Selected Skills**                  | Library View         |
+| `Ctrl+E`            | **Expand All Groups**                       | Library View         |
+| `Ctrl+Shift+E`      | **Collapse All Groups**                     | Library View         |
+| `Home`              | **Jump to Top of List**                     | All Views            |
 | `Alt+1` / `Alt+2` | **Switch between Quick Copy & Library**     | Global in App        |
 | `Alt+3` / `Alt+4` | **Switch between Updates & Settings**       | Global in App        |
 | `Ctrl+T`            | **Toggle Dark / Light Theme**               | Global in App        |
