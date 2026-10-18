@@ -7,7 +7,7 @@ Button {
 
     property string iconText: text
     property string iconSource: ""
-    property string role: "secondary" // secondary, primary, primary-outline, destructive, warning, ghost
+    property string role: "secondary" // secondary, primary, primary-outline, destructive, ghost
     property string tooltipText: ""
     property string accessibleName: tooltipText !== "" ? tooltipText : (iconText !== "" ? iconText : text)
     property int buttonSize: 32
@@ -39,7 +39,6 @@ Button {
                 if (control.role === "primary") return "white"
                 if (control.role === "primary-outline") return Theme.accent
                 if (control.role === "destructive") return Theme.danger
-                if (control.role === "warning") return Theme.warning
                 return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
             }
             horizontalAlignment: Text.AlignHCenter
@@ -66,7 +65,6 @@ Button {
                 if (!control.enabled) return Theme.secondaryLabel
                 if (control.role === "primary") return "white"
                 if (control.role === "destructive") return Theme.danger
-                if (control.role === "warning") return Theme.warning
                 return control.hovered || control.down ? Theme.iconLabel : Theme.iconSecondaryLabel
             }
             secondaryColor: Theme.darkMode ? Qt.rgba(1, 1, 1, 0.35) : (control.hovered ? "#CBD5E1" : "#E2E8F0")
@@ -81,7 +79,6 @@ Button {
             if (control.role === "primary") return control.down ? Theme.glassActive : Theme.accent
             if (control.role === "primary-outline") return control.down ? Theme.alpha(Theme.accent, 0.2) : (control.hovered ? Theme.alpha(Theme.accent, 0.1) : "transparent")
             if (control.role === "destructive") return control.hovered || control.down ? Theme.dangerHover : "transparent"
-            if (control.role === "warning") return control.hovered || control.down ? Theme.warningHover : "transparent"
             if (control.role === "ghost") return control.hovered || control.down ? Theme.glassHover : "transparent"
             return control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
         }
@@ -91,7 +88,6 @@ Button {
             if (control.role === "primary") return "transparent"
             if (control.role === "primary-outline") return Theme.accent
             if (control.role === "destructive") return control.hovered || control.down ? Theme.danger : Theme.glassBorder
-            if (control.role === "warning") return control.hovered || control.down ? Theme.warning : Theme.glassBorder
             if (control.role === "ghost") return control.hovered || control.down ? Theme.glassBorder : "transparent"
             return control.hovered || control.down ? Theme.separator : Theme.glassBorder
         }
