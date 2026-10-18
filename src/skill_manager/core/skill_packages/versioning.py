@@ -159,7 +159,7 @@ def probe_git_remote_version(
 
     # 1. Tags, newest semantic version first.
     try:
-        output = git_cmd.execute(
+        output = git_cmd.execute(  # type: ignore[reportCallIssue]
             ["git"] + config_args + ["ls-remote", "--tags", "--sort=-v:refname", "--", url],
             env=env,
             kill_after_timeout=timeout,
@@ -178,7 +178,7 @@ def probe_git_remote_version(
 
     # 2. HEAD hash fallback for untagged repositories.
     try:
-        output = git_cmd.execute(
+        output = git_cmd.execute(  # type: ignore[reportCallIssue]
             ["git"] + config_args + ["ls-remote", "--", url, "HEAD"],
             env=env,
             kill_after_timeout=timeout,

@@ -175,6 +175,7 @@ class AppController(AppControllerProxyMixin, QObject):
     _stats_up_to_date: int
     _stats_outdated: int
     _stats_missing: int
+    _stats_unchecked: int
     _watcher: SkillFolderWatcher | None
     _scheduler: Any
     _hotkey_id_screenshot: int
