@@ -27,7 +27,7 @@ Item {
     }
 
     // Dynamic height based on visibility of sub-header and item content
-    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 32 : 54))
+    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 32 : 46))
     visible: height > 0
     clip: true
 
@@ -141,7 +141,7 @@ Item {
         // --- SKILL ITEM CONTENT ---
         Item {
             width: parent.width
-            height: root.compactRows ? 32 : 54
+            height: root.compactRows ? 32 : 46
             visible: !root.isMainCollapsed && !root.isSubCollapsed
 
             Rectangle {
