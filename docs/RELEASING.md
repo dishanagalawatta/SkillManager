@@ -124,3 +124,18 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 ```
 The installer verifies every downloaded artifact against the release `SHA256SUMS` manifest
 before installation and aborts on any mismatch (see [docs/SECURITY.md](SECURITY.md)).
+
+### 6. Windows Package Manager (winget) — manual, out-of-band
+`winget` is **not** published yet, so `winget install --id dishanagalawatta.SkillManager`
+currently fails with *"No package found matching input criteria."* Nothing in
+`release-build.yml` submits it; the manifest is published by hand to
+[`microsoft/winget-pkgs`](https://github.com/microsoft/winget-pkgs).
+
+After a release, copy the newest version folder under
+[`packaging/winget/manifests/`](../packaging/winget/README.md) to one named for the new
+version, update `PackageVersion`, `InstallerUrl`, `InstallerSha256` (uppercase, from the
+release `SHA256SUMS`), `ReleaseDate`, and `ReleaseNotesUrl`, then open a PR adding **only
+that folder**. The first submission (v1.8.0,
+[#391299](https://github.com/microsoft/winget-pkgs/pull/391299)) was closed as *Stale*
+without review. See [`packaging/winget/README.md`](../packaging/winget/README.md) for the
+full checklist and the verified values for v2.12.1.

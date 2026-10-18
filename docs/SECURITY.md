@@ -14,7 +14,10 @@ Every release publishes a `SHA256SUMS` manifest alongside its artifacts (`.deb`,
 - If the manifest itself (or the artifact's entry) is unavailable — e.g. very old releases
   that predate checksums — the installer warns and proceeds, since the download still travels
   over TLS from GitHub Releases.
-- Windows (`winget`) installs are verified by Microsoft's package index.
+- Windows: verify the downloaded `SkillManager_Setup.exe` against the release's
+  `SHA256SUMS` manifest (`Get-FileHash .\SkillManager_Setup.exe -Algorithm SHA256`).
+  The `winget` package is **not** published in Microsoft's package index, so
+  winget is not currently an integrity-verified install channel.
 
 ## Shell Command Construction
 

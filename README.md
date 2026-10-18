@@ -8,10 +8,16 @@
 
 ## 📺 See It In Action (Demo)
 
+<!-- TODO(readme): the demo video asset below returns HTTP 404 (verified
+     2026-10-18), so the page rendered a dead embed. The original markup is kept
+     verbatim here — re-upload the overview video, update the src, and move the
+     block back out of this comment.
+
 <div align="center">
   <video src="https://github.com/user-attachments/assets/29541600-3647-474d-8a3e-98160cdd37ff" controls="controls" muted="muted" width="100%" style="max-height: 640px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);"></video>
   <p><em>Watch the overview of SkillManager in action.</em></p>
 </div>
+-->
 
 <p align="center">
   <img src="assets/readme/SkillManager_UI_mockup.jpeg" alt="SkillManager Liquid Glass Desktop Interface" width="100%" style="border-radius: 10px;" />
@@ -63,7 +69,18 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --uninstall
 ```
 
-### 🪟 Windows (winget or Setup.exe)
+### 🪟 Windows (Setup.exe)
+
+Download `SkillManager_Setup.exe` from [GitHub Releases](https://github.com/dishanagalawatta/SkillManager/releases), verify it against the release's `SHA256SUMS`, then run it (if SmartScreen appears, click **More info** → **Run anyway**).
+
+<!-- TODO(readme): winget is NOT published, so the commands below fail with
+     "No package found matching input criteria". Submission
+     microsoft/winget-pkgs#391299 (dishanagalawatta.SkillManager v1.8.0,
+     opened 2026-06-21) was closed UNMERGED as "Stale" by a maintainer on
+     2026-07-21, and `manifests/d/dishanagalawatta` is absent from
+     microsoft/winget-pkgs (verified 2026-10-18). The in-repo manifests under
+     packaging/winget/manifests/ stop at 1.8.0. Re-submit an up-to-date
+     manifest, then move this block back out of the comment.
 
 ```powershell
 # Install via Windows Package Manager (Verified, No SmartScreen warning)
@@ -75,8 +92,7 @@ winget upgrade --id dishanagalawatta.SkillManager
 # Uninstall
 winget uninstall --id dishanagalawatta.SkillManager
 ```
-
-*(Alternatively, download `SkillManager_Setup.exe` directly from [GitHub Releases](https://github.com/dishanagalawatta/SkillManager/releases)).*
+-->
 
 ---
 
@@ -311,12 +327,16 @@ SkillManager works out of the box with sensible defaults. Optional settings can 
 | --------------------------- | ---------------- | --------------------------------------------------------------- |
 | `SKILL_MANAGER_LOG_LEVEL` | `INFO`         | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `SKILL_MANAGER_DATA_DIR`  | (system default) | Custom directory for user settings and local database           |
-| `QT_QPA_PLATFORM`         | native           | Set`offscreen` for headless CI runs                           |
+| `QT_QPA_PLATFORM`         | native           | Set `offscreen` for headless CI runs                          |
 | `POSTHOG_PROJECT_TOKEN`   | *(empty)*      | Optional opt-in analytics token (requires `POSTHOG_HOST`)        |
 | `POSTHOG_HOST`            | *(empty)*      | PostHog instance URL — both token and host are needed to enable  |
 | `SENTRY_DSN`              | *(empty)*      | Optional opt-in crash reporting DSN                             |
 
 See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for full environment documentation.
+
+Telemetry stays off unless both PostHog variables are set, and you can switch it
+off at any time under **Settings → Diagnostics → Share Anonymous Usage Data**.
+See [docs/PRODUCT_TELEMETRY.md](docs/PRODUCT_TELEMETRY.md).
 
 ---
 
@@ -349,7 +369,7 @@ You can also trigger screenshots directly via the camera icon in the SkillManage
 <details>
 <summary><strong>Q: How do I backup my custom collections and project links?</strong></summary>
 
-All configuration is stored locally as standard JSON under your user data directory (`~/.config/SkillManager` on Linux or `%APPDATA%\SkillManager` on Windows). You can back up or migrate this directory at any time.
+All configuration is stored locally as standard JSON under your user data directory (`~/.local/share/SkillManager` on Linux or `%LOCALAPPDATA%\SkillManager` on Windows). You can back up or migrate this directory at any time.
 
 </details>
 
@@ -370,8 +390,8 @@ rm -f ~/.local/bin/skill-manager
 
 ## 🔒 Privacy, Security & Telemetry Notice
 
-- **100% Opt-in Telemetry**: Telemetry (PostHog / Sentry) is **disabled by default**. It is only active if you explicitly configure tokens in `.env`.
-- **Zero Token/Prompt Leaks**: SkillManager **never** logs API tokens, credentials, or custom skill prompt contents.
+- **100% Opt-in Telemetry**: Telemetry (PostHog / Sentry) is **disabled by default**. It is only active if you explicitly configure tokens in `.env`, and you can switch it off at any time under **Settings → Diagnostics → Share Anonymous Usage Data**.
+- **Zero Token/Prompt Leaks**: SkillManager **never** logs API tokens, credentials, or custom skill prompt contents. Crash reports are scrubbed of local file paths, usernames, and source lines before they leave your machine.
 - **Open Markdown Standard**: Skills and commands are stored as plain Markdown files (`SKILL.md`, `.md`) on your local filesystem—zero proprietary database lock-in.
 
 See [docs/SECURITY.md](docs/SECURITY.md) for our full security policy.

@@ -100,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 |---|---|
 | `--update`, `-u` | Check for updates and install if a newer version exists |
 | `--uninstall` | Remove SkillManager and desktop shortcuts |
-| `--purge` | With `--uninstall`: removes `~/.config/SkillManager` and user data |
+| `--purge` | With `--uninstall`: removes user data (`~/.local/share/SkillManager`, plus legacy `~/.config/SkillManager` and `~/.cache/SkillManager`) |
 | `--deb` | Force installation via Debian package (`.deb`) |
 | `--appimage` | Force installation via portable `AppImage` |
 | `-v`, `--version <VER>` | Install a specific version (e.g. `2.0.0` or `v2.0.0`) |
@@ -109,13 +109,24 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 
 ---
 
-## 2. Windows (Recommended: winget)
+## 2. Windows (Setup.exe)
+
+Download `SkillManager_Setup.exe` from [GitHub Releases](https://github.com/dishanagalawatta/SkillManager/releases) and run it. See [Manual Downloads](#3-manual-downloads-direct-releases) for checksum verification.
+
+> **`winget` is not available yet.** The package is not published in the Windows
+> Package Manager community repository, so `winget install --id
+> dishanagalawatta.SkillManager` fails with *"No package found matching input
+> criteria."* The submission
+> ([microsoft/winget-pkgs#391299](https://github.com/microsoft/winget-pkgs/pull/391299))
+> was closed unmerged. Until a new manifest is merged, use the installer above.
+
+<!-- TODO(install): restore the winget instructions once the manifest is merged.
+     Verified 2026-10-18: `manifests/d/dishanagalawatta` is absent from
+     microsoft/winget-pkgs, and packaging/winget/manifests/ stops at 1.8.0.
 
 ```powershell
 winget install --id dishanagalawatta.SkillManager -e --source winget
 ```
-
-This installs SkillManager via Windows Package Manager. The binary is distributed through Microsoft's package index with verified hashes, so **no SmartScreen warnings appear**.
 
 ### Update (Windows)
 
@@ -128,6 +139,7 @@ winget upgrade --id dishanagalawatta.SkillManager
 ```powershell
 winget uninstall --id dishanagalawatta.SkillManager
 ```
+-->
 
 ---
 
