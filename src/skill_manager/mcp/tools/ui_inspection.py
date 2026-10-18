@@ -33,10 +33,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "sm_inspect_qml_tree": {
         "description": (
-            "Capture a bounded snapshot of the QML object tree (object names, classes, geometry, "
-            "visibility, child counts). Returns root_count and node_count plus the nested tree; "
-            "nodes at max_depth set truncated:true. Read-only. Works in headless --mcp mode by "
-            "rendering Main.qml offscreen on demand; no running GUI required."
+            "Capture a bounded snapshot of the QML object tree (object names, QML "
+            "types, accessible role/name, geometry, visibility, child counts). "
+            "Returns root_count and node_count plus the nested tree; nodes at "
+            "max_depth set truncated:true. Read-only. Works in headless --mcp mode "
+            "by rendering Main.qml offscreen on demand; no running GUI required."
         ),
         "annotations": {
             "readOnlyHint": True,

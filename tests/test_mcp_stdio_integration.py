@@ -223,12 +223,41 @@ def test_mcp_stdio_headless_ui_tools_work(
     assert tree["data"]["root_count"] >= 1
     root = tree["data"]["tree"][0]
     assert root["class_name"]
+    # Regression: class_name used to be the Python class, which is "QQuickItem"
+    # for every QML item and therefore identifies nothing.
+    assert root["class_name"] != "QQuickItem", "tree reported the Python class, not the QML type"
+    assert root["accessible_role"] == "Window"
+    assert root["accessible_name"]
     assert root["width"] > 0 and root["height"] > 0
     assert root["children"], "QML root has no children — the window did not render"
 
     audit = results["sm_accessibility_audit"]
     assert audit["ok"] is True, audit.get("error")
-    assert audit["data"]["element_count"] > 0
+    audit_data = audit["data"]
+    assert audit_data["element_count"] > 0
+    # The audit reads Qt's accessible tree (what assistive technology sees), so
+    # every issue names a real control role and no container is ever flagged —
+    # the class-name classifier produced 8 bogus DialogButtonBox issues and
+    # never reported a genuinely unnamed control.
+    assert audit_data["source"] == "accessible-tree"
+    assert audit_data["accessible_nodes"] > 0
+    for issue in audit_data["issues"]:
+        assert issue["role"] in {
+            "Button",
+            "CheckBox",
+            "ComboBox",
+            "EditableText",
+            "Link",
+            "MenuItem",
+            "PageTab",
+            "RadioButton",
+            "Slider",
+            "SpinBox",
+            "Switch",
+            "ToolButton",
+        }, issue
+        assert issue["path"]
+        assert "box" not in issue["class_name"].lower(), issue
 
     shot = results["sm_screenshot"]
     assert shot["ok"] is True, shot.get("error")

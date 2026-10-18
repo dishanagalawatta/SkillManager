@@ -80,9 +80,10 @@ Key properties (all pinned by tests):
 | Provenance | `capture_app_window_info()` returns `source`: `live-gui` (IPC) → `native` (platform API) → `headless-qml`, or `null` with an error |
 
 Real headless output for reference (isolated data dir, default window 880×640):
-QML tree = 1 root `QQuickWindow` + 362 items and 25 named objects
+QML tree = 1 root (`Main_QMLTYPE_41`) + 362 items and 25 named objects
 (`navLibrary`, `viewLoader`, `LibraryView`, `libraryList`, …), accessibility
-audit = 386 elements, screenshot ≈ 30 KB PNG with ≈ 1400 distinct colours.
+audit = 86 accessible nodes / 7 unnamed controls, screenshot ≈ 30 KB PNG with
+≈ 1400 distinct colours.
 
 ### Module layout (`src/skill_manager/mcp/`)
 ```
@@ -104,7 +105,8 @@ mcp/
     _static.py         # repo-root constants, ignore rules
     _telemetry.py      # diagnostics/health aggregation
     _ui_inspection.py  # pixel color, QML tree (window contentItem aware), view
-    _accessibility.py  # QML accessibility audit
+    _qml_object.py     # shared QML type-name + QAccessible role/name reads
+    _accessibility.py  # accessible-tree accessibility audit
     _performance.py    # startup time and runtime metrics
     _frame_timing.py   # frame sampling (natural / forced_60hz)
     _visual_analysis.py# visual comparison and layout-issue detection
@@ -208,17 +210,15 @@ All tools return structured JSON, names prefixed `sm_`.
   and measure real per-frame costs.
 
 **Accessibility** (always on, read-only)
-- `sm_accessibility_audit` — traverse the QML object tree and flag
-  accessibility issues: missing Accessible roles, missing accessible names,
-  unlabeled buttons, and elements without keyboard focus support. Read-only;
-  loads `Main.qml` offscreen on demand in headless mode.
-  **Verified limitation:** the class lists hold plain Qt names (`qpushbutton`,
-  `text`, …) while QML-defined types report `Foo_QMLTYPE_<n>`, so the
-  `missing_name` / `missing_role` checks currently match nothing in a real
-  `Main.qml` tree — only the `"button"` substring check fires, which also
-  catches containers. Against a stock library view (`max_depth=12`) that
-  yields 8 `unlabeled_button` issues, all on `DialogButtonBox_QMLTYPE_52`
-  instances sharing the auto-generated name `dialogbuttonbox_qmltype_52`.
+- `sm_accessibility_audit` — audit the UI by walking **Qt's accessible tree**
+  (what assistive technology sees): every exposed control with no accessible
+  name is reported as `unlabeled_button` (buttons) or `missing_name` (another
+  interactive role), with its role, node path and window rect so it can be
+  located on a screenshot. Containers, layouts and static text are not in that
+  tree, so they are never flagged. Read-only; loads `Main.qml` offscreen on
+  demand in headless mode. Against a stock library view (`max_depth=12`) it
+  reports 86 accessible nodes and 7 unnamed controls (3 buttons, 4 text
+  inputs/dropdowns) — all real app controls.
 
 **Bug Detection** (always on, read-only)
 - `sm_detect_qml_errors` — scan the diagnostic ring buffer for QML/JavaScript
@@ -484,7 +484,7 @@ mcpServers:
 | `sm_measure_startup_time` | Time headless controller access; return ms + timestamp | No |
 | `sm_get_performance_metrics` | Return memory, CPU, thread count, PID, uptime | No |
 | `sm_get_frame_timing` | Capture QML render frames; report mode, FPS, p95/max frame ms | No |
-| `sm_accessibility_audit` | Audit QML tree for missing roles/names, unlabeled buttons | No |
+| `sm_accessibility_audit` | Audit Qt's accessible tree for controls with no accessible name (role, path, rect) | No |
 | `sm_detect_qml_errors` | Scan diagnostic buffer for QML/JavaScript errors | No |
 | `sm_compare_screenshot` | Diff baseline vs current PNG; structural + perceptual similarity | No |
 | `sm_find_visual_issues` | Scan a PNG (or the current window) for clipping/contrast issues | No |
@@ -678,15 +678,24 @@ objects for the stock library view).
 ```json
 { "ok": true, "tool": "sm_inspect_qml_tree",
   "data": { "root_count": 1, "node_count": 363, "max_depth": 12, "tree": [
-    { "object_name": "", "class_name": "QQuickWindow", "visible": true,
-      "enabled": true, "x": 0, "y": 0, "width": 880, "height": 640,
+    { "object_name": "", "class_name": "Main_QMLTYPE_41",
+      "accessible_role": "Window", "accessible_name": "SkillManager",
+      "visible": true, "enabled": true, "x": 0, "y": 0, "width": 880, "height": 640,
       "child_count": 1, "truncated": false, "children": [ ... ] }
   ], "error": null } }
 ```
 
-- Each node has `object_name`, `class_name`, `visible`, `enabled`, `x`, `y`,
-  `width`, `height`, `child_count`, `truncated` and a recursive `children`
-  array.
+- Each node has `object_name`, `class_name`, `accessible_role`,
+  `accessible_name`, `visible`, `enabled`, `x`, `y`, `width`, `height`,
+  `child_count`, `truncated` and a recursive `children` array.
+- `class_name` is the **QML type** (`Main_QMLTYPE_41`, `IconButton_QMLTYPE_22`),
+  not the Python class: PySide reports `QQuickItem` for every QML item, which
+  cannot identify a control. Nodes that really are plain `QQuickItem` containers
+  still report `QQuickItem`.
+- `accessible_role` / `accessible_name` are what Qt's accessibility layer
+  exposes for the node (both empty for layouts, static text and other
+  non-accessible nodes) — the same source `sm_accessibility_audit` classifies,
+  so an unnamed control can be located here and diagnosed there.
 - `root_count` is the number of top-level QML root objects; `node_count` is the
   total serialized nodes; `truncated` marks nodes whose children were cut at
   `max_depth` (their `child_count` still reports the real count).
@@ -975,42 +984,66 @@ FPS, avg/p95/max frame duration, and dropped frames (frames exceeding
 
 ---
 
-### `sm_accessibility_audit` — QML accessibility audit
+### `sm_accessibility_audit` — accessibility audit (Qt's accessible tree)
 
-Traverses the QML object tree and flags accessibility issues: missing
-Accessible roles, missing accessible names, unlabeled buttons, and elements
-without keyboard focus support. Read-only; lazy-loads `Main.qml` offscreen in
-headless mode. A stock library view audits 386 elements; only Qt-internal dialog
-buttons are flagged (`unlabeled_button`), which come from Qt Quick Dialogs rather
-than app components.
+Walks Qt's **accessible tree** — the object tree Qt exposes to assistive
+technology — and reports every interactive control with no accessible name.
+That is what a screen reader sees, so the audit is accurate and low-noise:
+containers (`DialogButtonBox`), layouts and static text are simply not in the
+tree, while real controls report a role. Read-only; lazy-loads `Main.qml`
+offscreen in headless mode.
+
+If a root exposes no accessible interface at all (a non-QML root, or a Qt build
+without the accessibility bridge) the audit degrades to a class-name walk that
+still reports interactive-looking elements with no role; `source` says which
+traversal produced the result.
 
 **Parameters**
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
-| `max_depth` | integer | `10` | Maximum QML tree depth to audit (1–30). |
+| `max_depth` | integer | `10` | Maximum accessible-tree depth to audit (1–30). A stock `Main.qml` is ~3 deep, so the default covers it. |
 
 **Response envelope**
 
 ```json
 { "ok": true, "tool": "sm_accessibility_audit",
-  "data": { "element_count": 25, "issue_count": 2, "issues": [
-    { "object_name": "save_button", "class_name": "QPushButton",
-      "issue_type": "missing_name", "severity": "high",
-      "description": "Interactive element 'save_button' (QPushButton) has no Accessible name.",
-      "suggestion": "Set Accessible.name on this element." },
-    { "object_name": "cancel_button", "class_name": "QPushButton",
-      "issue_type": "missing_role", "severity": "medium",
-      "description": "Interactive element 'cancel_button' (QPushButton) has no Accessible role.",
-      "suggestion": "Set Accessible.role on this element." }
+  "data": { "source": "accessible-tree", "element_count": 86, "accessible_nodes": 86,
+    "issue_count": 2, "issue_counts_by_type": { "missing_name": 1, "unlabeled_button": 1 },
+    "issues": [
+    { "object_name": "", "class_name": "IconButton_QMLTYPE_22", "role": "Button",
+      "issue_type": "unlabeled_button", "severity": "high", "path": "0.31.4.0",
+      "description": "Button 'IconButton_QMLTYPE_22' (IconButton_QMLTYPE_22) has no accessible name.",
+      "suggestion": "Set Accessible.name on this button, or give it visible text.",
+      "x": 0, "y": 0, "width": 0, "height": 0 },
+    { "object_name": "", "class_name": "GlassDropdown_QMLTYPE_58", "role": "ComboBox",
+      "issue_type": "missing_name", "severity": "high", "path": "0.22",
+      "description": "Interactive element 'GlassDropdown_QMLTYPE_58' (GlassDropdown_QMLTYPE_58) has no accessible name.",
+      "suggestion": "Set Accessible.name on this element.",
+      "x": 615, "y": 118, "width": 160, "height": 36 }
   ], "error": null } }
 ```
 
-- `element_count` is the total number of QML elements traversed.
-- `issue_count` is the number of accessibility issues found.
-- Each issue has `object_name`, `class_name`, `issue_type`, `severity`, `description`, and an optional `suggestion`.
-- `issue_type` is one of: `missing_role`, `missing_name`, `unlabeled_button`, `no_keyboard_focus`.
-- `severity` is one of: `low`, `medium`, `high`.
+- `source` is `accessible-tree` (normal), `class-name-fallback` or `mixed`.
+- `element_count` counts every node walked; `accessible_nodes` counts those that
+  came from Qt's accessible tree.
+- `issue_count` is the number of accessibility issues found;
+  `issue_counts_by_type` breaks it down by `issue_type`.
+- Each issue has `object_name`, `class_name`, `role`, `issue_type`, `severity`,
+  `path`, `description`, `suggestion`, plus `x`/`y`/`width`/`height` when the
+  node reports a rect. `path` is the node's position in the accessible tree
+  (`"0.31.4.0"` = root → child 31 → child 4 → child 0), which disambiguates
+  identical-looking controls.
+- `issue_type` is one of: `unlabeled_button` (a button), `missing_name`
+  (another interactive role), `missing_role` (class-name fallback only: an
+  interactive-looking element that exposes no interface at all).
+- `severity` is `high` for a missing name and `medium` for a missing role.
+- Geometry is window-relative and omitted when unavailable; `0,0,0,0` means the
+  control exists in the tree but is not laid out (e.g. inside an unopened panel).
+- Roles required to carry a name: Button, CheckBox, ComboBox, EditableText,
+  Link, MenuItem, PageTab, RadioButton, Slider, SpinBox, Switch, ToolButton.
+  Scroll bars, panes and static text are deliberately excluded — Qt gives them
+  no meaningful name and flagging them is noise.
 
 **Errors**
 

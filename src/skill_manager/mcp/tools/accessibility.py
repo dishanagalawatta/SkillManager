@@ -30,10 +30,12 @@ class _AccessibilityAuditArgs(BaseModel):
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "sm_accessibility_audit": {
         "description": (
-            "Audit the QML object tree for accessibility issues: missing roles, "
-            "missing accessible names, unlabeled buttons. Read-only. Works in "
-            "headless --mcp mode by rendering Main.qml offscreen on demand; "
-            "no running GUI required."
+            "Audit the UI for accessibility issues by walking Qt's accessible tree "
+            "(what assistive technology sees): interactive controls with no "
+            "accessible name are reported as unlabeled_button / missing_name, with "
+            "the node path and window rect so they can be located. Read-only. Works "
+            "in headless --mcp mode by rendering Main.qml offscreen on demand; no "
+            "running GUI required."
         ),
         "annotations": {
             "readOnlyHint": True,

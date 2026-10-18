@@ -103,10 +103,10 @@ sequenceDiagram
 ### Positive
 
 - The UI tools are useful with **no GUI running**: verified against the real
-  subprocess — 1 `QQuickWindow` root + 362 items across 25 named objects
-  (`navLibrary`, `viewLoader`, `LibraryView`, `libraryList`, …), 386
-  accessibility elements, a ~30 KB PNG with ~1400 distinct colours, and 59 frames
-  in a 1 s forced-render sample.
+  subprocess — 1 root (`Main_QMLTYPE_41`) + 362 items across 25 named objects
+  (`navLibrary`, `viewLoader`, `LibraryView`, `libraryList`, …), 86 accessible
+  nodes / 7 unnamed controls, a ~30 KB PNG with ~1400 distinct colours, and 59
+  frames in a 1 s forced-render sample.
 - View navigation works headlessly and is verified, so agents can screenshot any
   section without a desktop session.
 - No new IPC surface, no second process, no display: the whole feature is
@@ -128,22 +128,26 @@ sequenceDiagram
 - One more code path to keep correct: `QQuickStyle`/`QSurfaceFormat` ordering and
   the `show()` requirement are load-bearing and would fail subtly (black images)
   if reordered.
-- The accessibility classifier only half-works on real QML trees: its class lists
-  hold plain Qt names (`qpushbutton`, `text`, …) but QML-defined types report
-  `Foo_QMLTYPE_<n>`, so `missing_name` / `missing_role` never fire and only the
-  `"button"` substring check does — 8 `unlabeled_button` issues on
-  `DialogButtonBox_QMLTYPE_52` instances at `max_depth=12`. "App components are
-  clean" therefore cannot be concluded from it; the classifier needs
-  QML-type-aware matching (follow-up, documented in `docs/MCP_SERVER.md`).
+- The first accessibility classifier guessed from QML class names and only
+  half-worked on a real tree: its class lists held plain Qt names
+  (`qpushbutton`, `text`, …) while QML types report `Foo_QMLTYPE_<n>`, so
+  `missing_name` / `missing_role` never fired and the `"button"` substring check
+  produced 8 false `unlabeled_button` issues on `DialogButtonBox_QMLTYPE_52`
+  containers — while missing the genuinely unnamed app controls. **Resolved**:
+  the audit now walks Qt's own accessible tree (see `docs/MCP_SERVER.md`), which
+  reports 86 accessible nodes and the 7 unnamed app controls, and cannot flag a
+  container at all.
+- Elements Qt does not expose to assistive technology are outside the audit's
+  view: an unnamed control inside a never-shown/unopened panel is reported when
+  it becomes exposed (its rect then reads `0,0,0,0`), not while hidden.
 
 ### Neutral
 
 - `--mcp-light` is unchanged (no `QGuiApplication`, no UI tools).
 - `SKILL_MANAGER_MCP_PLATFORM` overrides the pinned offscreen platform for
   debugging, e.g. to run the server against a real X11 display.
-- The audit surfaces `DialogButtonBox` instances (Qt Quick Dialogs' button box,
-  instantiated by the app's dialogs) as `unlabeled_button`; the class-name
-  matching limitation above is why nothing else is classified.
+- `sm_inspect_qml_tree`'s `class_name` is the QML type (`Main_QMLTYPE_41`), not
+  the Python class, which PySide reports as `QQuickItem` for every QML item.
 
 ## Alternatives Considered
 

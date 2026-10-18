@@ -14,6 +14,7 @@ from typing import Any
 from ._capture import capture_app_window_info
 from ._controller import _APP_CONTROLLER_ERROR, _controller_or_none
 from ._qml_headless import ensure_qml_engine
+from ._qml_object import accessible_info, qml_class_name
 from ._telemetry import _log_call
 
 
@@ -76,12 +77,22 @@ def _child_items(obj: Any) -> list[Any]:
 
 
 def _qml_node(obj: Any, depth: int, max_depth: int) -> dict[str, Any]:
-    """Serialise a single QML object into a bounded node dict."""
+    """Serialise a single QML object into a bounded node dict.
+
+    ``class_name`` is the QML *type* (``Button_QMLTYPE_42``), not the Python
+    class — PySide reports ``QQuickItem`` for every QML item, which cannot
+    identify a control. ``accessible_role``/``accessible_name`` carry what Qt's
+    accessibility layer exposes for the node (both empty when the node has no
+    accessible interface, e.g. layouts and static text).
+    """
     child_objects = _child_items(obj)
     truncated = depth >= max_depth and bool(child_objects)
+    accessible_role, accessible_name = accessible_info(obj)
     return {
         "object_name": str(_attr(obj, "objectName", "") or ""),
-        "class_name": obj.__class__.__name__,
+        "class_name": qml_class_name(obj),
+        "accessible_role": accessible_role,
+        "accessible_name": accessible_name or "",
         "visible": _flag(obj, "isVisible", "visible"),
         "enabled": _flag(obj, "isEnabled", "enabled"),
         "x": int(_attr(obj, "x", 0) or 0),

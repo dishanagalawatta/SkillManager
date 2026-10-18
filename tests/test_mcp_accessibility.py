@@ -153,8 +153,9 @@ def test_accessibility_audit_tool_schema_declared() -> None:
 #
 # The handler tests above stub the bridge out, so they never exercise the
 # traversal, classification or graceful-degradation paths. These use plain
-# Python fakes instead of a live QML tree: the walk only needs metaObject(),
-# objectName() and children().
+# Python fakes instead of a live QML tree: the accessible walk only needs
+# role()/text()/childCount()/child()/object(), and the class-name fallback only
+# needs metaObject()/objectName()/children().
 # ---------------------------------------------------------------------------
 class _FakeMeta:
     def __init__(self, class_name: str) -> None:
@@ -165,7 +166,7 @@ class _FakeMeta:
 
 
 class _FakeQmlObject:
-    """Minimal stand-in for a QML QObject in the accessibility walk."""
+    """Minimal stand-in for a QML QObject in either accessibility walk."""
 
     def __init__(
         self, class_name: str, object_name: str = "", children: list[Any] | None = None
@@ -209,27 +210,85 @@ class _BrokenChildren(_FakeQmlObject):
         raise RuntimeError("children boom")
 
 
+class _FakeRect:
+    def __init__(self, x: int, y: int, width: int, height: int) -> None:
+        self._x, self._y, self._width, self._height = x, y, width, height
+
+    def x(self) -> int:
+        return self._x
+
+    def y(self) -> int:
+        return self._y
+
+    def width(self) -> int:
+        return self._width
+
+    def height(self) -> int:
+        return self._height
+
+
+class _FakeRole:
+    """Role stand-in: the classifier only reads ``.name``."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
 class _FakeAccessibleInterface:
-    def __init__(self, name: str, role: int) -> None:
+    """Accessible-interface double, for both the tree walk and object reads."""
+
+    def __init__(
+        self,
+        name: str = "",
+        role: Any = None,
+        children: list[Any] | None = None,
+        obj: Any = None,
+        rect: _FakeRect | None = None,
+    ) -> None:
         self._name = name
         self._role = role
+        self._children = list(children or [])
+        self._obj = obj
+        self._rect = rect
 
     def text(self, kind: int) -> str:
         return self._name if kind == _FakeAccessible.Name else ""
 
-    def role(self) -> int:
+    def role(self) -> Any:
         return self._role
+
+    def childCount(self) -> int:  # noqa: N802 - Qt spelling
+        return len(self._children)
+
+    def child(self, index: int) -> Any:
+        return self._children[index]
+
+    def object(self) -> Any:
+        return self._obj
+
+    def rect(self) -> _FakeRect | None:
+        return self._rect
+
+
+class _BrokenAccessibleNode(_FakeAccessibleInterface):
+    """Node whose ``object()`` and ``childCount()`` both fail."""
+
+    def object(self) -> Any:
+        raise RuntimeError("object boom")
+
+    def childCount(self) -> int:  # noqa: N802 - Qt spelling
+        raise RuntimeError("count boom")
 
 
 class _FakeAccessible:
-    """Stand-in for ``PySide6.QtGui.QAccessible`` (attached-property reads)."""
+    """Stand-in for ``PySide6.QtGui.QAccessible`` (interface + name lookups)."""
 
     Name = 7
 
-    def __init__(self, interfaces: dict[int, _FakeAccessibleInterface]) -> None:
+    def __init__(self, interfaces: dict[int, Any]) -> None:
         self._interfaces = interfaces
 
-    def queryAccessibleInterface(self, obj: Any) -> _FakeAccessibleInterface | None:  # noqa: N802 - Qt spelling
+    def queryAccessibleInterface(self, obj: Any) -> Any:  # noqa: N802 - Qt spelling
         return self._interfaces.get(id(obj))
 
 
@@ -303,19 +362,165 @@ def test_bridge_audit_requires_roots(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["error"] == "no QML root objects"
 
 
+# ---------------------------------------------------------------------------
+# Accessible-tree walk (the normal path on real Qt)
+# ---------------------------------------------------------------------------
+def test_bridge_audit_walks_the_accessible_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Roles come from Qt's accessible tree; unnamed controls are reported."""
+    root_obj = _FakeQmlObject("Main_QMLTYPE_41", object_name="rootWindow")
+    named_button = _FakeAccessibleInterface(
+        name="Save",
+        role=_FakeRole("Button"),
+        obj=_FakeQmlObject("ActionButton_QMLTYPE_39"),
+    )
+    unnamed_button = _FakeAccessibleInterface(
+        role=_FakeRole("Button"),
+        obj=_FakeQmlObject("IconButton_QMLTYPE_16"),
+        rect=_FakeRect(10, 20, 30, 40),
+    )
+    unnamed_dropdown = _FakeAccessibleInterface(
+        role=_FakeRole("ComboBox"),
+        obj=_FakeQmlObject("GlassDropdown_QMLTYPE_64"),
+    )
+    unnamed_scrollbar = _FakeAccessibleInterface(role=_FakeRole("ScrollBar"))
+    unnamed_pane = _FakeAccessibleInterface(role=_FakeRole("Pane"))
+    root_iface = _FakeAccessibleInterface(
+        name="SkillManager",
+        role=_FakeRole("Window"),
+        obj=root_obj,
+        children=[named_button, unnamed_button, unnamed_dropdown, unnamed_scrollbar, unnamed_pane],
+    )
+
+    result = _audit_with(
+        monkeypatch,
+        [root_obj],
+        accessible=_FakeAccessible({id(root_obj): root_iface}),
+    )
+
+    assert result["ok"] is True
+    assert result["source"] == "accessible-tree"
+    assert result["element_count"] == 6
+    assert result["accessible_nodes"] == 6
+    assert result["issue_counts_by_type"] == {"unlabeled_button": 1, "missing_name": 1}
+
+    by_type = {issue["issue_type"]: issue for issue in result["issues"]}
+    button = by_type["unlabeled_button"]
+    assert button["class_name"] == "IconButton_QMLTYPE_16"
+    assert button["role"] == "Button"
+    assert button["path"] == "0.1"
+    assert (button["x"], button["y"], button["width"], button["height"]) == (10, 20, 30, 40)
+    assert button["severity"] == "high"
+    assert button["suggestion"]
+
+    dropdown = by_type["missing_name"]
+    assert dropdown["path"] == "0.2"
+    assert dropdown["role"] == "ComboBox"
+    assert "x" not in dropdown, "geometry must be omitted when the node has no rect"
+
+
+def test_bridge_audit_ignores_containers_and_static_text_on_the_accessible_walk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Roles outside the interactive set (Pane/Client/StaticText) are not issues."""
+    root_obj = _FakeQmlObject("Main_QMLTYPE_41")
+    container = _FakeAccessibleInterface(
+        role=_FakeRole("Client"), obj=_FakeQmlObject("DialogButtonBox_QMLTYPE_52")
+    )
+    label = _FakeAccessibleInterface(role=_FakeRole("StaticText"), obj=_FakeQmlObject("QQuickText"))
+    root_iface = _FakeAccessibleInterface(
+        role=_FakeRole("Window"), obj=root_obj, children=[container, label]
+    )
+
+    result = _audit_with(
+        monkeypatch, [root_obj], accessible=_FakeAccessible({id(root_obj): root_iface})
+    )
+
+    assert result["issue_count"] == 0
+    assert result["issues"] == []
+    assert result["issue_counts_by_type"] == {}
+
+
+def test_bridge_audit_honours_max_depth_on_the_accessible_walk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The accessible walk stops at max_depth like the fallback walk."""
+    deep = _FakeAccessibleInterface(role=_FakeRole("Button"))
+    for _ in range(5):
+        deep = _FakeAccessibleInterface(role=_FakeRole("Window"), children=[deep])
+    root_obj = _FakeQmlObject("Main_QMLTYPE_41")
+
+    result = _audit_with(
+        monkeypatch, [root_obj], accessible=_FakeAccessible({id(root_obj): deep}), max_depth=3
+    )
+
+    assert result["element_count"] == 3
+
+
+def test_bridge_audit_tolerates_a_broken_accessible_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raising childCount()/object() degrades instead of aborting the walk."""
+    root_obj = _FakeQmlObject("Main_QMLTYPE_41")
+    broken = _BrokenAccessibleNode(role=_FakeRole("Button"))
+
+    result = _audit_with(
+        monkeypatch, [root_obj], accessible=_FakeAccessible({id(root_obj): broken})
+    )
+
+    assert result["ok"] is True
+    assert result["element_count"] == 1
+    assert result["accessible_nodes"] == 1
+    assert result["issues"][0]["issue_type"] == "unlabeled_button"
+    assert result["issues"][0]["class_name"] == ""
+    assert result["issues"][0]["object_name"] == ""
+    assert result["issues"][0]["role"] == "Button"
+
+
+def test_bridge_audit_falls_back_for_roots_without_an_interface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A root with no accessible interface is class-name audited, not skipped."""
+    window = _FakeQmlObject("Main_QMLTYPE_41")
+    orphan = _FakeQmlObject(
+        "IconButton_QMLTYPE_16",
+        object_name="orphan_button",
+        children=[_FakeQmlObject("QQuickItem")],
+    )
+
+    result = _audit_with(
+        monkeypatch,
+        [window, orphan],
+        accessible=_FakeAccessible(
+            {id(window): _FakeAccessibleInterface(role=_FakeRole("Window"), obj=window)}
+        ),
+    )
+
+    assert result["source"] == "mixed"
+    assert result["accessible_nodes"] == 1
+    assert result["element_count"] == 3
+    assert sorted(issue["issue_type"] for issue in result["issues"]) == [
+        "missing_role",
+        "unlabeled_button",
+    ]
+    assert all(issue["object_name"] == "orphan_button" for issue in result["issues"])
+
+
+# ---------------------------------------------------------------------------
+# Class-name fallback walk
+# ---------------------------------------------------------------------------
 def test_bridge_audit_flags_interactive_element_without_name_or_role(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unnamed, role-less button is reported for all three issue types."""
+    """An unnamed, role-less button is reported as unlabeled with no role."""
     button = _FakeQmlObject("QPushButton", object_name="save_button")
     root = _FakeQmlObject("QQuickItem", object_name="root", children=[button])
 
     result = _audit_with(monkeypatch, [root])
 
     assert result["ok"] is True
+    assert result["source"] == "class-name-fallback"
     assert result["element_count"] == 2
     assert sorted(issue["issue_type"] for issue in result["issues"]) == [
-        "missing_name",
         "missing_role",
         "unlabeled_button",
     ]
@@ -343,6 +548,47 @@ def test_bridge_audit_accepts_labelled_element_with_role(
     assert result["issue_count"] == 0
 
 
+def test_bridge_audit_ignores_button_containers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``DialogButtonBox`` is a container, not an unlabeled button.
+
+    Regression: the old substring classifier flagged every
+    ``DialogButtonBox_QMLTYPE_<n>`` in the real tree (8 bogus issues) while
+    missing the genuinely unnamed controls.
+    """
+    container = _FakeQmlObject(
+        "DialogButtonBox_QMLTYPE_52", object_name="dialogbuttonbox_qmltype_52"
+    )
+    real_button = _FakeQmlObject("TitleBarButton", object_name="close_window")
+
+    result = _audit_with(
+        monkeypatch, [_FakeQmlObject("QQuickItem", children=[container, real_button])]
+    )
+
+    assert [issue["object_name"] for issue in result["issues"]] == ["close_window"] * 2
+    assert sorted(issue["issue_type"] for issue in result["issues"]) == [
+        "missing_role",
+        "unlabeled_button",
+    ]
+
+
+def test_bridge_audit_strips_stacked_qml_decorations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nested QML types stack decorations (``Foo_QMLTYPE_16_QML_109``)."""
+    nested = _FakeQmlObject("IconButton_QMLTYPE_16_QML_109", object_name="nested_button")
+    plain = _FakeQmlObject("TextField_QMLTYPE_17", object_name="argField")
+
+    result = _audit_with(monkeypatch, [_FakeQmlObject("QQuickItem", children=[nested, plain])])
+
+    assert sorted(issue["issue_type"] for issue in result["issues"]) == [
+        "missing_name",
+        "missing_role",
+        "missing_role",
+        "unlabeled_button",
+    ]
+    assert {issue["object_name"] for issue in result["issues"]} == {"nested_button", "argField"}
+
+
 def test_bridge_audit_descends_into_children_of_broken_objects(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -360,7 +606,22 @@ def test_bridge_audit_descends_into_children_of_broken_objects(
     # root + _BrokenMeta + broken_name + the leaf + broken_children itself; the
     # unreachable child under broken_children is never walked.
     assert result["element_count"] == 5
-    assert [issue["object_name"] for issue in result["issues"]] == ["leaf"] * 3
+    assert [issue["object_name"] for issue in result["issues"]] == ["leaf"] * 2
+
+
+def test_bridge_audit_tolerates_non_list_children(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A children() that is not a list/tuple is ignored, not iterated blindly."""
+
+    class _WeirdChildren(_FakeQmlObject):
+        def children(self) -> Any:
+            return "not-a-list"
+
+    result = _audit_with(
+        monkeypatch, [_FakeQmlObject("QQuickItem", children=[_WeirdChildren("QQuickItem")])]
+    )
+
+    assert result["ok"] is True
+    assert result["element_count"] == 2
 
 
 def test_bridge_audit_honours_max_depth(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -372,24 +633,3 @@ def test_bridge_audit_honours_max_depth(monkeypatch: pytest.MonkeyPatch) -> None
     result = _audit_with(monkeypatch, [deep], max_depth=3)
 
     assert result["element_count"] == 3
-
-
-def test_bridge_audit_survives_nested_dialog_button_box_names(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """QML-defined types keep their ``_QMLTYPE_<n>`` class names.
-
-    Documented behaviour, not desired behaviour: ``_ROLE_REQUIRED_CLASSES``
-    holds plain Qt names (``qpushbutton`` …), so the ``missing_role`` /
-    ``missing_name`` checks never fire for ``Foo_QMLTYPE_52`` classes — only the
-    substring ``"button"`` match does, which also catches containers such as
-    ``DialogButtonBox``. Observed against the real tree (see the MCP report).
-    """
-    button_box = _FakeQmlObject(
-        "DialogButtonBox_QMLTYPE_52", object_name="dialogbuttonbox_qmltype_52"
-    )
-
-    result = _audit_with(monkeypatch, [_FakeQmlObject("QQuickItem", children=[button_box])])
-
-    assert sorted({issue["issue_type"] for issue in result["issues"]}) == ["unlabeled_button"]
-    assert result["issues"][0]["class_name"] == "DialogButtonBox_QMLTYPE_52"

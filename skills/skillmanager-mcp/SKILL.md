@@ -90,8 +90,8 @@ to keep the server from talking to a running GUI at all (it then refuses with
 | Tool | Args | Description |
 |------|------|-------------|
 | `sm_screenshot` | `{navigate?, save?, width?, height?}` | Capture the window as base64 PNG. `data.source` is `live-gui`, `native` or `headless-qml`. |
-| `sm_inspect_qml_tree` | `{max_depth?}` | QML object tree (names, classes, geometry, `child_count`); returns `root_count`/`node_count`. |
-| `sm_accessibility_audit` | `{max_depth?}` | Audit the tree for missing roles/names and unlabeled buttons. Class matching uses plain Qt names, so QML-defined types (`Foo_QMLTYPE_<n>`) currently only match the `button` rule. |
+| `sm_inspect_qml_tree` | `{max_depth?}` | QML object tree (names, QML types, `accessible_role`/`accessible_name`, geometry, `child_count`); returns `root_count`/`node_count`. |
+| `sm_accessibility_audit` | `{max_depth?}` | Audit Qt's accessible tree for controls with no accessible name (`unlabeled_button` / `missing_name`), each with role, node path and window rect. |
 | `sm_get_current_view` | `{}` | Active view (`Library` / `QuickCopy` / `Updates` / `Settings`). |
 | `sm_get_pixel_color` | `{x, y}` | RGB/hex color of a pixel in the captured window. |
 | `sm_find_visual_issues` | `{image_b64?, check_*?}` | Clipping/contrast/overlap scan; omit `image_b64` to analyse the current window. |
