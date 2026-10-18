@@ -83,6 +83,15 @@ if not engine.rootObjects():
     sys.exit(1)
 
 
+def step0_show_library():
+    # The app can restore any view at startup, so the Library capture must
+    # actually navigate there first — otherwise this saved whatever view
+    # happened to be on screen under the name "library_view.png".
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] Navigating to Library...")
+    window.navigateTo("Library")
+    QTimer.singleShot(3000, step1_capture_library)
+
+
 def step1_capture_library():
     print(f"[+{time.monotonic() - START_TIME:.1f}s] Capturing Library view screenshot...")
     shot_path = str(CAPTURES_DIR / "library_view.png")
@@ -119,6 +128,6 @@ def step3_capture_quickcopy():
 
 
 # Allow discovery and rendering to settle before capture
-QTimer.singleShot(4000, step1_capture_library)
+QTimer.singleShot(4000, step0_show_library)
 app.exec()
 print(f"[+{time.monotonic() - START_TIME:.1f}s] Verification completed cleanly.")
