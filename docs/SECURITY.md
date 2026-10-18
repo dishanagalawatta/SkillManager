@@ -19,6 +19,83 @@ Every release publishes a `SHA256SUMS` manifest alongside its artifacts (`.deb`,
   The `winget` package is **not** published in Microsoft's package index, so
   winget is not currently an integrity-verified install channel.
 
+## Code-Signing Key Exposure & Rotation
+
+A Windows code-signing bundle (`packaging/windows/certs/code-signing.pfx`) was
+committed to the repository and tracked until it was untracked. **Untracking a
+file does not remove it from history** — the blob is still reachable in this
+repository and on GitHub.
+
+### What was exposed
+
+- An encrypted PKCS#12 bundle exported from the **Microsoft Software Key Storage
+  Provider** (one private key and its certificate, PBES2-encrypted, SHA-1 MAC).
+- The file path only; its contents are not decryptable without the passphrase.
+
+### What was not exposed
+
+The passphrase. CI reads it from the `WIN_PFX_PASS` repository secret and writes
+the bundle from `WIN_PFX_B64`. Neither value appears anywhere in the tree or in
+history (verified by search). Because the bundle is password-encrypted, an
+attacker holding the file alone cannot use the key.
+
+### Why rotation comes first
+
+History rewriting does not invalidate a key. Purging the blob reduces
+discoverability but leaves the old key material valid — so rotation is the real
+remediation, and it is the step that cannot be done from inside the repository
+(issuing a certificate is an external, account-bound action). Treat the previous
+key as retired once a replacement is in use.
+
+```mermaid
+flowchart TD
+    A["PKCS#12 bundle committed, later untracked"] --> B{"Was it used to sign a published release?"}
+    B -->|"No — current installers are unsigned"| C["Exposure is latent, not confirmed"]
+    B -->|"Yes"| D["Assume the private key is compromised"]
+    C --> E["Rotate anyway: obtain a new code-signing certificate"]
+    D --> E
+    E --> F["Set WIN_PFX_B64 and WIN_PFX_PASS secrets to the new bundle"]
+    F --> G["Re-release and verify the Authenticode signature"]
+    G --> H["Optional: purge the old blob from history"]
+    H --> I["Force-push; every existing clone must re-clone"]
+```
+
+### Rotation
+
+1. Obtain a new code-signing certificate and export it as a password-protected
+   PFX. Do not write it into the working tree.
+2. Update the `WIN_PFX_B64` and `WIN_PFX_PASS` repository secrets.
+3. Cut a release and confirm the installer is Authenticode-signed
+   (`Get-AuthenticodeSignature .\SkillManager_Setup.exe`). The
+   `release-build.yml` sign step skips silently when the secret is unset, so an
+   unsigned installer means the secret is missing rather than that signing
+   failed.
+4. Revoke the superseded certificate with the issuing authority if it was
+   CA-issued.
+
+### Optional history purge
+
+Deferred deliberately: a history rewrite rewrites public commits, invalidates
+every existing clone, and is only worth doing once the key behind it is
+retired. It also requires a clean working tree, so it must not be run while
+other work is uncommitted.
+
+```bash
+# Requires a clean tree and a fresh clone; git-filter-repo is not bundled.
+git log --diff-filter=A --oneline -- packaging/windows/certs/code-signing.pfx  # confirm the origin
+git filter-repo --invert-paths --path packaging/windows/certs/code-signing.pfx
+git push --force-with-lease origin main
+```
+
+Then confirm the blob is gone:
+
+```bash
+git log --all --oneline -- packaging/windows/certs/code-signing.pfx   # expect no output
+```
+
+Anyone who has already cloned must re-clone rather than pull. If the key is
+still unrotated, this step buys little: prefer rotation first.
+
 ## Shell Command Construction
 
 Package `verify_command` strings are generated from user-influenced paths
