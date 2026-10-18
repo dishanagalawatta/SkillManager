@@ -58,7 +58,7 @@
 | `sm_find_visual_issues` | read | Scan an image (or the current window) for clipping/contrast issues |
 | `sm_run_ui_scenario` | read | Run a navigation scenario, verifying each step took effect |
 | `sm_get_frame_timing` | read | Capture QML render frames; report mode, FPS and frame timing |
-| `sm_accessibility_audit` | read | Audit QML tree for missing roles/names, unlabeled buttons |
+| `sm_accessibility_audit` | read | Audit Qt's accessible tree for controls with no accessible name (role, path, rect) |
 | `sm_mouse_move` | read* | Move system cursor (Windows; input-guarded) |
 | `sm_mouse_click` | read* | Send mouse click (Windows; input-guarded) |
 | `sm_type_text` | read* | Type text into focused window (Windows; input-guarded) |
