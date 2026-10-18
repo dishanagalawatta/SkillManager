@@ -150,17 +150,67 @@ sequenceDiagram
     end
     
     Ver-->>Ctrl: Normalized Record with latest_version & current_version snapped
-    Ctrl->>Ctrl: Commit to app._update_packages & save config
-    Ctrl->>Watch: _refresh_after_package_add (add_path to watcher)
-    Ctrl->>Disc: loadInitialData() [Silent background scan]
-    Ctrl-->>UI: {"ok": true, "error": null, "name": pkg_name} (Dialog Closes <5ms)
+    Ctrl->>Ctrl: Commit to app._update_packages & save config (last_updated = "Installing…")
+    Ctrl->>Watch: _register_package_watcher (add_path to watcher)
+    Ctrl-->>UI: {"ok": true, "installing": true, "check_status": …, "warning": …}
     
     Ctrl->>Runner: runPackageUpdate(new_index) [Async Worker]
     Runner->>Disk: Run npx/git/script update into staging & relocate skills
     Runner->>Watch: Register resolved_package_path with file watcher
-    Runner->>Disc: discover_single(..., is_package=True) & loadInitialData()
+    Runner->>Disc: discover_single(..., is_package=True)
+    Runner->>Disc: _schedule_discovery_refresh() [coalesced loadInitialData]
     Runner-->>UI: Update finished notification & automatic library refresh
 ```
+
+The add path deliberately does **not** call `loadInitialData()` itself: the install it schedules ends with its own (coalesced) refresh, and the immediate one walked every source and project before a single file of the package existed on disk.
+
+#### Version Check State, Bounded Probes, and Scan Recovery
+
+Every package record carries the outcome of its last remote check, so the UI can tell
+"up to date" apart from "we never found out":
+
+| `check_status` | Meaning | UI |
+|----------------|---------|----|
+| `ok` | Remote answered; `latest_version` is trustworthy | `Update` or `Up to Date` |
+| `failed` | Probe failed (network/auth/timeout); `latest_version` is stale | amber `· could not check` + `Re-check` |
+| `never_checked` | No remote and no version command to ask | `Update` or `Up to Date` |
+
+```mermaid
+stateDiagram-v2
+    [*] --> never_checked: package added without a remote
+    [*] --> failed: add-time probe could not reach the remote
+    never_checked --> ok: remote answers
+    failed --> ok: Re-check succeeds
+    ok --> failed: later probe fails (latest_version kept, now stale)
+    ok --> ok: probe confirms latest_version
+    failed --> failed: Re-check fails again
+    note right of failed
+        Primary action becomes "Re-check".
+        A *known* newer version still wins,
+        so the button stays "Update".
+    end note
+```
+
+Guarantees that make this state reachable instead of silently stuck:
+
+- **Bounded, non-interactive probes** (`versioning.DEFAULT_GIT_TIMEOUT`, `_git_probe_env()`): every
+  `git ls-remote` passes `env=` (no terminal prompts, `BatchMode` ssh) and
+  `kill_after_timeout=`, and any plausible git remote is probed — not just
+  `github.com`/`gitlab.com`. Previously the env dict was built and never passed, and
+  there was no timeout, so a credential-gated remote blocked the scan thread forever.
+- **Scan watchdog** (`UpdateController.SCAN_WATCHDOG_MS`): a real `QTimer` finalises the scan
+  with partial results if the worker never returns, so `_is_loading` can never be stranded
+  and "Update scan complete: 0" is never reported for a scan that failed. A failed or
+  timed-out scan also suppresses auto-update for that run.
+- **Recovery** (`retryPackageCheck(package_id)`): re-probes one package on the task runner and
+  writes the result back by `package_id`, so a row added or removed mid-probe cannot be
+  written to the wrong position.
+- **Visibility**: `statsUnchecked` (a `count_unchecked_packages()` count) drives the header's
+  "· N unchecked" text; per-row state drives the caption and the button label.
+- **One probe per remote per scan, one rescan per change burst**: `RemoteProbeCache` is shared
+  across a scan and across both phases of an add/edit, and
+  `_schedule_discovery_refresh()` coalesces rapid `loadInitialData()` requests into a single
+  filesystem scan.
 
 #### Reactive Package File Watching & Instant Library Refresh
 When a skill package is added (`addSkillPackage`, `addUpdatePackage`) or updated (`runPackageUpdate`):
@@ -210,6 +260,24 @@ flowchart TD
     - Removes entries from `package_skill_inventory.json` and `project_skill_ownership.json`.
     - Surgically purges deleted skill paths from `cache.json` using `patch_cache_remove()`.
     - Removes skill instances from in-memory models (`_library_model`, `_quick_copy_model`) and unregisters the directory from the live file watcher (`_watcher`).
+5. **All-or-Nothing Removal**: `delete_package_storage()` returns an `errors` list. If it is non-empty the
+   removal **aborts before any state mutation** — no list entry removed, no config written — and the
+   status reports which package could not be removed, so the user can retry instead of being left with
+   orphaned files, a vanished row, and no explanation.
+
+#### Config Write Durability & Storage Resolution Integrity
+
+- **Atomic config writes**: `ConfigManager.save()` goes through `_atomic_write_json()` (serialise, write
+  a `.tmp`, `os.replace`). A crash, a full disk, or a serialisation failure leaves the previous
+  `config.json` intact instead of a truncated one.
+- **No record is ever dropped**: `_resolvePackageStorageState()` writes resolved records back
+  *positionally*, so a package whose record fails `model_validate` is kept as-is rather than dropped.
+  Dropping it used to shift the write-back and give every later package the previous package's storage
+  path. If `resolve_package_storage()` returns fewer records than it was given, the remainder is
+  appended instead of truncating the list.
+- **Every displayed field is declared**: `UpdatePackageRecord` is validated with `extra="ignore"`, so a
+  field the UI reads but the model does not declare (this bit `update_error`) is silently discarded on
+  every round-trip. New UI-visible record fields must be declared on the model.
 
 #### Skill Copying, Project Classification & Differential Ingest (ADR-0030)
 

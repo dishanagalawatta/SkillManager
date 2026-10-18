@@ -34,6 +34,11 @@ class UpdateController(BaseController):
     def __init__(self, app):
         super().__init__(app)
         self._auto_update_in_flight = False
+        # Scan lifecycle (see _finish_scan): generation guards against a stale
+        # watchdog or a late worker result mutating current state.
+        self._scan_generation = 0
+        self._scan_finished = False
+        self._scan_watchdog = None
 
     def _publish_project_sync_state(self):
         """Publish a ``_syncing_projects`` change to every QML binding.
@@ -68,9 +73,26 @@ class UpdateController(BaseController):
                 record = UpdatePackageRecord.model_validate({**normalized, **package})
                 packages.append(record.model_dump())
             except Exception as e:
+                # Keep the record instead of dropping it.  Dropping shortened
+                # the list, and because the write-back below is positional,
+                # every later entry was repointed at the previous package's
+                # storage path (and the tail was deleted outright).
                 logger.error("Failed to normalize package during storage resolution: %s", e)
+                packages.append(dict(package))
 
         refreshed = resolve_package_storage(packages, load_package_skill_inventory())
+
+        # The write-back below is positional, so guard the invariant it relies
+        # on: resolve_package_storage maps one input record to one output
+        # record, in order.  If that ever changes, append rather than truncate.
+        if len(refreshed) < len(self.app._update_packages):
+            logger.error(
+                "Storage resolution returned %d records for %d packages; "
+                "appending the remainder instead of truncating.",
+                len(refreshed),
+                len(self.app._update_packages),
+            )
+            refreshed = refreshed + [dict(p) for p in self.app._update_packages[len(refreshed) :]]
 
         # Update each dict in place so that every captured reference (QML
         # modelData, background workers) keeps pointing at the same object.
@@ -181,12 +203,22 @@ class UpdateController(BaseController):
             self._publish_project_sync_state()
             self.app._set_status(f"Failed to start global update: {e}")
 
+    # Hard ceiling for a whole scan.  Individual probes are bounded, but a
+    # wedged worker thread would otherwise leave ``_is_loading`` True forever,
+    # which made every later scan bail out with "Update scan already
+    # running..." — indistinguishable from "updates stopped working".
+    SCAN_WATCHDOG_MS = 90_000
+
     @Slot()
     def scanForUpdates(self):
         """Scans all sources and projects for potential updates."""
         if self.app._is_loading:
             self.app._set_status("Update scan already running...")
             return
+
+        self._scan_generation += 1
+        generation = self._scan_generation
+        self._scan_finished = False
 
         self.app._set_status("Scanning for updates...")
         self.app._is_loading = True
@@ -200,36 +232,19 @@ class UpdateController(BaseController):
             task_runner=self.app.task_runner,
         )
 
+        self._arm_scan_watchdog(generation, service)
+
         def completion_callback(results, updated_sources):
-            def finalize():
-                self.app._update_results = results
-                self.app._update_packages = updated_sources
-                self.recalculateStats()
-                self.app._is_loading = False
-                self.app.isLoadingChanged.emit()
-                self.app.updatePackagesChanged.emit()
-                self.app._set_status(
-                    f"Update scan complete: {len(results)} package skills processed"
-                )
-
-                # Auto-update decision point: Auto Update on applies updates
-                # in the background; off notifies via toast instead.  Update
-                # checks always run (startup + periodic) in both states.
-                auto_update = self.config.get("skill_package_auto_update", False)
-                if isinstance(auto_update, str):
-                    auto_update = auto_update.strip().lower() == "silent"
-                outdated = getattr(self.app, "_stats_outdated", 0)
-                if outdated <= 0:
-                    return
-                if auto_update:
-                    logger.info("Auto-update triggered for outdated skill packages.")
-                    self._auto_update_in_flight = True
-                    self.updateNow()
-                else:
-                    logger.info("Auto-update off: notifying %d available update(s).", outdated)
-                    self.updatesAvailable.emit(outdated)
-
-            _safe_single_shot(0, self.app, finalize)
+            _safe_single_shot(
+                0,
+                self.app,
+                lambda: self._finish_scan(
+                    generation,
+                    service=service,
+                    results=results,
+                    updated_sources=updated_sources,
+                ),
+            )
 
         try:
             service.scan_for_updates(
@@ -237,9 +252,112 @@ class UpdateController(BaseController):
             )
         except Exception as e:
             capture_exception(e)
-            self.app._is_loading = False
-            self.app.isLoadingChanged.emit()
-            self.app._set_status(f"Failed to start update scan: {e}")
+            self._finish_scan(generation, error=e)
+
+    def _arm_scan_watchdog(self, generation: int, service) -> None:
+        """Force-finish the scan if the worker never reports back.
+
+        Uses a real ``QTimer`` instance rather than ``QTimer.singleShot`` so
+        it can be cancelled the moment the scan completes, and so tests that
+        stub the static helper cannot fire it by accident.
+        """
+        self._stop_scan_watchdog()
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(self.SCAN_WATCHDOG_MS)
+        timer.timeout.connect(
+            lambda: self._finish_scan(generation, service=service, timed_out=True)
+        )
+        self._scan_watchdog = timer
+        timer.start()
+
+    def _stop_scan_watchdog(self) -> None:
+        timer = self._scan_watchdog
+        self._scan_watchdog = None
+        if timer is not None:
+            with contextlib.suppress(Exception):
+                timer.stop()
+
+    def _finish_scan(
+        self,
+        generation: int,
+        *,
+        service=None,
+        results=None,
+        updated_sources=None,
+        error: BaseException | None = None,
+        timed_out: bool = False,
+    ):
+        """Single exit path for a scan; always clears the loading flag.
+
+        Guarded by ``generation`` so a watchdog firing after a scan already
+        finished cannot clobber newer state, and so a late result from a
+        timed-out scan is discarded instead of resurrecting a stale flag.
+        """
+        if generation != self._scan_generation or self._scan_finished:
+            return
+        self._scan_finished = True
+        self._stop_scan_watchdog()
+
+        if results is not None:
+            self.app._update_results = results
+        if updated_sources is not None:
+            self.app._update_packages = updated_sources
+
+        self.recalculateStats()
+        self.app._is_loading = False
+        self.app.isLoadingChanged.emit()
+        self.app.updatePackagesChanged.emit()
+
+        if timed_out:
+            logger.warning(
+                "Update scan exceeded %ss; finalised with partial results.",
+                self.SCAN_WATCHDOG_MS // 1000,
+            )
+            self.app._set_status("Update scan failed: a repository did not respond in time.")
+            return
+
+        if error is not None:
+            logger.error("Failed to start update scan: %s", error)
+            self.app._set_status(f"Failed to start update scan: {error}")
+            return
+
+        # The service swallows its own exceptions so it can still emit a
+        # completion; without this the failure showed up as
+        # "Update scan complete: 0".  ``str`` check keeps mocks out.
+        scan_error = getattr(service, "last_scan_error", None) if service is not None else None
+        if isinstance(scan_error, str) and scan_error:
+            logger.error("Update scan failed: %s", scan_error)
+            self.app._set_status(f"Update scan failed: {scan_error}")
+            return
+
+        unchecked = [
+            p for p in (self.app._update_packages or []) if p.get("check_status") == "failed"
+        ]
+        message = (
+            f"Update scan complete: {len(self.app._update_results or [])} package skills processed"
+        )
+        if unchecked:
+            message += f" — could not check {len(unchecked)} package(s)"
+        self.app._set_status(message)
+
+        # Auto-update decision point: Auto Update on applies updates in the
+        # background; off notifies via toast instead.  Update checks always run
+        # (startup + periodic) in both states.  Skipped when the scan did not
+        # complete, so a partial scan cannot trigger updates on stale data.
+        auto_update = self.config.get("skill_package_auto_update", False)
+        if isinstance(auto_update, str):
+            auto_update = auto_update.strip().lower() == "silent"
+        outdated = getattr(self.app, "_stats_outdated", 0)
+        if outdated <= 0:
+            return
+        if auto_update:
+            logger.info("Auto-update triggered for outdated skill packages.")
+            self._auto_update_in_flight = True
+            self.updateNow()
+        else:
+            logger.info("Auto-update off: notifying %d available update(s).", outdated)
+            self.updatesAvailable.emit(outdated)
 
     @Slot(str, str)
     def updateSkillInProject(self, skill_name: str, project_name: str):
@@ -312,7 +430,10 @@ class UpdateController(BaseController):
         ``_stats_up_to_date`` / ``_stats_missing`` remain skill-level scan
         detail for diagnostics and telemetry.
         """
-        from skill_manager.core.skill_packages.versioning import count_outdated_packages
+        from skill_manager.core.skill_packages.versioning import (
+            count_outdated_packages,
+            count_unchecked_packages,
+        )
 
         up_to_date = 0
         missing = 0
@@ -327,14 +448,24 @@ class UpdateController(BaseController):
         except Exception:
             package_outdated = 0
 
+        try:
+            unchecked = count_unchecked_packages(getattr(self.app, "_update_packages", []))
+        except Exception:
+            unchecked = 0
+
         self.app._stats_up_to_date = up_to_date
         self.app._stats_outdated = package_outdated
         self.app._stats_missing = missing
+        self.app._stats_unchecked = unchecked
         self.app.statsChanged.emit()
 
-    def _refresh_after_package_add(self, package_path: str) -> None:
-        """Register the new package directory with the file watcher and trigger
-        a silent background discovery refresh so its skills appear without restart."""
+    def _register_package_watcher(self, package_path: str) -> None:
+        """Watch a newly added package directory so its skills appear live.
+
+        Deliberately does *not* refresh discovery: the install that follows an
+        add ends with its own refresh, and the old immediate one walked every
+        source and project *before* a single file of the package existed.
+        """
         try:
             watcher = getattr(self.app, "_watcher", None)
             if watcher is not None and package_path:
@@ -344,12 +475,29 @@ class UpdateController(BaseController):
         except Exception as exc:
             logger.warning("[CONFIG] Failed to register package watcher path: %s", exc)
 
-        try:
+    # Adding several packages in a row, or an edit landing while an install
+    # finishes, used to stack full filesystem scans.  Rapid repeats are folded
+    # into one: discovery walks every source and project, and the end state is
+    # identical whichever scan discovered it.
+    REFRESH_COALESCE_MS = 400
+
+    def _schedule_discovery_refresh(self) -> None:
+        """Request a discovery refresh, folding rapid repeats into one run."""
+        if getattr(self, "_refresh_scheduled", False):
+            return
+        self._refresh_scheduled = True
+
+        def run_refresh():
+            self._refresh_scheduled = False
             refresh = getattr(self.app, "loadInitialData", None)
-            if refresh is not None:
+            if refresh is None:
+                return
+            try:
                 refresh()
-        except Exception as exc:
-            logger.warning("[CONFIG] Failed to trigger discovery refresh: %s", exc)
+            except Exception as exc:
+                logger.warning("[CONFIG] Failed to trigger discovery refresh: %s", exc)
+
+        _safe_single_shot(self.REFRESH_COALESCE_MS, self.app, run_refresh)
 
     @Slot(str)
     def addUpdatePackage(self, package_name: str):
@@ -374,7 +522,9 @@ class UpdateController(BaseController):
                 or pkg_record.get("local_path")
                 or ""
             )
-            self._refresh_after_package_add(pkg_path)
+            # The install below runs its own discovery refresh; skipping the
+            # immediate one avoids a redundant full filesystem scan per add.
+            self._register_package_watcher(pkg_path)
             QTimer.singleShot(500, lambda idx=new_index: self.runPackageUpdate(idx))
         except Exception as e:
             logger.error("Failed to add update package: %s", e)
@@ -393,6 +543,7 @@ class UpdateController(BaseController):
             return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
 
         from skill_manager.core.skill_packages import (
+            RemoteProbeCache,
             check_skill_package_versions,
             normalize_skill_package_config,
         )
@@ -404,8 +555,13 @@ class UpdateController(BaseController):
             record.is_updating = False
             record.last_updated = "Never"
 
+            # One cache for both phases below: phase 2 re-probes the same
+            # remote as phase 1, which used to be a second blocking round-trip
+            # on the UI thread.
+            cache = RemoteProbeCache()
+
             # 2. Phase 1 — detect latest_version only (no snap yet)
-            detected_data = check_skill_package_versions(record.model_dump())
+            detected_data = check_skill_package_versions(record.model_dump(), remote_cache=cache)
 
             # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
             if not detected_data.get("latest_version"):
@@ -420,14 +576,31 @@ class UpdateController(BaseController):
                     self.app._set_status(f"Add failed: {error_msg}")
                     return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
 
+            # A probe that could not reach the remote is not a clean add: tell
+            # the caller so it can warn instead of silently pinning "latest".
+            probe_warning = (
+                str(detected_data.get("check_error") or "")
+                if detected_data.get("check_status") == "failed"
+                else ""
+            )
+
             # 4. Phase 2 — snap current_version = latest_version on add
-            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            synced_data = check_skill_package_versions(
+                detected_data, sync_current_to_latest=True, remote_cache=cache
+            )
             final_record = UpdatePackageRecord.model_validate(synced_data)
 
-            # 5. Commit to state
+            # 5. Commit to state.  The install itself runs in the background a
+            #    moment later, so the record starts from an explicit pending
+            #    state rather than claiming to be installed and up to date.
+            final_record.last_updated = "Installing…"
+            final_record.update_error = ""
             self.app._update_packages.append(final_record.model_dump())
             self._resolvePackageStorageState()
-            self.app._set_status(f"Added skill package: {final_record.name}")
+            status = f"Added skill package: {final_record.name} (installing…)"
+            if probe_warning:
+                status += f" — could not check for updates: {probe_warning}"
+            self.app._set_status(status)
             capture_event("skill_package_added", {"source_type": final_record.source_type})
 
             new_index = len(self.app._update_packages) - 1
@@ -438,7 +611,10 @@ class UpdateController(BaseController):
                 or pkg_record.get("local_path")
                 or ""
             )
-            self._refresh_after_package_add(pkg_path)
+            # The install below triggers its own discovery refresh, so the
+            # immediate one is skipped — it used to walk every source and
+            # project before a single file of this package existed on disk.
+            self._register_package_watcher(pkg_path)
 
             # 6. Trigger initial install in background so skill files are
             #    actually downloaded/relocated into the resolved package
@@ -448,7 +624,19 @@ class UpdateController(BaseController):
             new_index = len(self.app._update_packages) - 1
             QTimer.singleShot(500, lambda idx=new_index: self.runPackageUpdate(idx))
 
-            return json.dumps({"ok": True, "error": None, "name": final_record.name})
+            # ``ok`` means "added and saved"; ``installing`` states that the
+            # files are still being fetched, and ``warning`` carries a failed
+            # version probe so the caller can surface it honestly.
+            return json.dumps(
+                {
+                    "ok": True,
+                    "error": None,
+                    "name": final_record.name,
+                    "installing": True,
+                    "check_status": final_record.check_status,
+                    "warning": probe_warning,
+                }
+            )
         except Exception as e:
             logger.error("Failed to add skill package: %s", e)
             self.app._set_status(f"Error adding skill package: {e}")
@@ -470,6 +658,7 @@ class UpdateController(BaseController):
             return json.dumps({"ok": False, "error": "No data provided.", "name": ""})
 
         from skill_manager.core.skill_packages import (
+            RemoteProbeCache,
             check_skill_package_versions,
             normalize_skill_package_config,
         )
@@ -481,6 +670,10 @@ class UpdateController(BaseController):
             just_finished = existing.get("just_finished", False)
             last_updated = existing.get("last_updated", "Never")
 
+            # One cache for both phases below: without it the same remote is
+            # listed twice, doubling the latency of every edit.
+            remote_cache = RemoteProbeCache()
+
             # 1. Normalize and Validate
             normalized = normalize_skill_package_config(data)
             record = UpdatePackageRecord.model_validate(normalized)
@@ -489,7 +682,9 @@ class UpdateController(BaseController):
             record.last_updated = last_updated
 
             # 2. Phase 1 — detect latest_version only (no snap yet)
-            detected_data = check_skill_package_versions(record.model_dump())
+            detected_data = check_skill_package_versions(
+                record.model_dump(), remote_cache=remote_cache
+            )
 
             # 3. Block save only if package is completely unidentifiable and latest_version is undetectable
             if not detected_data.get("latest_version"):
@@ -505,7 +700,9 @@ class UpdateController(BaseController):
                     return json.dumps({"ok": False, "error": error_msg, "name": pkg_name})
 
             # 4. Phase 2 — snap current_version = latest_version on edit
-            synced_data = check_skill_package_versions(detected_data, sync_current_to_latest=True)
+            synced_data = check_skill_package_versions(
+                detected_data, sync_current_to_latest=True, remote_cache=remote_cache
+            )
             final_record = UpdatePackageRecord.model_validate(synced_data)
 
             # Re-apply internal state (model_validate defaults these)
@@ -619,6 +816,20 @@ class UpdateController(BaseController):
             getattr(self.app, "_sources", []) or []
         )
         cleanup_result = delete_package_storage(source, protected_paths=protected)
+        deletion_errors = list(cleanup_result.get("errors") or [])
+        if deletion_errors:
+            # Abort instead of dropping the record.  The old behaviour removed
+            # the package from the list and config while its files stayed on
+            # disk, leaving orphans with no way for the user to retry.
+            logger.error(
+                "Aborting removal of %s: %d storage error(s): %s",
+                pkg_name,
+                len(deletion_errors),
+                "; ".join(str(e) for e in deletion_errors[:3]),
+            )
+            self.app._set_status(f"Could not remove {pkg_name}: {deletion_errors[0]}")
+            return
+
         deleted_skill_paths.update(cleanup_result.get("deleted_skill_paths", []))
 
         # 3. Clean up persistence (inventory, ownership, cache)
@@ -883,8 +1094,9 @@ class UpdateController(BaseController):
                                     )
 
                         self.config.set("skills", self.app._update_packages)
-                        if hasattr(self.app, "loadInitialData"):
-                            self.app.loadInitialData()
+                        # Coalesced: adding several packages in a row (or an
+                        # edit landing mid-install) must not stack full scans.
+                        self._schedule_discovery_refresh()
 
                     _safe_single_shot(0, self.app, finalize_ui)
 
@@ -914,6 +1126,65 @@ class UpdateController(BaseController):
         if 0 <= index < len(packages):
             return index
         return None
+
+    @Slot(str)
+    def retryPackageCheck(self, package_id: str):
+        """Re-probe one package's remote and refresh its stored check result.
+
+        Runs on the shared task runner: a probe is allowed to take
+        ``DEFAULT_GIT_TIMEOUT`` seconds, and the UI must keep painting while
+        it does.  The row shows the outcome via ``check_status`` /
+        ``check_error``, so a remote that could not be reached stops looking
+        like "up to date".
+        """
+        from skill_manager.core.skill_packages import (
+            RemoteProbeCache,
+            check_skill_package_versions,
+        )
+
+        target = self._resolve_package_index(-1, package_id)
+        if target is None:
+            return
+
+        package = dict(self.app._update_packages[target])
+        label = package.get("name") or package_id
+        self.app._set_status(f"Checking {label} for updates...")
+
+        def run():
+            try:
+                result = check_skill_package_versions(
+                    package, force_refresh=True, remote_cache=RemoteProbeCache()
+                )
+            except Exception as exc:
+                logger.error("Version re-check failed for %s: %s", package_id, exc)
+                capture_exception(exc)
+                result = dict(package)
+                result["check_status"] = "failed"
+                result["check_error"] = f"version check failed: {exc}"
+
+            def finalize_ui():
+                # Re-resolve: an add or remove while the probe ran shifts rows.
+                current = self._resolve_package_index(-1, package_id)
+                if current is None:
+                    return
+                self.app._update_packages[current].clear()
+                self.app._update_packages[current].update(result)
+                self.config.set("skills", self.app._update_packages)
+                self.recalculateStats()
+                self.app.updatePackagesChanged.emit()
+                if result.get("check_status") == "failed":
+                    reason = result.get("check_error") or "unknown error"
+                    self.app._set_status(f"Could not check {label}: {reason}")
+                else:
+                    self.app._set_status(f"Checked {label}")
+
+            _safe_single_shot(0, self.app, finalize_ui)
+
+        try:
+            self.app.task_runner.run(run)
+        except Exception as e:
+            capture_exception(e)
+            self.app._set_status(f"Could not start version check for {label}: {e}")
 
     @Slot(str)
     def syncProject(self, path: str):

@@ -290,13 +290,17 @@ class ConfigManager:
         return self.data
 
     def save(self) -> None:
-        """Saves current configuration."""
+        """Saves current configuration.
+
+        Writes through :func:`_atomic_write_json` (temp file + ``os.replace``)
+        so an interrupted or crashing write can never leave a truncated
+        ``config.json`` — which would take the package list down with it.
+        """
         try:
-            content = orjson.dumps(
-                self.data, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE
-            )
-            with open(self.config_path, "wb") as f:
-                f.write(content)
+            from skill_manager.core.persistence import _atomic_write_json
+
+            if not _atomic_write_json(self.config_path, self.data):
+                logger.warning("Atomic save reported failure for %s", self.config_path)
         except Exception as e:
             logger.warning("Error saving config: %s", e)
 

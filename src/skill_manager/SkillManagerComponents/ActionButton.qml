@@ -8,7 +8,7 @@ Button {
     property string iconText: ""
     property string iconSource: ""
     property string labelText: text
-    property string role: "secondary" // primary, secondary, destructive, danger
+    property string role: "secondary" // primary, secondary, destructive, danger, warning
     property string tooltipText: ""
     property string accessibleName: tooltipText !== "" ? tooltipText : (iconText !== "" ? iconText : (labelText !== "" ? labelText : text))
     property int buttonHeight: 36
@@ -49,6 +49,7 @@ Button {
                         if (control.role === "primary") return "white"
                         if (control.role === "danger") return "white"
                         if (control.role === "destructive") return Theme.danger
+                        if (control.role === "warning") return Theme.warning
                         return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                     }
                     horizontalAlignment: Text.AlignHCenter
@@ -74,6 +75,7 @@ Button {
                         if (control.role === "primary") return "white"
                         if (control.role === "danger") return "white"
                         if (control.role === "destructive") return Theme.danger
+                        if (control.role === "warning") return Theme.warning
                         return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                     }
                     visible: control.iconSource !== ""
@@ -91,6 +93,7 @@ Button {
                     if (control.role === "primary") return "white"
                     if (control.role === "danger") return "white"
                     if (control.role === "destructive") return Theme.danger
+                    if (control.role === "warning") return Theme.warning
                     return control.hovered || control.down ? Theme.label : Theme.secondaryLabel
                 }
                 horizontalAlignment: Text.AlignHCenter
@@ -107,6 +110,7 @@ Button {
             if (control.role === "primary") return control.down ? Theme.glassActive : (control.hovered ? Theme.selectedRowBorder : Theme.accent)
             if (control.role === "danger") return !control.enabled ? Theme.disabledControl : (control.down ? Theme.dangerHover : (control.hovered ? Theme.alpha(Theme.danger, 0.88) : Theme.danger))
             if (control.role === "destructive") return control.down ? Theme.dangerHover : (control.hovered ? Theme.dangerHover : "transparent")
+            if (control.role === "warning") return control.down ? Theme.warningHover : (control.hovered ? Theme.warningHover : "transparent")
             return control.down ? Theme.glassActive : (control.hovered ? Theme.glassHover : "transparent")
         }
         border.color: {
@@ -114,6 +118,7 @@ Button {
             if (!control.enabled) return Theme.glassBorder
             if (control.role === "danger") return control.visualFocus ? Theme.label : "transparent"
             if (control.role === "destructive") return control.hovered || control.down ? Theme.danger : "transparent"
+            if (control.role === "warning") return control.hovered || control.down ? Theme.warning : Theme.glassBorder
             return control.hovered || control.down ? Theme.separator : Theme.glassBorder
         }
         border.width: control.visualFocus ? 2 : (control.role === "primary" || control.role === "danger" ? 0 : 1)

@@ -244,6 +244,18 @@ class UpdatePackageRecord(BaseModel):
     latest_version_command: str = ""
     install_args: str = ""
 
+    # Version-check outcome, so the Updates view can distinguish "up to date"
+    # from "the remote could not be reached" instead of showing neither.
+    check_status: str = "never_checked"  # ok | failed | never_checked
+    check_error: str = ""
+    last_checked_at: str = ""
+
+    # Last install/update failure, rendered by UpdatesView.  Declared here
+    # because ``extra="ignore"`` silently dropped it on every model validation
+    # (e.g. the _resolvePackageStorageState pass run before each update), so
+    # the failure the user was told about vanished from the record.
+    update_error: str = ""
+
     @field_validator("name", mode="before")
     @classmethod
     def _coerce_name(cls, value: Any) -> str:
@@ -394,6 +406,7 @@ class UIStateRecord(BaseModel):
     remember_filters: bool = True
     reduced_motion: bool = False
     compact_list_rows: bool = False
+    telemetry_enabled: bool = True
     inspector_width: int = Field(default=0, ge=0)
 
 

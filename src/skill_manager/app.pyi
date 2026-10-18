@@ -99,6 +99,7 @@ class AppController(AppControllerProxyMixin, QObject):
     statsUpToDate: int
     statsOutdated: int
     statsMissing: int
+    statsUnchecked: int
 
     # --- Proxy Properties (QML compat) ---
     currentProject: str

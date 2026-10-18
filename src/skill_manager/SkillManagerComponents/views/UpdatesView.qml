@@ -80,6 +80,7 @@ Item {
 
     PackageEditDialog {
         id: uv_packageEditDialog
+        objectName: "uv_packageEditDialog"
     }
 
     ProjectRenameDialog {
@@ -128,6 +129,15 @@ Item {
                         font.pixelSize: Theme.sizeCaption
                         color: AppController.isLoading ? Theme.accent : Theme.secondaryLabel
                         visible: updatesRoot.width >= 420
+                    }
+                    // "0 updates" is not the same as "0 packages checked":
+                    // say so when a remote could not be reached.
+                    Text {
+                        text: "· " + AppController.statsUnchecked + " unchecked"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeCaption
+                        color: Theme.warning
+                        visible: updatesRoot.width >= 480 && AppController.statsUnchecked > 0
                     }
                 }
 
@@ -314,6 +324,16 @@ Item {
                                                 color: Theme.accent
                                                 visible: Boolean(modelData.latest_version && modelData.latest_version !== modelData.current_version)
                                             }
+                                            Text {
+                                                // Never render a failed check as
+                                                // a plain version row: the latest
+                                                // version is simply unknown.
+                                                visible: Boolean(modelData.check_status === "failed")
+                                                text: "· could not check"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.sizeCaption
+                                                color: Theme.warning
+                                            }
                                         }
                                     }
 
@@ -324,25 +344,44 @@ Item {
                                         // Update Button / Status
                                         ActionButton {
                                             id: uv_itemUpdateBtn
-                                            property bool isLatest: Boolean(
+                                            // A newer version we actually know about always wins:
+                                            // it is not stale information, so the action is Update.
+                                            property bool hasNewerVersion: Boolean(
                                                 modelData.latest_version && modelData.latest_version !== "" &&
-                                                modelData.latest_version === modelData.current_version
+                                                modelData.latest_version !== modelData.current_version
                                             )
-                                            labelText: modelData.is_updating ? "Updating..." : (isLatest ? "Up to Date" : "Update")
+                                            // Otherwise a failed check must not present as
+                                            // "Up to Date" — we never learned the latest version,
+                                            // so the honest primary action is to retry the check.
+                                            property bool checkFailed: !hasNewerVersion && modelData.check_status === "failed"
+                                            labelText: modelData.is_updating
+                                                ? "Updating..."
+                                                : (hasNewerVersion ? "Update" : (checkFailed ? "Re-check" : "Up to Date"))
                                             iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
-                                            role: modelData.update_error ? "destructive" : (isLatest ? "secondary" : "primary")
+                                            role: modelData.update_error
+                                                ? "destructive"
+                                                : (checkFailed ? "warning" : (hasNewerVersion ? "primary" : "secondary"))
                                             buttonHeight: 26
                                             iconOnlyMode: uv_packagesList.width < 320
                                             Layout.preferredWidth: implicitWidth
                                             Layout.minimumWidth: implicitWidth
-                                            enabled: !isLatest && !modelData.is_updating
+                                            enabled: !modelData.is_updating && (hasNewerVersion || checkFailed)
                                             tooltipText: {
                                                 if (modelData.update_error) return "Update failed: " + modelData.update_error
                                                 if (modelData.is_updating) return "Update in progress..."
-                                                if (isLatest) return "Already up to date"
+                                                if (checkFailed) {
+                                                    var reason = modelData.check_error ? (": " + modelData.check_error) : ""
+                                                    return "Could not check for updates" + reason + " — click to retry"
+                                                }
+                                                if (!hasNewerVersion) return "Already up to date"
                                                 return "Update " + modelData.name + " to latest version"
                                             }
                                             onClicked: (mouse) => {
+                                                if (checkFailed) {
+                                                    AppController.logDiagnosticEvent("INFO", "check_retry", "User retried the version check for package: " + modelData.name)
+                                                    AppController.update_controller.retryPackageCheck(modelData.package_id)
+                                                    return
+                                                }
                                                 AppController.logDiagnosticEvent("INFO", "update_click", "User clicked Update for package: " + modelData.name + " (index=" + index + ")")
                                                 AppController.update_controller.runPackageUpdate(index)
                                             }

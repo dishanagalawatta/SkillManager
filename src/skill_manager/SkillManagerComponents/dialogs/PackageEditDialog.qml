@@ -23,6 +23,11 @@ Dialog {
     property bool userEditedName: false
     property bool userEditedProtocol: false
     property bool isInternalUpdating: false
+    // Which "Verify" is in flight and for which URL.  Verification is
+    // asynchronous (the probe is network-bound), so a result is only applied
+    // when it still belongs to the latest click.
+    property string verifyingField: ""
+    property string verifyingUrl: ""
     
     property real targetHeight: {
         if (typeCombo && typeCombo.currentValue === "custom") return 560
@@ -326,6 +331,7 @@ Dialog {
                                 Text { text: "Protocol"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.secondaryLabel }
                                 ComboBox { 
                                     id: typeCombo
+                                    objectName: "pkgTypeCombo"
                                     model: ListModel {
                                         ListElement { text: "NPX Package"; value: "npx" }
                                         ListElement { text: "GitHub Repository"; value: "git" }
@@ -480,6 +486,7 @@ Dialog {
                                 spacing: 12
                                 TextField { 
                                     id: repoInput
+                                    objectName: "pkgRepoInput"
                                     placeholderText: "https://github.com/user/skills.git"
                                     Accessible.role: Accessible.EditableText
                                     Accessible.name: "Repository URL"
@@ -500,18 +507,18 @@ Dialog {
                                     }
                                 }
                                 ActionButton {
+                                    id: repoVerifyBtn
                                     text: "🔍 Verify"
-                                    enabled: repoInput.text.length > 0
+                                    enabled: repoInput.text.length > 0 && root.verifyingField !== "repo"
                                     Layout.preferredHeight: 40
                                     Layout.preferredWidth: 100
                                     onClicked: {
+                                        // Non-blocking: the probe is network-bound
+                                        // and used to freeze this dialog.
                                         verificationStatus.text = "Validating..."
-                                        let tag = AppController.verifyGitPackage(repoInput.text, tokenInput.text)
-                                        if (tag) {
-                                            verificationStatus.text = "✓ Connection Successful (Latest: " + tag + ")"
-                                        } else {
-                                            verificationStatus.text = "✗ Connection Failed"
-                                        }
+                                        root.verifyingField = "repo"
+                                        root.verifyingUrl = repoInput.text
+                                        AppController.verifyGitPackage(repoInput.text, tokenInput.text)
                                     }
                                     background: Rectangle {
                                         radius: Theme.radiusSmall
@@ -532,6 +539,7 @@ Dialog {
 
                             Text { 
                                 id: verificationStatus
+                                objectName: "pkgVerifyStatus"
                                 text: ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.sizeMetadata
@@ -698,18 +706,17 @@ Dialog {
                                         }
                                     }
                                     ActionButton {
+                                        id: npxVerifyBtn
                                         text: "🔍 Verify"
-                                        enabled: npxRepoInput.text.length > 0
+                                        enabled: npxRepoInput.text.length > 0 && root.verifyingField !== "npx"
                                         Layout.preferredHeight: 40
                                         Layout.preferredWidth: 100
                                         onClicked: {
+                                            // Non-blocking (see the repo Verify button).
                                             npxVerificationStatus.text = "Validating..."
-                                            let tag = AppController.verifyGitPackage(npxRepoInput.text, npxTokenInput.text)
-                                            if (tag) {
-                                                npxVerificationStatus.text = "✓ Connection Successful (Latest: " + tag + ")"
-                                            } else {
-                                                npxVerificationStatus.text = "✗ Connection Failed"
-                                            }
+                                            root.verifyingField = "npx"
+                                            root.verifyingUrl = npxRepoInput.text
+                                            AppController.verifyGitPackage(npxRepoInput.text, npxTokenInput.text)
                                         }
                                         background: Rectangle {
                                             radius: Theme.radiusSmall
@@ -989,5 +996,27 @@ Dialog {
         id: folderPicker
         mode: "path"
         onFolderSelected: (path) => pathInput.text = path
+    }
+
+    // Result of an asynchronous "Verify" probe (see SourcesMixin.verifyGitPackage).
+    Connections {
+        target: AppController.config_controller
+        function onGitVerificationFinished(url, tag, error) {
+            if (root.verifyingField === "" || url !== root.verifyingUrl)
+                return
+
+            var ok = (error === "" || error === undefined) && tag !== ""
+            var message = ok
+                ? "✓ Connection Successful (Latest: " + tag + ")"
+                : "✗ Connection Failed" + (error ? " — " + error : "")
+
+            if (root.verifyingField === "repo")
+                verificationStatus.text = message
+            else if (root.verifyingField === "npx")
+                npxVerificationStatus.text = message
+
+            root.verifyingField = ""
+            root.verifyingUrl = ""
+        }
     }
 }

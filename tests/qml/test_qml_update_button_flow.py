@@ -353,11 +353,16 @@ class TestResolvePackageStorageStateInPlace:
         assert mock_app._update_packages[0]["storage_mode"] == "grouped"
         assert mock_app._update_packages[1]["storage_mode"] == "grouped"
 
-    def test_list_length_matches(self, ctrl, mock_app):
-        """The list must end up with exactly the items returned by resolve_package_storage."""
+    def test_short_resolution_never_truncates(self, ctrl, mock_app):
+        """A shorter result must not drop records or repoint them.
+
+        The write-back below is positional, so truncating to a short result
+        used to make the last package inherit the previous package's storage
+        path.  The record is kept instead (regression: WS3).
+        """
 
         def fake_resolve(packages, _inventory):
-            return packages[:1]  # drop the second package
+            return packages[:1]  # resolver lost the second package
 
         with patch(
             "skill_manager.core.skill_packages.resolve_package_storage",
@@ -365,7 +370,8 @@ class TestResolvePackageStorageStateInPlace:
         ):
             ctrl._resolvePackageStorageState()
 
-        assert len(mock_app._update_packages) == 1
+        # Nothing vanished, and each record kept its own package_id.
+        assert [p["package_id"] for p in mock_app._update_packages] == ["pkg_aaaa", "pkg_bbbb"]
 
     def test_background_worker_reference_stable(self, ctrl, mock_app):
         """After _resolvePackageStorageState, a dict captured by a background

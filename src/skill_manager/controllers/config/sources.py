@@ -4,16 +4,24 @@ import logging
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Signal, Slot
 
 from skill_manager.core.analytics import capture_event, capture_exception
 from skill_manager.core.diagnostics import get_diagnostic_logger
+from skill_manager.utils.qt_threading import schedule_on_ui_thread
 
 logger = logging.getLogger(__name__)
+
+# Reason reported when a git probe answered with nothing at all.
+_NO_VERSION_REASON = "remote did not report a version (network, auth, or timeout)"
 
 
 class SourcesMixin:
     """Source directory CRUD plus git-package verification."""
+
+    # Emitted when an asynchronous Verify finishes: (url, tag, error).
+    # ``tag`` is empty when ``error`` is set.
+    gitVerificationFinished = Signal(str, str, str)
 
     def normalize_path(self, raw_url: str) -> str:
         """Helper to convert file URLs or raw strings to canonical absolute local paths."""
@@ -90,18 +98,44 @@ class SourcesMixin:
 
     @Slot(str, str, result=str)
     def verifyGitPackage(self, url: str, token: str | None = None) -> str:
-        """Verifies a git repository and returns its latest tag."""
+        """Starts a bounded, non-blocking git remote verification.
+
+        Returns ``""`` immediately and reports the outcome asynchronously via
+        :attr:`gitVerificationFinished`.  The probe needs up to
+        ``DEFAULT_GIT_TIMEOUT`` seconds, and running it here used to block the
+        GUI thread — so a slow, unreachable, or credential-gated remote froze
+        the whole dialog while the user watched nothing happen.
+        """
         if not url:
+            self.gitVerificationFinished.emit(url or "", "", "No repository URL provided.")
             return ""
-        from skill_manager.core.skill_packages import get_git_tag
+
+        from skill_manager.core.skill_packages import probe_git_remote_version
 
         self.app._set_status(f"Verifying repository: {url}")
-        tag = get_git_tag(url, is_remote=True, token=token)
-        if tag:
-            self.app._set_status(f"Repository verified. Latest version: {tag}")
-        else:
+
+        def run():
+            probe = probe_git_remote_version(url, token=token)
+
+            def deliver():
+                if probe.ok:
+                    self.app._set_status(f"Repository verified. Latest version: {probe.version}")
+                else:
+                    self.app._set_status(f"Verification failed for: {url}")
+                self.gitVerificationFinished.emit(
+                    url, probe.version, "" if probe.ok else (probe.reason or _NO_VERSION_REASON)
+                )
+
+            schedule_on_ui_thread(self.app, deliver)
+
+        try:
+            self.app.task_runner.run(run)
+        except Exception as e:
+            capture_exception(e)
             self.app._set_status(f"Verification failed for: {url}")
-        return tag or ""
+            self.gitVerificationFinished.emit(url, "", str(e) or _NO_VERSION_REASON)
+
+        return ""
 
     @Slot(str, result=str)
     def detectPackageMetadata(self, raw_input: str) -> str:

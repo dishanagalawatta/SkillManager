@@ -23,6 +23,7 @@ from skill_manager.core.quick_copy import (
     discover_project_skills,
 )
 from skill_manager.core.skill_packages import (
+    RemoteProbeCache,
     check_skill_package_versions,
     diff_package_inventory,
     inventory_removals_verified,
@@ -153,6 +154,10 @@ class UpdateService:
         ]
         self.project_aliases = project_aliases or {}
         self.task_runner = task_runner or BackgroundTaskRunner()
+        # Set by scan_for_updates_sync when the scan itself blew up.  The
+        # controller reads it so a failed scan is reported as a failure
+        # instead of "Update scan complete: 0".
+        self.last_scan_error: str | None = None
 
     def run_global_update(
         self,
@@ -595,6 +600,7 @@ class UpdateService:
         completion_callback: Callable[[list[dict[str, Any]], list[dict[str, Any]]], None],
     ) -> None:
         try:
+            self.last_scan_error = None
             status_callback("Scanning for updates...")
             source_skills = discover_package_skills(
                 sources=self._package_discovery_sources(),
@@ -613,6 +619,11 @@ class UpdateService:
             import sys
 
             updated_sources = []
+            # One cache for the whole scan: a remote is probed once even
+            # though several branches of check_skill_package_versions want its
+            # tags (previously ~2N probes for N packages).
+            remote_cache = RemoteProbeCache()
+            unchecked: list[str] = []
             for source in self.update_packages:
                 if getattr(sys, "is_shutting_down", False):
                     break
@@ -622,14 +633,33 @@ class UpdateService:
                     # so a package installed at 1.0.0 would never notice 2.0.0.
                     # force_refresh=True re-queries npm/git/commands on every
                     # scan — required for Silent/Prompt auto-update to work.
-                    updated_sources.append(check_skill_package_versions(source, force_refresh=True))
+                    checked = check_skill_package_versions(
+                        source, force_refresh=True, remote_cache=remote_cache
+                    )
+                    if checked.get("check_status") == "failed":
+                        unchecked.append(str(checked.get("name") or source.get("name") or "?"))
+                    updated_sources.append(checked)
                 except Exception as exc:
                     logger.error(
                         "[ERROR] Failed to check versions for %s: %s",
                         source.get("name"),
                         exc,
                     )
-                    updated_sources.append(source)
+                    # Keep the record, but say so instead of letting it look
+                    # up to date: a swallowed failure here is exactly how a
+                    # package silently stopped offering updates.
+                    failed = dict(source)
+                    failed["check_status"] = "failed"
+                    failed["check_error"] = f"version check failed: {exc}"
+                    unchecked.append(str(source.get("name") or "?"))
+                    updated_sources.append(failed)
+
+            if unchecked:
+                logger.warning(
+                    "[WARN] Could not check %d package(s): %s",
+                    len(unchecked),
+                    ", ".join(unchecked[:5]),
+                )
 
             completion_callback(
                 self.compare_source_and_project_skills(source_skills, projects_state),
@@ -639,6 +669,7 @@ class UpdateService:
             import traceback
 
             traceback.print_exc()
+            self.last_scan_error = str(exc)
             # Guarantee completion: the controller clears _is_loading only in
             # finalize.  Queue it before the failure status so the visible
             # message still reports the error.

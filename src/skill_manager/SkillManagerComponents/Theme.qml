@@ -47,6 +47,11 @@ QtObject {
     readonly property color accent: darkMode ? "#3B82F6" : "#059669" // Modern Blue for Dark, Sage for Light
     readonly property color success: darkMode ? "#10B981" : "#10B981"
     readonly property color danger: darkMode ? "#EF4444" : "#DC2626"
+    // "Needs attention but nothing failed": e.g. a version check that could not
+    // reach its remote.  Distinct from danger (an action failed) and accent
+    // (an update is available).
+    readonly property color warning: darkMode ? "#F59E0B" : "#B45309"
+    readonly property color warningHover: darkMode ? "#3A2E14" : "#FFFBEB"
     
     // Aliases for compatibility
     readonly property color hoverBackground: glassHover

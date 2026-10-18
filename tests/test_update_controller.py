@@ -719,7 +719,10 @@ def test_add_skill_package_strict_schema(update_controller, mock_app):
     assert record["name"] == "My Git Package"
     assert "extra_field" not in record
     assert record["is_updating"] is False
-    assert record["last_updated"] == "Never"
+    # The install runs in the background *after* this call returns, so the
+    # record starts from an explicit pending state instead of claiming to be
+    # untouched (and therefore already up to date).
+    assert record["last_updated"] == "Installing…"
     # Config fields must survive the round-trip (ADR-0008 regression)
     assert record["repository_url"] == "https://github.com/test/repo.git"
     assert record["github_token"] == "ghp_secret"
@@ -871,7 +874,7 @@ def test_update_update_package_logs_version_check(update_controller, mock_app):
         {"name": "TestPkg", "package_id": "test12345", "source_type": "git"}
     ]
 
-    def mock_check(source, force_refresh=False, sync_current_to_latest=False):
+    def mock_check(source, force_refresh=False, sync_current_to_latest=False, **kwargs):
         return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
 
     with (
@@ -901,7 +904,7 @@ def test_update_update_package_diagnostic_event(update_controller, mock_app):
         }
     ]
 
-    def mock_check(source, force_refresh=False, sync_current_to_latest=False):
+    def mock_check(source, force_refresh=False, sync_current_to_latest=False, **kwargs):
         return {**source, "current_version": "v1.0.0", "latest_version": "v2.0.0"}
 
     with (
@@ -975,7 +978,10 @@ def test_add_skill_package_registers_watcher_and_triggers_discovery(
 
     assert result["ok"] is True
     mock_app._watcher.add_path.assert_called_once_with(str(pkg_dir.resolve()))
-    mock_app.loadInitialData.assert_called_once()
+    # Discovery is deliberately *not* triggered here: the install this add
+    # schedules ends with its own coalesced refresh, and the immediate one
+    # used to walk every source and project before any file existed on disk.
+    mock_app.loadInitialData.assert_not_called()
 
 
 def test_add_update_package_registers_watcher_and_triggers_discovery(
@@ -998,4 +1004,5 @@ def test_add_update_package_registers_watcher_and_triggers_discovery(
         update_controller.addUpdatePackage("npx-test-pkg")
 
     mock_app._watcher.add_path.assert_called_once_with(str(pkg_dir.resolve()))
-    mock_app.loadInitialData.assert_called_once()
+    # See the skill-package equivalent: the install owns the refresh now.
+    mock_app.loadInitialData.assert_not_called()

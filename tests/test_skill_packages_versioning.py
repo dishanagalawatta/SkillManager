@@ -123,11 +123,15 @@ def test_check_skill_package_versions_git(mock_get_git_tag, tmp_path):
         "clone_path": str(tmp_path),
     }
 
-    mock_get_git_tag.side_effect = ["v1.2", "v1.0", "v1.5"]
+    mock_get_git_tag.side_effect = ["v1.2", "v1.0"]
 
     updated = check_skill_package_versions(source, force_refresh=True)
-    assert updated["latest_version"] == "1.5"
+    # The remote is probed exactly once per check: the generic reconciliation
+    # and the git branch share one cached probe, so the second value is the
+    # local clone's tag rather than a second remote answer.
+    assert updated["latest_version"] == "1.2"
     assert updated["current_version"] == "1.0"
+    assert mock_get_git_tag.call_count == 2
 
 
 @patch("skill_manager.core.skill_packages.versioning.run_version_command")

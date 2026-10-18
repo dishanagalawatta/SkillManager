@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.controllers.config_controller import ConfigController
+from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
 @pytest.fixture
@@ -15,6 +16,9 @@ def mock_app():
     app._project_aliases = {}
     app._syncing_projects = []
     app._config = MagicMock()
+    # Git verification and other probes run through the task runner, and the
+    # controller assumes it exists (see SourcesMixin.verifyGitPackage).
+    app.task_runner = SynchronousTaskRunner()
     return app
 
 
@@ -125,12 +129,61 @@ def test_config_controller_add_project_invalid(config_controller, mock_app):
     mock_app.projectsChanged.emit.assert_not_called()
 
 
-@patch("skill_manager.core.skill_packages.get_git_tag")
-def test_config_controller_verify_git_fail(mock_tag, config_controller, mock_app):
-    mock_tag.return_value = ""
-    res = config_controller.verifyGitPackage("http://git.com")
+@patch("skill_manager.core.skill_packages.probe_git_remote_version")
+def test_config_controller_verify_git_fail(mock_probe, config_controller, mock_app):
+    """Verify is asynchronous: it returns immediately and reports by signal.
+
+    The probe is network-bound, so it must never run on the GUI thread.
+    """
+    from skill_manager.core.skill_packages.versioning import VersionProbe
+
+    mock_probe.return_value = VersionProbe(ok=False, version="", reason="unreachable")
+    received = []
+    config_controller.gitVerificationFinished.connect(
+        lambda url, tag, error: received.append((url, tag, error))
+    )
+
+    with patch(
+        "skill_manager.controllers.config.sources.schedule_on_ui_thread",
+        side_effect=lambda _receiver, callback: callback(),
+    ):
+        res = config_controller.verifyGitPackage("http://git.com")
+
     assert res == ""
     mock_app._set_status.assert_any_call("Verification failed for: http://git.com")
+    assert received == [("http://git.com", "", "unreachable")]
+
+
+@patch("skill_manager.core.skill_packages.probe_git_remote_version")
+def test_config_controller_verify_git_success(mock_probe, config_controller, mock_app):
+    from skill_manager.core.skill_packages.versioning import VersionProbe
+
+    mock_probe.return_value = VersionProbe(ok=True, version="v2.1.0", reason="")
+    received = []
+    config_controller.gitVerificationFinished.connect(
+        lambda url, tag, error: received.append((url, tag, error))
+    )
+
+    with patch(
+        "skill_manager.controllers.config.sources.schedule_on_ui_thread",
+        side_effect=lambda _receiver, callback: callback(),
+    ):
+        res = config_controller.verifyGitPackage("http://git.com")
+
+    assert res == ""
+    assert received == [("http://git.com", "v2.1.0", "")]
+    mock_app._set_status.assert_any_call("Repository verified. Latest version: v2.1.0")
+
+
+def test_config_controller_verify_git_empty_url(config_controller, mock_app):
+    """An empty URL fails fast without starting a probe."""
+    received = []
+    config_controller.gitVerificationFinished.connect(
+        lambda url, tag, error: received.append((url, tag, error))
+    )
+
+    assert config_controller.verifyGitPackage("") == ""
+    assert received == [("", "", "No repository URL provided.")]
 
 
 def test_config_controller_shortcuts(config_controller, mock_app):

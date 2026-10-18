@@ -223,6 +223,7 @@ class AppController(AppControllerProxyMixin, QObject):
         self._stats_up_to_date = 0
         self._stats_outdated = 0
         self._stats_missing = 0
+        self._stats_unchecked = 0
         self._update_results = []
         self._syncing_projects = []
 
@@ -812,6 +813,14 @@ class AppController(AppControllerProxyMixin, QObject):
     @Property(int, notify=statsChanged)
     def statsMissing(self):
         return self._stats_missing
+
+    @Property(int, notify=statsChanged)
+    def statsUnchecked(self):  # type: ignore[reportRedeclaration]
+        """Packages whose last version check failed.
+
+        Non-zero means "0 updates" is unproven, not that everything is current.
+        """
+        return self._stats_unchecked
 
     # --- Proxy Properties (Temporary for QML compatibility) ---
     # These will be removed once QML is updated to use controller namespaces.

@@ -1,0 +1,9 @@
+{
+  "slug": "skill_package_workflow_20261019",
+  "title": "Skill Package Update Workflow Reliability",
+  "status": "active",
+  "owner": "@dishanagalawatta",
+  "created": "2026-10-19",
+  "description": "Make the in-app Skill Packages (Sync & Updates) workflow reliable, responsive and efficient, anchored on the report that updates sometimes silently stop working.",
+  "related_adrs": ["ADR-0028"]
+}

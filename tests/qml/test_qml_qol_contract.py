@@ -158,7 +158,7 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
 
     assert 'text: model ? model.name : ""' in skill_item
     assert 'model.project + " • " + model.category' not in skill_item
-    assert "root.compactRows ? 32 : 54" in skill_item
+    assert "root.compactRows ? 32 : 46" in skill_item
     assert "delegate: SkillItem" in quick_copy
     assert "delegate: SkillItem" in library
 
@@ -678,8 +678,9 @@ def test_update_all_button_mirrors_package_up_to_date_state():
     assert 'role: hasPendingUpdates ? "primary" : "secondary"' in updates
     assert "enabled: !AppController.isLoading && hasPendingUpdates" in updates
     assert "AppController.update_controller.updateAllOutdated()" in updates
-    # Parity with the per-package cards in the same file.
-    assert 'isLatest ? "Up to Date" : "Update"' in updates
+    # Parity with the per-package cards in the same file.  The card predicate
+    # gained a third state: a failed version check must not read "Up to Date".
+    assert 'hasNewerVersion ? "Update" : (checkFailed ? "Re-check" : "Up to Date")' in updates
 
 
 def test_skill_packages_auto_update_is_a_switch():
@@ -709,3 +710,34 @@ def test_update_toast_contract():
     assert "UpdateToast {" in main
     assert "function onUpdatesAvailable(count)" in main
     assert "function onAutoUpdateFinished(updated, failed)" in main
+
+
+def test_packages_view_distinguishes_unchecked_from_up_to_date():
+    """A package whose remote could not be reached must not read "Up to Date"."""
+    updates = (QML_DIR / "views" / "UpdatesView.qml").read_text(encoding="utf-8")
+
+    # Per-package: the third state, its retry action, and the shared predicate.
+    assert (
+        'property bool checkFailed: !hasNewerVersion && modelData.check_status === "failed"'
+        in updates
+    )
+    assert "AppController.update_controller.retryPackageCheck(modelData.package_id)" in updates
+    assert 'text: "· could not check"' in updates
+    # A known newer version still wins over a failed check.
+    assert "property bool hasNewerVersion: Boolean(" in updates
+    # View level: "0 updates" must be separable from "0 packages checked".
+    assert "AppController.statsUnchecked" in updates
+
+
+def test_package_edit_dialog_verifies_asynchronously():
+    """Verify must not run its network probe on the GUI thread."""
+    dialog = (QML_DIR / "dialogs" / "PackageEditDialog.qml").read_text(encoding="utf-8")
+
+    # The result arrives by signal, guarded against a stale in-flight click.
+    assert "function onGitVerificationFinished(url, tag, error)" in dialog
+    assert 'root.verifyingField = "repo"' in dialog
+    assert 'root.verifyingField = "npx"' in dialog
+    assert "target: AppController.config_controller" in dialog
+    # A second click cannot stack while one probe is in flight.
+    assert 'root.verifyingField !== "repo"' in dialog
+    assert 'root.verifyingField !== "npx"' in dialog
