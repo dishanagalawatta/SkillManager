@@ -27,6 +27,10 @@ rules:
   # instead of softprops/action-gh-release, but swapping release-publishing
   # machinery is only observable during a real release run. Deferred until it
   # can be verified end-to-end against a (pre)release tag.
+  #
+  # Note: the ignore is line-scoped, so it must track the `uses:` line. It said
+  # release-build.yml:191 while the step's `uses:` sits at :190, so the accepted
+  # finding resurfaced and failed the audit on every run.
   superfluous-actions:
     ignore:
-      - release-build.yml:191
+      - release-build.yml:190
