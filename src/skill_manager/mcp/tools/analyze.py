@@ -17,7 +17,7 @@ import contextlib
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import (
     list_projects,
     list_skills,
@@ -29,7 +29,7 @@ from skill_manager.mcp.models import ToolResult, err, ok
 
 def _emit(tool: str, args: dict[str, Any]) -> None:
     with contextlib.suppress(Exception):
-        capture_event("mcp_tool_call", {"tool": tool, "args": args})
+        capture_mcp_tool_call("mcp_tool_call", tool, args)
 
 
 # ---------------------------------------------------------------------------

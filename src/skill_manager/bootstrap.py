@@ -53,6 +53,23 @@ def _handle_qml_warning(msg):
     logger.warning(f"QML Warning: {msg_str}")
 
 
+def _scrub_sentry_event(event: Any, _hint: Any = None) -> Any:  # pragma: no cover
+    """Strip user-identifying data from a Sentry event before it is sent.
+
+    Error and transaction payloads can carry local filesystem paths (which
+    embed the OS username) and request/user context. Telemetry is opt-in, but
+    we still send only the error itself.
+    """
+    try:
+        event.pop("request", None)
+        event.pop("user", None)
+        for crumb in (event.get("breadcrumbs") or {}).get("values") or []:
+            crumb.pop("data", None)
+    except Exception:
+        pass
+    return event
+
+
 def _setup_sentry() -> None:  # pragma: no cover
     """Initialize Sentry as early as possible."""
     sentry_sdk.init(
@@ -62,6 +79,9 @@ def _setup_sentry() -> None:  # pragma: no cover
         environment="production" if getattr(sys, "frozen", False) else "development",
         release=f"skill-manager@{skill_manager.__version__}",
         default_integrations=False,
+        send_default_pii=False,
+        before_send=_scrub_sentry_event,
+        before_send_transaction=_scrub_sentry_event,
     )
 
 

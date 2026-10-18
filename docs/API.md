@@ -254,6 +254,19 @@ See [`environments/README.md`](../environments/README.md) for tier-specific valu
 | `skill_launched` | — | User opens skill folder in explorer |
 | `skill_searched` | — | User applies category filter |
 
+### MCP Bridge Events (developer tooling)
+
+Emitted only when the internal MCP server (`--mcp`) is running. Payloads are passed through
+`capture_mcp_tool_call`, which **drops raw arguments, paths, free-form queries, and content** and
+forwards only scalar values — tool calls can never leak skill bodies, typed text, or local paths.
+
+| Event | Properties | When |
+|-------|------------|------|
+| `mcp_server_start` | `allow_write`, `transport`, `qt_pump_interval_s` | MCP stdio server starts |
+| `mcp_tool_call` | `tool` + allowlisted scalars (e.g. `limit`, `enabled`) | Any MCP tool is invoked |
+| `mcp_write_attempt` | `tool`, `allowed` (+ `name` for create) | A write-capable MCP tool is invoked |
+| `mcp_bridge_call` | `fn` | A bridge wrapper is called |
+
 See [`docs/PRODUCT_TELEMETRY.md`](PRODUCT_TELEMETRY.md) for full details.
 
 ## 10. Error Model

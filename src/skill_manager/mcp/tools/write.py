@@ -8,7 +8,8 @@ Security model:
 * Write tools are ONLY active when started with ``--mcp-allow-write``.
 * AGENTS.md exclusions are enforced: we never mutate paths matching
   ``TODO.md``, ``.agents/commands/`` or ``.agents/skills/``.
-* Every write attempt is recorded via ``capture_event("mcp_write_attempt", ...)``.
+* Every write attempt is recorded via ``capture_mcp_tool_call("mcp_write_attempt", ...)``
+  with a privacy-safe payload (no paths or content).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import create_skill, delete_skill, deploy, update_skill
 from skill_manager.mcp.models import ToolResult, err, ok
 
@@ -169,9 +170,10 @@ def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     description: str = str(args.get("description", ""))
     category: str = str(args.get("category", ""))
 
-    capture_event(
+    capture_mcp_tool_call(
         "mcp_write_attempt",
-        {"tool": "sm_create_skill", "allowed": allow_write, "name": name},
+        "sm_create_skill",
+        {"allowed": allow_write, "name": name},
     )
 
     if not allow_write:
@@ -199,9 +201,10 @@ def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     description: str = str(args.get("description", ""))
     category: str = str(args.get("category", ""))
 
-    capture_event(
+    capture_mcp_tool_call(
         "mcp_write_attempt",
-        {"tool": "sm_update_skill", "allowed": allow_write, "skill_id": skill_id},
+        "sm_update_skill",
+        {"allowed": allow_write},
     )
 
     if not allow_write:
@@ -225,9 +228,10 @@ def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
 def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = args.get("skill_id", "")
 
-    capture_event(
+    capture_mcp_tool_call(
         "mcp_write_attempt",
-        {"tool": "sm_delete_skill", "allowed": allow_write, "skill_id": skill_id},
+        "sm_delete_skill",
+        {"allowed": allow_write},
     )
 
     if not allow_write:
@@ -256,9 +260,10 @@ def _handle_deploy(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = args.get("skill_id", "")
     target: str = args.get("target", "")
 
-    capture_event(
+    capture_mcp_tool_call(
         "mcp_write_attempt",
-        {"tool": "sm_deploy", "allowed": allow_write, "skill_id": skill_id, "target": target},
+        "sm_deploy",
+        {"allowed": allow_write},
     )
 
     if not allow_write:

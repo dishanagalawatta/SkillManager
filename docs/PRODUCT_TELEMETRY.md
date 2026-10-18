@@ -7,7 +7,7 @@ The wizard has completed a deep integration of PostHog analytics into Skill Mana
 
 ### New files
 - **`src/skill_manager/core/analytics.py`** — PostHog client initialisation, persistent device ID helper, and `capture_event` / `capture_exception` / `shutdown` helpers. Reads credentials from environment variables and registers a graceful shutdown via `atexit`.
-- **`.env`** — Stores `POSTHOG_PROJECT_TOKEN` and `POSTHOG_HOST` (covered by `.gitignore`).
+- **`.env`** — Stores `POSTHOG_PROJECT_TOKEN` and `POSTHOG_HOST` **locally only**. `.gitignore` lists `.env`, but `.env` must also stay *untracked* — a file already tracked in git is not affected by `.gitignore`, and a committed `.env` would both leak the token and silently enable telemetry for everyone who clones the repo. The `secret-guard` CI job fails the build if `.env` becomes tracked or a `phc_…` token is committed.
 
 ### Modified files
 - **`src/skill_manager/app.py`** — Imports the analytics module and adds event capture calls throughout `AppController`.

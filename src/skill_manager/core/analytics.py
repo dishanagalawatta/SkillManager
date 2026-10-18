@@ -94,6 +94,52 @@ def capture_exception(exc: Exception) -> None:
         _posthog.capture_exception(exc, distinct_id=get_device_id())
 
 
+# ---------------------------------------------------------------------------
+# MCP tool-call telemetry (privacy allowlist)
+# ---------------------------------------------------------------------------
+#
+# MCP tool arguments can carry user-authored content, free-form search
+# queries, and absolute filesystem paths. None of that may leave the machine,
+# so every ``mcp_tool_call`` / ``mcp_write_attempt`` event goes through
+# ``capture_mcp_tool_call``. One allowlist — not each call site — decides what
+# is safe to send.
+_MCP_TELEMETRY_BLOCKED_KEYS = frozenset(
+    {
+        "args",
+        "path",
+        "pattern",
+        "query",
+        "skill_id",
+        "source_path",
+        "target",
+        "content",
+        "body",
+        "body_content",
+        "raw_content",
+        "text",
+        "project_label",
+    }
+)
+_MCP_TELEMETRY_SCALARS = (bool, int, float, str)
+
+
+def capture_mcp_tool_call(event: str, tool: str, properties: dict | None = None) -> None:
+    """Capture an MCP tool event with a privacy-safe, allowlisted payload.
+
+    Free-form or path-bearing fields (``args``, ``query``, ``path``,
+    ``pattern``, ``skill_id``, ``content``, ``text``, ...) are dropped, and
+    only JSON scalar values are forwarded, so tool arguments can never leak
+    user content or local paths into analytics.
+    """
+    safe: dict = {"tool": str(tool)}
+    for key, value in (properties or {}).items():
+        if key in _MCP_TELEMETRY_BLOCKED_KEYS:
+            continue
+        if isinstance(value, _MCP_TELEMETRY_SCALARS):
+            safe[key] = value
+    capture_event(event, safe)
+
+
 def shutdown() -> None:
     """Flush all queued PostHog events and shut down the client."""
     if _posthog is not None:

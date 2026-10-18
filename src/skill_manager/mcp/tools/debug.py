@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import (
     capture_errors as _bridge_capture_errors,
     dump_state as _bridge_dump_state,
@@ -157,28 +157,25 @@ def _handle_toggle_debug_overlay(enabled: bool) -> ToolResult:
 # ---------------------------------------------------------------------------
 def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
     def _dispatch_dump_state(_args: dict[str, Any]) -> ToolResult:
-        capture_event("mcp_tool_call", {"tool": "sm_dump_state", "args": {}})
+        capture_mcp_tool_call("mcp_tool_call", "sm_dump_state")
         return _handle_dump_state()
 
     def _dispatch_inspect_controller(args: dict[str, Any]) -> ToolResult:
         parsed = _InspectControllerArgs(**args)
-        capture_event(
-            "mcp_tool_call", {"tool": "sm_inspect_controller", "args": {"name": parsed.name}}
-        )
+        capture_mcp_tool_call("mcp_tool_call", "sm_inspect_controller", {"name": parsed.name})
         return _handle_inspect_controller(parsed.name)
 
     def _dispatch_capture_errors(args: dict[str, Any]) -> ToolResult:
         parsed = _CaptureErrorsArgs(**args)
-        capture_event(
-            "mcp_tool_call", {"tool": "sm_capture_errors", "args": {"limit": parsed.limit}}
-        )
+        capture_mcp_tool_call("mcp_tool_call", "sm_capture_errors", {"limit": parsed.limit})
         return _handle_capture_errors(parsed.limit)
 
     def _dispatch_toggle_debug_overlay(args: dict[str, Any]) -> ToolResult:
         parsed = _ToggleDebugOverlayArgs(**args)
-        capture_event(
+        capture_mcp_tool_call(
             "mcp_tool_call",
-            {"tool": "sm_toggle_debug_overlay", "args": {"enabled": parsed.enabled}},
+            "sm_toggle_debug_overlay",
+            {"enabled": parsed.enabled},
         )
         return _handle_toggle_debug_overlay(parsed.enabled)
 

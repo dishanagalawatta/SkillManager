@@ -312,7 +312,8 @@ SkillManager works out of the box with sensible defaults. Optional settings can 
 | `SKILL_MANAGER_LOG_LEVEL` | `INFO`         | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `SKILL_MANAGER_DATA_DIR`  | (system default) | Custom directory for user settings and local database           |
 | `QT_QPA_PLATFORM`         | native           | Set`offscreen` for headless CI runs                           |
-| `POSTHOG_PROJECT_TOKEN`   | *(empty)*      | Optional opt-in analytics token                                 |
+| `POSTHOG_PROJECT_TOKEN`   | *(empty)*      | Optional opt-in analytics token (requires `POSTHOG_HOST`)        |
+| `POSTHOG_HOST`            | *(empty)*      | PostHog instance URL — both token and host are needed to enable  |
 | `SENTRY_DSN`              | *(empty)*      | Optional opt-in crash reporting DSN                             |
 
 See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for full environment documentation.

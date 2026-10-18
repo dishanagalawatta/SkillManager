@@ -115,3 +115,30 @@ jobs:
           advanced-security: "false"
           version: v1.30.1
           config: .github/zizmor.yml
+
+  secret-guard:
+    name: Committed-secret guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fail on a tracked .env or committed token
+        run: |
+          set -euo pipefail
+          # .env holds live credentials (PostHog/Sentry). It is listed in
+          # .gitignore, but a file that is already tracked ignores that rule —
+          # so this job fails loudly if .env is tracked again.
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked by git — remove it with 'git rm --cached .env'."
+            exit 1
+          fi
+          # No live PostHog project token (phc_...) may be committed anywhere.
+          if git grep -nE 'phc_[A-Za-z0-9]{20,}'; then
+            echo "::error::A PostHog project token appears to be committed."
+            exit 1
+          fi
+          echo "No tracked .env and no committed PostHog token."

@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import (
     capture_app_window_info as _bridge_capture_app_window_info,
     navigate_view as _bridge_navigate_view,
@@ -164,12 +164,10 @@ def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
         save = bool(args.get("save", False))
         width = args.get("width")
         height = args.get("height")
-        capture_event(
+        capture_mcp_tool_call(
             "mcp_tool_call",
-            {
-                "tool": "sm_screenshot",
-                "args": {"navigate": navigate, "save": save, "width": width, "height": height},
-            },
+            "sm_screenshot",
+            {"navigate": navigate, "save": save, "width": width, "height": height},
         )
         return _handle_screenshot(navigate=navigate, save=save, width=width, height=height)
 

@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import (
     get_diagnostics as _bridge_get_diagnostics,
     get_health as _bridge_get_health,
@@ -246,25 +246,21 @@ def _handle_profile(force_full_scan: bool) -> ToolResult:
 def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
     def _dispatch_get_diagnostics(args: dict[str, Any]) -> ToolResult:
         parsed = _GetDiagnosticsArgs(**args)
-        capture_event(
-            "mcp_tool_call", {"tool": "sm_get_diagnostics", "args": {"limit": parsed.limit}}
-        )
+        capture_mcp_tool_call("mcp_tool_call", "sm_get_diagnostics", {"limit": parsed.limit})
         return _handle_get_diagnostics(parsed.limit)
 
     def _dispatch_get_health(_args: dict[str, Any]) -> ToolResult:
-        capture_event("mcp_tool_call", {"tool": "sm_get_health", "args": {}})
+        capture_mcp_tool_call("mcp_tool_call", "sm_get_health")
         return _handle_get_health()
 
     def _dispatch_tail_events(args: dict[str, Any]) -> ToolResult:
         parsed = _TailEventsArgs(**args)
-        capture_event("mcp_tool_call", {"tool": "sm_tail_events", "args": {"limit": parsed.limit}})
+        capture_mcp_tool_call("mcp_tool_call", "sm_tail_events", {"limit": parsed.limit})
         return _handle_tail_events(parsed.limit)
 
     def _dispatch_profile(args: dict[str, Any]) -> ToolResult:
         force_full_scan = bool(args.get("force_full_scan", False))
-        capture_event(
-            "mcp_tool_call", {"tool": "sm_profile", "args": {"force_full_scan": force_full_scan}}
-        )
+        capture_mcp_tool_call("mcp_tool_call", "sm_profile", {"force_full_scan": force_full_scan})
         return _handle_profile(force_full_scan)
 
     return {

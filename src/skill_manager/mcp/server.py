@@ -34,7 +34,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
-from skill_manager.core.analytics import capture_event
+from skill_manager.core.analytics import capture_event, capture_mcp_tool_call
 from skill_manager.mcp.models import ToolResult
 
 # How often the stdio loop hands control back to Qt for event processing.
@@ -154,7 +154,9 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
     async def _call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
         args: dict[str, Any] = arguments or {}
         with contextlib.suppress(Exception):  # analytics must never break a tool call
-            capture_event("mcp_tool_call", {"tool": name, "args": args})
+            # Never forward raw arguments — they can contain skill bodies,
+            # typed text, or local paths. Only the tool name leaves the machine.
+            capture_mcp_tool_call("mcp_tool_call", name)
 
         handler = handlers.get(name)
         if handler is None:
