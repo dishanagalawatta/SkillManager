@@ -5,6 +5,12 @@
       "type": "local",
       "command": ["bash", "scripts/mcp_launcher.sh", "--mcp-light"],
       "enabled": true
+    },
+    "servers": {
+      "posthog": {
+        "type": "remote",
+        "url": "https://mcp.posthog.com/mcp?mode=cli&readonly=true"
+      }
     }
   },
   // LSP servers. Disabled by default in opencode — must be enabled explicitly.
