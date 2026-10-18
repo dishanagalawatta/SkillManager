@@ -36,6 +36,7 @@
 | [ADR-0039](docs/adr/ADR-0039-boolean-auto-update-toast.md) | Boolean Auto Update with Toast Notifications | Accepted | 2026-09-25 | @DIKKA |
 | [ADR-0040](docs/adr/ADR-0040-mcp-stdio-transport-anyio.md) | MCP Stdio Transport Runs on `anyio`, Not `QtAsyncio` | Accepted | 2026-10-18 | @DIKKA |
 | [ADR-0041](docs/adr/ADR-0041-headless-qml-introspection-mcp.md) | Lazy Offscreen QML Introspection in `--mcp` Mode | Accepted | 2026-10-18 | @DIKKA |
+| [ADR-0042](docs/adr/ADR-0042-telemetry-privacy-boundaries.md) | Telemetry Privacy Boundaries (Scrubbing, Opt-Out, Credential Loading) | Accepted | 2026-10-18 | @DIKKA |
 
 
 ## Template

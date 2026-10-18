@@ -206,6 +206,30 @@ def test_ui_controller_preference_toggles(ui_controller):
     assert ui_controller.rememberFilters is False
 
 
+def test_telemetry_toggle_persists_and_applies_immediately(ui_controller, monkeypatch):
+    """The Settings toggle must persist the choice and take effect at once."""
+    applied: list[bool] = []
+    monkeypatch.setattr(
+        "skill_manager.controllers.ui_controller.set_telemetry_enabled",
+        lambda enabled: applied.append(enabled),
+    )
+
+    # Default stays telemetry-on; credentials remain the other gate.
+    assert ui_controller.telemetryEnabled is True
+
+    ui_controller.setTelemetryEnabled(False)
+
+    assert ui_controller.telemetryEnabled is False
+    assert ui_controller.state.telemetry_enabled is False
+    # Applied live (no restart) and queued for persistence.
+    assert applied == [False]
+    assert ui_controller._save_timer.isActive() is True
+
+    # A repeated value is a no-op: no second apply, no second save arm.
+    ui_controller.setTelemetryEnabled(False)
+    assert applied == [False]
+
+
 def test_dark_mode_changed_signal_count(ui_controller):
     """darkModeChanged must fire exactly once per value change and zero times on no-op."""
     spy = MagicMock()

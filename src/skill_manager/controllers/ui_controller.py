@@ -13,7 +13,11 @@ from pathlib import Path
 from PySide6.QtCore import Property, QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
-from skill_manager.core.analytics import capture_event, capture_exception
+from skill_manager.core.analytics import (
+    capture_event,
+    capture_exception,
+    set_enabled as set_telemetry_enabled,
+)
 from skill_manager.core.resources import logo_asset_for_client
 from skill_manager.core.schemas import UIStateRecord
 
@@ -33,6 +37,7 @@ class UIController(BaseController):
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
     compactListRowsChanged = Signal()
+    telemetryEnabledChanged = Signal()
     inspectorWidthChanged = Signal()
 
     def __init__(self, app):
@@ -210,6 +215,20 @@ class UIController(BaseController):
             self.triggerSave()
             self.compactListRowsChanged.emit()
 
+    @Property(bool, notify=telemetryEnabledChanged)
+    def telemetryEnabled(self):  # type: ignore[reportRedeclaration]
+        return self.state.telemetry_enabled
+
+    @telemetryEnabled.setter  # type: ignore[func-attr]
+    def telemetryEnabled(self, value):
+        value = bool(value)
+        if self.state.telemetry_enabled != value:
+            self.state.telemetry_enabled = value
+            self.triggerSave()
+            self.telemetryEnabledChanged.emit()
+            # Apply immediately so disabling stops sending without a restart.
+            set_telemetry_enabled(value)
+
     @Property(int, notify=inspectorWidthChanged)
     def inspectorWidth(self):  # type: ignore[reportRedeclaration]
         return self.state.inspector_width
@@ -270,6 +289,10 @@ class UIController(BaseController):
     def setCompactListRows(self, b):
         self.compactListRows = b
 
+    @Slot(bool)
+    def setTelemetryEnabled(self, b):
+        self.telemetryEnabled = b
+
     @Slot()
     def triggerSave(self):
         """Triggers a debounced save of the UI state."""
@@ -304,7 +327,10 @@ class UIController(BaseController):
         self.rememberFiltersChanged.emit()
         self.reducedMotionChanged.emit()
         self.compactListRowsChanged.emit()
+        self.telemetryEnabledChanged.emit()
         self.inspectorWidthChanged.emit()
+        # Defaults restore telemetry to on; keep the live client in step.
+        set_telemetry_enabled(self.state.telemetry_enabled)
 
     @staticmethod
     def _normalizeViewName(value: str) -> str:

@@ -586,6 +586,15 @@ Item {
                                         onCheckedChanged: if (AppController.config_controller) AppController.config_controller.diagnosticLogging = checked
                                     }
                                 }
+                                Separator {}
+                                SettingsRow {
+                                    titleText: "Share Anonymous Usage Data"
+                                    descriptionText: "Sends anonymous feature-usage events and error reports.\nOnly active when analytics credentials are configured."
+                                    GlassSwitch {
+                                        checked: AppController.ui_controller ? AppController.ui_controller.telemetryEnabled : false
+                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setTelemetryEnabled(checked)
+                                    }
+                                }
                             }
                         }
                     }

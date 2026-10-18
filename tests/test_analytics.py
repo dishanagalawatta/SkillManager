@@ -127,7 +127,8 @@ def test_init_posthog_missing_env():
         assert analytics.init_posthog() is None
 
 
-def test_init_posthog_success(mock_posthog):
+def test_init_posthog_success(mock_posthog, monkeypatch):
+    monkeypatch.setattr(analytics, "_user_disabled_telemetry", lambda: False)
     with patch.dict(
         os.environ,
         {
@@ -139,4 +140,63 @@ def test_init_posthog_success(mock_posthog):
     ):
         client = analytics.init_posthog()
         assert client is not None
+        mock_posthog.assert_called_once()
+
+
+def test_init_posthog_respects_user_opt_out(mock_posthog, monkeypatch):
+    """The Settings toggle must veto initialisation, credentials or not."""
+    monkeypatch.setattr(analytics, "_user_disabled_telemetry", lambda: True)
+    with patch.dict(
+        os.environ,
+        {
+            "POSTHOG_PROJECT_TOKEN": "tok",
+            "POSTHOG_HOST": "host",
+            "SKILL_MANAGER_TESTING": "0",
+            "PYTEST_CURRENT_TEST": "",
+        },
+    ):
+        assert analytics.init_posthog() is None
+        mock_posthog.assert_not_called()
+
+
+def test_user_disabled_telemetry_reads_persisted_config(monkeypatch, tmp_path):
+    """Preference is read from the config file, not from UIController."""
+    monkeypatch.setattr("skill_manager.core.config.DATA_DIR", tmp_path)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"ui_state": {"telemetry_enabled": False}}), encoding="utf-8")
+    assert analytics._user_disabled_telemetry() is True
+
+    config.write_text(json.dumps({"ui_state": {"telemetry_enabled": True}}), encoding="utf-8")
+    assert analytics._user_disabled_telemetry() is False
+
+    # Absent config or key defaults to enabled (credentials still gate sending).
+    config.unlink()
+    assert analytics._user_disabled_telemetry() is False
+
+
+def test_set_enabled_false_tears_down_the_client(monkeypatch):
+    """Disabling must stop sending immediately, not at next restart."""
+    client = MagicMock()
+    monkeypatch.setattr(analytics, "_posthog", client)
+
+    analytics.set_enabled(False)
+
+    client.shutdown.assert_called_once()
+    assert analytics._posthog is None
+
+
+def test_set_enabled_true_rebuilds_when_configured(mock_posthog, monkeypatch):
+    monkeypatch.setattr(analytics, "_posthog", None)
+    monkeypatch.setattr(analytics.atexit, "register", lambda *a, **k: None)
+    with patch.dict(
+        os.environ,
+        {
+            "POSTHOG_PROJECT_TOKEN": "tok",
+            "POSTHOG_HOST": "host",
+            "SKILL_MANAGER_TESTING": "0",
+            "PYTEST_CURRENT_TEST": "",
+        },
+    ):
+        analytics.set_enabled(True)
+        assert analytics._posthog is not None
         mock_posthog.assert_called_once()

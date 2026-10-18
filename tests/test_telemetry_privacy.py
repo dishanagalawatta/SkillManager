@@ -13,9 +13,12 @@ They are pure/cheap and do not touch Qt or the network.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import subprocess
+import sys
+import types
 
 import pytest
 
@@ -32,6 +35,7 @@ _BLOCKED = (
     "path",
     "pattern",
     "skill_id",
+    "name",
     "source_path",
     "target",
     "content",
@@ -71,7 +75,7 @@ def test_capture_mcp_tool_call_drops_sensitive_keys_and_non_scalars(monkeypatch)
             "limit": 5,
             "enabled": True,
             "duration_s": 1.5,
-            "name": "safe-identifier",
+            "name": "acme-internal-deploy",
         },
     )
 
@@ -84,9 +88,38 @@ def test_capture_mcp_tool_call_drops_sensitive_keys_and_non_scalars(monkeypatch)
     assert props["limit"] == 5
     assert props["enabled"] is True
     assert props["duration_s"] == 1.5
-    assert props["name"] == "safe-identifier"
     # No forwarded string may carry an absolute path or the typed secret.
-    assert not any(isinstance(v, str) and ("/home/" in v or "secret" in v) for v in props.values())
+    assert not any(
+        isinstance(v, str) and ("/home/" in v or "secret" in v or "acme" in v)
+        for v in props.values()
+    )
+
+
+def test_mcp_write_attempt_never_forwards_the_skill_name(monkeypatch):
+    """Regression guard: ``sm_create_skill``'s ``name`` is user content.
+
+    It reached analytics before, unlike every other identifier key
+    (``skill_id``, ``path``, ``query``, ...). The allowlist now drops it.
+    """
+    captured: dict = {}
+    monkeypatch.setattr(
+        analytics,
+        "capture_event",
+        lambda event, properties=None: captured.update({"event": event, "properties": properties}),
+    )
+
+    analytics.capture_mcp_tool_call(
+        "mcp_write_attempt",
+        "sm_create_skill",
+        {"allowed": True, "name": "acme-internal-deploy"},
+    )
+
+    assert captured["event"] == "mcp_write_attempt"
+    props = captured["properties"]
+    assert props["tool"] == "sm_create_skill"
+    assert props["allowed"] is True
+    assert "name" not in props
+    assert not any(isinstance(v, str) and "acme" in v for v in props.values())
 
 
 def test_no_mcp_call_site_forwards_raw_arguments():
@@ -144,3 +177,120 @@ def test_no_committed_posthog_token():
     """No tracked file may contain a live PostHog project token (``phc_...``)."""
     found = _git("grep", "-nE", r"phc_[A-Za-z0-9]{20,}")
     assert found.stdout.strip() == "", f"committed PostHog token detected:\n{found.stdout}"
+
+
+# ---------------------------------------------------------------------------
+# Exception payloads and credential loading
+# ---------------------------------------------------------------------------
+
+
+def test_scrub_posthog_event_redacts_paths_and_source_context():
+    """Autocaptured exceptions must not ship absolute paths or source lines."""
+    event = {
+        "event": "$exception",
+        "properties": {
+            "$exception_list": [
+                {
+                    "type": "ValueError",
+                    "value": (
+                        "Clone path exists but is not an empty git checkout: /home/someone/proj"
+                    ),
+                    "stacktrace": {
+                        "type": "raw",
+                        "frames": [
+                            {
+                                "filename": "skill_manager/core/skill_packages/updater.py",
+                                "abs_path": (
+                                    "/home/someone/repo/src/skill_manager/"
+                                    "core/skill_packages/updater.py"
+                                ),
+                                "context_line": "raise ValueError(f'...{path}')",
+                                "pre_context": ["secret = 'x'"],
+                                "post_context": ["secret = 'y'"],
+                                "function": "_clone",
+                                "lineno": 72,
+                            }
+                        ],
+                    },
+                }
+            ],
+            "tool": "sm_example",
+        },
+    }
+
+    scrubbed = analytics._scrub_posthog_event(event)
+    exception = scrubbed["properties"]["$exception_list"][0]
+
+    assert "/home/someone" not in exception["value"]
+    assert "<path>" in exception["value"]
+
+    frame = exception["stacktrace"]["frames"][0]
+    for key in ("abs_path", "context_line", "pre_context", "post_context", "vars"):
+        assert key not in frame, f"{key!r} leaks source/paths"
+    # Debugging signal survives: bare filename, function, line.
+    assert frame["filename"] == "updater.py"
+    assert frame["function"] == "_clone"
+    assert frame["lineno"] == 72
+
+    # Non-path telemetry is left alone.
+    assert scrubbed["properties"]["tool"] == "sm_example"
+    assert exception["type"] == "ValueError"
+
+
+def test_scrub_posthog_event_survives_odd_payloads():
+    """A malformed event must never raise — the SDK fails open, not closed."""
+    for event in (
+        {},
+        {"properties": None},
+        {"properties": {"$exception_list": None}},
+        {"properties": {"$exception_list": ["not-a-dict", 1, None]}},
+        {"properties": {"$exception_list": [{"stacktrace": ["bad"]}]}},
+        {"properties": {"$exception_list": [{"stacktrace": {"frames": ["bad"]}}]}},
+    ):
+        assert analytics._scrub_posthog_event(dict(event)) is not None
+
+
+def test_env_loading_never_reads_the_working_directory(tmp_path, monkeypatch):
+    """Regression guard for the CWD ``.env`` hijack.
+
+    Launching from a project directory used to import that project's ``.env``:
+    unrelated secrets, and a ``POSTHOG_HOST`` able to redirect telemetry.
+    """
+    (tmp_path / ".env").write_text(
+        "HOSTILE_CWD_MARKER=1\nPOSTHOG_HOST=https://attacker.example\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    before = dict(os.environ)
+    try:
+        analytics._load_env()
+        assert "HOSTILE_CWD_MARKER" not in os.environ
+        assert os.environ.get("POSTHOG_HOST") != "https://attacker.example"
+    finally:
+        os.environ.clear()
+        os.environ.update(before)
+
+
+def test_posthog_client_is_built_with_the_scrubber(monkeypatch):
+    """The scrubber and the no-code-variables setting must stay wired up."""
+    captured: dict = {}
+
+    class FakePosthog:
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+
+        def shutdown(self):  # pragma: no cover - not called here
+            pass
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SKILL_MANAGER_TESTING", raising=False)
+    monkeypatch.setenv("POSTHOG_PROJECT_TOKEN", "phc_test_token")
+    monkeypatch.setenv("POSTHOG_HOST", "https://example.invalid")
+    monkeypatch.setitem(sys.modules, "posthog", types.SimpleNamespace(Posthog=FakePosthog))
+    monkeypatch.setattr(analytics.atexit, "register", lambda *a, **k: None)
+
+    assert analytics.init_posthog() is not None
+    assert captured["before_send"] is analytics._scrub_posthog_event
+    assert captured["capture_exception_code_variables"] is False
+    assert captured["enable_exception_autocapture"] is True

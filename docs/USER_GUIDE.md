@@ -183,7 +183,7 @@ If something breaks, export diagnostics and file an issue with the bundle attach
 3. Click **Export Bundle** — saves `diagnostic_bundle_*.zip` (manifest + logs + 50 recent events).
 4. Click **Copy Issue URL** (prefilled title, version, OS, health, event counts), open it in your browser, and attach the bundle manually.
 
-Notes: the last 1000 events are always kept in memory; file logging stays opt-in via Settings. `skill_manager.log` rotates at 5 MB x 5; `qml_console.log` appends and truncates only over the 5 MB cap. Telemetry stays opt-in and disabled by default.
+Notes: the last 1000 events are always kept in memory; file logging stays opt-in via Settings. `skill_manager.log` rotates at 5 MB x 5; `qml_console.log` appends and truncates only over the 5 MB cap. Telemetry is off unless analytics credentials are configured, and you can switch it off at any time under **Settings > Diagnostics > Share Anonymous Usage Data**.
 
 ---
 

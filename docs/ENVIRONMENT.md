@@ -7,7 +7,18 @@
 ## Read order
 
 All variables are read once at process start. Restart the app to apply
-changes. `.env` overrides process environment.
+changes. The process environment wins: a variable that is already set is
+**not** overwritten by `.env`.
+
+`.env` is loaded from an app-owned location, never from the current working
+directory. The first file that exists wins:
+
+1. `$DATA_DIR/.env` — packaged/user install (see `SKILL_MANAGER_DATA_DIR`).
+2. `<repo>/.env` — source checkout.
+
+Launching the app from inside a project directory therefore does **not** import
+that project's `.env`, which would otherwise pull in unrelated secrets and let
+a foreign `POSTHOG_HOST` redirect telemetry.
 
 ## Qt / QML
 
@@ -31,9 +42,13 @@ changes. `.env` overrides process environment.
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `POSTHOG_PROJECT_TOKEN` | optional | empty | Empty disables. |
+| `POSTHOG_PROJECT_TOKEN` | optional | empty | Empty disables. The in-app toggle (Settings → Diagnostics) can also disable. |
 | `POSTHOG_HOST` | optional | empty | PostHog host URL. |
 | `SENTRY_DSN` | optional | empty | Empty disables Sentry. |
+
+Both credentials must be set *and* the Settings toggle left on for events to be
+sent. See [`PRODUCT_TELEMETRY.md`](PRODUCT_TELEMETRY.md) and
+[ADR-0042](adr/ADR-0042-telemetry-privacy-boundaries.md).
 
 ## Tier Matrix
 
