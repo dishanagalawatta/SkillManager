@@ -12,10 +12,14 @@ on:
       - 'conductor/**'
       - 'LICENSE'
   pull_request:
-    # Intentionally unfiltered: "CI Gate" is a required status check, and a
-    # workflow skipped by paths-ignore never reports it — which would leave a
-    # docs-only pull request permanently unmergeable. Push triggers keep the
-    # filter below.
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'assets/**'
+      - '.agents/**'
+      - 'image/**'
+      - 'conductor/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:

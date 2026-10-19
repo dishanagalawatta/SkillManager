@@ -126,10 +126,17 @@ paths-ignore:
 |---|---|
 | `deletion` | `main` cannot be deleted |
 | `non_fast_forward` | force-pushes are rejected — for everyone, including the owner |
-| `required_status_checks` → `CI Gate` | a pull request cannot merge until `lint` and both test jobs pass |
 
 There are deliberately **no bypass actors**, so `current_user_can_bypass` is
 `never`.
+
+**`required_status_checks` is deliberately absent.** In a ruleset it applies to
+direct pushes, not only to merges: with no bypass actor the push is rejected
+outright — *"push declined due to repository rule violations"* — because the new
+commit cannot already have reported the check. Requiring `CI Gate` therefore
+deadlocks the owner *and* `auto-release.yml`, which pushes its version bump with
+`GITHUB_TOKEN`. The check becomes usable only once the bot pushes with a token that
+can bypass, i.e. a personal access token.
 
 **There is no "require a pull request" rule, and that is intentional.**
 `auto-release.yml` commits the version bump and pushes it to `main` itself using
@@ -139,9 +146,10 @@ the ruleset source or owner organization"* — so requiring pull requests would 
 the release automation behind its own gate. Direct pushes therefore stay allowed;
 force pushes and deletion do not.
 
-If PR-only merges are wanted later, either transfer the repository to an
-organization (which permits the integration as a bypass actor), or have
-`auto-release.yml` push with a token belonging to an account that can bypass.
+To get the full set (required checks and PR-only merges), either transfer the
+repository to an organization, which permits the integration as a bypass actor, or
+give `auto-release.yml` a personal access token belonging to an account that can
+bypass.
 
 No approval count is set: this is a single-maintainer repository, and GitHub does
 not let an author approve their own pull request.
