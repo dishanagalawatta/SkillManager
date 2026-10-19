@@ -23,6 +23,23 @@ from release import (  # noqa: E402
 import skill_manager  # noqa: E402
 
 
+def _load_windows_version_info():
+    """Import ``packaging/windows/version_info.py`` without touching sys.path.
+
+    That directory sits under a folder named ``packaging``, which collides with
+    the widely used PyPI distribution of the same name that PyInstaller and other
+    build tooling import. Adding it to sys.path would shadow that package, so the
+    file is loaded by path instead.
+    """
+    import importlib.util
+
+    path = os.path.join(get_project_root(), "packaging", "windows", "version_info.py")
+    spec = importlib.util.spec_from_file_location("_sm_version_info_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_semver_parsing():
     """Test semantic version parsing helper (4-tuple: major, minor, patch, dev)."""
     assert parse_version("1.9.0") == (1, 9, 0, None)
@@ -80,6 +97,59 @@ def test_version_consistency_across_metadata():
         assert f'<release version="{expected_version}"' in xml_content, (
             f"Metainfo XML does not contain current release version {expected_version}"
         )
+
+    # 4. Windows version resource, generated at build time for the EXE metadata
+    version_info = _load_windows_version_info()
+    assert version_info.resolve_version(root) == expected_version, (
+        "version_info.resolve_version() disagrees with get_current_version()"
+    )
+    resource = version_info.build_version_file(expected_version)
+    for attribute, value in (
+        ("ProductName", "SkillManager"),
+        ("ProductVersion", expected_version),
+        ("FileVersion", expected_version),
+    ):
+        assert f'StringStruct("{attribute}", "{value}")' in resource, (
+            f"generated version resource is missing {attribute}={value}"
+        )
+
+
+def test_windows_version_tuple_pads_and_drops_prerelease():
+    """The file-version tuple is numeric-only and always four parts."""
+    version_info = _load_windows_version_info()
+    assert version_info.version_tuple("2.12.1") == (2, 12, 1, 0)
+    assert version_info.version_tuple("v2.12.1") == (2, 12, 1, 0)
+    assert version_info.version_tuple("2.13.0-dev.3") == (2, 13, 0, 0)
+
+    with pytest.raises(ValueError, match="Cannot derive"):
+        version_info.version_tuple("nightly")
+
+
+def test_windows_version_resource_is_evaluable():
+    """PyInstaller eval's this text, so a typo would otherwise surface on Windows.
+
+    The names PyInstaller injects are stubbed here purely to prove the generated
+    expression parses and calls them in a valid shape.
+    """
+
+    class _Stub:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    namespace = dict.fromkeys(
+        (
+            "VSVersionInfo",
+            "FixedFileInfo",
+            "StringFileInfo",
+            "StringTable",
+            "StringStruct",
+            "VarFileInfo",
+            "VarStruct",
+        ),
+        _Stub,
+    )
+    evaluated = eval(_load_windows_version_info().build_version_file("2.12.1"), namespace)
+    assert isinstance(evaluated, _Stub)
 
 
 def test_detect_bump_from_commits(monkeypatch):

@@ -118,6 +118,23 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+
+# Windows-only: embed ProductName/ProductVersion from the generated version
+# resource. Without one the EXE carries no file properties. The version comes
+# from pyproject.toml (via version_info.py) so it cannot drift from the release.
+# `version` is a Windows-only parameter, so other platforms pass None.
+def _windows_version_resource():
+    if sys.platform != "win32":
+        return None
+    import importlib.util
+
+    module_path = os.path.join(SPECPATH, "windows", "version_info.py")
+    module_spec = importlib.util.spec_from_file_location("_sm_version_info", module_path)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    return module.write_version_file(base_path)
+
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -137,6 +154,7 @@ exe = EXE(
     icon=os.path.join(
         base_path, "assets", "brand", "logo.ico"
     ),  # Using generated multi-size .ico icon
+    version=_windows_version_resource(),
 )
 
 coll = COLLECT(
