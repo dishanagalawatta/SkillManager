@@ -117,11 +117,34 @@ paths-ignore:
 
 ---
 
-## Branch Protection (Recommended)
+## Branch Protection
 
-Apply via GitHub UI or `gh api`:
+`main` is protected by the repository ruleset `main` (id `25431580`), active since
+2026-10-20:
 
-- `main`: require CI gate to pass, require 1 approval, no force push
+| Rule | Effect |
+|---|---|
+| `deletion` | `main` cannot be deleted |
+| `non_fast_forward` | force-pushes are rejected — for everyone, including the owner |
+| `required_status_checks` → `CI Gate` | a pull request cannot merge until `lint` and both test jobs pass |
+
+There are deliberately **no bypass actors**, so `current_user_can_bypass` is
+`never`.
+
+**There is no "require a pull request" rule, and that is intentional.**
+`auto-release.yml` commits the version bump and pushes it to `main` itself using
+`GITHUB_TOKEN`. On a user-owned repository GitHub refuses the GitHub Actions
+integration as a bypass actor — *"Actor GitHub Actions integration must be part of
+the ruleset source or owner organization"* — so requiring pull requests would trap
+the release automation behind its own gate. Direct pushes therefore stay allowed;
+force pushes and deletion do not.
+
+If PR-only merges are wanted later, either transfer the repository to an
+organization (which permits the integration as a bypass actor), or have
+`auto-release.yml` push with a token belonging to an account that can bypass.
+
+No approval count is set: this is a single-maintainer repository, and GitHub does
+not let an author approve their own pull request.
 
 ## Secret Inventory
 
@@ -149,10 +172,17 @@ uv run pytest --cov=skill_manager --cov-fail-under=80
 
 ## Required Repo Settings
 
-The Release workflow depends on the following repo-level setting (Settings → Actions → General → Workflow permissions):
+No repository-level permission changes are needed. The repository runs with
+GitHub's default **read-only** workflow token, because every workflow declares
+what it needs in its own `permissions:` block:
 
-- **Workflow permissions**: "Read and write permissions"
-- **Allow GitHub Actions to create and approve pull requests**: enabled
+- `auto-release.yml` — `contents: write` (push the version bump) and
+  `actions: write` (dispatch `release-build.yml`)
+- `release-build.yml` — `contents: write` (create the tag and release)
+- every other workflow — `contents: read`
+
+Do **not** enable "Allow GitHub Actions to create and approve pull requests": no
+workflow opens pull requests, so that setting only widens the token.
 
 ## Troubleshooting
 
