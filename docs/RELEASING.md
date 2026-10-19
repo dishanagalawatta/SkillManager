@@ -139,3 +139,130 @@ that folder**. The first submission (v1.8.0,
 [#391299](https://github.com/microsoft/winget-pkgs/pull/391299)) was closed as *Stale*
 without review. See [`packaging/winget/README.md`](../packaging/winget/README.md) for the
 full checklist and the verified values for v2.12.1.
+
+## Windows Code Signing
+
+Windows installers are currently **unsigned**. `release-build.yml` signs only
+when the `WIN_PFX_B64` secret is set, and it is not, so `sign.ps1` exits with
+`SKIP_SIGN` and SmartScreen shows "More info → Run anyway" on first run (see
+[INSTALL.md](INSTALL.md)).
+
+Signing is moving to [SignPath Foundation](https://signpath.org), which issues
+certificates to open-source projects free of charge. It is the only free route:
+Certum's open-source tier became paid in 2016, Azure Artifact Signing needs a
+billed subscription, and a physical token cannot be reached from GitHub-hosted
+runners. The previous mechanism cannot simply be re-pointed at a new
+certificate — since June 2023 no publicly trusted CA issues an exportable key —
+so see [SECURITY.md § Code-Signing Key Exposure & Rotation](SECURITY.md) for the
+rationale and the revocation duty.
+
+**Status: application not yet submitted.** Everything below is prepared and
+inert until `SIGNPATH_API_TOKEN` exists.
+
+### Signing lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Tag as Tag push vX.Y.Z
+    participant CI as GitHub Actions
+    participant SP as SignPath.io
+    participant Approver as Approver
+    participant Rel as GitHub Release
+
+    Tag->>CI: release-build.yml
+    CI->>CI: build.ps1 -SkipSign (unsigned EXE and installer)
+    CI->>CI: upload-artifact, archive false
+    CI->>SP: submit-signing-request with api-token and slugs
+    Note over SP: confirms the artifact came from this repository<br/>built on GitHub-hosted runners
+    SP->>Approver: signing request pending
+    Approver-->>SP: manual approval
+    SP->>SP: sign using the SignPath Foundation certificate
+    SP-->>CI: signed artifact
+    CI->>Rel: publish signed installer and SHA256SUMS
+```
+
+### Prerequisites (already in place)
+
+- **EXE product metadata.** SignPath's artifact policy requires ProductName and
+  ProductVersion to be set and identical across a build. `SkillManager.exe` had
+  none; `packaging/windows/version_info.py` now generates the version resource
+  from `pyproject.toml` and the spec passes it to `EXE()`. Keep the generated
+  values in step with the release — `tests/test_version_sync.py` fails if the
+  generator and `pyproject.toml` disagree.
+- **Code signing policy** published in [README.md](../README.md), with the
+  attribution line and the reviewer/approver roles.
+- **All jobs on GitHub-hosted runners**, and the installer is already uploaded as
+  a workflow artifact before the release job runs.
+
+### Workflow changes to apply once approved
+
+Replace the "Decode signing cert" step and the secret-gated `build.ps1`
+invocation in `release-build.yml`:
+
+```yaml
+- name: Build installer (unsigned)
+  shell: pwsh
+  run: .\packaging\windows\build.ps1 -SkipSign
+
+- name: Upload unsigned installer
+  id: upload-unsigned
+  uses: actions/upload-artifact@<pinned-sha>
+  with:
+    name: SkillManager_Setup_unsigned
+    path: dist/SkillManager_Setup.exe
+    archive: false                 # SignPath wants the raw file, not a ZIP
+    if-no-files-found: error
+
+- name: Sign installer
+  uses: signpath/github-action-submit-signing-request@<pinned-sha>
+  with:
+    api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+    organization-id: '<organization id>'
+    project-slug: 'skillmanager'
+    signing-policy-slug: 'release-signing'
+    github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+    wait-for-completion: true
+    output-artifact-directory: dist
+    skip-decompress: true          # pairs with archive: false
+
+- name: Re-upload signed installer
+  uses: actions/upload-artifact@<pinned-sha>
+  with:
+    name: SkillManager_Setup      # the name publish-release expects
+    path: dist/SkillManager_Setup.exe
+    if-no-files-found: error
+```
+
+Pin both `uses:` to full commit SHAs, matching every other action in the
+workflow. Then delete the `WIN_PFX_B64` and `WIN_PFX_PASS` secrets; `sign.ps1`
+becomes unused and can be kept for local signing or removed.
+
+`build.ps1` currently signs **both** `dist\SkillManager\SkillManager.exe` and the
+installer. The SignPath artifact configuration must cover both if both are to
+carry a signature, otherwise only the installer is signed.
+
+### Verification
+
+```powershell
+Get-AuthenticodeSignature .\SkillManager_Setup.exe | Format-List Status, SignerCertificate
+```
+
+`Status` must read `Valid` and the signer must be **SignPath Foundation** — not
+your own name, because the certificate is issued to the foundation. Confirm the
+same for `dist\SkillManager\SkillManager.exe` if it is configured for signing.
+
+### Constraints to plan around
+
+- **Every release needs manual approval.** A tag push no longer publishes a
+  signed installer on its own; the workflow stops until a signing request is
+  approved. Budget for that in the release flow, and note it makes prerelease
+  tags (`vX.Y.Z-dev.N`) need approval too.
+- **The published identity changes.** Add/Remove Programs currently shows the
+  `MyAppPublisher` value from `installer.iss` (`dishanagalawatta`) while the
+  Authenticode signature will read *SignPath Foundation*. Align `installer.iss`
+  once the certificate is in use; it cannot be compiled off Windows, so change it
+  where the build can be verified.
+- **Eligibility is not guaranteed.** SignPath can decline a project with too
+  little public reputation, and their terms provide no appeal. If declined,
+  revert the README policy section and revisit paid options.
+
