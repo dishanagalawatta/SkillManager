@@ -48,6 +48,6 @@
 
 ### Leaked code-signing key (`packaging/windows/certs/code-signing.pfx`)
 
-* [ ] Request removal from GitHub Support. A history rewrite alone is **not** sufficient: 138 `refs/pull/*` refs still serve the blob and cannot be rewritten by pushing. See `docs/SECURITY.md` for the measured blast radius.
+* [x] Removed on 2026-10-19 by deleting and recreating the repository. A rewrite alone could not: 138 `refs/pull/*` refs served the blob and cannot be rewritten by pushing. See `docs/SECURITY.md` for the measurement and the cost paid.
 * [ ] Rotate/revoke the superseded certificate once a replacement is in use — revocation is what actually retires the key.
 

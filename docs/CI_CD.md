@@ -128,8 +128,8 @@ Apply via GitHub UI or `gh api`:
 | Secret | Purpose | Required |
 |---|---|---|
 | `GITHUB_TOKEN` | Default token for releases | Yes (auto-provided) |
-| `WIN_PFX_B64` | Base64-encoded Windows code signing certificate | Optional |
-| `WIN_PFX_PASS` | Password for Windows code signing certificate | Optional |
+| `WIN_PFX_B64` | *Retired* — the legacy signing bundle was removed with the 2026-10-19 repository recreation; Windows signing awaits SignPath | No |
+| `WIN_PFX_PASS` | *Retired* — passphrase for the removed signing bundle | No |
 
 ### Suppressed CVEs
 

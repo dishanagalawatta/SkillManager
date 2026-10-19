@@ -60,8 +60,8 @@ flowchart TD
     E --> F["Choose a signing route: no CA can issue an exportable PFX any more"]
     F --> G["Store signing credentials as secrets — never key material"]
     G --> H["Re-release and verify the Authenticode signature"]
-    H --> I["Optional: purge the old blob from history"]
-    I --> J["Force-push; every existing clone must re-clone"]
+    H --> I["Purge the old blob from history"]
+    I --> J["Delete and recreate the repository; every clone must re-clone"]
 ```
 
 ### Rotation
@@ -104,9 +104,9 @@ Steps once a route is chosen:
    CLI, passing credentials via `env`.
 4. Cut a release and confirm the signature:
    `Get-AuthenticodeSignature .\SkillManager_Setup.exe` must report `Valid`.
-5. Revoke the superseded certificate with the issuing authority. Do this
-   regardless of whether the historical purge is ever performed — revocation is
-   what actually retires the key.
+5. Revoke the superseded certificate with the issuing authority. The blob is
+   already out of the repository (see below), but revocation is what actually
+   retires the key itself.
 
 Note that public code signing certificate validity is now capped at **460 days**
 for certificates issued on or after 1 March 2026, so reissuance recurs roughly
@@ -115,46 +115,51 @@ annually and the workflow should make it a one-secret-change operation.
 Signing also does not buy an immediate SmartScreen pass: since March 2024 EV and
 OV certificates build reputation the same way, through download volume.
 
-### Optional history purge
+### History purge (executed 2026-10-19)
 
-**Blast radius, measured:** the bundle was added in the repository's **root
-commit**, so no commit is free of it — every descendant hash changes. Purging it
-rewrites **all commits and all release tags**, not one file from a long history:
+**Blast radius:** the bundle was added in the repository's **root commit**, so no
+commit is free of it and every descendant hash changes. A purge rewrites **all**
+commits and **all 87 tags**, not one file out of a long history. Every existing
+clone breaks, every release tag is force-updated, and every commit SHA recorded in
+changelogs, release notes, and issue links stops resolving.
 
-```bash
-git rev-list --count HEAD                                              # 108 commits
-git rev-list --count c0ad749..HEAD                                     # 107 — i.e. all but the root
-git for-each-ref --format='%(refname:short)' refs/tags | wc -l          # 87 tags, every one moves
-git rev-list --max-parents=0 HEAD                                      # the root is where it was added
-```
-
-That means every clone breaks, every release tag is force-updated, and every
-recorded commit SHA in changelogs, release notes, and issue links stops
-resolving. For a published project, that is a large permanent cost for one
-*encrypted* file whose passphrase was never exposed.
-
-**It also does not guarantee the file is gone.** A force-push makes the blob
-unreachable from a normal fetch, but GitHub retains unreachable objects, and
-cached views and forks can keep serving it by SHA. Deleting it from GitHub's
-servers requires asking GitHub Support to run garbage collection. Do not treat a
-force-push as proof of removal.
-
-Given that, the recommended position is: **rotate and do not rewrite.** The
-exposure is an encrypted bundle with a secret passphrase, and rotation retires
-the key that the file protects, which is the part that carries risk.
-
-If a rewrite is still wanted, it requires a clean working tree and is best done
-from a fresh clone so no local work is at risk:
+**A rewrite alone would not have removed it.** GitHub keeps a
+`refs/pull/<n>/head` ref for every pull request ever opened, and those refs are
+server-managed: they cannot be force-pushed, rewritten, or deleted from a client.
+Measured before the purge:
 
 ```bash
-git clone --no-local git@github.com:dishanagalawatta/SkillManager.git /tmp/purge && cd /tmp/purge
-git filter-repo --invert-paths --path packaging/windows/certs/code-signing.pfx
-git push --force-with-lease origin main
-git push --force --tags origin    # 87 tags move with the rewrite
+git ls-remote origin | grep -c 'refs/pull/'        # 296 pull refs
+# 138 of them resolved packaging/windows/certs/code-signing.pfx
+# to blob 406110ccb6e19426d700061ca771e8546a8008af
 ```
 
-Anyone who has already cloned must re-clone rather than pull, and GitHub Support
-should be asked to purge the unreachable object.
+Rewriting `main` and the tags would have changed every SHA in the project and
+still left the blob fetchable with `git fetch origin pull/143/head`. Removal was
+therefore done by **deleting and recreating the repository**, which drops the pull
+refs along with the history:
+
+1. Rewrote a scratch clone with
+   `git filter-repo --invert-paths --path packaging/windows/certs/code-signing.pfx`
+   — 724 commits and 87 tags, verified to hold no key material in any ref.
+2. Deleted and recreated the public repository, preserving visibility, default
+   branch, and feature flags.
+3. Pushed the rewritten `main` and all 87 tags.
+4. Recreated no releases: the 56 historical releases were deliberately dropped
+   rather than re-uploading 36.5 GB of assets. Future releases publish normally.
+5. Purged the local clone (`git reflog expire --expire=now --all`, then
+   `git gc --prune=now`) and deleted the pre-delete backup bundle. The retained
+   history backup is a post-rewrite bundle that contains no key material.
+
+Verified afterwards: zero pull refs, the blob absent from the object database and
+from every ref on the remote, and `git fetch origin pull/143/head` failing.
+
+**Cost paid:** every pull request and its discussion, the 56 releases and their
+assets, star and fork history, and every commit SHA recorded in changelogs and
+issue links. File contents and tree state did not change — only hashes.
+
+**The remaining duty is revocation.** Ask the issuing authority to revoke the
+certificate: removal retires a copy of the key, revocation retires the key.
 
 ## Shell Command Construction
 

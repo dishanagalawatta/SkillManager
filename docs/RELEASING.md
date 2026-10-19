@@ -143,9 +143,11 @@ full checklist and the verified values for v2.12.1.
 ## Windows Code Signing
 
 Windows installers are currently **unsigned**. `release-build.yml` signs only
-when the `WIN_PFX_B64` secret is set, and it is not, so `sign.ps1` exits with
-`SKIP_SIGN` and SmartScreen shows "More info → Run anyway" on first run (see
-[INSTALL.md](INSTALL.md)).
+when the `WIN_PFX_B64` secret is set; that secret no longer exists — it was
+destroyed on 2026-10-19 when the repository was recreated, together with the
+certificate it held — so the signing step never runs, `sign.ps1` exits with
+`SKIP_SIGN`, and SmartScreen shows "More info → Run anyway" on first run (see
+[INSTALL.md](INSTALL.md)). Signing returns only with SignPath.
 
 Signing is moving to [SignPath Foundation](https://signpath.org), which issues
 certificates to open-source projects free of charge. It is the only free route:
@@ -234,8 +236,9 @@ invocation in `release-build.yml`:
 ```
 
 Pin both `uses:` to full commit SHAs, matching every other action in the
-workflow. Then delete the `WIN_PFX_B64` and `WIN_PFX_PASS` secrets; `sign.ps1`
-becomes unused and can be kept for local signing or removed.
+workflow. The `WIN_PFX_B64` and `WIN_PFX_PASS` secrets no longer exist, so the
+"Decode signing cert" step is permanently inert; `sign.ps1` is unused by CI and
+can be kept for local signing or removed.
 
 `build.ps1` currently signs **both** `dist\SkillManager\SkillManager.exe` and the
 installer. The SignPath artifact configuration must cover both if both are to
