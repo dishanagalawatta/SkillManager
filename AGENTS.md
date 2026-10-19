@@ -9,7 +9,6 @@
 
 | Path | Reason |
 |------|--------|
-| `TODO.md` | User-managed task list |
 | `.agents/commands/**` | User-managed agent commands |
 | `.agents/skills/**` | Installed agent skills |
 | `image/TODO/**` | Packaging reference screenshots |
@@ -123,7 +122,7 @@
 ## Forbidden Actions
 
 - Never commit `.env`, `data/*.json`, or `src/data/*.json`
-- Never modify `TODO.md`, `.agents/commands/`, `.agents/skills/`
+- Never modify `.agents/commands/`, `.agents/skills/`
 - Never hardcode colors, sizes, or fonts in QML (use `Theme.qml` tokens)
 - Never use `ThreadPoolExecutor` for heavy work (use `joblib.Parallel`)
 - Never block the main thread with I/O or computation
