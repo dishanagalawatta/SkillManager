@@ -87,10 +87,9 @@ shutdown_diag.log
 !environments/.env.*.example
 
 # Windows code-signing material (PKCS#12: certificate + private key).
-# release-build.yml decodes the real cert from the WIN_PFX_B64 secret at build
-# time, so no .pfx/.p12 belongs in the tree.
-# NOTE: packaging/windows/certs/code-signing.pfx is ALREADY TRACKED — this rule
-# cannot untrack it. Remove it with:
-#   git rm --cached packaging/windows/certs/code-signing.pfx
+# Since 2023 no publicly trusted CA issues an exportable code-signing key, so
+# signing runs through a cloud signing service and no bundle belongs in the tree.
+# packaging/windows/certs/code-signing.pfx is untracked with `git rm --cached`
+# (it remains in history — see docs/SECURITY.md for the rotation runbook).
 *.pfx
 *.p12

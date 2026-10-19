@@ -57,24 +57,63 @@ flowchart TD
     B -->|"Yes"| D["Assume the private key is compromised"]
     C --> E["Rotate anyway: obtain a new code-signing certificate"]
     D --> E
-    E --> F["Set WIN_PFX_B64 and WIN_PFX_PASS secrets to the new bundle"]
-    F --> G["Re-release and verify the Authenticode signature"]
-    G --> H["Optional: purge the old blob from history"]
-    H --> I["Force-push; every existing clone must re-clone"]
+    E --> F["Choose a signing route: no CA can issue an exportable PFX any more"]
+    F --> G["Store signing credentials as secrets — never key material"]
+    G --> H["Re-release and verify the Authenticode signature"]
+    H --> I["Optional: purge the old blob from history"]
+    I --> J["Force-push; every existing clone must re-clone"]
 ```
 
 ### Rotation
 
-1. Obtain a new code-signing certificate and export it as a password-protected
-   PFX. Do not write it into the working tree.
-2. Update the `WIN_PFX_B64` and `WIN_PFX_PASS` repository secrets.
-3. Cut a release and confirm the installer is Authenticode-signed
-   (`Get-AuthenticodeSignature .\SkillManager_Setup.exe`). The
-   `release-build.yml` sign step skips silently when the secret is unset, so an
-   unsigned installer means the secret is missing rather than that signing
-   failed.
-4. Revoke the superseded certificate with the issuing authority if it was
-   CA-issued.
+Since **1 June 2023** the CA/Browser Forum Baseline Requirements require code
+signing private keys to be generated and held on a hardware crypto module
+(FIPS 140-2 Level 2 / Common Criteria EAL 4+) and to be **non-exportable**. No
+publicly trusted CA can issue a downloadable PFX any more.
+
+That means the original mechanism cannot be reproduced: `WIN_PFX_B64` holding a
+base64 bundle that `sign.ps1` feeds to `signtool /f ... /p ...` requires an
+exportable private key, which no longer exists for a trusted certificate. The
+committed bundle was therefore self-signed, pre-2023, or a test artifact — and
+the release workflow never actually signed, because the secrets are unset.
+**Rotation replaces the signing mechanism, not just a secret value.**
+
+| Route | Where the key lives | CI fit | Cost | Gate |
+|---|---|---|---|---|
+| SignPath Foundation | Their HSM | Native, via their signing action | Free for OSS | Genuinely non-commercial OSS; a human approves each release |
+| Cloud signing service (SSL.com eSigner, DigiCert KeyLocker, Certum SimplySign) | Provider HSM | Native CLI/action; secrets are API credentials | ~$120–380/yr | Paid account; identity validation |
+| Azure Artifact Signing | Microsoft HSM | Native action | ~$120/yr | Region-gated (see below) |
+| Physical token (YubiKey FIPS, SafeNet eToken) | USB token | **None** — requires a self-hosted runner with the token attached | Token + cert | Not viable on GitHub-hosted runners |
+| Self-signed certificate | Local file | Trivial | Free | **Does not help** — untrusted publisher, SmartScreen unchanged |
+
+Azure Artifact Signing is restricted: Public Trust certificates are available to
+organizations in the US, Canada, the EU, the UK, Australia, New Zealand, Japan,
+South Korea, Singapore, Switzerland, Norway and Israel, and to **individual
+developers only in the US and Canada**. Check eligibility before designing
+around it.
+
+Steps once a route is chosen:
+
+1. Provision the certificate or signing service and note the credentials the
+   provider issues (typically an API username, password, and TOTP secret — not a
+   key file).
+2. Set those as repository secrets. **Never** store key material in the tree;
+   `*.pfx` / `*.p12` are gitignored for that reason.
+3. Replace the "Decode signing cert" step and the `sign.ps1` invocation in
+   `.github/workflows/release-build.yml` with the provider's signing action or
+   CLI, passing credentials via `env`.
+4. Cut a release and confirm the signature:
+   `Get-AuthenticodeSignature .\SkillManager_Setup.exe` must report `Valid`.
+5. Revoke the superseded certificate with the issuing authority. Do this
+   regardless of whether the historical purge is ever performed — revocation is
+   what actually retires the key.
+
+Note that public code signing certificate validity is now capped at **460 days**
+for certificates issued on or after 1 March 2026, so reissuance recurs roughly
+annually and the workflow should make it a one-secret-change operation.
+
+Signing also does not buy an immediate SmartScreen pass: since March 2024 EV and
+OV certificates build reputation the same way, through download volume.
 
 ### Optional history purge
 
