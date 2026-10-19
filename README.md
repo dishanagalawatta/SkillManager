@@ -398,6 +398,21 @@ See [docs/SECURITY.md](docs/SECURITY.md) for our full security policy.
 
 ---
 
+## 📝 Code signing policy
+
+Official Windows installers are signed so Windows can confirm that a download
+came from this repository's release pipeline and was not altered afterwards.
+Only artifacts produced by the release workflow are signed; local development
+builds are not.
+
+**Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).**
+
+- **Committers and reviewers**: [@dishanagalawatta](https://github.com/dishanagalawatta) — proposed changes are reviewed before they merge.
+- **Approvers**: [@dishanagalawatta](https://github.com/dishanagalawatta) — every signing request is approved manually before a release is signed.
+- **Privacy**: see [docs/PRODUCT_TELEMETRY.md](docs/PRODUCT_TELEMETRY.md) and the Privacy, Security & Telemetry Notice above. Telemetry stays off unless you configure credentials yourself, and SkillManager never transmits API tokens, credentials, or skill contents.
+
+---
+
 ## ⚖️ License & Trademark Disclaimers
 
 - **License**: SkillManager is open-source software licensed under the [MIT License](LICENSE).
