@@ -39,3 +39,15 @@
 ---
 
 ## 5. Icebox / Backlog
+
+### Windows code signing — free OSS route (SignPath Foundation)
+
+* [ ] Submit application at <https://signpath.org/apply> — repo URL, Releases page, short description. Prerequisites are already in place: EXE `ProductName`/`ProductVersion` metadata and the README code signing policy.
+* [ ] After approval: create the organization / project / signing-policy / artifact-configuration on signpath.io, add the `SIGNPATH_API_TOKEN` secret, then apply the workflow diff in [`docs/RELEASING.md`](docs/RELEASING.md).
+* [ ] On Windows: align `installer.iss` `MyAppPublisher` so Add/Remove Programs matches the Authenticode publisher (SignPath Foundation). Needs a Windows machine — Inno Setup cannot be compiled on Linux.
+
+### Leaked code-signing key (`packaging/windows/certs/code-signing.pfx`)
+
+* [ ] Request removal from GitHub Support. A history rewrite alone is **not** sufficient: 138 `refs/pull/*` refs still serve the blob and cannot be rewritten by pushing. See `docs/SECURITY.md` for the measured blast radius.
+* [ ] Rotate/revoke the superseded certificate once a replacement is in use — revocation is what actually retires the key.
+
