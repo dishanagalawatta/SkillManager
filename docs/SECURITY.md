@@ -22,15 +22,18 @@ Every release publishes a `SHA256SUMS` manifest alongside its artifacts (`.deb`,
 ## Code-Signing Key Exposure & Rotation
 
 A Windows code-signing bundle (`packaging/windows/certs/code-signing.pfx`) was
-committed to the repository and tracked until it was untracked. **Untracking a
-file does not remove it from history** — the blob is still reachable in this
-repository and on GitHub.
+committed to the repository's **root commit** and tracked until it was untracked.
+Untracking a file does not remove it from history, and because the file has been
+present since the first commit, **every commit and every release tag descends
+from a tree containing it** — which is why a purge here is a full history
+rewrite rather than a surgical removal.
 
 ### What was exposed
 
-- An encrypted PKCS#12 bundle exported from the **Microsoft Software Key Storage
-  Provider** (one private key and its certificate, PBES2-encrypted, SHA-1 MAC).
-- The file path only; its contents are not decryptable without the passphrase.
+- The bundle file itself: an encrypted PKCS#12 exported from the **Microsoft
+  Software Key Storage Provider** (one private key and its certificate,
+  PBES2-encrypted, SHA-1 MAC).
+- The contents are **not** decryptable without the passphrase.
 
 ### What was not exposed
 
@@ -75,26 +78,44 @@ flowchart TD
 
 ### Optional history purge
 
-Deferred deliberately: a history rewrite rewrites public commits, invalidates
-every existing clone, and is only worth doing once the key behind it is
-retired. It also requires a clean working tree, so it must not be run while
-other work is uncommitted.
+**Blast radius, measured:** the bundle was added in the repository's **root
+commit**, so no commit is free of it — every descendant hash changes. Purging it
+rewrites **all commits and all release tags**, not one file from a long history:
 
 ```bash
-# Requires a clean tree and a fresh clone; git-filter-repo is not bundled.
-git log --diff-filter=A --oneline -- packaging/windows/certs/code-signing.pfx  # confirm the origin
+git rev-list --count HEAD                                              # 108 commits
+git rev-list --count c0ad749..HEAD                                     # 107 — i.e. all but the root
+git for-each-ref --format='%(refname:short)' refs/tags | wc -l          # 87 tags, every one moves
+git rev-list --max-parents=0 HEAD                                      # the root is where it was added
+```
+
+That means every clone breaks, every release tag is force-updated, and every
+recorded commit SHA in changelogs, release notes, and issue links stops
+resolving. For a published project, that is a large permanent cost for one
+*encrypted* file whose passphrase was never exposed.
+
+**It also does not guarantee the file is gone.** A force-push makes the blob
+unreachable from a normal fetch, but GitHub retains unreachable objects, and
+cached views and forks can keep serving it by SHA. Deleting it from GitHub's
+servers requires asking GitHub Support to run garbage collection. Do not treat a
+force-push as proof of removal.
+
+Given that, the recommended position is: **rotate and do not rewrite.** The
+exposure is an encrypted bundle with a secret passphrase, and rotation retires
+the key that the file protects, which is the part that carries risk.
+
+If a rewrite is still wanted, it requires a clean working tree and is best done
+from a fresh clone so no local work is at risk:
+
+```bash
+git clone --no-local git@github.com:dishanagalawatta/SkillManager.git /tmp/purge && cd /tmp/purge
 git filter-repo --invert-paths --path packaging/windows/certs/code-signing.pfx
 git push --force-with-lease origin main
+git push --force --tags origin    # 87 tags move with the rewrite
 ```
 
-Then confirm the blob is gone:
-
-```bash
-git log --all --oneline -- packaging/windows/certs/code-signing.pfx   # expect no output
-```
-
-Anyone who has already cloned must re-clone rather than pull. If the key is
-still unrotated, this step buys little: prefer rotation first.
+Anyone who has already cloned must re-clone rather than pull, and GitHub Support
+should be asked to purge the unreachable object.
 
 ## Shell Command Construction
 
