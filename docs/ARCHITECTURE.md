@@ -42,7 +42,7 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | `DiscoveryController` | `discovery_controller.py` | Filesystem scanning, project discovery, prepared-state pipeline |
 | `ScreenshotController` | `screenshot_controller.py` | Screen capture, region selection, PII redaction |
 | `ImageInspectorController` | `image_inspector_controller.py` | Color isolation, pixel inspection |
-| `AppUpdateController` | `app_update_controller.py` | App self-update via GitHub Releases API |
+| `AppUpdateController` | `app_update_controller.py` | App release checks (automatic launch/daily + manual) via GitHub Releases API |
 
 ### Registration & Meta-Object Signal Inheritance
 
@@ -505,8 +505,9 @@ Versions are bumped manually; GitHub Actions only builds tagged releases:
 
 ### Application Updates
 
-- `AppUpdateController` checks GitHub Releases API
-- Users download updates manually from the Releases page
+- `AppUpdateController` checks the GitHub Releases API automatically ~4s after launch and then daily (`startAutoCheck`), plus on demand from Settings.
+- A newer version emits `appUpdateAvailable`, rendered by `UpdateToast` with a **View Release** action (see [ADR-0044](adr/ADR-0044-automatic-app-release-checks.md)).
+- Users download and install updates manually from the Releases page — the app never self-installs ([ADR-0010](adr/ADR-0010-drop-tuf.md)).
 
 ### Skill Package Auto-Update
 
