@@ -158,7 +158,11 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
 
     assert 'text: model ? model.name : ""' in skill_item
     assert 'model.project + " • " + model.category' not in skill_item
-    assert "root.compactRows ? 32 : 46" in skill_item
+    # Row metrics live in one place so normal rows stay tighter than the old
+    # 46 px (one-line rows were wasting vertical space) and compact rows keep
+    # their own scale.
+    assert "readonly property int rowContentHeight: compactRows ? 32 : 40" in skill_item
+    assert "height: root.rowContentHeight" in skill_item
     assert "delegate: SkillItem" in quick_copy
     assert "delegate: SkillItem" in library
 

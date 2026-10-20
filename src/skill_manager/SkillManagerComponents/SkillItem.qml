@@ -15,6 +15,17 @@ Item {
     property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
     property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
 
+    // Row metrics. Normal rows carry one title line, so a 46 px row wasted
+    // vertical space; 40 px still clears the 28 px icon and reads comfortably.
+    readonly property int rowContentHeight: compactRows ? 32 : 40
+    readonly property int rowTopMargin: compactRows ? 2 : 3
+    readonly property int rowIconSize: compactRows ? 22 : 28
+    readonly property int rowIconGlyphSize: compactRows ? 14 : 16
+    readonly property int rowTitleSize: compactRows ? 11 : 13
+    readonly property int rowCheckboxSize: compactRows ? 16 : 18
+    readonly property int rowCheckMarkSize: compactRows ? 10 : 11
+    readonly property int rowSelectionBarHeight: compactRows ? 16 : 20
+
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
 
@@ -27,7 +38,7 @@ Item {
     }
 
     // Dynamic height based on visibility of sub-header and item content
-    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : (compactRows ? 32 : 46))
+    height: isMainCollapsed ? 0 : (isFirstInSub ? 34 : 0) + (isSubCollapsed ? 0 : rowContentHeight)
     visible: height > 0
     clip: true
 
@@ -141,7 +152,7 @@ Item {
         // --- SKILL ITEM CONTENT ---
         Item {
             width: parent.width
-            height: root.compactRows ? 32 : 46
+            height: root.rowContentHeight
             visible: !root.isMainCollapsed && !root.isSubCollapsed
 
             Rectangle {
@@ -149,8 +160,8 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 48 // Start Level 2 Background
                 anchors.rightMargin: 5
-                anchors.topMargin: root.compactRows ? 2 : 4
-                anchors.bottomMargin: root.compactRows ? 2 : 4
+                anchors.topMargin: root.rowTopMargin
+                anchors.bottomMargin: root.rowTopMargin
                 radius: Theme.radiusCard
                 color: root.isSelected ? (mouseArea.containsMouse ? Theme.selectedRowHover : Theme.selectedRow) : (mouseArea.containsMouse ? Theme.glassHover : "transparent")
                 border.color: mouseArea.activeFocus ? Theme.accent : (root.isSelected ? Theme.selectedRowBorder : Theme.glassOuterBorder)
@@ -294,8 +305,8 @@ Item {
                     // Multi-select Checkbox
                     Rectangle {
                         id: checkboxRect
-                        width: root.compactRows ? 16 : 20
-                        height: root.compactRows ? 16 : 20
+                        width: root.rowCheckboxSize
+                        height: root.rowCheckboxSize
                         radius: Theme.radiusSmall
                         color: model && model.isSelected ? Theme.selectedRowBorder : "transparent"
                         border.width: activeFocus ? 2 : (model && model.isSelected ? 0 : 1)
@@ -310,7 +321,7 @@ Item {
                             anchors.centerIn: parent
                             text: "✓"
                             color: "white"
-                            font.pixelSize: root.compactRows ? 10 : 12
+                            font.pixelSize: root.rowCheckMarkSize
                             visible: model && model.isSelected
                         }
 
@@ -339,16 +350,16 @@ Item {
 
                     // Icon Section
                     Rectangle {
-                        width: root.compactRows ? 22 : 32
-                        height: root.compactRows ? 22 : 32
+                        width: root.rowIconSize
+                        height: root.rowIconSize
                         radius: Theme.radiusField
                         color: model && model.isStarred ? Theme.selectedRow : (model && model.isCollection ? Theme.glassActive : (model && model.isCommand ? Theme.glassHover : Theme.glassPill))
                         
                         Image {
                             id: starImg
                             anchors.centerIn: parent
-                            width: root.compactRows ? 14 : 18
-                            height: root.compactRows ? 14 : 18
+                            width: root.rowIconGlyphSize
+                            height: root.rowIconGlyphSize
                             source: AppController.ui_controller.getAssetUri("ui/star-filled.svg")
                             sourceSize.width: 32
                             sourceSize.height: 32
@@ -374,7 +385,7 @@ Item {
                                 return AppController.getCategoryEmoji(model.category)
                             }
                             font.family: Theme.fontFamily
-                            font.pixelSize: root.compactRows ? 14 : 18
+                            font.pixelSize: root.rowIconGlyphSize
                             font.weight: Font.Bold
                             color: (model && model.isCommand) ? Theme.accent : Theme.label
                             visible: !(model && model.isStarred && root.showStarredIcon)
@@ -389,7 +400,7 @@ Item {
                         Text {
                             text: model ? model.name : ""
                             font.family: Theme.fontFamily
-                            font.pixelSize: root.compactRows ? 11 : 14
+                            font.pixelSize: root.rowTitleSize
                             font.weight: Font.DemiBold
                             color: Theme.label
                             elide: Text.ElideRight
@@ -401,7 +412,7 @@ Item {
                     // Selection indicator for Inspector
                     Rectangle {
                         width: 4
-                        height: root.compactRows ? 16 : 24
+                        height: root.rowSelectionBarHeight
                         radius: Theme.radiusSmall
                         color: Theme.selectedRowBorder
                         visible: root.isSelected
