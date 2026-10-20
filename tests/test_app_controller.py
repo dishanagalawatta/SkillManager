@@ -951,3 +951,31 @@ def test_create_custom_command_refreshes_selected_skill_real_discovery(
         "discover_single returned None for newly created command — "
         "the command file parser should handle bare .md files"
     )
+
+
+def test_window_maximized_round_trips_through_ui_state(controller):
+    """The maximize bit is remembered separately from the restore-down size."""
+    assert controller.windowMaximized is False
+
+    signals = MagicMock()
+    controller.ui.windowMaximizedChanged.connect(signals.changed)
+
+    controller.windowMaximized = True
+
+    assert controller.windowMaximized is True
+    assert controller.ui.state.window_maximized is True
+    signals.changed.assert_called_once()
+
+    controller.windowMaximized = False
+    assert controller.ui.state.window_maximized is False
+
+
+def test_honors_window_position_follows_the_platform(controller, monkeypatch):
+    """Wayland has no client-side placement, so x/y must not be persisted."""
+    from PySide6.QtGui import QGuiApplication
+
+    monkeypatch.setattr(QGuiApplication, "platformName", staticmethod(lambda: "wayland"))
+    assert controller.ui.honorsWindowPosition is False
+
+    monkeypatch.setattr(QGuiApplication, "platformName", staticmethod(lambda: "xcb"))
+    assert controller.ui.honorsWindowPosition is True

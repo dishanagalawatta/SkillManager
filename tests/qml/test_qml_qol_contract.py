@@ -748,3 +748,21 @@ def test_package_edit_dialog_verifies_asynchronously():
     # A second click cannot stack while one probe is in flight.
     assert 'root.verifyingField !== "repo"' in dialog
     assert 'root.verifyingField !== "npx"' in dialog
+
+
+def test_window_state_remembers_maximized_and_skips_wayland_position():
+    """Maximize survives a restart; position is only saved where it exists."""
+    main = (QML_DIR / "Main.qml").read_text(encoding="utf-8")
+
+    assert "AppController.ui_controller.windowMaximized = (visibility === Window.Maximized)" in main
+    assert (
+        "if (_isInitialized && !_isHidingForSnap && "
+        "(visibility === Window.Windowed || visibility === Window.Maximized))" in main
+    )
+    # Both x and y writes are gated on the platform honouring placement.
+    assert (
+        main.count(
+            "AppController.ui_controller.honorsWindowPosition) AppController.ui_controller.window"
+        )
+        == 2
+    )

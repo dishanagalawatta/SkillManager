@@ -33,8 +33,11 @@ Window {
 
     onWidthChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowWidth = width
     onHeightChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowHeight = height
-    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowX = x
-    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap) AppController.ui_controller.windowY = y
+    // Wayland compositors own window placement: Qt ignores setX/setY and every
+    // window reports (0, 0), so persisting x/y there would erase a position
+    // saved during an X11/Windows session. Size and maximized still apply.
+    onXChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap && AppController.ui_controller.honorsWindowPosition) AppController.ui_controller.windowX = x
+    onYChanged: if (_isInitialized && window.visibility === Window.Windowed && !_isHidingForSnap && AppController.ui_controller.honorsWindowPosition) AppController.ui_controller.windowY = y
 
     onClosing: (close) => {
         isClosing = true
@@ -180,6 +183,11 @@ Window {
     onVisibilityChanged: (visibility) => {
         AppController.logDiagnostic("INFO", "window_state",
             "Visibility changed: " + visibility + " at (" + window.x + ", " + window.y + "), opacity=" + window.opacity)
+        // Remember maximize/unmaximize so the next launch reopens the same way.
+        // Hidden (snap auto-minimize) and transitional states are ignored.
+        if (_isInitialized && !_isHidingForSnap && (visibility === Window.Windowed || visibility === Window.Maximized)) {
+            AppController.ui_controller.windowMaximized = (visibility === Window.Maximized)
+        }
     }
 
     function navigateTo(view) {

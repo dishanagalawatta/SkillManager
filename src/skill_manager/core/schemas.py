@@ -400,6 +400,9 @@ class UIStateRecord(BaseModel):
     window_height: int = Field(default=650, ge=520)
     window_x: int = 100
     window_y: int = 100
+    # Maximized is a separate bit rather than a visibility enum: the size fields
+    # above keep the restore-down geometry for the next unmaximize.
+    window_maximized: bool = False
     dark_mode: bool = False
     current_view: str = "Library"
     startup_view: str = "Library"
