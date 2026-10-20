@@ -134,7 +134,9 @@ def _handle_screenshot(
         if b64 is None:
             return err(
                 "sm_screenshot",
-                "SkillManager GUI not running and no headless QML render available",
+                "SkillManager GUI not running and no headless QML render available. "
+                "Start the app, or launch the MCP server with --mcp instead of "
+                "--mcp-light to render QML offscreen without a GUI.",
             )
 
         data: dict[str, Any] = {

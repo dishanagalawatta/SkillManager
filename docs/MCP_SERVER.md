@@ -85,6 +85,43 @@ QML tree = 1 root (`Main_QMLTYPE_41`) + 362 items and 25 named objects
 audit = 86 accessible nodes / 7 unnamed controls, screenshot ≈ 30 KB PNG with
 ≈ 1400 distinct colours.
 
+### Headless operation
+
+`--mcp` is the headless entry point and the one to use on servers, in containers,
+over SSH, or in CI. The launcher pins `QT_QPA_PLATFORM=offscreen` *before*
+`QGuiApplication` exists, so the server needs no X/Wayland display, no window
+manager and no running SkillManager instance.
+
+Verified in a stripped environment (no `DISPLAY`, `WAYLAND_DISPLAY`,
+`XDG_RUNTIME_DIR`, or session bus): `initialize` answers in 1.4–2.2 s,
+`tools/list` returns all 40 tools, `sm_get_health` / `sm_list_skills` read the
+real models, and `sm_screenshot` / `sm_inspect_qml_tree` render `Main.qml`
+offscreen on first call (`source: "headless-qml"`, a real PNG with ~24 distinct
+sampled colours, not a black grab).
+
+```mermaid
+flowchart TD
+    Client["MCP client"] --> Flag{"launcher arg"}
+    Flag -->|"--mcp"| Headless["offscreen QGuiApplication<br/>+ AppController<br/>40 tools, no window"]
+    Flag -->|"--mcp-light"| Light["no Qt<br/>7 tools"]
+    Light --> Need["needs a live SkillManager GUI<br/>(Win32 + file IPC)"]
+    Headless --> Lazy["first UI tool:<br/>load Main.qml offscreen"]
+    Lazy --> Shot["tree / audit / PNG / pixel / frames"]
+```
+
+| Capability | Headless `--mcp` |
+|---|---|
+| Data tools (`sm_list_skills`, `sm_get_health`, analyze, build, tests) | Full — in-process `AppController` |
+| QML tree / accessibility audit / screenshot / pixel / frame timing | Works through the lazily loaded offscreen window; the first UI call costs ~1.7–3.8 s |
+| Continuous repaint (frame timing) | Degraded: Qt events are pumped every 20 ms only while the stdio loop yields ([ADR-0040](adr/ADR-0040-mcp-stdio-transport-anyio.md)) |
+| Driving a *visible* window (`sm_mouse_click`, `sm_type_text`, native capture) | Requires that GUI to exist; otherwise the tool returns `source: null` with an error |
+| Configuration writes | Never — `disable_state_persistence()` keeps `config.json` byte-identical |
+
+`--mcp-light` is the opposite trade-off: instant startup, no Qt import, but only
+the 7 GUI/capture tools, and every one of them talks to a **running** GUI. Do
+not use it for headless work — a container or SSH session has no window for it
+to drive.
+
 ### Module layout (`src/skill_manager/mcp/`)
 ```
 mcp/
