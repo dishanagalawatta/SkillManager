@@ -23,6 +23,30 @@ def safe_package_folder_name(package: dict[str, Any]) -> str:
     return slug
 
 
+def _unique_package_id(package: dict[str, Any], taken: set[str]) -> str:
+    """Derive a package id that does not collide with ``taken``.
+
+    Two packages can share a ``package_name`` (npm installers such as
+    ``skills`` serve many repositories) and older configs may already hold the
+    resulting duplicate ids. Sharing an id makes both records use one inventory
+    entry and one storage slot, so the second record is re-keyed on load.
+
+    The last eight characters are kept: storage folder names are built from
+    ``package_id[-8:]``, so preserving them re-keys the record *without* moving
+    its directory (or orphaning the old one).
+    """
+    current = str(package.get("package_id") or "")
+    suffix = current[-8:] if len(current) >= 8 else ""
+    identity = str(package.get("name") or package.get("package_path") or "package")
+    salt = 0
+    while True:
+        salt += 1
+        digest = hashlib.sha1(f"{identity}#{salt}".encode()).hexdigest()
+        candidate = f"pkg_{digest[:4]}{suffix}" if suffix else f"pkg_{digest[:12]}"
+        if candidate not in taken:
+            return candidate
+
+
 def resolve_package_storage(
     packages: list[dict[str, Any]],
     inventory: dict[str, Any] | None = None,
@@ -30,10 +54,24 @@ def resolve_package_storage(
     """Assigns each package an isolated final storage path."""
     inventory = inventory or {}
     final_keys: set[str] = set()
+    seen_ids: set[str] = set()
     result = []
 
     for package in packages:
         item = dict(package)
+        package_id = str(item.get("package_id") or "")
+        if package_id:
+            if package_id in seen_ids:
+                repaired = _unique_package_id(item, seen_ids)
+                logger.warning(
+                    "Duplicate package_id %r for %r; reassigned to %r",
+                    package_id,
+                    item.get("name"),
+                    repaired,
+                )
+                package_id = repaired
+                item["package_id"] = package_id
+            seen_ids.add(package_id)
         configured = (
             item.get("configured_package_path")
             or item.get("package_path")
@@ -50,7 +88,6 @@ def resolve_package_storage(
             continue
 
         configured_path = Path(os.path.expanduser(configured)).resolve()
-        package_id = item.get("package_id")
         prior = inventory.get(package_id, {}) if package_id else {}
         old_resolved = item.get("resolved_package_path") or item.get("package_path")
         if old_resolved:
@@ -194,6 +231,15 @@ def promote_package_storage(package: dict[str, Any], previous_inventory: dict[st
     if not old_path.is_dir():
         return {"moved": 0, "skipped": 0}
     if new_path.exists() and any(new_path.iterdir()):
+        managed = {str(name) for name in (package.get("managed_folders") or [])}
+        present = {child.name for child in new_path.iterdir()}
+        if managed and managed & present:
+            # The package already lives at its new path (a renamed record whose
+            # _previous_resolved_package_path is stale). Returning "skipped"
+            # here made every later update fail with "Could not promote package
+            # storage", which kept the package permanently outdated and made
+            # auto-update re-run it on every scan.
+            return {"moved": 0, "skipped": 0, "already_present": True}
         return {"moved": 0, "skipped": 1}
 
     skill_names = set((previous_inventory or {}).get("skills", {}))

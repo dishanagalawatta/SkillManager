@@ -7,9 +7,16 @@ from typing import Any
 
 
 def _stable_package_id(source: dict[str, Any]) -> str:
+    package_name = str(source.get("package_name") or "").strip()
+    install_args = str(source.get("package_args") or source.get("install_args") or "").strip()
+    # npm-style installers report their *own* package name for every payload
+    # they install (`npx skills add <repo>` is always package_name "skills"),
+    # so package_name alone collides across unrelated packages. The install
+    # arguments identify the actual payload and keep the ids distinct.
+    declared_payload = f"{package_name} {install_args}".strip() if package_name else ""
     identity = (
         source.get("repository_url")
-        or source.get("package_name")
+        or declared_payload
         or source.get("package_path")
         or source.get("name")
         or "unnamed-package"

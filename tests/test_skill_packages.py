@@ -57,6 +57,24 @@ def test_normalize_skill_package_config_preserves_package_id():
     assert normalized["package_id"] == "pkg_existing"
 
 
+def test_package_id_distinguishes_payloads_of_the_same_installer():
+    """npm installers report their own name for every payload they install.
+
+    ``npx skills add <repo>`` has package_name "skills" for both
+    ``vercel-labs/skills`` and ``tt-a1i/archify``. Hashing package_name alone
+    gave both records the same package_id, so they shared one inventory entry
+    and one storage slot.
+    """
+    find_skills = normalize_skill_package_config(
+        {"package_name": "skills", "package_args": "add vercel-labs/skills -y"}
+    )
+    archify = normalize_skill_package_config(
+        {"package_name": "skills", "package_args": "add tt-a1i/archify -g -y"}
+    )
+
+    assert find_skills["package_id"] != archify["package_id"]
+
+
 def test_sanitize_token_masks_auth_urls_and_ignores_non_string():
     assert (
         sanitize_token("https://secret@example.com/repo.git") == "https://***@example.com/repo.git"
