@@ -32,6 +32,7 @@ class UIController(BaseController):
     windowHeightChanged = Signal()
     windowXChanged = Signal()
     windowYChanged = Signal()
+    windowMaximizedChanged = Signal()
     darkModeChanged = Signal()
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
@@ -156,6 +157,32 @@ class UIController(BaseController):
             self.state.window_y = value
             self.triggerSave()
             self.windowYChanged.emit()
+
+    @Property(bool, notify=windowMaximizedChanged)
+    def windowMaximized(self):  # type: ignore[reportRedeclaration]
+        return self.state.window_maximized
+
+    @windowMaximized.setter  # type: ignore[func-attr]
+    def windowMaximized(self, value):
+        value = bool(value)
+        if self.state.window_maximized != value:
+            self.state.window_maximized = value
+            self.triggerSave()
+            self.windowMaximizedChanged.emit()
+
+    @Property(bool, constant=True)
+    def honorsWindowPosition(self):
+        """Whether the window manager lets the app place its own window.
+
+        Wayland does not: the compositor positions top-levels, ``setX``/``setY``
+        are ignored and every window reports (0, 0). Persisting that would
+        overwrite a real position saved during an X11/Windows session with a
+        meaningless zero, so QML skips the position write-back there. Size and
+        the maximized flag are still client-controlled and are always restored.
+        """
+        from PySide6.QtGui import QGuiApplication
+
+        return not QGuiApplication.platformName().startswith("wayland")
 
     @Property(bool, notify=darkModeChanged)
     def darkMode(self):  # type: ignore[reportRedeclaration]

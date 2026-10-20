@@ -435,7 +435,14 @@ def _show_windows(engine, controller, app_icon) -> None:  # pragma: no cover
             root_any.setY(controller.ui.windowY)
             root_any.setWidth(controller.ui.windowWidth)
             root_any.setHeight(controller.ui.windowHeight)
-            root_any.show()
+            # Restore the maximized state the user quit with. Wayland ignores
+            # the position above but honours this, and the stored width/height
+            # stay untouched so unmaximizing returns to the previous size.
+            show_call = "showMaximized" if controller.ui.windowMaximized else "show"
+            if controller.ui.windowMaximized:
+                root_any.showMaximized()
+            else:
+                root_any.show()
             if hasattr(root, "raise_"):
                 root_any.raise_()
             if hasattr(root, "requestActivate"):
@@ -443,7 +450,7 @@ def _show_windows(engine, controller, app_icon) -> None:  # pragma: no cover
             diag.log_event(
                 "INFO",
                 "window_state",
-                f"Called root.show() on root {i} at ({root_any.x()}, {root_any.y()}) size={root_any.width()}x{root_any.height()}",
+                f"Called root.{show_call}() on root {i} at ({root_any.x()}, {root_any.y()}) size={root_any.width()}x{root_any.height()}",
             )
 
 

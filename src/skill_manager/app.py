@@ -151,6 +151,7 @@ class AppController(AppControllerProxyMixin, QObject):
     windowHeightChanged = Signal()
     windowXChanged = Signal()
     windowYChanged = Signal()
+    windowMaximizedChanged = Signal()
     darkModeChanged = Signal()
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
@@ -273,6 +274,7 @@ class AppController(AppControllerProxyMixin, QObject):
         self.ui.windowHeightChanged.connect(self.windowHeightChanged.emit)
         self.ui.windowXChanged.connect(self.windowXChanged.emit)
         self.ui.windowYChanged.connect(self.windowYChanged.emit)
+        self.ui.windowMaximizedChanged.connect(self.windowMaximizedChanged.emit)
         self.ui.darkModeChanged.connect(self.darkModeChanged.emit)
         self.ui.startupViewChanged.connect(self.startupViewChanged.emit)
         self.ui.rememberFiltersChanged.connect(self.rememberFiltersChanged.emit)
@@ -883,6 +885,14 @@ class AppController(AppControllerProxyMixin, QObject):
     @windowY.setter  # type: ignore[func-attr]
     def windowY(self, v):
         self.ui.windowY = v
+
+    @Property(bool, notify=windowMaximizedChanged)
+    def windowMaximized(self):  # type: ignore[reportRedeclaration]
+        return self.ui.windowMaximized
+
+    @windowMaximized.setter  # type: ignore[func-attr]
+    def windowMaximized(self, v):
+        self.ui.windowMaximized = v
 
     @Property(bool, notify=darkModeChanged)
     def darkMode(self):  # type: ignore[reportRedeclaration]

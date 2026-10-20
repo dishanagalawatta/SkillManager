@@ -35,7 +35,7 @@
 
 ## 4. Bug Tracker
 
-* [ ] remember window position - tried to bug. need further investigations (Not urgent)
+* [x] remember window position — root cause: on GNOME Wayland the compositor owns top-level placement, Qt ignores `setX`/`setY` and every window reports (0, 0). The app no longer overwrites the stored position there (it stays valid for X11/Windows sessions), and it now remembers the maximized state across restarts, which is client-controlled and works on Wayland.
 
 ---
 
