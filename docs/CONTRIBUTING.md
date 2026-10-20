@@ -9,8 +9,9 @@
    done until `python scripts/dev_test.py` is green and ruff is clean.
 4. **Open a PR to `main`** with the track's spec linked in the
    description. CI must be green before review.
-5. **Release** — `uv run python scripts/release.py [bump]` bumps the version,
-   creates the release tag, and triggers the CI build. See
+5. **Release** — `uv run python scripts/release.py [bump]` opens a release PR;
+   merge it once CI is green, then `uv run python scripts/release.py tag` pushes
+   the tag that triggers the CI build. See
    [VERSIONING.md](VERSIONING.md) and [RELEASING.md](RELEASING.md).
 
 ## Commit Style
@@ -65,8 +66,10 @@ perf(search): optimize fuzzy matching
 
 ## Release Process
 
-Releases are orchestrated using `uv run python scripts/release.py [patch|minor|major]`.
-See [RELEASING.md](RELEASING.md) for the full process.
+Releases are prepared using `uv run python scripts/release.py [patch|minor|major]`,
+which opens a release PR; after the merge, `uv run python scripts/release.py tag`
+pushes the tag that triggers the build. See [RELEASING.md](RELEASING.md) for the
+full process.
 
 ## Security
 

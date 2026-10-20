@@ -10,11 +10,10 @@ Versions are bumped **manually** with `scripts/release.py`, which takes an expli
 
 ## 1. Cutting a Release
 
-Releases are cut manually with `scripts/release.py`; the resulting tag drives the
-automated build:
+Releases are cut manually in two steps: prepare the bump, then tag the merge:
 
 ```bash
-# Specify the SemVer bump explicitly
+# 1. Open a release PR carrying the version bump
 uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
 uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
 uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
@@ -23,6 +22,9 @@ uv run python scripts/release.py dev     # x.y.z -> x.y.(z+1)-dev.1
 # Or set an explicit version (incl. pre-releases)
 uv run python scripts/release.py 2.0.1
 uv run python scripts/release.py 2.0.1-dev.1
+
+# 2. After the PR merges, tag the merge commit
+uv run python scripts/release.py tag
 ```
 
 ### How It Works
@@ -30,9 +32,10 @@ uv run python scripts/release.py 2.0.1-dev.1
 1. **Choose the bump**: read `git log` since the last tag and decide — see §2.
 2. **Pre-flight**: the script refuses a dirty working tree and runs `ruff` plus `pytest`.
 3. **Metadata Synchronization**: `scripts/release.py` automatically synchronizes all 7 metadata files (`pyproject.toml`, `uv.lock` via `uv lock`, `__init__.py`, `installer.iss`, `metainfo.xml`, `README.md`, `CHANGELOG.md`).
-4. **Git Tag & Push**: An annotated git tag (`vX.Y.Z`) and release commit (`[skip ci]`) are created and pushed to GitHub.
-5. **Multi-Platform Build**: GitHub Actions builds the multi-platform installer assets (`.deb`, `AppImage`, `.exe`, `SHA256SUMS`) and attaches them to the release.
-6. **End-User Distribution**: End users can install or update in one command via `scripts/install.sh`.
+4. **Release PR**: the commit is created on `release/vX.Y.Z` and pushed. `main` is protected, so it lands through a pull request that must pass `CI Gate`.
+5. **Tag**: after the merge, `scripts/release.py tag` creates the annotated tag `vX.Y.Z` on `main` and pushes it.
+6. **Multi-Platform Build**: GitHub Actions builds the multi-platform installer assets (`.deb`, `AppImage`, `.exe`, `SHA256SUMS`) and attaches them to the release.
+7. **End-User Distribution**: End users can install or update in one command via `scripts/install.sh`.
 
 ---
 

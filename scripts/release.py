@@ -9,6 +9,7 @@
 #   uv run python scripts/release.py 1.9.1
 #   uv run python scripts/release.py 2.2.4-dev.1
 #   uv run python scripts/release.py patch --dry-run
+#   uv run python scripts/release.py tag          (after the release PR merges)
 # ==============================================================================
 """Release and version synchronization tool for SkillManager."""
 
@@ -295,28 +296,53 @@ def run_preflight_checks(project_root: str, skip_tests: bool, skip_lint: bool) -
         print("  [OK] All tests passed.")
 
 
-def git_commit_and_tag(
+def _current_branch(project_root: str) -> str:
+    """Return the name of the checked-out branch."""
+    res = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return res.stdout.strip()
+
+
+def prepare_release_pr(
     project_root: str,
     next_version: str,
     custom_msg: str | None = None,
     push: bool = True,
     dry_run: bool = False,
 ) -> None:
-    """Commit synchronized files and create an annotated git tag."""
+    """Commit the version sync on a release branch and open a pull request.
+
+    ``main`` is protected, so the bump cannot be pushed directly: it lands
+    through a pull request. The tag is created afterwards, once merged, by
+    :func:`tag_current_version`.
+    """
+    branch = f"release/v{next_version}"
     tag_name = f"v{next_version}"
-    if not custom_msg:
-        commit_msg = f"chore(release): bump version to v{next_version} [skip ci]"
-    else:
-        commit_msg = f"{custom_msg} [skip ci]" if "[skip ci]" not in custom_msg else custom_msg
+    # No [skip ci]: the release PR must run CI, otherwise the required "CI Gate"
+    # status check never reports and the pull request can never merge.
+    commit_msg = custom_msg or f"chore(release): bump version to {tag_name}"
 
     if dry_run:
-        print(f"\n[DRY RUN] Would commit synchronized files with message: '{commit_msg}'")
-        print(f"[DRY RUN] Would create git tag: '{tag_name}'")
+        print(f"\n[DRY RUN] Would create branch: '{branch}'")
+        print(f"[DRY RUN] Would commit synchronized files with message: '{commit_msg}'")
         if push:
-            print("[DRY RUN] Would push commit and tag to origin main --tags")
+            print(f"[DRY RUN] Would push '{branch}' and open a pull request into main")
+            print("[DRY RUN] After the merge: uv run python scripts/release.py tag")
         return
 
-    print("\nStaging synchronized files in git...")
+    if _current_branch(project_root) != "main":
+        print("ERROR: Release branches are cut from 'main'. Switch to main first.")
+        sys.exit(1)
+
+    print(f"\nCreating release branch: {branch}...")
+    subprocess.run(["git", "checkout", "-b", branch], cwd=project_root, check=True)
+
+    print("Staging synchronized files in git...")
     subprocess.run(
         [
             "git",
@@ -332,32 +358,101 @@ def git_commit_and_tag(
         check=True,
     )
 
-    subprocess.run(
-        ["git", "commit", "-m", commit_msg],
-        cwd=project_root,
-        check=True,
-    )
+    subprocess.run(["git", "commit", "-m", commit_msg], cwd=project_root, check=True)
     print(f"  [OK] Created commit: {commit_msg}")
 
-    print(f"Creating annotated tag: {tag_name}...")
-    subprocess.run(
-        ["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"],
+    if not push:
+        print("\nSkipped git push (--no-push). To open the release PR manually:")
+        print(f"  git push -u origin {branch}")
+        print(f"  gh pr create --base main --head {branch} --title '{commit_msg}'")
+        return
+
+    print(f"\nPushing {branch} to origin...")
+    subprocess.run(["git", "push", "-u", "origin", branch], cwd=project_root, check=True)
+    print("  [OK] Branch pushed.")
+    subprocess.run(["git", "checkout", "main"], cwd=project_root, check=True)
+
+    print("\nOpening release pull request...")
+    pr = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            "main",
+            "--head",
+            branch,
+            "--title",
+            commit_msg,
+            "--body",
+            (
+                "Version bump prepared by `scripts/release.py`.\n\n"
+                "Merge once `CI Gate` is green, then tag the merge commit:\n\n"
+                "```\nuv run python scripts/release.py tag\n```"
+            ),
+        ],
         cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if pr.returncode == 0:
+        print(f"  [OK] Pull request opened: {pr.stdout.strip()}")
+    else:
+        print("  [WARN] Could not open the pull request (gh missing or unauthenticated).")
+        print(f"  Open it manually: compare/main...{branch}?expand=1")
+    print("\nNext: merge the PR, then run:\n  uv run python scripts/release.py tag")
+
+
+def tag_current_version(
+    project_root: str,
+    custom_msg: str | None = None,
+    push: bool = True,
+    dry_run: bool = False,
+) -> None:
+    """Tag the already-merged release version and push the tag.
+
+    Push the tag *after* the release PR merges: the tag is what triggers
+    ``release-build.yml``.
+    """
+    version = get_current_version(project_root)
+    tag_name = f"v{version}"
+    message = custom_msg or f"Release {tag_name}"
+
+    existing = subprocess.run(
+        ["git", "tag", "--list", tag_name],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
         check=True,
     )
+    if existing.stdout.strip():
+        print(f"ERROR: Tag {tag_name} already exists.")
+        sys.exit(1)
+
+    if dry_run:
+        print(f"[DRY RUN] Would create annotated tag: '{tag_name}'")
+        if push:
+            print(f"[DRY RUN] Would push tag {tag_name} (triggers release-build.yml)")
+        return
+
+    branch = _current_branch(project_root)
+    if branch != "main":
+        print(f"ERROR: Tag on 'main', not '{branch}' — the release PR must merge first.")
+        sys.exit(1)
+    check_git_status(project_root)
+
+    print(f"Creating annotated tag: {tag_name}...")
+    subprocess.run(["git", "tag", "-a", tag_name, "-m", message], cwd=project_root, check=True)
     print(f"  [OK] Created tag: {tag_name}")
 
     if push:
-        print("\nPushing commit and tags to origin...")
-        subprocess.run(
-            ["git", "push", "origin", "main", "--tags"],
-            cwd=project_root,
-            check=True,
-        )
+        print(f"\nPushing tag {tag_name} to origin...")
+        subprocess.run(["git", "push", "origin", tag_name], cwd=project_root, check=True)
         print(f"\nGitHub Actions release workflow will now build and publish release {tag_name}!")
     else:
         print("\nSkipped git push (--no-push). To push manually:")
-        print("  git push origin main --tags")
+        print(f"  git push origin {tag_name}")
 
 
 def main() -> None:
@@ -366,7 +461,7 @@ def main() -> None:
     )
     parser.add_argument(
         "target",
-        help="Bump type ('patch', 'minor', 'major', 'dev') or explicit version (e.g. '1.9.1' or '2.2.4-dev.1'). Required: releases are bumped deliberately, never inferred.",
+        help="Bump type ('patch', 'minor', 'major', 'dev'), explicit version (e.g. '1.9.1' or '2.2.4-dev.1'), or 'tag' to tag the merged version. Required: releases are bumped deliberately, never inferred.",
     )
     parser.add_argument(
         "--dry-run",
@@ -397,6 +492,15 @@ def main() -> None:
     args = parser.parse_args()
     project_root = get_project_root()
 
+    if args.target.lower() == "tag":
+        tag_current_version(
+            project_root,
+            args.message,
+            push=not args.no_push,
+            dry_run=args.dry_run,
+        )
+        return
+
     current_ver = get_current_version(project_root)
 
     next_ver = calculate_next_version(current_ver, args.target)
@@ -422,7 +526,7 @@ def main() -> None:
     sync_readme(project_root, next_ver, args.dry_run)
     update_changelog(project_root, next_ver, dry_run=args.dry_run)
 
-    git_commit_and_tag(
+    prepare_release_pr(
         project_root,
         next_ver,
         args.message,

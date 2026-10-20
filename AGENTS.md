@@ -85,6 +85,7 @@
 - Prefix: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`, `docs:`
 - Keep subject line ≤ 50 characters
 - Body only when "why" isn't obvious from subject
+- **Protected `main`**: direct pushes are rejected. Work on a branch, open a PR, and wait for the `CI Gate` check. Releases use `scripts/release.py <bump>` (opens a release PR) followed by `scripts/release.py tag` after the merge.
 
 ### Documentation & Architecture Diagrams
 
