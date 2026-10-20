@@ -443,6 +443,8 @@ def test_capture_strategy_live_uses_ipc_and_skips_headless(monkeypatch, tmp_path
         "send_capture_command",
         lambda **kw: {"ok": True, "capture_path": str(live_png)},
     )
+    # Windows only probes IPC when a window handle is found; CI has no GUI.
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: 1)
 
     info = bridge.capture_app_window_info(strategy="live")
 
@@ -475,6 +477,8 @@ def test_capture_auto_falls_back_to_ipc_when_headless_empty(monkeypatch, tmp_pat
         "send_capture_command",
         lambda **kw: {"ok": True, "capture_path": str(live_png)},
     )
+    # Windows only probes IPC when a window handle is found; CI has no GUI.
+    monkeypatch.setattr(bridge_capture, "_find_skill_manager_window", lambda: 1)
 
     info = bridge.capture_app_window_info(strategy="auto")
 
