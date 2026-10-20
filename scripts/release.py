@@ -52,75 +52,6 @@ def parse_version(version_str: str) -> tuple[int, int, int, int | None]:
     return int(match.group(1)), int(match.group(2)), int(match.group(3)), dev
 
 
-def detect_bump_from_commits(project_root: str) -> str | None:
-    """Scan commits since the latest git tag for [major], [minor], [patch], [dev], or Conventional Commits across subject and body."""
-    # Find latest tag
-    tag_res = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    latest_tag = tag_res.stdout.strip()
-    rev_range = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
-
-    log_res = subprocess.run(
-        ["git", "log", rev_range, "--pretty=format:%B---COMMIT-DELIMITER---"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    raw_output = log_res.stdout.strip()
-    commits = [c.strip() for c in raw_output.split("---COMMIT-DELIMITER---") if c.strip()]
-    if not commits:
-        return None
-
-    highest_bump = None
-    for msg in commits:
-        msg_lower = msg.lower()
-
-        # Step 1: Explicit bracket token overrides take highest priority
-        commit_bump = None
-        if "[major]" in msg_lower:
-            commit_bump = "major"
-        elif "[minor]" in msg_lower:
-            commit_bump = "minor"
-        elif "[patch]" in msg_lower:
-            commit_bump = "patch"
-        elif "[dev]" in msg_lower:
-            commit_bump = "dev"
-        # Step 2: Conventional Commits heuristic fallback when no explicit bracket token is set
-        elif (
-            msg_lower.startswith("feat!:")
-            or "breaking change:" in msg_lower
-            or "breaking-change:" in msg_lower
-        ):
-            commit_bump = "major"
-        elif msg_lower.startswith("feat:") or msg_lower.startswith("feat("):
-            commit_bump = "minor"
-        elif (
-            msg_lower.startswith("fix:")
-            or msg_lower.startswith("fix(")
-            or msg_lower.startswith("perf:")
-            or msg_lower.startswith("perf(")
-        ):
-            commit_bump = "patch"
-
-        # Step 3: Aggregate across commits (major > minor > dev > patch)
-        if commit_bump == "major":
-            return "major"
-        if commit_bump == "minor":
-            highest_bump = "minor"
-        elif commit_bump == "dev" and highest_bump != "minor":
-            highest_bump = "dev"
-        elif commit_bump == "patch" and highest_bump not in ("minor", "dev"):
-            highest_bump = "patch"
-
-    return highest_bump
-
-
 def calculate_next_version(current_ver: str, bump_type_or_ver: str) -> str:
     """Calculate the next version given a bump type or explicit version.
 
@@ -271,9 +202,7 @@ def sync_uvlock(project_root: str, new_ver: str, dry_run: bool = False) -> None:
         print(f"  [OK] uv.lock -> would regenerate lockfile for version {new_ver}")
         return
 
-    res = subprocess.run(
-        ["uv", "lock"], cwd=project_root, capture_output=True, text=True
-    )
+    res = subprocess.run(["uv", "lock"], cwd=project_root, capture_output=True, text=True)
     if res.returncode != 0:
         print(f"  [ERROR] uv lock failed: {res.stderr.strip()}")
         sys.exit(1)
@@ -437,14 +366,7 @@ def main() -> None:
     )
     parser.add_argument(
         "target",
-        nargs="?",
-        default="auto",
-        help="Bump type ('patch', 'minor', 'major', 'dev', 'auto') or explicit version (e.g. '1.9.1' or '2.2.4-dev.1'). Default: auto",
-    )
-    parser.add_argument(
-        "--only-if-triggered",
-        action="store_true",
-        help="In 'auto' mode, only perform a release if an explicit release tag or conventional commit trigger is detected; otherwise exit 0.",
+        help="Bump type ('patch', 'minor', 'major', 'dev') or explicit version (e.g. '1.9.1' or '2.2.4-dev.1'). Required: releases are bumped deliberately, never inferred.",
     )
     parser.add_argument(
         "--dry-run",
@@ -477,26 +399,7 @@ def main() -> None:
 
     current_ver = get_current_version(project_root)
 
-    target_bump = args.target
-    if target_bump.lower() == "auto":
-        detected = detect_bump_from_commits(project_root)
-        if detected:
-            print(f"Auto-detected version bump from git commits: {detected.upper()}")
-            target_bump = detected
-        elif args.only_if_triggered:
-            print(
-                "No release tokens ([patch], [minor], [major], [dev]) or conventional commit triggers found in recent commits."
-            )
-            print("Skipping version bump (--only-if-triggered).")
-            return
-        else:
-            print(
-                "No release tokens ([patch], [minor], [major], [dev]) or conventional commit triggers found in recent commits."
-            )
-            print("Defaulting to 'patch' bump. To specify otherwise, pass 'minor', 'major', or 'X.Y.Z'.")
-            target_bump = "patch"
-
-    next_ver = calculate_next_version(current_ver, target_bump)
+    next_ver = calculate_next_version(current_ver, args.target)
 
     print("==================================================")
     print("  SkillManager Release & Version Synchronization  ")

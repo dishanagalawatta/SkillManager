@@ -47,8 +47,8 @@
 |----------|-------------|
 | [CI_CD.md](CI_CD.md) | CI/CD pipeline reference (GitHub Actions) |
 | [QA.md](QA.md) | Living QA checklist: installer & update pipeline statuses |
-| [RELEASING.md](RELEASING.md) | Release checklist, semantic-release workflow, versioning |
-| [VERSIONING.md](VERSIONING.md) | Semantic versioning policy and commit keyword conventions |
+| [RELEASING.md](RELEASING.md) | Release checklist, manual bump, tag-driven build |
+| [VERSIONING.md](VERSIONING.md) | Semantic versioning policy and release rules |
 | [SECURITY.md](SECURITY.md) | Security policy and token handling guidelines |
 | [HOUSEKEEPING.md](HOUSEKEEPING.md) | Workspace cleanup rules, targets, and exclusions |
 | [../conductor/workflow.md](../conductor/workflow.md) | Conductor track lifecycle and metadata schema |

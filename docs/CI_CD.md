@@ -9,7 +9,6 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 ```
 .github/workflows/
 ├── ci.yml                    # PR + main push gate (lint + test + security)
-├── auto-release.yml          # Automated version bump and git tagging on main push
 ├── release-build.yml         # Multi-platform packaging (Windows .exe + Linux .deb & AppImage)
 ├── _lint.yml                 # Ruff check + format (reusable)
 ├── _test-python.yml          # Test suite runner (reusable)
@@ -35,39 +34,34 @@ flowchart LR
 
 ---
 
-## Automated Versioning & Release Pipeline (`auto-release.yml` & `release-build.yml`)
+## Release Pipeline (`release-build.yml`)
 
-Releases are fully automated from Git commits and tags:
+Releases are triggered by a tag you push yourself with `scripts/release.py` — no
+workflow bumps the version. The tag then drives a fully automated build:
 
 ```mermaid
 flowchart TD
-    subgraph "1. Developer Push"
-        A["git push origin main (with [patch], [minor], [major], [dev], or feat:/fix:)"]
+    subgraph "1. Local Release"
+        A["uv run python scripts/release.py <bump>"] --> B["Pre-flight: ruff + pytest"]
+        B --> C["Sync version in 7 metadata files & commit [skip ci]"]
+        C --> D["Create annotated git tag vX.Y.Z"]
+        D --> E["git push origin main --tags"]
     end
 
-    subgraph "2. Auto Version Bump & Tagging (auto-release.yml)"
-        A --> B["auto-release.yml triggers on main"]
-        B --> C["Scan commit subject & body for SemVer tokens"]
-        C --> D["uv run python scripts/release.py auto --only-if-triggered"]
-        D --> E["Sync version in 7 metadata files & commit [skip ci]"]
-        E --> F["Create annotated git tag: vX.Y.Z"]
-        F --> G["Push commit & tag to origin main"]
-    end
-
-    subgraph "3. Multi-Platform Build & Publish (release-build.yml)"
-        G --> H["release-build.yml triggers on tag v*"]
-        H --> I["Build Windows installer: SkillManager_Setup.exe"]
-        H --> J["Build Linux .deb & AppImage"]
-        I --> K["Compute SHA256 checksums: SHA256SUMS"]
-        J --> K
-        K --> L["Publish GitHub Release with all binary assets"]
-        L --> M["End users install/update via 1-command installer script"]
+    subgraph "2. Multi-Platform Build & Publish (release-build.yml)"
+        E --> F["release-build.yml triggers on tag v*"]
+        F --> G["Build Windows installer: SkillManager_Setup.exe"]
+        F --> H["Build Linux .deb & AppImage"]
+        G --> I["Compute SHA256 checksums: SHA256SUMS"]
+        H --> I
+        I --> J["Publish GitHub Release with all binary assets"]
+        J --> K["End users install/update via 1-command installer script"]
     end
 ```
 
 The Release workflow compiles all platform binaries on native GitHub runners, signs Windows installers (when certificate secrets are present), and attaches verified artifacts to the GitHub Release.
 
-Dev pre-releases (`vX.Y.Z-dev.N` tags) are published with `prerelease: true` and are skipped by the GitHub `/releases/latest` endpoint, so stable users never receive them via `install.sh --update` or the in-app update check. A `[patch]` commit while a dev line is active promotes it to stable. See [VERSIONING.md §4](VERSIONING.md#4-pre-release-versions).
+Dev pre-releases (`vX.Y.Z-dev.N` tags) are published with `prerelease: true` and are skipped by the GitHub `/releases/latest` endpoint, so stable users never receive them via `install.sh --update` or the in-app update check. Running `release.py patch` while a dev line is active promotes it to stable. See [VERSIONING.md §4](VERSIONING.md#4-pre-release-versions).
 
 ## Action Pinning
 
@@ -85,23 +79,22 @@ All third-party actions are pinned to full commit SHAs (not floating tags). Depe
 
 ---
 
-## Dual-Workflow Architecture on `main` Push
+## Push to `main`
 
-When a push to `main` occurs, GitHub Actions triggers two distinct workflows in parallel:
+A push to `main` runs only `ci.yml`:
 
 ```mermaid
-flowchart TD
-    A["git push origin main"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• Quality Gate"]
-    A --> C["Auto Version & Release (auto-release.yml)\n• Write permissions\n• Scans commits for SemVer tokens\n• Tags vX.Y.Z(-dev.N) & triggers release-build.yml\n• Exits in ~5s if no bump needed"]
+flowchart LR
+    A["git push origin main"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• CI Gate"]
 ```
 
-### Why They Are Decoupled
-1. **Security Isolation (Least Privilege)**: `CI` runs on untrusted Pull Requests with strictly read-only repository permissions (`contents: read`). `Auto Version & Release` requires write permissions (`contents: write`, `actions: write`) to push tags and dispatch workflows, and is locked to `main`.
-2. **Speed & Efficiency**: `auto-release.yml` performs an instantaneous pre-flight check via `scripts/release.py auto --only-if-triggered`. If no SemVer tokens are found, it terminates in ~5 seconds without consuming heavy runner minutes.
-3. **Pull Request Support**: `ci.yml` validates PRs to prevent broken code from landing on `main`, while release automation only acts once changes are merged to `main`.
+No workflow bumps the version or creates a tag on push. Releases start from
+`scripts/release.py` on a maintainer's machine, which pushes the release commit and
+tag together (see [RELEASING.md](RELEASING.md)).
 
-### `paths-ignore` & Lockfile Behavior
-Both `ci.yml` and `auto-release.yml` ignore changes restricted strictly to documentation and reference directories:
+### `paths-ignore` Behavior
+
+`ci.yml` ignores changes restricted strictly to documentation and reference directories:
 ```yaml
 paths-ignore:
   - 'docs/**'
@@ -113,7 +106,7 @@ paths-ignore:
   - 'LICENSE'
 ```
 - **Doc-only commits** (`docs/`, `README.md`, etc.) are skipped automatically by GitHub Actions.
-- **Dependency & lockfile updates** ([`uv.lock`](file:///home/dikka/Documents/01-Projects/27-SkillManager/skill-manager/uv.lock)) or code changes are **not** ignored, triggering both workflows to ensure all tests pass and any release tokens are processed.
+- **Dependency & lockfile updates** ([`uv.lock`](file:///home/dikka/Documents/01-Projects/27-SkillManager/skill-manager/uv.lock)) or code changes are **not** ignored, so the full gate runs.
 
 ---
 
@@ -133,23 +126,23 @@ There are deliberately **no bypass actors**, so `current_user_can_bypass` is
 **`required_status_checks` is deliberately absent.** In a ruleset it applies to
 direct pushes, not only to merges: with no bypass actor the push is rejected
 outright — *"push declined due to repository rule violations"* — because the new
-commit cannot already have reported the check. Requiring `CI Gate` therefore
-deadlocks the owner *and* `auto-release.yml`, which pushes its version bump with
-`GITHUB_TOKEN`. The check becomes usable only once the bot pushes with a token that
-can bypass, i.e. a personal access token.
+commit cannot already have reported the check. Requiring `CI Gate` would block the
+release commit and tag that `scripts/release.py` pushes, plus every ordinary push.
+The check becomes usable only with a token that can bypass, i.e. a personal access
+token.
 
 **There is no "require a pull request" rule, and that is intentional.**
-`auto-release.yml` commits the version bump and pushes it to `main` itself using
-`GITHUB_TOKEN`. On a user-owned repository GitHub refuses the GitHub Actions
-integration as a bypass actor — *"Actor GitHub Actions integration must be part of
-the ruleset source or owner organization"* — so requiring pull requests would trap
-the release automation behind its own gate. Direct pushes therefore stay allowed;
-force pushes and deletion do not.
+`scripts/release.py` commits the version sync and pushes it straight to `main`. On
+a user-owned repository GitHub refuses the GitHub Actions integration as a bypass
+actor — *"Actor GitHub Actions integration must be part of the ruleset source or
+owner organization"* — so requiring pull requests would mean cutting every release
+through a PR. Direct pushes therefore stay allowed; force pushes and deletion do
+not.
 
 To get the full set (required checks and PR-only merges), either transfer the
 repository to an organization, which permits the integration as a bypass actor, or
-give `auto-release.yml` a personal access token belonging to an account that can
-bypass.
+authenticate the release push with a personal access token belonging to an account
+that can bypass.
 
 No approval count is set: this is a single-maintainer repository, and GitHub does
 not let an author approve their own pull request.
@@ -184,8 +177,6 @@ No repository-level permission changes are needed. The repository runs with
 GitHub's default **read-only** workflow token, because every workflow declares
 what it needs in its own `permissions:` block:
 
-- `auto-release.yml` — `contents: write` (push the version bump) and
-  `actions: write` (dispatch `release-build.yml`)
 - `release-build.yml` — `contents: write` (create the tag and release)
 - every other workflow — `contents: read`
 
@@ -215,8 +206,10 @@ portable — Linux-green tests have repeatedly broken CI:
 ### Coverage below threshold
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
 
-### Auto Release not creating release
-Ensure commits on `main` include an opt-in SemVer token (`[patch]`, `[minor]`, `[major]`, or `[dev]`) or Conventional Commit prefix (`feat!:`, `feat:`, `fix:`, `perf:`) in the commit subject or body.
+### Release not published after tagging
+Check that the tag reached the remote (`git ls-remote --tags origin`) and that
+`release-build.yml` ran for it. The version is never bumped on push — run
+`uv run python scripts/release.py <bump>`, which creates and pushes the tag.
 
 ### Artifact upload fails
 Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml).

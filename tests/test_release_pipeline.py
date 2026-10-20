@@ -1,13 +1,11 @@
 """
 Tests for the release pipeline tool (scripts/release.py): the uv.lock
 synchronization added to prevent version drift between pyproject.toml and
-uv.lock from tripping check_git_status on CI releases, and the dev
-pre-release sequencing behind the [dev] commit token.
+uv.lock from tripping check_git_status on release, and the dev
+pre-release sequencing behind the `dev` bump.
 """
 
 import importlib.util
-import shutil
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -170,70 +168,3 @@ class TestCalculateNextVersion:
     def test_invalid_explicit_version_raises(self) -> None:
         with pytest.raises(ValueError):
             release.calculate_next_version("2.2.3", "banana")
-
-
-@pytest.mark.skipif(shutil.which("git") is None, reason="git not available")
-class TestDetectBumpFromCommits:
-    """Tests for release.detect_bump_from_commits() using scratch git repos."""
-
-    @staticmethod
-    def _repo_with_commits(tmp_path: Path, messages: list[str]) -> str:
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        for cmd in (
-            ["git", "init", "-q", "-b", "main"],
-            ["git", "config", "user.email", "test@example.com"],
-            ["git", "config", "user.name", "Test"],
-        ):
-            subprocess.run(cmd, cwd=repo, check=True)
-        (repo / "f").write_text("x\n", encoding="utf-8")
-        subprocess.run(["git", "add", "."], cwd=repo, check=True)
-        subprocess.run(["git", "commit", "-qm", "base"], cwd=repo, check=True)
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=repo, check=True)
-        for msg in messages:
-            with (repo / "f").open("a", encoding="utf-8") as fh:
-                fh.write(msg + "\n")
-            subprocess.run(["git", "add", "."], cwd=repo, check=True)
-            subprocess.run(["git", "commit", "-qm", msg], cwd=repo, check=True)
-        return str(repo)
-
-    @pytest.mark.parametrize(
-        ("messages", "expected"),
-        [
-            (["[patch] fix a bug"], "patch"),
-            (["[minor] add feature"], "minor"),
-            (["[major] breaking rewrite"], "major"),
-            (["[dev] nightly tweak"], "dev"),
-            (["docs: no token here"], None),
-            (["feat: conventional fallback"], "minor"),
-            (["fix: conventional fallback"], "patch"),
-            (["perf: conventional fallback"], "patch"),
-            (["subject with token\n\nbody [patch] only"], "patch"),
-            (["feat: subject but body has [patch]"], "patch"),
-            (["chore: [minor] in body"], "minor"),
-        ],
-    )
-    def test_token_detection(
-        self, tmp_path: Path, messages: list[str], expected: str | None
-    ) -> None:
-        repo = self._repo_with_commits(tmp_path, messages)
-        assert release.detect_bump_from_commits(repo) == expected
-
-    def test_dev_beats_patch(self, tmp_path: Path) -> None:
-        repo = self._repo_with_commits(tmp_path, ["[patch] a", "[dev] b"])
-        assert release.detect_bump_from_commits(repo) == "dev"
-
-    def test_minor_beats_dev(self, tmp_path: Path) -> None:
-        repo = self._repo_with_commits(tmp_path, ["[dev] a", "[minor] b"])
-        assert release.detect_bump_from_commits(repo) == "minor"
-
-    def test_major_beats_all(self, tmp_path: Path) -> None:
-        repo = self._repo_with_commits(tmp_path, ["[patch] a", "[minor] b", "[major] c"])
-        assert release.detect_bump_from_commits(repo) == "major"
-
-    def test_body_prose_token_triggers_bump(self, tmp_path: Path) -> None:
-        """Bracket tokens are substring-matched across subject and body."""
-        repo = self._repo_with_commits(
-            tmp_path, ["feat: describe sequencing\n\nmention [patch] in prose"]
-        )
-        assert release.detect_bump_from_commits(repo) == "patch"

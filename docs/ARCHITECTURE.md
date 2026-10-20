@@ -497,9 +497,9 @@ SkillManagerComponents/
 
 ### CI/CD Pipeline
 
-Uses `python-semantic-release` with opt-in tokens:
+Versions are bumped manually; GitHub Actions only builds tagged releases:
 
-1. **Opt-In Version Bumps**: Commits must include `[patch]`, `[minor]`, `[major]`, or `[dev]`
+1. **Manual Version Bump**: `uv run python scripts/release.py <patch|minor|major|dev|X.Y.Z>` syncs all metadata and pushes the commit and tag
 2. **Build**: `windows-latest` × Python 3.12 + 3.13
 3. **Artifact Publishing**: Native installer + portable ZIP attached to GitHub Release
 
@@ -723,7 +723,7 @@ sequenceDiagram
 
 ## 12. Distribution & Release Architecture
 
-SkillManager uses a dual-track delivery pipeline: a zero-dependency, 1-command installer/updater for end users on Linux and Windows, and an automated SemVer release pipeline for maintainers:
+SkillManager uses a dual-track delivery pipeline: a zero-dependency, 1-command installer/updater for end users on Linux and Windows, and a tag-driven release pipeline for maintainers:
 
 ```mermaid
 flowchart TD

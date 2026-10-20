@@ -8,7 +8,7 @@
 
 Run a full cleanup before any of the following:
 
-- **Pre-release.** After `python-semantic-release` bumps the version.
+- **Pre-release.** After `scripts/release.py` bumps the version.
 - **Monthly.** First Monday of each month (automated via CI or manual).
 - **Post-merge.** After a large feature branch merges to `develop`.
 

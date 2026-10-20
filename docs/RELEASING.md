@@ -6,77 +6,44 @@ This document explains the full release and versioning lifecycle for SkillManage
 
 ## Overview
 
-SkillManager supports two unified release mechanisms: **Commit-Based Opt-in Tokens** (fully automated via GitHub Actions) and the **Local Release CLI (`scripts/release.py`)**:
+Releases are cut **manually**: you choose the bump, `scripts/release.py`
+synchronises every version location, commits, tags, and pushes, and the tag
+triggers the multi-platform build.
 
 ```mermaid
 flowchart TD
-    subgraph "1. Triggering Version Bumps"
-        A1["Commit Tokens in Subject/Body: [patch], [minor], [major], [dev]"] --> B["Push to origin main"]
-        A2["Explicit Local CLI bump: patch, minor, major, dev, X.Y.Z(-dev.N)"] --> C["uv run python scripts/release.py"]
-    end
-
-    subgraph "2. Automated CI/CD (auto-release.yml)"
-        B --> D["auto-release.yml triggers on main"]
-        D --> E["scripts/release.py auto --only-if-triggered"]
-        E --> F["Sync versions across 7 files, commit [skip ci] & tag vX.Y.Z"]
-        F --> G["Push to origin main --tags"]
-    end
-
-    subgraph "3. Local Orchestration"
-        C --> H["Pre-flight checks: ruff + pytest"]
-        H --> I["Sync version across 7 files, commit & tag vX.Y.Z"]
-        I --> G
-    end
-
-    subgraph "4. Multi-Platform Build & Distribution (release-build.yml)"
-        G --> J["release-build.yml triggers on tag v*"]
-        J --> K["Build Windows .exe, Linux .deb & AppImage"]
-        K --> L["Compute SHA256SUMS & publish GitHub Release"]
-        L --> M["End users install/update via scripts/install.sh (SHA256SUMS-verified)"]
-    end
+    A["Choose the bump: patch, minor, major, dev, or X.Y.Z(-dev.N)"] --> B["uv run python scripts/release.py <bump>"]
+    B --> C["Pre-flight checks: ruff + pytest"]
+    C --> D["Sync version across 7 files, commit & tag vX.Y.Z"]
+    D --> E["Push to origin main --tags"]
+    E --> F["release-build.yml triggers on tag v*"]
+    F --> G["Build Windows .exe, Linux .deb & AppImage"]
+    G --> H["Compute SHA256SUMS & publish GitHub Release"]
+    H --> I["End users install/update via scripts/install.sh (SHA256SUMS-verified)"]
 ```
 
----
-
-## Method 1: Commit-Based Automated Version Bumping
-
-You can declare version bumps directly within your Git commit messages using opt-in tokens in the **subject or body**:
-
-| Token / Prefix | Bump Type | Result | Example Commit |
-|---|---|---|---|
-| `[patch]` / `fix:` | Patch | `x.y.z` → `x.y.(z+1)` | `fix: correct dropdown alignment [patch]` |
-| `[minor]` / `feat:` | Minor | `x.y.z` → `x.(y+1).0` | `feat: add new search filter [minor]` |
-| `[major]` / `feat!:` | Major | `x.y.z` → `(x+1).0.0` | `feat!: redesign configuration API [major]` |
-| `[dev]` | Pre-release | `x.y.z` → `x.y.(z+1)-dev.1` | `fix: experiment with snapshot capture [dev]` |
-
-### How It Operates
-1. Include the token anywhere in your commit message (e.g. `feat: add quick copy button [minor]` or in a bullet point inside the commit body `* Added new filter. [minor]`).
-2. When pushed to `main`, GitHub Actions (`.github/workflows/auto-release.yml`) scans all commits since the previous release tag.
-3. If an unreleased token is detected, it runs `scripts/release.py auto`, commits the version sync across all 7 metadata files, creates the `vX.Y.Z` git tag, and pushes to GitHub.
-4. The tag push immediately triggers `.github/workflows/release-build.yml` to compile and publish the multi-platform release.
-
-Commits **without** a token (e.g. `docs: update README`, `chore: lint`) will not trigger a version bump.
+Nothing is inferred from commit messages: pushing to `main` never bumps the
+version or creates a tag, and no workflow does it on your behalf.
 
 ---
 
-## Method 2: Automated Release CLI (`scripts/release.py`)
+## Cutting a Release
 
-Run the release script directly from the repository root:
+Run the release script from the repository root with an explicit target:
 
 ```bash
-# Auto-detect bump from unreleased commit tokens
-uv run python scripts/release.py
+uv run python scripts/release.py patch   # 2.13.0 -> 2.13.1
+uv run python scripts/release.py minor   # 2.13.0 -> 2.14.0
+uv run python scripts/release.py major   # 2.13.0 -> 3.0.0
+uv run python scripts/release.py dev     # 2.13.0 -> 2.13.1-dev.1
 
-# Or force an explicit bump:
-uv run python scripts/release.py patch   # 2.0.0 -> 2.0.1
-uv run python scripts/release.py minor   # 2.0.0 -> 2.1.0
-uv run python scripts/release.py major   # 2.0.0 -> 3.0.0
-uv run python scripts/release.py dev     # 2.0.0 -> 2.0.1-dev.1
-
-# Or set an explicit version:
-uv run python scripts/release.py 2.0.1
-uv run python scripts/release.py 2.0.1-dev.1
+# Or name the version outright:
+uv run python scripts/release.py 2.14.0
+uv run python scripts/release.py 2.14.0-dev.1
 ```
+
+The bump argument is **required**: there is no default, no `auto` mode, and no
+detection from commit messages. Review `git log` and choose deliberately.
 
 ### CLI Flags
 

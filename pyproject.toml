@@ -90,7 +90,6 @@ dev = [
     "pytest-xdist",
     "pytest-sugar",
     "pip-audit",
-    "python-semantic-release>=10.5.3",
 ]
 
 [tool.pytest.ini_options]
@@ -104,24 +103,6 @@ markers = [
 filterwarnings = [
     "ignore:.*asyncio.AbstractEventLoopPolicy.*:DeprecationWarning",
 ]
-
-[tool.semantic_release]
-version_toml = ["pyproject.toml:project.version"]
-version_variables = ["src/skill_manager/__init__.py:__version__"]
-branch = "main"
-upload_to_pypi = false
-build_command = ""
-changelog_file = "CHANGELOG.md"
-
-commit_parser = "src/skill_manager/commit_parser_optin.py:OptInCommitParser"
-
-changelog.exclude_commit_patterns = [
-    '''chore(?:\([^)]*?\))?: .+''',
-    '''ci(?:\([^)]*?\))?: .+''',
-    '''Initial [Cc]ommit.*''',
-]
-
-tag_format = "v{version}"
 
 [tool.ruff]
 line-length = 100

@@ -14,15 +14,6 @@ rules:
     ignore:
       - release-build.yml
 
-  # auto-release.yml must keep its checkout credential: scripts/release.py
-  # pushes the version-bump commit and tags back to origin (git push origin
-  # main --tags), which requires the persisted token. Only dist/* globs from
-  # release-build.yml are ever uploaded as artifacts, so no credential
-  # material can persist into a published artifact from this job.
-  artipacked:
-    ignore:
-      - auto-release.yml
-
   # Line-scoped: the publish-release step could use `gh release create`
   # instead of softprops/action-gh-release, but swapping release-publishing
   # machinery is only observable during a real release run. Deferred until it

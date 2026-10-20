@@ -1,6 +1,6 @@
 # Development Guide
 
-Welcome to the SkillManager development engine room. This guide covers environment setup, technical workflows, and our automated release pipeline.
+Welcome to the SkillManager development engine room. This guide covers environment setup, technical workflows, and our tag-driven release pipeline.
 
 ---
 
@@ -12,7 +12,7 @@ Welcome to the SkillManager development engine room. This guide covers environme
 - **Linting & Formatting**: `ruff`
 - **Packaging**: PyInstaller & Inno Setup
 - **Testing**: `pytest` with `pytest-xdist` for parallel execution
-- **CI/CD**: GitHub Actions with automated SemVer release pipeline (`scripts/release.py`)
+- **CI/CD**: GitHub Actions with a tag-driven release build; versions are bumped manually via `scripts/release.py`
 - **Error Tracking**: Sentry
 - **Analytics**: PostHog
 
@@ -127,10 +127,10 @@ To build locally for testing:
 
 ## Release Strategy
 
-SkillManager uses `scripts/release.py` and GitHub Actions for automated releases. See `docs/RELEASING.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
+SkillManager cuts releases manually with `scripts/release.py`; GitHub Actions then builds and publishes the tagged release. See `docs/RELEASING.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
 
 ```bash
-# Automated SemVer bump and release
+# Manual SemVer bump and release
 uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
 uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
 uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
