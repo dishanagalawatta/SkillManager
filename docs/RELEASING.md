@@ -6,24 +6,29 @@ This document explains the full release and versioning lifecycle for SkillManage
 
 ## Overview
 
-Releases are cut **manually**: you choose the bump, `scripts/release.py`
-synchronises every version location, commits, tags, and pushes, and the tag
-triggers the multi-platform build.
+Releases are cut **manually** in two steps: `scripts/release.py <bump>`
+synchronises every version location onto a `release/vX.Y.Z` branch and opens a
+pull request; after that merges, `scripts/release.py tag` tags the merge commit,
+and the tag triggers the build.
 
 ```mermaid
 flowchart TD
     A["Choose the bump: patch, minor, major, dev, or X.Y.Z(-dev.N)"] --> B["uv run python scripts/release.py <bump>"]
     B --> C["Pre-flight checks: ruff + pytest"]
-    C --> D["Sync version across 7 files, commit & tag vX.Y.Z"]
-    D --> E["Push to origin main --tags"]
-    E --> F["release-build.yml triggers on tag v*"]
-    F --> G["Build Windows .exe, Linux .deb & AppImage"]
-    G --> H["Compute SHA256SUMS & publish GitHub Release"]
-    H --> I["End users install/update via scripts/install.sh (SHA256SUMS-verified)"]
+    C --> D["Sync version across 7 files on release/vX.Y.Z"]
+    D --> E["Push branch & open pull request"]
+    E --> F["CI Gate must pass; merge the PR"]
+    F --> G["uv run python scripts/release.py tag"]
+    G --> H["Push tag vX.Y.Z"]
+    H --> I["release-build.yml triggers on tag v*"]
+    I --> J["Build Windows .exe, Linux .deb & AppImage"]
+    J --> K["Compute SHA256SUMS & publish GitHub Release"]
+    K --> L["End users install/update via scripts/install.sh (SHA256SUMS-verified)"]
 ```
 
 Nothing is inferred from commit messages: pushing to `main` never bumps the
-version or creates a tag, and no workflow does it on your behalf.
+version or creates a tag, and no workflow does it on your behalf. `main` is
+protected, so even the release commit arrives through a pull request.
 
 ---
 
@@ -45,6 +50,18 @@ uv run python scripts/release.py 2.14.0-dev.1
 The bump argument is **required**: there is no default, no `auto` mode, and no
 detection from commit messages. Review `git log` and choose deliberately.
 
+That opens a pull request from `release/vX.Y.Z`. Once `CI Gate` is green and the
+PR is merged, tag the merge commit:
+
+```bash
+git pull
+uv run python scripts/release.py tag
+```
+
+`tag` reads the version from `pyproject.toml`, refuses to run off `main` or with a
+dirty working tree, and pushes `vX.Y.Z` — the push that starts `release-build.yml`.
+It also refuses to reuse an existing tag.
+
 ### CLI Flags
 
 | Flag | Description |
@@ -52,8 +69,8 @@ detection from commit messages. Review `git log` and choose deliberately.
 | `--dry-run` | Simulate the entire release and version synchronization without making changes |
 | `--skip-tests` | Skip executing `pytest` suite during pre-flight checks |
 | `--skip-lint` | Skip executing `ruff` linter during pre-flight checks |
-| `--no-push` | Stage, commit, and tag locally without pushing to `origin` |
-| `-m`, `--message` | Custom commit and release tag message |
+| `--no-push` | Create the release branch and commit locally, without pushing or opening the PR |
+| `-m`, `--message` | Custom commit message, also used as the PR title |
 
 ---
 
@@ -74,8 +91,12 @@ The version is synchronized across all repository components in lockstep:
 - `README.md` (version badge)
 - `CHANGELOG.md` (release entry)
 
-### 3. Git Tag & Push
-The script creates an annotated tag `vX.Y.Z` and pushes to `origin main --tags`.
+### 3. Release PR & Tag
+`scripts/release.py` cuts `release/vX.Y.Z` from `main`, commits the synchronized
+files, pushes the branch, and opens a pull request. `main` is protected, so this is
+the only way the bump can land. After `CI Gate` passes and the PR merges,
+`scripts/release.py tag` creates the annotated tag `vX.Y.Z` on `main` and pushes
+it; that push is what starts the build.
 
 ### 4. GitHub Actions Release Workflow (`release-build.yml`)
 When tag `v*` is pushed:

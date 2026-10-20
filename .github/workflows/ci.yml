@@ -12,14 +12,10 @@ on:
       - 'conductor/**'
       - 'LICENSE'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'assets/**'
-      - '.agents/**'
-      - 'image/**'
-      - 'conductor/**'
-      - 'LICENSE'
+    # No paths-ignore: "CI Gate" is a required status check on main, and a
+    # workflow skipped by paths-ignore never reports it — which would leave a
+    # docs-only pull request permanently unmergeable.
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:

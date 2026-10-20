@@ -37,25 +37,28 @@ flowchart LR
 ## Release Pipeline (`release-build.yml`)
 
 Releases are triggered by a tag you push yourself with `scripts/release.py` — no
-workflow bumps the version. The tag then drives a fully automated build:
+workflow bumps the version. `main` is protected, so the bump lands through a pull
+request and the tag is pushed on the merge commit:
 
 ```mermaid
 flowchart TD
-    subgraph "1. Local Release"
+    subgraph "1. Release PR"
         A["uv run python scripts/release.py <bump>"] --> B["Pre-flight: ruff + pytest"]
-        B --> C["Sync version in 7 metadata files & commit [skip ci]"]
-        C --> D["Create annotated git tag vX.Y.Z"]
-        D --> E["git push origin main --tags"]
+        B --> C["Sync version in 7 metadata files on release/vX.Y.Z"]
+        C --> D["Push branch & open pull request"]
+        D --> E["CI Gate green, then merge"]
     end
 
-    subgraph "2. Multi-Platform Build & Publish (release-build.yml)"
-        E --> F["release-build.yml triggers on tag v*"]
-        F --> G["Build Windows installer: SkillManager_Setup.exe"]
-        F --> H["Build Linux .deb & AppImage"]
-        G --> I["Compute SHA256 checksums: SHA256SUMS"]
-        H --> I
-        I --> J["Publish GitHub Release with all binary assets"]
-        J --> K["End users install/update via 1-command installer script"]
+    subgraph "2. Tag & Build (release-build.yml)"
+        E --> F["uv run python scripts/release.py tag"]
+        F --> G["git push origin vX.Y.Z"]
+        G --> H["release-build.yml triggers on tag v*"]
+        H --> I["Build Windows installer: SkillManager_Setup.exe"]
+        H --> J["Build Linux .deb & AppImage"]
+        I --> K["Compute SHA256 checksums: SHA256SUMS"]
+        J --> K
+        K --> L["Publish GitHub Release with all binary assets"]
+        L --> M["End users install/update via 1-command installer script"]
     end
 ```
 
@@ -81,20 +84,21 @@ All third-party actions are pinned to full commit SHAs (not floating tags). Depe
 
 ## Push to `main`
 
-A push to `main` runs only `ci.yml`:
+`main` only advances through a merged pull request, which runs `ci.yml`:
 
 ```mermaid
 flowchart LR
-    A["git push origin main"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• CI Gate"]
+    A["Pull request"] --> B["CI (ci.yml)\n• Read-only permissions\n• Ruff lint + format check\n• Python 3.12 & 3.13 test matrix\n• CI Gate"]
+    B --> C["Merge to main"]
 ```
 
 No workflow bumps the version or creates a tag on push. Releases start from
-`scripts/release.py` on a maintainer's machine, which pushes the release commit and
-tag together (see [RELEASING.md](RELEASING.md)).
+`scripts/release.py` on a maintainer's machine, which opens a release PR and, after
+the merge, pushes the tag (see [RELEASING.md](RELEASING.md)).
 
 ### `paths-ignore` Behavior
 
-`ci.yml` ignores changes restricted strictly to documentation and reference directories:
+The push trigger ignores changes restricted strictly to documentation and reference directories:
 ```yaml
 paths-ignore:
   - 'docs/**'
@@ -105,7 +109,7 @@ paths-ignore:
   - 'conductor/**'
   - 'LICENSE'
 ```
-- **Doc-only commits** (`docs/`, `README.md`, etc.) are skipped automatically by GitHub Actions.
+- **Doc-only pushes** to `main` (`docs/`, `README.md`, etc.) skip CI. **Pull requests are never filtered**: `CI Gate` is a required check, so a workflow skipped by `paths-ignore` would leave the PR permanently unmergeable.
 - **Dependency & lockfile updates** ([`uv.lock`](file:///home/dikka/Documents/01-Projects/27-SkillManager/skill-manager/uv.lock)) or code changes are **not** ignored, so the full gate runs.
 
 ---
@@ -119,33 +123,31 @@ paths-ignore:
 |---|---|
 | `deletion` | `main` cannot be deleted |
 | `non_fast_forward` | force-pushes are rejected — for everyone, including the owner |
+| `pull_request` | changes must arrive through a pull request; 0 approvals required |
+| `required_status_checks` → `CI Gate` | a pull request cannot merge until `lint` and both test jobs pass |
 
 There are deliberately **no bypass actors**, so `current_user_can_bypass` is
-`never`.
+`never`. The owner merges their own pull requests rather than pushing to `main`;
+no approval count is set because GitHub does not let an author approve their own
+pull request.
 
-**`required_status_checks` is deliberately absent.** In a ruleset it applies to
-direct pushes, not only to merges: with no bypass actor the push is rejected
-outright — *"push declined due to repository rule violations"* — because the new
-commit cannot already have reported the check. Requiring `CI Gate` would block the
-release commit and tag that `scripts/release.py` pushes, plus every ordinary push.
-The check becomes usable only with a token that can bypass, i.e. a personal access
-token.
+Two platform constraints shaped this configuration:
 
-**There is no "require a pull request" rule, and that is intentional.**
-`scripts/release.py` commits the version sync and pushes it straight to `main`. On
-a user-owned repository GitHub refuses the GitHub Actions integration as a bypass
-actor — *"Actor GitHub Actions integration must be part of the ruleset source or
-owner organization"* — so requiring pull requests would mean cutting every release
-through a PR. Direct pushes therefore stay allowed; force pushes and deletion do
-not.
+- **No bot bypass exists on a user-owned repository.** GitHub rejects the GitHub
+  Actions integration as a ruleset bypass actor — *"Actor GitHub Actions
+  integration must be part of the ruleset source or owner organization"* — and
+  classic branch protection rejects bypass lists outright — *"Only organization
+  repositories can have users and team restrictions"*. That rules out the
+  "workflow pushes straight to `main`" model, which is why releases go through a
+  PR opened by `scripts/release.py`.
+- **`required_status_checks` gates direct pushes, not just merges.** A push is
+  rejected with *"push declined due to repository rule violations"*, because the
+  new commit cannot already have reported the check. Consequence: `ci.yml` must
+  run on **every** pull request, with no `paths-ignore` on `pull_request`.
 
-To get the full set (required checks and PR-only merges), either transfer the
-repository to an organization, which permits the integration as a bypass actor, or
-authenticate the release push with a personal access token belonging to an account
-that can bypass.
-
-No approval count is set: this is a single-maintainer repository, and GitHub does
-not let an author approve their own pull request.
+To relax this later, add a `bypass_actors` entry with
+`bypass_mode: "always"` for the repository-admin role — at the cost of allowing
+direct pushes (and force-pushes) again.
 
 ## Secret Inventory
 
@@ -205,6 +207,16 @@ portable — Linux-green tests have repeatedly broken CI:
 
 ### Coverage below threshold
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
+
+### Pull request changes never trigger CI
+A `pull_request:` trigger whose body is empty or comment-only is parsed as null,
+and GitHub then silently creates **no run**: the PR reports *"no checks reported"*
+and can never satisfy the required `CI Gate` check. Keep an explicit mapping:
+
+```yaml
+pull_request:
+  types: [opened, synchronize, reopened]
+```
 
 ### Release not published after tagging
 Check that the tag reached the remote (`git ls-remote --tags origin`) and that

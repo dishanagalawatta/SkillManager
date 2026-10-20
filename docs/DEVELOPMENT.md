@@ -127,13 +127,16 @@ To build locally for testing:
 
 ## Release Strategy
 
-SkillManager cuts releases manually with `scripts/release.py`; GitHub Actions then builds and publishes the tagged release. See `docs/RELEASING.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
+SkillManager cuts releases manually with `scripts/release.py`: the bump lands through a release PR, then a tag on the merge commit drives the GitHub Actions build. See `docs/RELEASING.md` for the full pipeline architecture and `docs/VERSIONING.md` for versioning rules.
 
 ```bash
-# Manual SemVer bump and release
+# 1. Prepare the bump and open a release PR
 uv run python scripts/release.py patch   # x.y.z -> x.y.(z+1)
 uv run python scripts/release.py minor   # x.y.z -> x.(y+1).0
 uv run python scripts/release.py major   # x.y.z -> (x+1).0.0
+
+# 2. After the PR merges, tag the merge commit
+uv run python scripts/release.py tag
 ```
 
 ---
