@@ -16,11 +16,15 @@ Rectangle {
     property string toastTitle: ""
     property string toastMessage: ""
     property bool showAction: false
+    // "packages" = skill-package updates (opens Updates and installs them),
+    // "release"  = app release (opens the GitHub releases page).
+    property string actionMode: "packages"
 
-    function show(title, message, action) {
+    function show(title, message, action, mode) {
         root.toastTitle = title
         root.toastMessage = message
         root.showAction = action
+        root.actionMode = mode === undefined ? "packages" : mode
         root.visible = true
         hideTimer.restart()
     }
@@ -88,14 +92,20 @@ Rectangle {
             ActionButton {
                 objectName: "updateToastActionBtn"
                 visible: root.showAction
-                labelText: "Update"
+                labelText: root.actionMode === "release" ? "View Release" : "Update"
                 role: "primary"
                 buttonHeight: 28
-                tooltipText: "Open Updates and install all package updates"
+                tooltipText: root.actionMode === "release"
+                             ? "Open the SkillManager release page"
+                             : "Open Updates and install all package updates"
                 onClicked: (mouse) => {
                     root.hide()
-                    window.navigateTo("Updates")
-                    AppController.update_controller.updateAllOutdated()
+                    if (root.actionMode === "release") {
+                        AppController.app_update_controller.openReleasesPage()
+                    } else {
+                        window.navigateTo("Updates")
+                        AppController.update_controller.updateAllOutdated()
+                    }
                 }
             }
         }

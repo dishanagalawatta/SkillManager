@@ -476,7 +476,8 @@ Window {
                 updateToast.show(
                     "Skill updates available",
                     count + (count === 1 ? " package update is ready." : " package updates are ready."),
-                    true
+                    true,
+                    "packages"
                 )
             }
             function onAutoUpdateFinished(updated, failed) {
@@ -486,6 +487,20 @@ Window {
                         ? (updated + " updated, " + failed + " failed.")
                         : (updated + " package(s) updated."),
                     false
+                )
+            }
+        }
+
+        // Automatic app-release check (AppUpdateController): announce a newer
+        // SkillManager version without making the user open Settings.
+        Connections {
+            target: AppController.app_update_controller
+            function onAppUpdateAvailable(version) {
+                updateToast.show(
+                    "App update available",
+                    "SkillManager v" + version + " is ready to download.",
+                    true,
+                    "release"
                 )
             }
         }

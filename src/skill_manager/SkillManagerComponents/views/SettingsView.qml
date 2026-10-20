@@ -747,11 +747,10 @@ Item {
                                             return "Check for Updates"
                                         }
                                         role: (AppController.app_update_controller.updateAvailable) ? "primary" : "secondary"
-                                        enabled: {
-                                            if (AppController.app_update_controller.updateAvailable) return true
-                                            if (AppController.app_update_controller.hasCheckedForUpdates) return false
-                                            return true
-                                        }
+                                        // Stay clickable after an up-to-date result: the
+                                        // automatic check now runs on launch, so locking the
+                                        // button would leave no way to re-check by hand.
+                                        enabled: !AppController.app_update_controller.isCheckingForUpdates
                                         onClicked: (mouse) => {
                                             if (AppController.app_update_controller.updateAvailable) {
                                                 AppController.app_update_controller.openReleasesPage()

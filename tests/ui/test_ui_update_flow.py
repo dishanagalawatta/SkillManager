@@ -149,7 +149,9 @@ class TestCheckForUpdates:
         assert not getattr(sys, "frozen", False)
         controller.checkForUpdates(manual=False)
         mock_app_mock_runner.task_runner.submit.assert_not_called()
-        assert controller.hasCheckedForUpdates is True
+        # A skipped check must not claim "up to date": Settings renders
+        # has_checked as the Up to Date label.
+        assert controller.hasCheckedForUpdates is False
         assert controller.isCheckingForUpdates is False
 
     def test_already_checking_returns_early(self, mock_app_mock_runner):
@@ -172,6 +174,44 @@ class TestCheckForUpdates:
         controller = AppUpdateController(mock_app_no_runner)
         controller.checkForUpdates(manual=True)
         assert controller.isCheckingForUpdates is False
+
+    def test_start_auto_check_schedules_first_check_and_daily_timer(self, mock_app_mock_runner):
+        """startAutoCheck arms the periodic timer and one delayed check."""
+        controller = AppUpdateController(mock_app_mock_runner)
+        with patch(
+            "skill_manager.controllers.app_update_controller.QTimer.singleShot"
+        ) as single_shot:
+            controller.startAutoCheck()
+
+        single_shot.assert_called_once()
+        assert controller._auto_check_timer is not None
+        assert controller._auto_check_timer.isActive()
+
+        # Idempotent: repeat calls must not stack timers.
+        with patch(
+            "skill_manager.controllers.app_update_controller.QTimer.singleShot"
+        ) as single_shot_again:
+            controller.startAutoCheck()
+        single_shot_again.assert_not_called()
+        controller._auto_check_timer.stop()
+
+    def test_newer_release_emits_app_update_signal(self, mock_app_mock_runner, qtbot):
+        """A detected release reaches Main.qml so the toast can be shown."""
+        controller = AppUpdateController(mock_app_mock_runner)
+        with qtbot.waitSignal(controller.appUpdateAvailable, timeout=1000) as blocker:
+            controller.on_updates_checked("99.0.0", manual=False, error=None)
+
+        assert blocker.args == ["99.0.0"]
+        assert controller.updateAvailable is True
+
+    def test_up_to_date_emits_no_app_update_signal(self, mock_app_mock_runner):
+        controller = AppUpdateController(mock_app_mock_runner)
+        emitted = []
+        controller.appUpdateAvailable.connect(emitted.append)
+
+        controller.on_updates_checked(controller.currentVersion, manual=False, error=None)
+
+        assert emitted == []
 
     def test_full_flow_with_sync_runner(self, mock_app_sync_runner):
         """Full flow: real runner invokes callback, covers on_checked lines 110-111."""

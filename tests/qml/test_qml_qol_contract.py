@@ -702,14 +702,17 @@ def test_update_toast_contract():
 
     assert 'objectName: "updateToast"' in toast
     assert 'objectName: "updateToastActionBtn"' in toast
-    assert 'labelText: "Update"' in toast
+    assert 'labelText: root.actionMode === "release" ? "View Release" : "Update"' in toast
     assert 'window.navigateTo("Updates")' in toast
     assert "AppController.update_controller.updateAllOutdated()" in toast
+    assert "AppController.app_update_controller.openReleasesPage()" in toast
     assert "UpdateToast 1.0 UpdateToast.qml" in qmldir
     # Host wiring in Main.qml: instance + both signal handlers.
     assert "UpdateToast {" in main
     assert "function onUpdatesAvailable(count)" in main
     assert "function onAutoUpdateFinished(updated, failed)" in main
+    # Automatic app-release check is announced through the same toast.
+    assert "function onAppUpdateAvailable(version)" in main
 
 
 def test_packages_view_distinguishes_unchecked_from_up_to_date():

@@ -406,6 +406,10 @@ class AppController(AppControllerProxyMixin, QObject):
             # Arm the periodic job.
             self._update_package_scheduler()
 
+            # Automatic app-release check: once shortly after launch, then
+            # daily. Notifies via `appUpdateAvailable` (no silent install).
+            self.app_updater.startAutoCheck()
+
     def _normalize_paths_on_startup(self):
         """Rewrite stored project, source, and skill package paths to their canonical form and auto-repair malformed paths.
 
