@@ -10,6 +10,18 @@ from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 @pytest.mark.usefixtures("setup_qml_style")
 class TestUIUpdateFlow:
+    @pytest.fixture(autouse=True)
+    def _stub_real_package_install(self):
+        """Stop the delayed real install scheduled by ``addUpdatePackage``.
+
+        Adding a package queues ``runPackageUpdate`` 500 ms later. Under
+        parallel load that probe outlives the test, hits the npm registry
+        for a fake package, and can overwrite the status message the test
+        waits on, so stub it for the whole class.
+        """
+        with patch("skill_manager.controllers.update_controller.UpdateController.runPackageUpdate"):
+            yield
+
     def test_add_and_run_update_flow(self, qml_engine, app_controller, qtbot):
         # 1. Add a package via the controller
         # This simulates a user typing a name and clicking "Add"
