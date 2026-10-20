@@ -25,6 +25,20 @@
 
 ---
 
+## 🧭 Feature Index
+
+| Capability | What it gives you |
+| --- | --- |
+| **[Central Library & Inspector](#central-library--inspector)** | Search, filter, inspect, star, archive, and deploy thousands of skills from one place. |
+| **[Quick Copy & Format Switcher](#quick-copy--format-switcher)** | Copy references in your agent's exact syntax, with project cycling and automatic dependency carry. |
+| **[Surgical Git Synchronization](#surgical-git-synchronization)** | See exactly which skills are stale in which repository, then sync only those. |
+| **[Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents)** | Hotkey capture, color-redact PII, save into the active project, paste into your terminal. |
+| **[Updates & Automatic Sync](#updates--automatic-sync)** | Track skill packages, install updates in the background, and hear about new SkillManager releases. |
+| **[MCP Automation Bridge](#mcp-automation-bridge)** | Drive the library, screenshots, and UI inspection from an AI agent over stdio MCP. |
+| **[Accessibility & Comfort](#accessibility--comfort)** | Screen-reader semantics, full keyboard operation, reduced motion, compact rows, and themes. |
+
+---
+
 ## 💡 Why SkillManager?
 
 Modern AI coding agents (**Claude Code**, **Antigravity**, **Cursor**, **Gemini CLI**, **OpenCode**, **Codex**) are only as capable as the specialized skills, commands, and prompts you give them.
@@ -34,6 +48,7 @@ However, managing agent skills and multimodal context across multiple project re
 | The Problem (Without SkillManager)                                                                                                                                                 | The Solution (With SkillManager)                                                                                                                                                                                                   |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ❌**Skill Drift:** Improved prompts in one repo stay trapped there; other repos run stale skills.                                                                            | ✅**Central Library & Surgical Sync:** One unified source of truth. Updates propagate across repos in milliseconds.                                                                                                          |
+| ❌**Package Drift:** GitHub, NPX, and script-based skill packs go stale silently, and checking each one by hand doesn't scale.                                               | ✅**Background Updates:** Version checks run at startup and every 6 hours, install in the background, and a toast tells you when a new SkillManager release is out.                                                              |
 | ❌**Manual Copy-Paste Overhead:** Manually copying `.agents/skills/` folders and forgetting required dependencies.                                                         | ✅**1-Click Multi-Deploy:** Deploy single skills, custom collections, or `.md` commands to multiple projects simultaneously.                                                                                               |
 | ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Quick Copy Companion:** Copy ready-to-paste references formatted for your active agent in a click (`Ctrl+C` on a focused skill, or the **Copy Reference** button).                                                                                              |
 | ❌**Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅**Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies a client-formatted reference for instant `Ctrl+V` into your TUI/CLI agent. |
@@ -107,7 +122,7 @@ flowchart LR
     C --> D["4. Supercharge Agent\n(Claude, Cursor, Antigravity)"]
 ```
 
-1. **Launch SkillManager**: Open the app from your application launcher. (Note: the global hotkey `Ctrl+Shift+S` does not launch the app — it captures a screenshot; see [Snap to Project](#4--snap-to-project-instant-visual-context-for-tui--terminal-agents).)
+1. **Launch SkillManager**: Open the app from your application launcher. (Note: the global hotkey `Ctrl+Shift+S` does not launch the app — it captures a screenshot; see [Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents).)
 2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into **Updates**), connect your central skills Git repository and local project folders.
 3. **Deploy or Copy Reference**:
    - In **Library**, select skills and click **Copy to Projects** to install them.
@@ -118,7 +133,7 @@ flowchart LR
 
 ## 🌟 Core Capabilities
 
-### 1. Central Skill Library & Inspector
+### Central Library & Inspector
 
 Manage thousands of agent skills with instant fuzzy search, automatic category detection, and deep Markdown inspection.
 
@@ -133,7 +148,7 @@ Manage thousands of agent skills with instant fuzzy search, automatic category d
 
 ---
 
-### 2. Quick Copy & Format Switcher
+### Quick Copy & Format Switcher
 
 Your daily companion during active development sessions.
 
@@ -147,7 +162,7 @@ Your daily companion during active development sessions.
 
 ---
 
-### 3. Surgical Git Synchronization
+### Surgical Git Synchronization
 
 Keep your skill ecosystem synchronized without manual pulling or broken symlinks.
 
@@ -157,7 +172,7 @@ Keep your skill ecosystem synchronized without manual pulling or broken symlinks
 
 ---
 
-### 4. 📸 "Snap to Project": Instant Visual Context for TUI & Terminal Agents
+### Snap to Project: Instant Visual Context for TUI & Terminal Agents
 
 Modern terminal and TUI coding agents (**Claude Code**, **Antigravity**, **Gemini CLI**, **OpenCode**, **Codex**) have powerful multimodal capabilities—but getting visual screenshots into terminal prompts without friction used to be painful.
 
@@ -175,6 +190,49 @@ flowchart LR
 - **1-Keystroke Terminal Prompting**: Switch to your terminal/TUI coding platform and press `Ctrl+V`. The AI agent immediately has direct filesystem access to read the image—zero file hunting or dragging needed.
 - **Pixel-Level Color PII Redaction**: Isolate and scrub specific pixel colors (passwords, tokens, customer names) before saving, ensuring private data never leaks to LLMs.
 - **Library & Quick Copy Integration**: All captured snaps are automatically indexed under the **Snaps** category for quick recall and cross-project reuse.
+
+---
+
+### Updates & Automatic Sync
+
+Keeping a fleet of repositories current shouldn't mean remembering which skill changed where.
+
+- **Version-aware skill packages**: Track NPX packages, GitHub/GitLab repositories, and custom scripts. Versions are auto-detected from NPM and upstream tags, with live validation while you type.
+- **Background updates**: Checks run at startup and every six hours. With **Auto Update** on, outdated packages install automatically and a bottom-right toast confirms it; with it off, the toast offers an **Update** button that opens the Updates view and starts Update All.
+- **Honest counts**: The "N updates" badge matches the per-package buttons one-to-one, and **Update All** flips to **Up to Date** as the new versions land.
+- **Surgical project sync**: Compares version fingerprints across your library and every linked project, updates only what is stale, and links matching project skills to their package automatically.
+- **Clean removal**: Deleting a package removes its storage, clone cache, lockfiles, inventory, and the corresponding skills from the Library and Quick Copy — no orphans left behind.
+- **Release notices**: SkillManager checks GitHub Releases shortly after launch and once a day, and shows a **View Release** toast when a newer version exists. Installation stays manual and explicit.
+
+---
+
+### MCP Automation Bridge
+
+SkillManager can expose itself as an MCP server, so an AI agent can inspect and drive the real application instead of guessing at its state.
+
+```bash
+# Read-only (default)
+uv run skill-manager --mcp
+
+# Enable skill write tools
+uv run skill-manager --mcp --mcp-allow-write
+```
+
+- **40 tools** covering library search, skill retrieval, source and project listing, screenshots, frame timing, accessibility audits, controller introspection, and UI automation.
+- **Background screenshots**: captures render the real `Main.qml` offscreen by default, so taking a screenshot never steals focus or switches the view on your desktop.
+- **Write gate**: write tools are refused unless the server was started with `--mcp-allow-write`.
+- **Local-only transport**: the bridge speaks stdio to the local process; no network listener is opened.
+
+See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for the tool reference, headless rendering, and programmatic client setup.
+
+---
+
+### Accessibility & Comfort
+
+- **Screen-reader semantics**: Every control exposes a role, accessible name, and state — toggles are checkboxes, views are page tabs — and tooltips surface on keyboard focus, not hover alone.
+- **Full keyboard operation**: Search, copy, archive, delete, refresh, navigation, theme, and list traversal all have shortcuts, remappable in Settings.
+- **Reduced motion & density**: Disable animations, switch to compact list rows, resize the inspector, and tune scroll speed from 0.5× to 5.0×.
+- **Themes**: Light and dark palettes share one semantic token set; Windows builds can add Mica/Acrylic materials.
 
 ---
 
@@ -253,17 +311,7 @@ uv run pytest -n auto --dist loadfile
 python scripts/dev_test.py
 ```
 
-### 4. Internal Developer Tooling (MCP Bridge)
-
-For automated testing, controller introspection, and headless workflows during development, SkillManager includes an internal stdio MCP server bridge:
-
-```bash
-uv run skill-manager --mcp
-```
-
-See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for the internal tool reference and developer architecture.
-
-### 5. Build Binaries
+### 4. Build Binaries
 
 ```bash
 # Build standalone executable with PyInstaller
@@ -273,7 +321,7 @@ uv run skill-manager-build
 uv run skill-manager-build linux
 ```
 
-### 6. Update Installed App from Local Source (Offline)
+### 5. Update Installed App from Local Source (Offline)
 
 ```bash
 # Build the .deb from your working tree and install it — no GitHub download

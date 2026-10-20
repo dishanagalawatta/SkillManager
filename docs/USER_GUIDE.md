@@ -4,7 +4,7 @@ Welcome to SkillManager, your professional tool for organizing, editing, and syn
 
 ## Overview of Views
 
-The application is divided into four main views, accessible via the left sidebar:
+The application is divided into four main views, accessible from the top ribbon:
 
 1. **Library**: Your central repository for all agent skills. Features multi-select deployment and deep inspection.
 2. **Quick Copy**: A project-focused view for rapid reference copying during active development.
