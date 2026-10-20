@@ -208,6 +208,16 @@ portable — Linux-green tests have repeatedly broken CI:
 ### Coverage below threshold
 Check `tests/test_coverage_boost.py` for uncovered modules. Add targeted tests for the lowest-coverage source files.
 
+### Pull request changes never trigger CI
+A `pull_request:` trigger whose body is empty or comment-only is parsed as null,
+and GitHub then silently creates **no run**: the PR reports *"no checks reported"*
+and can never satisfy the required `CI Gate` check. Keep an explicit mapping:
+
+```yaml
+pull_request:
+  types: [opened, synchronize, reopened]
+```
+
 ### Release not published after tagging
 Check that the tag reached the remote (`git ls-remote --tags origin`) and that
 `release-build.yml` ran for it. The version is never bumped on push — run
