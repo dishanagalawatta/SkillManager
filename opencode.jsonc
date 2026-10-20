@@ -3,7 +3,9 @@
   "mcp": {
     "skillmanager": {
       "type": "local",
-      "command": ["bash", "scripts/mcp_launcher.sh", "--mcp-light"],
+      // --mcp = headless server (offscreen Qt, all 40 tools, no GUI needed).
+      // --mcp-light only exposes 7 tools and needs a running GUI over IPC.
+      "command": ["bash", "scripts/mcp_launcher.sh", "--mcp"],
       "enabled": true
     },
     "servers": {
