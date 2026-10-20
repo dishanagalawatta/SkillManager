@@ -108,9 +108,9 @@ emit `selectedSkillChanged` as a side effect of refreshing the
 `void`. QML callers MUST parse the return value; on failure the
 controller returns `{"ok": false, "error": "..."}` and does not
 append/overwrite the record. See
-[`ADR-0013`](../ADR_INDEX.md#adr-0013-package-add-snap-to-latest-policy)
+[`ADR-0013`](adr/ADR-0013-package-add-snap-to-latest.md)
 and
-[`ADR-0014`](../ADR_INDEX.md#adr-0014-package-edit-snap-to-latest-policy).
+[`ADR-0014`](adr/ADR-0014-package-edit-snap-to-latest.md).
 
 ## 5. Signals (selected)
 
@@ -129,8 +129,7 @@ and
 **Invariant.** Any mutation that calls `addOrUpdateSkills` (or
 `setSkills`) after changing a skill's data MUST call
 `OpsController._refresh_selected_skill(local_path)` if the mutation may
-affect the currently selected skill. See
-[`ADR-0011`](../ADR_INDEX.md#adr-0011-selection-refresh-invariant).
+affect the currently selected skill.
 
 ## 6. Python Public Modules
 
