@@ -321,3 +321,64 @@ def test_promote_package_storage_destination_exists(tmp_path):
         "moved": 0,
         "skipped": 1,
     }
+
+
+def test_promote_package_storage_already_at_destination(tmp_path):
+    """A stale previous path must not fail every update forever.
+
+    Renaming a package repoints resolved_package_path while the old
+    _previous_resolved_package_path lingers. The destination already holds the
+    package's managed folder, so there is nothing to promote.
+    """
+    old_dir = tmp_path / "archify-2b87d3d3"
+    (old_dir / "archify").mkdir(parents=True)
+    new_dir = tmp_path / "find-skills-2b87d3d3"
+    (new_dir / "find-skills").mkdir(parents=True)
+
+    package = {
+        "_previous_resolved_package_path": str(old_dir),
+        "resolved_package_path": str(new_dir),
+        "managed_folders": ["find-skills"],
+    }
+
+    assert promote_package_storage(package, {"skills": {"archify": {}}}) == {
+        "moved": 0,
+        "skipped": 0,
+        "already_present": True,
+    }
+
+
+def test_resolve_package_storage_reassigns_duplicate_ids(tmp_path):
+    """Two packages that hash to one id must not share inventory or storage."""
+    packages = [
+        {
+            "package_id": "pkg_816f2b87d3d3",
+            "name": "Find Skills",
+            "package_name": "skills",
+            "package_args": "add vercel-labs/skills -y",
+            "configured_package_path": str(tmp_path),
+        },
+        {
+            "package_id": "pkg_816f2b87d3d3",
+            "name": "Archify",
+            "package_name": "skills",
+            "package_args": "add tt-a1i/archify -g -y",
+            "configured_package_path": str(tmp_path),
+        },
+    ]
+
+    resolved = resolve_package_storage(packages)
+
+    ids = [item["package_id"] for item in resolved]
+    assert ids[0] == "pkg_816f2b87d3d3"
+    assert ids[1] != "pkg_816f2b87d3d3"
+    assert len(set(ids)) == 2
+    # Storage folders are built from the id suffix, so re-keying must keep it:
+    # the package stays where it is instead of moving to a new directory.
+    assert ids[1].endswith("2b87d3d3")
+    assert resolved[0]["resolved_package_path"] == str(tmp_path / "find-skills-2b87d3d3")
+    assert resolved[1]["resolved_package_path"] == str(tmp_path / "archify-2b87d3d3")
+
+    # Idempotent: a second pass keeps the repaired ids.
+    again = resolve_package_storage(resolved)
+    assert [item["package_id"] for item in again] == ids

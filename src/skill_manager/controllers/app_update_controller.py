@@ -119,7 +119,12 @@ class AppUpdateController(BaseController):
 
     def on_updates_checked(self, new_version, manual=False, error=None):
         self.state.is_checking = False
-        self.state.has_checked = True
+        # A failed check proves nothing about the installed version. The
+        # Settings button renders "Up to Date" and disables itself once
+        # has_checked is set, so marking it here would turn a timeout or a
+        # GitHub rate limit into a permanent, untruthful "up to date" state
+        # with no way to retry until the app restarts.
+        self.state.has_checked = error is None
         self.state.error = error
 
         if error:

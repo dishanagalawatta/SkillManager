@@ -194,11 +194,15 @@ class TestCheckForUpdates:
 
 class TestOnUpdatesChecked:
     def test_error_sets_state(self, mock_app_mock_runner):
-        """Error branch: sets update_available=False, has_checked=True, error stored."""
+        """Error branch: no update, error stored, and the check is not cached.
+
+        has_checked stays False so the Settings button keeps reading "Check for
+        Updates" and stays clickable instead of claiming "Up to Date".
+        """
         controller = AppUpdateController(mock_app_mock_runner)
         controller.on_updates_checked(new_version=None, manual=True, error="timeout")
 
-        assert controller.hasCheckedForUpdates is True
+        assert controller.hasCheckedForUpdates is False
         assert controller.isCheckingForUpdates is False
         assert controller.updateAvailable is False
         assert controller.state.error == "timeout"
