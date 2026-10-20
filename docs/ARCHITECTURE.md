@@ -745,11 +745,12 @@ flowchart TD
         M["uv run python scripts/release.py [bump]"] --> N[Pre-flight: Lint & Test]
         N --> O[Sync versions across pyproject, __init__, iss, metainfo, README]
         O --> P[Update CHANGELOG.md]
-        P --> Q["Git Commit & Tag vX.Y.Z"]
-        Q --> R["Git Push origin main --tags"]
-        R --> S["GitHub Actions: release-build.yml"]
-        S --> T["Publish GitHub Release (.deb, .AppImage, .exe, SHA256SUMS)"]
-        T --> A
+        P --> Q["Commit on release/vX.Y.Z & open PR"]
+        Q --> R["Merge after CI Gate"]
+        R --> S["scripts/release.py tag & push vX.Y.Z"]
+        S --> T["GitHub Actions: release-build.yml"]
+        T --> U["Publish GitHub Release (.deb, .AppImage, .exe, SHA256SUMS)"]
+        U --> A
     end
 ```
 
