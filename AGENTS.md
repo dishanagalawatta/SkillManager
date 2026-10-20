@@ -141,6 +141,8 @@
 | Test (single file) | `uv run pytest tests/test_config.py` |
 | All checks | `python scripts/dev_test.py` |
 | Build | `uv run skill-manager-build` |
+| Release (open PR) | `uv run python scripts/release.py patch` |
+| Release (tag merged) | `uv run python scripts/release.py tag` |
 | MCP server (read) | `uv run skill-manager --mcp` |
 | MCP server (write) | `uv run skill-manager --mcp --mcp-allow-write` |
 
