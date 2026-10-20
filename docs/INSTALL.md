@@ -37,6 +37,12 @@ Check for the latest release and update seamlessly in one command:
 curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/scripts/install.sh | bash -s -- --update
 ```
 
+> **In-app notice.** Packaged builds from v2.13.1 on check GitHub Releases
+> themselves — about four seconds after launch and then once a day — and show an
+> "App update available" popup with **View Release**. The popup only links to the
+> download page: installation stays manual, either with the command above or by
+> opening the release asset for your platform.
+
 > **Switching package types (AppImage → deb):** If the previous installation was an AppImage
 > (or any other user-level binary at `~/.local/bin/skill-manager`), the updater installs the
 > `.deb` *alongside* the old binary instead of replacing it. Because `~/.local/bin` often

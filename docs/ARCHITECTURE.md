@@ -499,7 +499,7 @@ SkillManagerComponents/
 
 Versions are bumped manually; GitHub Actions only builds tagged releases:
 
-1. **Manual Version Bump**: `uv run python scripts/release.py <patch|minor|major|dev|X.Y.Z>` syncs all metadata and pushes the commit and tag
+1. **Release PR**: `uv run python scripts/release.py <patch|minor|major|dev|X.Y.Z>` syncs all metadata on `release/vX.Y.Z` and opens a PR (see [RELEASING.md](RELEASING.md))
 2. **Build**: `windows-latest` × Python 3.12 + 3.13
 3. **Artifact Publishing**: Native installer + portable ZIP attached to GitHub Release
 
@@ -508,6 +508,18 @@ Versions are bumped manually; GitHub Actions only builds tagged releases:
 - `AppUpdateController` checks the GitHub Releases API automatically ~4s after launch and then daily (`startAutoCheck`), plus on demand from Settings.
 - A newer version emits `appUpdateAvailable`, rendered by `UpdateToast` with a **View Release** action (see [ADR-0044](adr/ADR-0044-automatic-app-release-checks.md)).
 - Users download and install updates manually from the Releases page — the app never self-installs ([ADR-0010](adr/ADR-0010-drop-tuf.md)).
+- Only packaged builds (`sys.frozen`) check on startup; a source checkout skips it without marking the check as done, so Settings cannot report "Up to Date" for a check that never ran.
+
+```mermaid
+flowchart LR
+    Boot[App start] -->|4s, packaged only| Check[GET /releases/latest]
+    Boot -->|daily timer| Check
+    Settings[Settings: Check for Updates] --> Check
+    Check -->|tag newer than __version__| Toast[toast: App update available<br/>View Release]
+    Check -->|same or older| UpToDate[status: Up to date<br/>button stays enabled]
+    Check -->|dev build skipped| Skipped[no result recorded]
+    Toast -->|click| Releases[GitHub Releases page<br/>manual download and install]
+```
 
 ### Skill Package Auto-Update
 

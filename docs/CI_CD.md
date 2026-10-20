@@ -222,7 +222,9 @@ pull_request:
 ### Release not published after tagging
 Check that the tag reached the remote (`git ls-remote --tags origin`) and that
 `release-build.yml` ran for it. The version is never bumped on push — run
-`uv run python scripts/release.py <bump>`, which creates and pushes the tag.
+`uv run python scripts/release.py <bump>` to open the release PR, merge it once
+`CI Gate` is green, then run `uv run python scripts/release.py tag` to push the
+tag that starts the build (see [RELEASING.md](RELEASING.md)).
 
 ### Artifact upload fails
 Check the specific build job logs in the [release workflow](https://github.com/dishanagalawatta/SkillManager/actions/workflows/release-build.yml).

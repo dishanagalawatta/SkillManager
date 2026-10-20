@@ -2,8 +2,13 @@
 
 ## [2.13.1] - 2026-10-20
 
-### Changes
-- Release version bump.
+### Fixed
+- The app now checks GitHub Releases for a newer SkillManager on its own: ~4 seconds after launch, then once a day, in addition to the Settings button. A newer version raises a bottom-right toast with **View Release** ([ADR-0044](docs/adr/ADR-0044-automatic-app-release-checks.md)).
+- Development builds no longer mark the update check as completed, so Settings can't report "Up to Date" for a check that never ran.
+- Skill-package auto-update no longer re-promotes the same folder every scan: package ids now include install arguments, and a destination that already holds the managed folder counts as done. Stops the repeated `Could not promote package storage` failures and the perpetual outdated count.
+
+### Changed
+- The Settings update button stays enabled after an up-to-date result, so the check can be repeated.
 
 ## [2.13.0] - 2026-10-19
 
