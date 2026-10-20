@@ -32,7 +32,7 @@ Popup {
         border.color: Theme.glassBorder
         border.width: 1
 
-        layer.enabled: true
+        layer.enabled: !AppController.isHeadlessRender
         layer.effect: DropShadow {
             radius: 20
             color: Theme.glassShadow

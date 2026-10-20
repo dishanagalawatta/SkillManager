@@ -104,7 +104,7 @@ Button {
             Behavior on color { ColorAnimation { duration: 200 } }
             Behavior on border.color { ColorAnimation { duration: 200 } }
 
-            layer.enabled: true
+            layer.enabled: !AppController.isHeadlessRender
             layer.effect: MultiEffect {
                 shadowEnabled: control.hovered || control.checked
                 shadowBlur: 0.5

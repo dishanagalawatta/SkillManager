@@ -130,6 +130,21 @@ class AppController(AppControllerProxyMixin, QObject):
     def isTesting(self):
         return os.environ.get("SKILL_MANAGER_TESTING") == "1"
 
+    @Property(bool, constant=True)
+    def isHeadlessRender(self):
+        """True inside the MCP offscreen renderer (``--mcp``).
+
+        QML uses this to skip layer effects. The offscreen Qt platform runs the
+        software scenegraph backend, which cannot execute the shader effects
+        behind ``layer.effect`` (MultiEffect/DropShadow). A layered item with an
+        effect then renders *nothing* — glass pills, dialogs and toggle
+        backgrounds disappear from MCP screenshots even though the live window
+        draws them. Dropping the layer in this mode costs only the drop shadow
+        and keeps the render faithful. The flag is set by the MCP launcher
+        before the controller is built; the GUI never sets it.
+        """
+        return os.environ.get("SKILL_MANAGER_HEADLESS_RENDER") == "1"
+
     # Legacy UI/Config Signals (Forwarded from sub-controllers)
     currentViewChanged = Signal()
     windowWidthChanged = Signal()

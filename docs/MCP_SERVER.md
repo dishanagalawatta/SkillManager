@@ -77,7 +77,7 @@ Key properties (all pinned by tests):
 | Never fatal | `exit_on_failure=False`; `SystemExit` is caught, so a broken `.qml` file cannot kill the server |
 | Must be shown | an unshown offscreen window paints nothing (`grabWindow()` → one colour); the window is `show()`-n, which maps nothing on a desktop under the `offscreen` plugin |
 | Never persists | UI-state writes are disabled in the MCP process, so navigation/geometry changes are never saved to the user's `config.json` (asserted byte-for-byte in the stdio integration suite) |
-| Provenance | `capture_app_window_info()` returns `source`: `live-gui` (IPC) → `native` (platform API) → `headless-qml`, or `null` with an error |
+| Provenance | `capture_app_window_info(strategy=...)` returns `source`. In `--mcp` the **background offscreen render** (`headless-qml`) is tried first; otherwise `live-gui` (IPC) → `native`. Headless results also carry `render` (the `Main.qml` path, its SHA-256, style and geometry) as proof the pixels came from the shipped QML |
 
 Real headless output for reference (isolated data dir, default window 880×640):
 QML tree = 1 root (`Main_QMLTYPE_41`) + 362 items and 25 named objects
@@ -205,14 +205,17 @@ All tools return structured JSON, names prefixed `sm_`.
 - `sm_capture_errors` — in-memory / Sentry error buffer.
 
 **Visual** (always on, read-only)
-- `sm_screenshot` — capture the SkillManager window as a base64 PNG. Strategy
-  order: live GUI over IPC (`source: "live-gui"`) → platform-native capture
-  (`"native"`) → **offscreen headless render of `Main.qml`** (`"headless-qml"`),
-  so a screenshot works with no GUI running at all. Optional `navigate`
-  (`QuickCopy` | `Library` | `Updates` | `Settings`) switches the view first
-  (in-process in headless mode); `save=true` also writes the PNG to
-  `.agents/screenshots/`. No window and no engine → `ok=false` with the
-  capture error.
+- `sm_screenshot` — capture the SkillManager UI as a base64 PNG **without
+  disturbing a running app**. Default `source="auto"` renders the real
+  `Main.qml` offscreen in the MCP process (`source: "headless-qml"`): no window
+  is mapped, the live app is not navigated, focused, resized or restored. The
+  offscreen controller runs the same single-shot discovery as the GUI, so the
+  render shows the same skills, projects and toolbar. Pass `source="live"` to
+  capture the actual GUI window over IPC instead (exact on-screen pixels),
+  `source="headless"` to force the offscreen render, or `navigate` to switch
+  view (always in-process in `--mcp`, so the user's window never moves).
+  `save=true` also writes the PNG to `.agents/screenshots/`. No engine and no
+  GUI → `ok=false` with the capture error.
   Pixel color, QML tree, and current-view introspection are provided by the
   UI Inspection tools below.
 
@@ -510,7 +513,7 @@ mcpServers:
 | `sm_dump_state` | Export safe subset of controller state | No |
 | `sm_inspect_controller` | Introspect sub-controller methods/signals | No |
 | `sm_capture_errors` | Return error diagnostic buffer | No |
-| `sm_screenshot` | Capture the window (live GUI, native, or headless offscreen render) | No |
+| `sm_screenshot` | Capture the UI (background offscreen render by default; `source="live"` for the real window) | No |
 | `sm_mouse_move` | Move system cursor (Windows) | No |
 | `sm_mouse_click` | Send mouse click (Windows) | No |
 | `sm_type_text` | Type text into focused window (Windows) | No |
@@ -529,40 +532,88 @@ mcpServers:
 
 ### `sm_screenshot` — capture & navigation
 
-Captures a PNG of the SkillManager window and (optionally) drives it to a
-different section before capturing. Read-only; never opens or owns a GUI window
-of its own.
+Captures a PNG of the SkillManager UI and (optionally) navigates to a section
+first. Read-only; it never brings a window to the front.
 
-**Capture strategies (in order)**
+**Background by default.** With `--mcp`, the tool renders the real `Main.qml`
+in-process on Qt's `offscreen` plugin. Nothing is mapped on the desktop, so
+taking a screenshot while the user works never raises, focuses, resizes, restores
+or navigates their window.
 
-| Order | `source` | How |
-|---|---|---|
-| 1 | `live-gui` | IPC capture request to a running GUI (native `PrintWindow`/`BitBlt` on Windows; platform helper on Linux) |
-| 2 | `native` | Direct platform capture by this process (window found but IPC unavailable) |
-| 3 | `headless-qml` | The offscreen `Main.qml` window rendered in this process (lazy-loads the engine; see § Headless UI rendering) |
+```mermaid
+flowchart LR
+    Call["sm_screenshot<br/>(source=auto)"] --> H{"offscreen engine<br/>enabled? (--mcp)"}
+    H -->|yes| Head["headless-qml<br/>render Main.qml in-process"]
+    H -->|no| IPC["live-gui<br/>IPC grab of the real window"]
+    IPC -->|no GUI| Native["native<br/>platform capture"]
+    Native -->|fails| Head
+    Call2["sm_screenshot<br/>(source=live)"] --> IPC
+    Call3["sm_screenshot<br/>(source=headless)"] --> Head
+```
 
-`source` is `null` when every strategy fails, and the response then carries the
-capture error.
+**Why it is still the single source of truth.** The offscreen window is not a
+re-implementation: it loads the same `Main.qml`, with the same `QQuickStyle`
+(`Basic`), the same `AppController` (config, models, theme tokens) and the same
+window geometry (`ui_controller.windowWidth/Height`). The launcher fills the
+models from the **same on-disk skill index the GUI writes**, so skills,
+projects, filters and the Library/QuickCopy toolbars are populated — an early
+version skipped that step and rendered an empty shell, which is exactly the
+"looks different" failure this guards against. The load is cache-only and
+read-only: the MCP process never scans the filesystem or rewrites the index, so
+it cannot race a running GUI or shrink its library (an earlier build persisted
+620 skills over the GUI's 3240). A missing cache still falls back to a scan for
+the render, but with persistence disabled. Every headless result therefore
+includes `render`:
+
+```json
+"render": { "engine": "Main.qml", "path": ".../SkillManagerComponents/Main.qml",
+            "sha256": "edc88a26…", "style": "Basic", "offscreen": true,
+            "width": 1005, "height": 682, "device_pixel_ratio": 1.0 }
+```
+
+The SHA-256 lets a client prove the pixels came from the shipped QML. The only
+deliberate differences from the live window are transient per-instance UI state
+(hover, selection, scroll position, an expanded search box) and drop shadows:
+the offscreen platform runs Qt's **software** scenegraph backend, which cannot
+execute `layer.effect` shaders, so `AppController.isHeadlessRender` disables
+those layers (`GlassPill`, dialogs, `GlassToggleButton`, `SleekToolTip`). Without
+that, layered items render as *nothing* — the Library filter toolbar and pill
+backgrounds vanished from screenshots. Use `source="live"` when you need the
+exact on-screen pixels, including shadows and the user's current selection.
+
+**Capture strategies**
+
+| `source` | Behaviour |
+|---|---|
+| `auto` (default) | `headless-qml` when the `--mcp` launcher enabled the offscreen engine; otherwise `live-gui` → `native` → `headless-qml`. |
+| `headless` | Offscreen render only — never contacts a running GUI. Returns `error: "headless_render_unavailable"` when no engine is available. |
+| `live` | IPC capture of the running GUI only (`live-gui`, then `native`). Fails with a clear error when no GUI answers. |
+
+`source` in the response is `headless-qml`, `live-gui` or `native`, or `null`
+when every strategy failed (the response then carries the capture error).
 
 **Parameters**
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
-| `navigate` | string (enum) | — | One of `QuickCopy`, `Library`, `Updates`, `Settings`. Switches the view before capture. In headless mode this is an in-process view change; with a live GUI it goes through IPC. Omit to capture the current view. |
+| `navigate` | string (enum) | — | One of `QuickCopy`, `Library`, `Updates`, `Settings`. Switches the view before capture. In `--mcp` this is an in-process view change on the offscreen window — the user's GUI is untouched. |
+| `source` | string (enum) | `"auto"` | `auto` \| `headless` \| `live` — see the table above. |
 | `save` | boolean | `false` | When `true`, also writes the PNG to `.agents/screenshots/Screenshot_<timestamp>.png` and returns `save_path`. |
-| `width` | integer | — | Resize the window to this width before capture, then restore the original size. Use with `height` to exercise responsive layouts. |
-| `height` | integer | — | Resize the window to this height before capture, then restore the original size. |
+| `width` | integer | — | Resize the offscreen window to this width before capture, then restore. Use with `height` to exercise responsive layouts. |
+| `height` | integer | — | Resize the offscreen window to this height before capture, then restore. |
 
 **Response envelope**
 
 ```json
 { "ok": true, "tool": "sm_screenshot",
-  "data": { "image_b64": "<PNG, base64>", "width": 880, "height": 640,
-            "view": "Library", "source": "headless-qml", "saved": false } }
+  "data": { "image_b64": "<PNG, base64>", "width": 1005, "height": 682,
+            "view": "Library", "source": "headless-qml", "saved": false,
+            "render": { "engine": "Main.qml", "sha256": "edc88a26…", "style": "Basic" } } }
 ```
 
 - `view` is the requested `navigate` value, or the current view when omitted.
 - `source` tells you which strategy produced the image (see the table above).
+- `render` is present for offscreen captures (path + SHA-256 provenance).
 - `saved` / `save_path` reflect the `save` flag.
 
 **Errors**
@@ -649,9 +700,9 @@ calculate click targets relative to the window:
 ### `sm_get_pixel_color` — Pixel color inspection
 
 Reads the color of one pixel from the captured app window, using the same
-capture strategy order as `sm_screenshot` (`live-gui` → `native` →
-`headless-qml`). Read-only; the server never has to own the window, so this
-works headless against the offscreen render.
+capture strategy as `sm_screenshot` (background `headless-qml` in `--mcp`,
+otherwise `live-gui` → `native`). Read-only; the server never has to own the
+window, so this works headless against the offscreen render.
 
 Coordinates are **relative to the captured image**, not to the desktop: `0, 0`
 is the top-left of the window (or of the offscreen render). Add the window's

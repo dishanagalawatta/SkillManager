@@ -28,7 +28,7 @@ Menu {
             border.width: 1
             border.color: Theme.glassBorder
             
-            layer.enabled: true
+            layer.enabled: !AppController.isHeadlessRender
             layer.effect: DropShadow {
                 transparentBorder: true
                 horizontalOffset: 0
