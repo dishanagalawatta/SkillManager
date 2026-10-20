@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import inspect
 import json
+import time
 from typing import Any
 
 import anyio
@@ -34,7 +35,12 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
-from skill_manager.core.analytics import capture_event, capture_mcp_tool_call
+from skill_manager.core.analytics import (
+    begin_mcp_tool_call,
+    capture_event,
+    capture_mcp_tool_call,
+    end_mcp_tool_call,
+)
 from skill_manager.mcp.models import ToolResult
 
 # How often the stdio loop hands control back to Qt for event processing.
@@ -153,26 +159,38 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
     @server.call_tool()
     async def _call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
         args: dict[str, Any] = arguments or {}
-        with contextlib.suppress(Exception):  # analytics must never break a tool call
-            # Never forward raw arguments — they can contain skill bodies,
-            # typed text, or local paths. Only the tool name leaves the machine.
-            capture_mcp_tool_call("mcp_tool_call", name)
-
-        handler = handlers.get(name)
-        if handler is None:
-            return _error_result(
-                name,
-                f"unknown tool: {name!r}",
-            )
-
+        collect_token = begin_mcp_tool_call()
+        started = time.perf_counter()
+        failed = False
         try:
-            result = handler(args)
-            if inspect.isawaitable(result):
-                result = await result
-        except Exception as exc:  # noqa: BLE001 - envelope all failures
-            return _error_result(name, str(exc))
+            handler = handlers.get(name)
+            if handler is None:
+                failed = True
+                return _error_result(
+                    name,
+                    f"unknown tool: {name!r}",
+                )
 
-        return _normalize_result(result)
+            try:
+                result = handler(args)
+                if inspect.isawaitable(result):
+                    result = await result
+            except Exception as exc:  # noqa: BLE001 - envelope all failures
+                failed = True
+                return _error_result(name, str(exc))
+
+            return _normalize_result(result)
+        finally:
+            # Exactly one event per call, emitted here. Handlers contribute
+            # allowlisted properties via add_mcp_tool_properties() instead of
+            # capturing, which used to double every count. Raw arguments never
+            # leave the machine: they can carry skill bodies, typed text, or
+            # local paths.
+            with contextlib.suppress(Exception):  # analytics must never break a tool call
+                properties = end_mcp_tool_call(collect_token)
+                properties["ok"] = not failed
+                properties["duration_ms"] = round((time.perf_counter() - started) * 1000)
+                capture_mcp_tool_call("mcp_tool_call", name, properties)
 
     return server
 

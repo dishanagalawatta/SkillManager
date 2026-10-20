@@ -62,6 +62,8 @@ flowchart TD
 - Local variable values from stack frames.
 - MCP tool arguments, free-form queries, skill bodies, or file contents.
 - Skill archive paths or project labels.
+- IP address or geolocation: the SDK's GeoIP enrichment is pinned off
+  (`disable_geoip=True`), so events cannot be traced back to a network.
 - Sentry request/user context.
 
 ## Privacy guards in the code
@@ -70,7 +72,8 @@ flowchart TD
 |-------|----------|------------------|
 | Exception scrubber | `core/analytics.py` → `_scrub_posthog_event` | Redacts absolute paths in exception messages; drops frame `abs_path`, `context_line`, `pre_context`, `post_context`, `vars`; keeps bare filename. Never raises — the SDK fails *open* on a `before_send` error. |
 | Code variables pinned off | `core/analytics.py` → `_build_client` | `capture_exception_code_variables=False`, so a future SDK default flip cannot start shipping variable contents. |
-| MCP allowlist | `core/analytics.py` → `capture_mcp_tool_call` | One central decision point for every MCP event. Drops `args`, `path`, `pattern`, `query`, `skill_id`, `name`, `source_path`, `target`, `content`, `body`, `body_content`, `raw_content`, `text`, `project_label`, and forwards only JSON scalars (`bool`, `int`, `float`, `str`). |
+| MCP allowlist | `core/analytics.py` → `capture_mcp_tool_call`, `add_mcp_tool_properties` | One central decision point for every MCP event. Drops `args`, `path`, `pattern`, `query`, `skill_id`, `name`, `source_path`, `target`, `content`, `body`, `body_content`, `raw_content`, `text`, `project_label`, and forwards only JSON scalars (`bool`, `int`, `float`, `str`). Handlers contribute through `add_mcp_tool_properties`, so the allowlist also applies to the properties they add. |
+| Single MCP emission | `mcp/server.py` → `_call_tool` | Emits exactly one `mcp_tool_call` per invocation and attaches the outcome (`ok`, `duration_ms`). Handlers never capture the event themselves, so counts are not doubled. |
 | Credential loading | `core/analytics.py` → `_env_file_candidates` | Resolves `.env` from `$DATA_DIR` then the repo root — **never** the working directory, which would import a launch directory's secrets and let a foreign `POSTHOG_HOST` redirect telemetry. |
 | User opt-out | `core/analytics.py` → `_user_disabled_telemetry`, `set_enabled` | Honours the Settings toggle at init and at runtime. |
 | Sentry scrubber | `bootstrap.py` → `_scrub_sentry_event` | Strips `request`, `user`, and breadcrumb `data` before an event is sent. |
@@ -101,7 +104,7 @@ allowlist.
 | Event | When | Properties |
 |-------|------|------------|
 | `mcp_server_start` | The MCP server started | `allow_write`, transport details |
-| `mcp_tool_call` | Any MCP tool was invoked | `tool`, plus allowlisted scalars |
+| `mcp_tool_call` | Any MCP tool was invoked | `tool`, `ok`, `duration_ms`, plus allowlisted scalars contributed by the handler |
 | `mcp_write_attempt` | A write tool was invoked | `allowed` |
 | `mcp_bridge_call` | A bridge function was called | `fn` |
 | `mcp_headless_qml_loaded` | The headless QML engine loaded | — |

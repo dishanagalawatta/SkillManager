@@ -2,11 +2,13 @@
 
 import atexit
 import contextlib
+import contextvars
 import json
 import os
 import re
 import uuid
 from pathlib import Path
+from typing import Any
 
 #: ``.env`` shipped with a source checkout (``<repo>/src/skill_manager/core/`` → repo root).
 _REPO_ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"
@@ -150,6 +152,10 @@ def _build_client():
             host=host,
             enable_exception_autocapture=True,
             before_send=_scrub_posthog_event,
+            # Explicit: GeoIP enrichment must stay off so events cannot be
+            # traced to a network. True is the current SDK default; pinning it
+            # guards against a future default flip, like the setting below.
+            disable_geoip=True,
             # Explicit: local variable *values* must never be attached to
             # autocaptured frames. False is the SDK default; pinning it guards
             # against a future default flip.
@@ -253,6 +259,47 @@ _MCP_TELEMETRY_BLOCKED_KEYS = frozenset(
     }
 )
 _MCP_TELEMETRY_SCALARS = (bool, int, float, str)
+
+#: Properties contributed by an MCP tool handler for the *current* call.
+#: The server wrapper owns the single ``mcp_tool_call`` emission, so handlers
+#: contribute instead of capturing: previously the wrapper and every handler
+#: both captured, doubling each event and splitting its properties across two
+#: records.
+_mcp_tool_properties: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "mcp_tool_properties", default=None
+)
+
+
+def begin_mcp_tool_call() -> contextvars.Token:
+    """Start collecting properties for one MCP tool call."""
+    return _mcp_tool_properties.set({})
+
+
+def end_mcp_tool_call(token: contextvars.Token) -> dict:
+    """Stop collecting and return the properties for the finished call."""
+    properties = _mcp_tool_properties.get() or {}
+    _mcp_tool_properties.reset(token)
+    return properties
+
+
+def add_mcp_tool_properties(properties: dict | None = None, **extra: Any) -> None:
+    """Record allowlisted scalars for the in-flight ``mcp_tool_call`` event.
+
+    Applies the same allowlist as :func:`capture_mcp_tool_call`, so a handler
+    may pass its raw arguments without leaking user content, paths, or
+    free-form queries. No-op when no server call is collecting (for example a
+    handler invoked directly in a test).
+    """
+    current = _mcp_tool_properties.get()
+    if current is None:
+        return
+    merged = dict(properties or {})
+    merged.update(extra)
+    for key, value in merged.items():
+        if key == "tool" or key in _MCP_TELEMETRY_BLOCKED_KEYS:
+            continue
+        if isinstance(value, _MCP_TELEMETRY_SCALARS):
+            current[key] = value
 
 
 def capture_mcp_tool_call(event: str, tool: str, properties: dict | None = None) -> None:

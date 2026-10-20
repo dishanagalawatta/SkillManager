@@ -16,7 +16,7 @@ import contextlib
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import (
     get_skill,
     search_skills,
@@ -25,9 +25,9 @@ from skill_manager.mcp.bridge import (
 from skill_manager.mcp.models import ToolResult, err, ok
 
 
-def _emit(tool: str, args: dict[str, Any]) -> None:
+def _emit(args: dict[str, Any]) -> None:
     with contextlib.suppress(Exception):
-        capture_mcp_tool_call("mcp_tool_call", tool, args)
+        add_mcp_tool_properties(args)
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 async def _handle_get_skill(args: dict[str, Any]) -> ToolResult:
     tool = "sm_get_skill"
     skill_id: str = str(args.get("skill_id", ""))
-    _emit(tool, {"skill_id": skill_id})
+    _emit({"skill_id": skill_id})
     if not skill_id:
         return err(tool, "argument 'skill_id' is required and must be non-empty")
     try:
@@ -161,7 +161,7 @@ async def _handle_search_skills(args: dict[str, Any]) -> ToolResult:
     include_commands: bool = bool(args.get("include_commands", True))
     limit: int = int(args.get("limit", 50))
 
-    _emit(tool, {"query": query, "category": category, "project_label": project_label})
+    _emit({"query": query, "category": category, "project_label": project_label})
     try:
         skills = search_skills(
             query=query,
@@ -178,7 +178,7 @@ async def _handle_search_skills(args: dict[str, Any]) -> ToolResult:
 async def _handle_sync_skills(args: dict[str, Any]) -> ToolResult:
     tool = "sm_sync_skills"
     force_full_scan: bool = bool(args.get("force_full_scan", False))
-    _emit(tool, {"force_full_scan": force_full_scan})
+    _emit({"force_full_scan": force_full_scan})
     try:
         res = sync_skills(force_full_scan=force_full_scan)
         return ok(tool, res)

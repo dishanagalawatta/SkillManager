@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import get_frame_timing as _bridge_get_frame_timing
 from skill_manager.mcp.models import ToolResult, err, ok
 
@@ -80,13 +80,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 def _handle_get_frame_timing(args: dict[str, Any]) -> ToolResult:
     try:
         parsed = _GetFrameTimingArgs(**args)
-        capture_mcp_tool_call(
-            "mcp_tool_call",
-            "sm_get_frame_timing",
-            {
-                "duration_s": parsed.duration_s,
-                "force_render": parsed.force_render,
-            },
+        add_mcp_tool_properties(
+            duration_s=parsed.duration_s,
+            force_render=parsed.force_render,
         )
         result = _bridge_get_frame_timing(
             duration_s=parsed.duration_s, force_render=parsed.force_render

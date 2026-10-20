@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import audit_accessibility as _bridge_audit_accessibility
 from skill_manager.mcp.models import ToolResult, err, ok
 
@@ -66,11 +66,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 def _handle_accessibility_audit(args: dict[str, Any]) -> ToolResult:
     try:
         parsed = _AccessibilityAuditArgs(**args)
-        capture_mcp_tool_call(
-            "mcp_tool_call",
-            "sm_accessibility_audit",
-            {"max_depth": parsed.max_depth},
-        )
+        add_mcp_tool_properties(max_depth=parsed.max_depth)
         result = _bridge_audit_accessibility(max_depth=parsed.max_depth)
         if result.get("ok"):
             return ok("sm_accessibility_audit", result)
