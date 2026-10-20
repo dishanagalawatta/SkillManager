@@ -35,7 +35,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system architecture with data flow diagrams |
 | [../DESIGN.md](../DESIGN.md) | Design system, patterns, threading model, QML conventions |
 | [../ADR_INDEX.md](../ADR_INDEX.md) | Architecture Decision Records index |
-| [adr/](adr/) | Individual ADR files (`ADR-0010` through `ADR-0038`) |
+| [adr/](adr/) | Individual ADR files (`ADR-0010` through `ADR-0043`) |
 | [SNAP_CAPTURE_VALIDATION.md](SNAP_CAPTURE_VALIDATION.md) | Screenshot capture validation procedure (MCP/CI) |
 | [RIBBON_COLLAPSE.md](RIBBON_COLLAPSE.md) | GlassPill ribbon collapse specification |
 
@@ -47,7 +47,7 @@
 |----------|-------------|
 | [CI_CD.md](CI_CD.md) | CI/CD pipeline reference (GitHub Actions) |
 | [QA.md](QA.md) | Living QA checklist: installer & update pipeline statuses |
-| [RELEASING.md](RELEASING.md) | Release checklist, manual bump, tag-driven build |
+| [RELEASING.md](RELEASING.md) | Release runbook: bump on a release PR, tag after the merge |
 | [VERSIONING.md](VERSIONING.md) | Semantic versioning policy and release rules |
 | [SECURITY.md](SECURITY.md) | Security policy and token handling guidelines |
 | [HOUSEKEEPING.md](HOUSEKEEPING.md) | Workspace cleanup rules, targets, and exclusions |

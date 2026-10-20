@@ -102,7 +102,8 @@ Steps once a route is chosen:
 3. Replace the "Decode signing cert" step and the `sign.ps1` invocation in
    `.github/workflows/release-build.yml` with the provider's signing action or
    CLI, passing credentials via `env`.
-4. Cut a release and confirm the signature:
+4. Cut a release (`scripts/release.py <bump>`, merge the release PR, then
+   `scripts/release.py tag`) and confirm the signature:
    `Get-AuthenticodeSignature .\SkillManager_Setup.exe` must report `Valid`.
 5. Revoke the superseded certificate with the issuing authority. The blob is
    already out of the repository (see below), but revocation is what actually

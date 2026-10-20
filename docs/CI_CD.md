@@ -18,7 +18,8 @@ SkillManager uses GitHub Actions with industry-standard practices: pinned action
 
 ## CI Pipeline (`ci.yml`)
 
-Triggers: push to `main`, pull requests, manual dispatch.
+Triggers: push to `main` (which only happens through a merged pull request),
+every pull request, and manual dispatch.
 
 ```mermaid
 flowchart LR
