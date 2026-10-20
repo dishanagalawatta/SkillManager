@@ -25,7 +25,7 @@
 ### To Do (Ready for Pickup)
 
 * [ ] Update readme FI
-* [ ] PostHog implementation review.
+* [x] PostHog implementation review — found and fixed duplicated `mcp_tool_call` events (the server wrapper and every tool handler both captured, so live counts were ~2×; historical data confirms identical pairs one second apart). One emission point now attaches `ok`, `duration_ms`, and handler-contributed allowlisted properties; GeoIP is pinned off. Live MCP run: exactly one event per tool call.
 * [x] Reduce the size of list row(normal mode) — 46 px → 40 px, icon 28 px, title 13 px (`SkillItem.qml` row metrics).
 * [ ] Install v2.13.1 on the workstation (`sudo dpkg -i` or `bash scripts/install.sh --update`) — v2.11.2 is too old to contain the automatic release check.
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import (
     get_window_info as _bridge_get_window_info,
     navigate_view as _bridge_navigate_view,
@@ -203,17 +203,12 @@ def _handle_navigate(view: str) -> ToolResult:
 # ---------------------------------------------------------------------------
 def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
     def _dispatch_mouse_move(args: dict[str, Any]) -> ToolResult:
-        capture_mcp_tool_call("mcp_tool_call", "sm_mouse_move")
         return _handle_mouse_move(x=int(args["x"]), y=int(args["y"]))
 
     def _dispatch_mouse_click(args: dict[str, Any]) -> ToolResult:
-        capture_mcp_tool_call(
-            "mcp_tool_call",
-            "sm_mouse_click",
-            {
-                "button": str(args.get("button", "left")),
-                "double": bool(args.get("double", False)),
-            },
+        add_mcp_tool_properties(
+            button=str(args.get("button", "left")),
+            double=bool(args.get("double", False)),
         )
         return _handle_mouse_click(
             x=int(args["x"]) if args.get("x") is not None else None,
@@ -225,15 +220,14 @@ def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
     def _dispatch_type_text(args: dict[str, Any]) -> ToolResult:
         text = str(args["text"])
         # Record only the length — never the typed characters.
-        capture_mcp_tool_call("mcp_tool_call", "sm_type_text", {"chars": len(text)})
+        add_mcp_tool_properties(chars=len(text))
         return _handle_type_text(text=text)
 
     def _dispatch_get_window_info(_args: dict[str, Any]) -> ToolResult:
-        capture_mcp_tool_call("mcp_tool_call", "sm_get_window_info")
         return _handle_get_window_info()
 
     def _dispatch_navigate(args: dict[str, Any]) -> ToolResult:
-        capture_mcp_tool_call("mcp_tool_call", "sm_navigate", {"view": str(args.get("view", ""))})
+        add_mcp_tool_properties(view=str(args.get("view", "")))
         return _handle_navigate(view=str(args["view"]))
 
     return {

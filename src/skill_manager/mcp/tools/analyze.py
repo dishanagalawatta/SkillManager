@@ -17,7 +17,7 @@ import contextlib
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import (
     list_projects,
     list_skills,
@@ -27,9 +27,9 @@ from skill_manager.mcp.bridge import (
 from skill_manager.mcp.models import ToolResult, err, ok
 
 
-def _emit(tool: str, args: dict[str, Any]) -> None:
+def _emit(args: dict[str, Any]) -> None:
     with contextlib.suppress(Exception):
-        capture_mcp_tool_call("mcp_tool_call", tool, args)
+        add_mcp_tool_properties(args)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ async def _handle_list_skills(args: dict[str, Any]) -> ToolResult:
     tool = "sm_list_skills"
     include_commands: bool = bool(args.get("include_commands", True))
     project_label: str = str(args.get("project_label", ""))
-    _emit(tool, {"include_commands": include_commands, "project_label": project_label})
+    _emit({"include_commands": include_commands, "project_label": project_label})
     try:
         skills = list_skills(include_commands=include_commands, project_label=project_label)
         return ok(tool, {"skills": skills})
@@ -153,7 +153,7 @@ async def _handle_list_skills(args: dict[str, Any]) -> ToolResult:
 
 async def _handle_list_sources(_args: dict[str, Any]) -> ToolResult:
     tool = "sm_list_sources"
-    _emit(tool, {})
+    _emit({})
     try:
         sources = list_sources()
         return ok(tool, {"sources": sources})
@@ -163,7 +163,7 @@ async def _handle_list_sources(_args: dict[str, Any]) -> ToolResult:
 
 async def _handle_list_projects(_args: dict[str, Any]) -> ToolResult:
     tool = "sm_list_projects"
-    _emit(tool, {})
+    _emit({})
     try:
         projects = list_projects()
         return ok(tool, {"projects": projects})
@@ -175,7 +175,7 @@ async def _handle_static_analyze(args: dict[str, Any]) -> ToolResult:
     tool = "sm_static_analyze"
     pattern: str = str(args.get("pattern", ""))
     path: str = str(args.get("path", "src"))
-    _emit(tool, {"pattern": pattern, "path": path})
+    _emit({"pattern": pattern, "path": path})
     if not pattern:
         return err(tool, "argument 'pattern' is required and must be non-empty")
     try:

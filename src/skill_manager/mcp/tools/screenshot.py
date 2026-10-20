@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from skill_manager.core.analytics import capture_mcp_tool_call
+from skill_manager.core.analytics import add_mcp_tool_properties
 from skill_manager.mcp.bridge import (
     capture_app_window_info as _bridge_capture_app_window_info,
     navigate_view as _bridge_navigate_view,
@@ -192,16 +192,12 @@ def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
         width = args.get("width")
         height = args.get("height")
         source = args.get("source", "auto")
-        capture_mcp_tool_call(
-            "mcp_tool_call",
-            "sm_screenshot",
-            {
-                "navigate": navigate,
-                "save": save,
-                "width": width,
-                "height": height,
-                "source": source,
-            },
+        add_mcp_tool_properties(
+            navigate=navigate,
+            save=save,
+            width=width,
+            height=height,
+            source=source,
         )
         return _handle_screenshot(
             navigate=navigate,

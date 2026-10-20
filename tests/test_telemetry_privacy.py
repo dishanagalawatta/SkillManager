@@ -134,6 +134,106 @@ def test_no_mcp_call_site_forwards_raw_arguments():
     assert not offenders, f"raw MCP arguments must not be captured: {offenders}"
 
 
+def test_no_tool_module_emits_mcp_tool_call_directly():
+    """Regression guard: the server wrapper owns ``mcp_tool_call``.
+
+    Every tool module used to capture its own ``mcp_tool_call`` in addition to
+    the wrapper, so each invocation produced two events and the properties
+    landed on a different record than the count.
+    """
+    offenders: list[str] = []
+    for path in sorted(_MCP_DIR.rglob("*.py")):
+        if path.name == "server.py":
+            continue
+        if 'capture_mcp_tool_call("mcp_tool_call"' in path.read_text(encoding="utf-8"):
+            offenders.append(str(path.relative_to(_MCP_DIR)))
+    assert not offenders, f"tool modules must not emit mcp_tool_call themselves: {offenders}"
+
+
+def test_add_mcp_tool_properties_applies_the_allowlist_and_is_scoped_to_the_call():
+    """Handlers contribute through the collector, not by capturing."""
+    token = analytics.begin_mcp_tool_call()
+    analytics.add_mcp_tool_properties(
+        {
+            "query": "find my password",
+            "path": "/home/someone/private",
+            "pattern": "api_key",
+            "skill_id": "/home/someone/.agents/skills/x",
+            "content": "skill body",
+            "name": "acme-internal-deploy",
+            "tool": "spoofed",
+            "nested": {"a": 1},
+            "limit": 5,
+            "enabled": True,
+        }
+    )
+    properties = analytics.end_mcp_tool_call(token)
+
+    assert properties == {"limit": 5, "enabled": True}
+    # Outside a server call the collector is a no-op, never an error.
+    assert analytics.add_mcp_tool_properties(limit=9) is None
+    assert analytics._mcp_tool_properties.get() is None
+
+
+def test_mcp_server_emits_exactly_one_tool_call_event(monkeypatch):
+    """One invocation → one event, carrying handler properties and outcome."""
+    import anyio
+    from mcp import types as mcp_types
+
+    from skill_manager.mcp import server as mcp_server
+
+    captured: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        mcp_server,
+        "capture_mcp_tool_call",
+        lambda event, tool, properties=None: captured.append((event, tool, properties or {})),
+    )
+
+    server = mcp_server.create_mcp_server(allow_write=False)
+    handler = server.request_handlers[mcp_types.CallToolRequest]
+    request = mcp_types.CallToolRequest(
+        params=mcp_types.CallToolRequestParams(
+            name="sm_get_diagnostics",
+            arguments={"limit": 3},
+        )
+    )
+    anyio.run(handler, request)
+
+    assert len(captured) == 1, f"expected one mcp_tool_call event, got {captured}"
+    event, tool, properties = captured[0]
+    assert event == "mcp_tool_call"
+    assert tool == "sm_get_diagnostics"
+    assert properties["limit"] == 3
+    assert properties["ok"] is True
+    assert isinstance(properties["duration_ms"], int)
+
+
+def test_mcp_server_reports_failed_calls_without_the_error_text(monkeypatch):
+    """``ok`` is recorded; the exception message (paths!) never is."""
+    import anyio
+    from mcp import types as mcp_types
+
+    from skill_manager.mcp import server as mcp_server
+
+    captured: list[dict] = []
+    monkeypatch.setattr(
+        mcp_server,
+        "capture_mcp_tool_call",
+        lambda event, tool, properties=None: captured.append(properties or {}),
+    )
+
+    server = mcp_server.create_mcp_server(allow_write=False)
+    handler = server.request_handlers[mcp_types.CallToolRequest]
+    request = mcp_types.CallToolRequest(
+        params=mcp_types.CallToolRequestParams(name="sm_not_a_tool", arguments={})
+    )
+    anyio.run(handler, request)
+
+    assert len(captured) == 1
+    assert captured[0]["ok"] is False
+    assert "sm_not_a_tool" not in captured[0].values()
+
+
 def test_sentry_scrubber_removes_identifying_data():
     from skill_manager.bootstrap import _scrub_sentry_event
 
