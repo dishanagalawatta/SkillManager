@@ -13,9 +13,9 @@ from typing import Any
 from skill_manager.core.analytics import capture_mcp_tool_call
 from skill_manager.mcp.bridge import (
     get_window_info as _bridge_get_window_info,
+    navigate_view as _bridge_navigate_view,
     send_mouse_click as _bridge_send_mouse_click,
     send_mouse_move as _bridge_send_mouse_move,
-    send_navigation_command as _bridge_send_navigation_command,
     send_type_text as _bridge_send_type_text,
 )
 from skill_manager.mcp.models import ToolResult, err, ok
@@ -110,7 +110,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "sm_navigate": {
-        "description": "Navigate the live SkillManager GUI to a different view (QuickCopy, Library, Updates, Settings). Fire-and-forget: writes the command and returns immediately. The GUI processes it asynchronously. Use sm_screenshot afterwards to verify the view changed.",
+        "description": "Navigate the SkillManager UI to a section (QuickCopy, Library, Updates, Settings) before inspecting it. In headless --mcp mode this switches the in-process offscreen render and never touches the user's running window; without an offscreen engine (--mcp-light) it asks the live GUI over file IPC and waits for the acknowledgement. Use sm_screenshot afterwards to capture the target view.",
         "annotations": {
             "readOnlyHint": False,
             "destructiveHint": False,
@@ -182,9 +182,17 @@ def _handle_get_window_info() -> ToolResult:
 
 def _handle_navigate(view: str) -> ToolResult:
     try:
-        result = _bridge_send_navigation_command(view)
+        result = _bridge_navigate_view(view)
         if result.get("ok"):
-            return ok("sm_navigate", {"view": view, "cmd_id": result.get("cmd_id")})
+            return ok(
+                "sm_navigate",
+                {
+                    "view": view,
+                    "in_process": bool(result.get("in_process", False)),
+                    "verified": result.get("verified"),
+                    "cmd_id": result.get("cmd_id"),
+                },
+            )
         return err("sm_navigate", result.get("error", "navigation failed"))
     except Exception as exc:
         return err("sm_navigate", str(exc))

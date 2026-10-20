@@ -1075,3 +1075,57 @@ def test_discover_single_package_skill_explicit_and_autodetect(temp_dir):
     assert result_project is not None
     assert result_project["is_package"] is False
     assert result_project["is_source"] is False
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
+@patch("skill_manager.core.discovery.get_discovery_cache")
+def test_discover_all_persists_cache_by_default(
+    mock_get_cache, mock_save, mock_load, temp_dir, disk_cache
+):
+    """The GUI depends on discovery writing the shared skill index."""
+    mock_get_cache.return_value.__enter__.return_value = disk_cache
+    mock_load.return_value = None
+
+    source_lib = temp_dir / "master"
+    source_lib.mkdir()
+    (source_lib / "skill1").mkdir()
+    (source_lib / "skill1" / "SKILL.md").write_text("---\nname: Cached Skill\ncategory: Tools\n---")
+
+    service = DiscoveryService(sources=[str(source_lib)], projects=[])
+    service.discover_all(use_cache=False)
+
+    mock_save.assert_called_once()
+
+
+@patch("skill_manager.core.discovery.load_cache")
+@patch("skill_manager.core.discovery.save_cache")
+@patch("skill_manager.core.discovery.get_discovery_cache")
+def test_discover_all_read_only_when_persistence_disabled(
+    mock_get_cache, mock_save, mock_load, temp_dir, disk_cache
+):
+    """The headless MCP renderer must never rewrite the shared index.
+
+    Regression: an MCP run built a partial controller (no package scan), its
+    fallback scan persisted 620 skills over the GUI's 3240-entry index.
+    """
+    mock_get_cache.return_value.__enter__.return_value = disk_cache
+    mock_load.return_value = None
+
+    source_lib = temp_dir / "master"
+    source_lib.mkdir()
+    (source_lib / "skill1").mkdir()
+    (source_lib / "skill1" / "SKILL.md").write_text(
+        "---\nname: Read Only Skill\ncategory: Tools\n---"
+    )
+
+    service = DiscoveryService(sources=[str(source_lib)], projects=[])
+    discovery.set_cache_persistence(False)
+    try:
+        assert discovery.cache_persistence_enabled() is False
+        service.discover_all(use_cache=False)
+    finally:
+        discovery.set_cache_persistence(True)
+
+    mock_save.assert_not_called()
+    assert discovery.cache_persistence_enabled() is True

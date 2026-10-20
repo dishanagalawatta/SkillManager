@@ -30,6 +30,28 @@ from skill_manager.utils.joblib_backend import joblib_prefer, joblib_workers
 
 logger = logging.getLogger(__name__)
 
+#: Whether a discovery run may rewrite the shared skill-library index.
+#: The GUI and its scheduler leave this enabled. The headless MCP renderer
+#: disables it: it reads the same sources but must stay side-effect free, so it
+#: can never truncate the index a running GUI is using.
+_PERSIST_CACHE = True
+
+
+def set_cache_persistence(enabled: bool) -> None:
+    """Enable or disable writing the on-disk skill-library index.
+
+    Disabled for the headless MCP renderer (`--mcp`), whose controller is
+    intentionally partial (no package scan, no watchers). Persisting its result
+    would replace the GUI's complete index with a smaller one.
+    """
+    global _PERSIST_CACHE
+    _PERSIST_CACHE = bool(enabled)
+
+
+def cache_persistence_enabled() -> bool:
+    """Return whether discovery currently persists its result."""
+    return _PERSIST_CACHE
+
 
 @lru_cache(maxsize=2048)
 def _canonical_path(p: str | Path) -> str:
@@ -352,8 +374,10 @@ class DiscoveryService:
 
         result = state.model_dump()
 
-        # 4. Update index cache
-        save_cache(result)
+        # 4. Update index cache (skipped when persistence is disabled, e.g. the
+        #    read-only headless MCP renderer).
+        if _PERSIST_CACHE:
+            save_cache(result)
 
         return result
 

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
+import App 1.0
 
 ToolTip {
     id: control
@@ -59,7 +60,7 @@ ToolTip {
         border.color: Theme.glassBorder
         border.width: 1
         
-        layer.enabled: true
+        layer.enabled: !AppController.isHeadlessRender
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowColor: Theme.glassShadow

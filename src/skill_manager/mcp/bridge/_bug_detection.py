@@ -55,12 +55,14 @@ _FULL_TOUR_SEQUENCE: tuple[str, ...] = (
 def navigate_view(view: str) -> dict[str, Any]:
     """Navigate the UI to *view*, deterministically, in either MCP mode.
 
-    A headless ``--mcp`` process owns its own offscreen QML window *and* runs
-    the ``CommandChannel`` that consumes navigation commands. Sending IPC and
-    then blocking on the acknowledgement would therefore deadlock against our
-    own consumer, so the view is set in-process. When no QML engine is owned
-    here (headless offscreen loading disabled), the live GUI is a separate
-    process and its acknowledgement is awaited.
+    A headless ``--mcp`` process owns its own offscreen QML window, so the view
+    is set in-process: the renderer and the caller then agree on what was
+    captured, and the user's running window is never switched. (The launcher
+    also stops the MCP process's own ``CommandChannel`` so it cannot consume
+    commands meant for the live GUI.)
+
+    When no QML engine is owned here (``--mcp-light``), the live GUI is a
+    separate process and its acknowledgement is awaited over file IPC.
     """
     _log_call("navigate_view")
     if headless_qml_enabled():

@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import hashlib
+from pathlib import Path
 from typing import Any
 
 from ._controller import _controller_or_none, get_qml_engine
@@ -145,7 +147,27 @@ def ensure_qml_engine() -> Any | None:
     return engine
 
 
-def _show_offscreen_window(engine: Any, settle_s: float = 0.4) -> None:
+def _pump(seconds: float, step_s: float = 0.016) -> None:
+    """Run the Qt event loop (including animation timers) for *seconds*.
+
+    ``processEvents()`` alone returns immediately, so animations, layout
+    transitions and deferred polish never advance — a grab taken right after it
+    captures a half-laid-out frame (e.g. the Library toolbar still in its
+    collapsed phase). Sleeping between passes advances the animation driver the
+    same way the live app's event loop does.
+    """
+    import time
+
+    from PySide6.QtCore import QCoreApplication
+
+    deadline = time.perf_counter() + max(0.0, seconds)
+    while time.perf_counter() < deadline:
+        QCoreApplication.processEvents()
+        time.sleep(step_s)
+    QCoreApplication.processEvents()
+
+
+def _show_offscreen_window(engine: Any, settle_s: float = 0.45) -> None:
     """Expose the offscreen window so the scene graph actually paints.
 
     A ``QQuickWindow`` that was never shown stays un-exposed: ``grabWindow()``
@@ -153,7 +175,11 @@ def _show_offscreen_window(engine: Any, settle_s: float = 0.4) -> None:
     ``show()`` under the ``offscreen`` platform plugin maps nothing on the real
     desktop but makes Qt polish, lay out and render the scene.
 
-    Waits up to *settle_s* for the first rendered frame, then returns.
+    Exposure alone is not enough: the root window is 1005 px wide from the first
+    frame while the child views start at their minimum width and grow a frame or
+    two later. Grabbing at that moment renders the collapsed (mobile) variant of
+    the Library, which looks nothing like the app. So keep the event loop
+    running for *settle_s* after exposure.
     """
     import time
 
@@ -177,8 +203,8 @@ def _show_offscreen_window(engine: Any, settle_s: float = 0.4) -> None:
             if window.isExposed():
                 break
             time.sleep(0.01)
-        # One extra pass so the first frame lands before the caller grabs it.
-        QCoreApplication.processEvents()
+        # Let layout, Behaviors and entrance animations finish before any grab.
+        _pump(settle_s)
 
 
 def _register_qml_singletons(controller: Any) -> Any | None:
@@ -235,6 +261,51 @@ def get_qml_window() -> Any | None:
     except Exception:  # noqa: BLE001 - pure lookup
         return None
     return None
+
+
+_MAIN_QML = Path(__file__).resolve().parents[2] / "SkillManagerComponents" / "Main.qml"
+_RENDER_INFO_CACHE: dict[str, Any] = {}
+
+
+def headless_render_info() -> dict[str, Any]:
+    """Describe the QML source behind the headless render.
+
+    The offscreen window is not a second implementation of the UI: it loads the
+    same ``Main.qml`` the packaged app loads, with the same ``QQuickStyle`` and
+    the same ``AppController``. This returns the evidence — file path, SHA-256
+    and window geometry — so a caller can prove the pixels came from the shipped
+    QML rather than a mock-up. The hash is cached per (mtime, size).
+    """
+    info: dict[str, Any] = {
+        "engine": "Main.qml",
+        "path": str(_MAIN_QML),
+        "sha256": None,
+        "style": "Basic",
+        "offscreen": True,
+        "width": None,
+        "height": None,
+        "device_pixel_ratio": None,
+    }
+    try:
+        stat = _MAIN_QML.stat()
+        cache_key = f"{stat.st_mtime_ns}:{stat.st_size}"
+        cached = _RENDER_INFO_CACHE.get("main_qml")
+        if cached and cached[0] == cache_key:
+            info["sha256"] = cached[1]
+        else:
+            digest = hashlib.sha256(_MAIN_QML.read_bytes()).hexdigest()
+            _RENDER_INFO_CACHE["main_qml"] = (cache_key, digest)
+            info["sha256"] = digest
+    except Exception:  # noqa: BLE001 - metadata must never break a capture
+        pass
+
+    window = get_qml_window()
+    if window is not None:
+        with contextlib.suppress(Exception):
+            info["width"] = int(window.width())
+            info["height"] = int(window.height())
+            info["device_pixel_ratio"] = float(window.devicePixelRatio())
+    return info
 
 
 def _image_to_base64_png(image: Any) -> str | None:
@@ -295,7 +366,11 @@ def capture_headless_window(
             restore = (int(window.width()), int(window.height()))
             window.setWidth(int(resize_width))
             window.setHeight(int(resize_height))
-            QCoreApplication.processEvents()
+            _pump(0.35)
+
+        # Give the current view a few frames to settle (navigation, deferred
+        # layout) so the PNG matches what the user would see, not a mid-frame.
+        _pump(0.3)
 
         image = window.grabWindow()
         if image is None or image.isNull():
@@ -318,6 +393,7 @@ def capture_headless_window(
 __all__ = [
     "enable_headless_qml",
     "headless_qml_enabled",
+    "headless_render_info",
     "reset_headless_qml",
     "qml_engine_status",
     "ensure_qml_engine",

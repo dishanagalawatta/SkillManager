@@ -383,3 +383,147 @@ def test_server_registers_sm_screenshot():
 
     server.create_mcp_server()
     assert "sm_screenshot" in TOOL_SCHEMAS
+
+
+# ---------------------------------------------------------------------------
+# Capture strategy: background (headless) must win over the live GUI
+# ---------------------------------------------------------------------------
+def _headless_stub(monkeypatch, *, enabled=True, png=("HEADLESS", 100, 50), render=None):
+    """Stub the lazy offscreen renderer so no Qt/display is needed."""
+    import skill_manager.mcp.bridge._qml_headless as qml_headless
+
+    monkeypatch.setattr(qml_headless, "headless_qml_enabled", lambda: enabled)
+    monkeypatch.setattr(
+        qml_headless,
+        "capture_headless_window",
+        lambda *a, **kw: png,
+    )
+    monkeypatch.setattr(
+        qml_headless,
+        "headless_render_info",
+        lambda: render or {"engine": "Main.qml", "sha256": "deadbeef", "style": "Basic"},
+    )
+    return qml_headless
+
+
+def test_capture_prefers_headless_and_never_contacts_live_gui(monkeypatch):
+    """A headless --mcp capture must not send IPC to the running app."""
+    _headless_stub(monkeypatch)
+    ipc_calls: list[int] = []
+
+    def _ipc(**kwargs):
+        ipc_calls.append(1)
+        return {"ok": False}
+
+    monkeypatch.setattr(bridge_capture, "send_capture_command", _ipc)
+
+    info = bridge.capture_app_window_info()
+
+    assert info["source"] == "headless-qml"
+    assert info["image_b64"] == "HEADLESS"
+    assert (info["width"], info["height"]) == (100, 50)
+    assert info["render"]["sha256"] == "deadbeef"
+    assert ipc_calls == [], "headless capture must not touch the live GUI"
+
+
+def test_capture_strategy_live_uses_ipc_and_skips_headless(monkeypatch, tmp_path):
+    qml_headless = _headless_stub(monkeypatch)
+    headless_calls: list[int] = []
+    monkeypatch.setattr(
+        qml_headless,
+        "capture_headless_window",
+        lambda *a, **kw: headless_calls.append(1) or (None, 0, 0),
+    )
+
+    img = Image.new("RGB", (8, 6), "blue")
+    live_png = tmp_path / "live.png"
+    img.save(live_png)
+    monkeypatch.setattr(
+        bridge_capture,
+        "send_capture_command",
+        lambda **kw: {"ok": True, "capture_path": str(live_png)},
+    )
+
+    info = bridge.capture_app_window_info(strategy="live")
+
+    assert info["source"] == "live-gui"
+    assert (info["width"], info["height"]) == (8, 6)
+    assert headless_calls == []
+
+
+def test_capture_strategy_headless_never_uses_ipc(monkeypatch):
+    _headless_stub(monkeypatch, enabled=False)
+
+    def _ipc(**kwargs):
+        raise AssertionError("strategy='headless' must not contact the live GUI")
+
+    monkeypatch.setattr(bridge_capture, "send_capture_command", _ipc)
+
+    info = bridge.capture_app_window_info(strategy="headless")
+
+    assert info["source"] is None
+    assert info["error"] == "headless_render_unavailable"
+
+
+def test_capture_auto_falls_back_to_ipc_when_headless_empty(monkeypatch, tmp_path):
+    _headless_stub(monkeypatch, png=(None, 0, 0))
+    img = Image.new("RGB", (5, 4), "green")
+    live_png = tmp_path / "live.png"
+    img.save(live_png)
+    monkeypatch.setattr(
+        bridge_capture,
+        "send_capture_command",
+        lambda **kw: {"ok": True, "capture_path": str(live_png)},
+    )
+
+    info = bridge.capture_app_window_info(strategy="auto")
+
+    assert info["source"] == "live-gui"
+
+
+def test_capture_strategy_live_reports_failure_without_headless(monkeypatch):
+    _headless_stub(monkeypatch, png=(None, 0, 0))
+    monkeypatch.setattr(bridge_capture, "send_capture_command", lambda **kw: {"ok": False})
+    monkeypatch.setattr(bridge_capture, "_fallback_capture_linux", lambda: (None, 0, 0))
+
+    info = bridge.capture_app_window_info(strategy="live")
+
+    assert info["source"] is None
+    assert info["error"] == "live_capture_unavailable"
+
+
+def test_screenshot_handler_exposes_render_provenance(monkeypatch):
+    _headless_stub(monkeypatch, render={"engine": "Main.qml", "sha256": "cafebabe"})
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_navigate_view",
+        lambda v: {"ok": True, "view": v, "in_process": True, "verified": True},
+    )
+
+    handlers = tools_screenshot.get_handlers()
+    result = handlers["sm_screenshot"]({"navigate": "Library"})
+
+    assert result.ok is True
+    assert result.data["source"] == "headless-qml"
+    assert result.data["render"]["sha256"] == "cafebabe"
+    assert result.data["view"] == "Library"
+
+
+def test_screenshot_schema_documents_source():
+    props = tools_screenshot.TOOL_SCHEMAS["sm_screenshot"]["inputSchema"]["properties"]
+    assert props["source"]["enum"] == ["auto", "headless", "live"]
+    assert props["source"]["default"] == "auto"
+
+
+def test_screenshot_live_source_error_mentions_live(monkeypatch):
+    monkeypatch.setattr(
+        tools_screenshot,
+        "_bridge_capture_app_window_info",
+        lambda **kw: {"image_b64": None, "width": 0, "height": 0, "source": None},
+    )
+
+    handlers = tools_screenshot.get_handlers()
+    result = handlers["sm_screenshot"]({"source": "live"})
+
+    assert result.ok is False
+    assert "live capture failed" in result.error

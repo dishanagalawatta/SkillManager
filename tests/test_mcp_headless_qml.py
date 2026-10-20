@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 from types import SimpleNamespace
 from typing import Any
 
@@ -516,3 +517,56 @@ def test_get_health_qml_empty_when_controller_missing(monkeypatch: pytest.Monkey
     health = bridge_state.get_health()
 
     assert health["qml"] == {}
+
+
+# ---------------------------------------------------------------------------
+# MCP launcher: offscreen render mode
+# ---------------------------------------------------------------------------
+def test_force_offscreen_enables_headless_render_flag(monkeypatch):
+    """The offscreen renderer must announce itself to QML.
+
+    Without this flag ``layer.effect`` items (glass pills, dialogs, toggles) are
+    dropped by the software scenegraph backend, so screenshots would show an app
+    missing its toolbar and pill backgrounds.
+    """
+    from skill_manager.mcp import launcher
+
+    monkeypatch.setenv("QT_QPA_PLATFORM", "minimal")
+    monkeypatch.delenv("SKILL_MANAGER_HEADLESS_RENDER", raising=False)
+
+    launcher._force_offscreen_platform()
+
+    assert os.environ["QT_QPA_PLATFORM"] == "offscreen"
+    assert os.environ["SKILL_MANAGER_HEADLESS_RENDER"] == "1"
+
+
+def test_disable_command_consumer_stops_the_channel():
+    """The MCP process must not consume commands meant for the live GUI."""
+    from skill_manager.mcp.launcher import _disable_command_consumer
+
+    class _Channel:
+        def __init__(self):
+            self.stopped = 0
+
+        def stop(self):
+            self.stopped += 1
+
+    channel = _Channel()
+    _disable_command_consumer(SimpleNamespace(command_channel=channel))
+
+    assert channel.stopped == 1
+
+
+def test_disable_command_consumer_is_defensive():
+    from skill_manager.mcp.launcher import _disable_command_consumer
+
+    # Missing attribute and None channel are both fine.
+    _disable_command_consumer(SimpleNamespace())
+    _disable_command_consumer(SimpleNamespace(command_channel=None))
+
+    class _Boom:
+        def stop(self):
+            raise RuntimeError("already gone")
+
+    # A failing stop() must never break MCP startup.
+    _disable_command_consumer(SimpleNamespace(command_channel=_Boom()))

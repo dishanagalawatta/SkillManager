@@ -208,7 +208,12 @@ class CommandChannel(QObject):
                 self._write_ack(cmd_id, ok=False, error="failed to save PNG")
                 return
 
-            self._write_ack(cmd_id, ok=True, capture_path=str(out_path.resolve()))
+            self._write_ack(
+                cmd_id,
+                ok=True,
+                capture_path=str(out_path.resolve()),
+                view=str(getattr(getattr(self.app, "ui", None), "currentView", "")),
+            )
         except Exception as exc:  # noqa: BLE001
             self._write_ack(cmd_id, ok=False, error=str(exc))
 
