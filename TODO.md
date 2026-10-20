@@ -27,6 +27,7 @@
 * [ ] Update readme FI
 * [ ] PostHog implementation review.
 * [ ] Reduce the size of list row(normal mode)
+* [ ] Install v2.13.1 on the workstation (`sudo dpkg -i` or `bash scripts/install.sh --update`) — v2.11.2 is too old to contain the automatic release check.
 
 ### In Progress
 

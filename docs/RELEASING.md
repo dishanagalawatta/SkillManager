@@ -72,6 +72,23 @@ It also refuses to reuse an existing tag.
 | `--no-push` | Create the release branch and commit locally, without pushing or opening the PR |
 | `-m`, `--message` | Custom commit message, also used as the PR title |
 
+### Releasing with uncommitted local work
+
+`release.py` refuses to run unless `git status --porcelain` is empty, and it
+assumes it is on `main` because it creates `release/vX.Y.Z` itself. If you have
+unrelated changes you do not want to commit or stash, cut the release from a
+separate clone — a worktree cannot be used, since `main` is already checked out
+in the original and the script needs it free:
+
+```bash
+git clone https://github.com/dishanagalawatta/SkillManager.git /tmp/release-x.y.z
+cd /tmp/release-x.y.z
+uv run python scripts/release.py <bump>
+```
+
+In this case the release branch lives only in the clone. Push it and open the PR
+from there, and delete the clone once the tag is pushed.
+
 ---
 
 ## Release Pipeline Step-by-Step
@@ -127,6 +144,35 @@ that folder**. The first submission (v1.8.0,
 [#391299](https://github.com/microsoft/winget-pkgs/pull/391299)) was closed as *Stale*
 without review. See [`packaging/winget/README.md`](../packaging/winget/README.md) for the
 full checklist and the verified values for v2.12.1.
+
+### 7. Post-release verification
+
+Confirm the published artifacts are the ones you built and that the app's own
+update path works in a **packaged** build (the automatic check only runs when
+`sys.frozen` is true, so a source checkout will not exercise it):
+
+```bash
+mkdir -p /tmp/verify && cd /tmp/verify
+curl -sLO https://github.com/dishanagalawatta/SkillManager/releases/download/vX.Y.Z/SHA256SUMS
+curl -sLO https://github.com/dishanagalawatta/SkillManager/releases/download/vX.Y.Z/SkillManager-X.Y.Z-x86_64.AppImage
+# SHA256SUMS lists paths under dist/, so mirror that layout
+mkdir -p dist && mv SkillManager-X.Y.Z-x86_64.AppImage dist/ && sha256sum -c SHA256SUMS
+
+chmod +x dist/SkillManager-X.Y.Z-x86_64.AppImage && dist/SkillManager-X.Y.Z-x86_64.AppImage
+```
+
+Without touching the UI, `~/.local/share/SkillManager/skill_manager.log` should
+show a check a few seconds after the window appears:
+
+```
+... skill_manager.controllers.app_update_controller - INFO - SkillManager is up to date.
+```
+
+If the tag you just released *is* the latest, "up to date" is the expected
+result; the same line proves the daily timer and toast path are wired. Also check
+that <https://api.github.com/repos/dishanagalawatta/SkillManager/releases/latest>
+returns the new tag, since `install.sh --update` and the in-app check both read
+that endpoint.
 
 ## Windows Code Signing
 
