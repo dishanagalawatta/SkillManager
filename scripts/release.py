@@ -275,6 +275,31 @@ def check_git_status(project_root: str) -> None:
         sys.exit(1)
 
 
+def check_git_identity(project_root: str) -> None:
+    """Fail fast when git cannot build a committer identity.
+
+    Release runs often happen in a fresh clone, where ``user.name`` and
+    ``user.email`` are unset. Without this guard the script syncs every
+    version file, creates the branch, then dies at ``git commit`` — leaving
+    the clone dirty at the *new* version, so a re-run bumps again.
+    """
+    res = subprocess.run(
+        ["git", "var", "GIT_COMMITTER_IDENT"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if res.returncode != 0 or not res.stdout.strip():
+        print(
+            "ERROR: Git identity is not configured in this clone.\n"
+            "Set it before releasing:\n"
+            '  git config user.name "Your Name"\n'
+            '  git config user.email "you@example.com"'
+        )
+        sys.exit(1)
+
+
 def run_preflight_checks(project_root: str, skip_tests: bool, skip_lint: bool) -> None:
     """Run linter and tests before bumping version."""
     if not skip_lint:
@@ -441,6 +466,7 @@ def tag_current_version(
         print(f"ERROR: Tag on 'main', not '{branch}' — the release PR must merge first.")
         sys.exit(1)
     check_git_status(project_root)
+    check_git_identity(project_root)
 
     print(f"Creating annotated tag: {tag_name}...")
     subprocess.run(["git", "tag", "-a", tag_name, "-m", message], cwd=project_root, check=True)
@@ -515,6 +541,7 @@ def main() -> None:
 
     if not args.dry_run:
         check_git_status(project_root)
+        check_git_identity(project_root)
         run_preflight_checks(project_root, args.skip_tests, args.skip_lint)
 
     print("\nSynchronizing version across files...")

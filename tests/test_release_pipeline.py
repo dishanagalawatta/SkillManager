@@ -168,3 +168,52 @@ class TestCalculateNextVersion:
     def test_invalid_explicit_version_raises(self) -> None:
         with pytest.raises(ValueError):
             release.calculate_next_version("2.2.3", "banana")
+
+
+class TestGitIdentityGuard:
+    """Release must fail before syncing files when git identity is missing."""
+
+    def test_missing_identity_exits(self, tmp_path: Path, capsys) -> None:
+        result = type("R", (), {"returncode": 1, "stdout": "", "stderr": "fatal"})
+        with (
+            patch.object(release.subprocess, "run", return_value=result),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            release.check_git_identity(str(tmp_path))
+        assert exc_info.value.code == 1
+        out = capsys.readouterr().out
+        assert 'git config user.email "you@example.com"' in out
+
+    def test_configured_identity_passes(self, tmp_path: Path) -> None:
+        result = type(
+            "R",
+            (),
+            {"returncode": 0, "stdout": "Dikka <dikka@example.com> 1 +0000\n", "stderr": ""},
+        )
+        with patch.object(release.subprocess, "run", return_value=result):
+            release.check_git_identity(str(tmp_path))  # must not raise
+
+    def test_identity_checked_before_version_sync(self, tmp_path: Path, monkeypatch) -> None:
+        calls: list[str] = []
+        monkeypatch.setattr(release.sys, "argv", ["release.py", "patch"])
+        monkeypatch.setattr(release, "get_project_root", lambda: str(tmp_path))
+        monkeypatch.setattr(release, "get_current_version", lambda root: "2.13.2")
+        monkeypatch.setattr(release, "check_git_status", lambda root: calls.append("status"))
+        monkeypatch.setattr(release, "check_git_identity", lambda root: calls.append("identity"))
+        monkeypatch.setattr(release, "run_preflight_checks", lambda *a: calls.append("preflight"))
+        for name in (
+            "sync_pyproject",
+            "sync_uvlock",
+            "sync_init_py",
+            "sync_installer_iss",
+            "sync_metainfo_xml",
+            "sync_readme",
+            "update_changelog",
+            "prepare_release_pr",
+        ):
+            monkeypatch.setattr(release, name, lambda *a, **k: calls.append("sync"))
+
+        release.main()
+
+        assert calls[:3] == ["status", "identity", "preflight"]
+        assert "sync" in calls
