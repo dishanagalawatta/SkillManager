@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.13.3] - 2026-10-21
+
+### Fixed
+- Inspector controls now expose accessible names: the command name field, the image zoom percentage, and the annotation text overlay. The decorative collapse chevrons in the Metadata and Documentation headers are hidden from assistive technology, which already sees the header as the labelled toggle. The live audit drops from six unnamed controls to zero across all four views.
+- `scripts/release.py` now aborts before touching version files when the clone has no `user.name`/`user.email`, instead of failing later at `git commit` with every version already bumped.
+
 ## [2.13.2] - 2026-10-21
 
 ### Fixed
