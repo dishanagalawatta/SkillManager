@@ -139,6 +139,7 @@ Rectangle {
                 TextField {
                     id: nameField
                     ContextMenu.menu: null
+                    Accessible.name: "Command name"
                     text: (root._sel && root._sel.name) || ""
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeSectionTitle

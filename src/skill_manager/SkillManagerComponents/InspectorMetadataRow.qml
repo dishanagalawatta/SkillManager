@@ -70,7 +70,7 @@ ColumnLayout {
                 role: "ghost"
                 focusPolicy: Qt.NoFocus
                 tooltipText: "" // Handled by headerItem
-                accessibleName: "" // Name lives on headerItem; suppress empty inner AT node
+                Accessible.ignored: true // headerItem owns the checkbox role and name
                 iconSource: root.isExpanded ?
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
                     AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")

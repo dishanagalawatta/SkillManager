@@ -325,6 +325,7 @@ Rectangle {
                             role: "ghost"
                             focusPolicy: Qt.NoFocus
                             tooltipText: "" // Handled by docHeaderItem
+                            Accessible.ignored: true // docHeaderItem owns the checkbox role and name
                             iconSource: docSection.isExpanded ?
                                 AppController.ui_controller.getAssetUri("ui/collapse-arrow-up-broken.svg") :
                                 AppController.ui_controller.getAssetUri("ui/collapse-arrow-down-broken.svg")
