@@ -28,7 +28,8 @@
 * [x] PostHog implementation review — found and fixed duplicated `mcp_tool_call` events (the server wrapper and every tool handler both captured, so live counts were ~2×; historical data confirms identical pairs one second apart). One emission point now attaches `ok`, `duration_ms`, and handler-contributed allowlisted properties; GeoIP is pinned off. Live MCP run: exactly one event per tool call.
 * [x] Reduce the size of list row(normal mode) — 46 px → 40 px, icon 28 px, title 13 px (`SkillItem.qml` row metrics).
 * [x] Release v2.13.2 — window-state restore, one `mcp_tool_call` per invocation, background MCP captures, tighter list rows, README feature index, and docs/ADR link fixes. Release PR #17, tag pushed; `.deb`, AppImage, and Windows Setup published.
-* [x] Install v2.13.2 on the workstation — `bash scripts/install.sh --update` upgraded the installed v2.13.1, checksum verified; `skill-manager --version` reports 2.13.2.
+* [x] Release v2.13.3 — accessibility names for inspector fields and hidden decorative chevrons (audit 6 → 0 across all four views), plus the release-script git-identity preflight. Release PR #22, tag pushed; `.deb`, AppImage, and Windows Setup published.
+* [ ] Install v2.13.3 on the workstation (`bash scripts/install.sh --update`) — currently on v2.13.2; this release only changes accessibility metadata.
 
 ### In Progress
 
