@@ -337,6 +337,7 @@ Rectangle {
                     TextInput {
                         id: zoomInput
                         anchors.fill: parent
+                        Accessible.name: "Zoom level percentage"
                         text: Math.round(root.zoomLevel * 100) + "%"
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
@@ -1386,6 +1387,7 @@ Rectangle {
                             id: textInputField
                             anchors.fill: parent
                             anchors.margins: 6
+                            Accessible.name: "Annotation text"
                             color: Theme.label
                             font.family: root.activeFontFamily
                             font.pixelSize: 14
