@@ -2,7 +2,7 @@
 name: Debug
 category: Custom Commands
 type: command
-date: 2026-09-23
+date: 2026-10-14
 ---
 
 **Role**: You are an elite Principal Software Engineer, System Architect, and QA Lead.
