@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.13.2] - 2026-10-21
+
+### Fixed
+- Window state now remembers whether the window was maximized and restores it on launch. Position persistence is skipped on Wayland, where the compositor owns placement.
+- MCP tool calls emit exactly one `mcp_tool_call` event, now carrying `ok` and `duration_ms`.
+- Normal list rows are tighter (40 px) with a 28 px icon.
+
+### Changed
+- MCP visual captures render the real UI offscreen in the background by default, so screenshots no longer steal focus or switch the view.
+- OpenCode's MCP configuration now uses the headless mode.
+- README gained a feature index covering updates, the MCP bridge, and accessibility.
+
+### Documentation
+- Release, app-update, MCP, and API docs refreshed; docs links and ADR anchors repaired.
+- Release preflight tests no longer depend on the checkout directory name or leak delayed npm installs.
+
 ## [2.13.1] - 2026-10-20
 
 ### Fixed
