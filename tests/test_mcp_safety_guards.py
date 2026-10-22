@@ -13,6 +13,7 @@ Covers the defects found while auditing the bridge:
 """
 
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -36,7 +37,11 @@ def _run(coro):
 
 # ── B6: the input guard must fail closed ─────────────────────────────────
 
+#: The Wayland sentinel is a Linux/X11 concept; Windows uses FindWindowW.
+_LINUX_GUI = sys.platform != "win32"
 
+
+@pytest.mark.skipif(not _LINUX_GUI, reason="the Wayland sentinel is an X11/Wayland path")
 def test_gui_window_present_rejects_the_wayland_unknown_sentinel():
     """The "cannot locate the window" sentinel must count as absent.
 
@@ -52,16 +57,19 @@ def test_gui_window_present_rejects_the_wayland_unknown_sentinel():
         assert gui_window_present() is False
 
 
+@pytest.mark.skipif(not _LINUX_GUI, reason="the X11/Wayland path")
 def test_gui_window_present_accepts_a_real_window_id():
     with patch("skill_manager.utils.linux.find_window_by_title", return_value=4242):
         assert gui_window_present() is True
 
 
+@pytest.mark.skipif(not _LINUX_GUI, reason="the X11/Wayland path")
 def test_gui_window_present_rejects_a_missing_window():
     with patch("skill_manager.utils.linux.find_window_by_title", return_value=None):
         assert gui_window_present() is False
 
 
+@pytest.mark.skipif(not _LINUX_GUI, reason="the X11/Wayland path")
 def test_input_refused_reason_when_the_window_cannot_be_located():
     from skill_manager.utils.linux import WINDOW_ID_UNKNOWN
 
@@ -79,6 +87,15 @@ def test_input_refused_reason_when_the_window_cannot_be_located():
             reason = injection_refused_reason()
         assert reason is not None
         assert "window not running" in reason
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows FindWindowW path")
+def test_gui_window_present_on_windows_requires_a_live_hwnd():
+    """On Windows the guard needs a real HWND from ``FindWindowW``."""
+    with patch("ctypes.windll.user32.FindWindowW", return_value=0):
+        assert gui_window_present() is False
+    with patch("ctypes.windll.user32.FindWindowW", return_value=1234):
+        assert gui_window_present() is True
 
 
 # ── guard helpers ────────────────────────────────────────────────────────
@@ -123,7 +140,11 @@ def test_is_within_resolves_symlinks(tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     link = root / "escape"
-    link.symlink_to(outside)
+    try:
+        link.symlink_to(outside)
+    except OSError as exc:
+        # Creating a symlink needs extra privileges on Windows.
+        pytest.skip(f"symlinks are not available here: {exc}")
 
     assert is_within(link / "file.txt", [root]) is False
 
