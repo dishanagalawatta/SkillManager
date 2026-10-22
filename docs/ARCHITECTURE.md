@@ -720,6 +720,7 @@ flowchart TD
 - **Cancellation**: Generation counter (`_refresh_generation`) for cooperative cancellation
 - **Debounce**: 400 ms `QTimer` trailing-edge debounce for filesystem events
 - **Self-Healing Storage**: Automatically cleans missing leading slashes (`home/...` -> `/home/...`) and nested duplicated roots before watcher registration.
+- **Cache Version Stamping**: `cache.json` is written with a `cache_version` marker (`SKILL_LIBRARY_CACHE_VERSION` in `core/persistence.py`). On load, a missing or mismatched marker means on-disk shape expectations can no longer be trusted: the stale file is discarded and unlinked, forcing a clean rescan instead of serving entries from an incompatible layout.
 - **Canonical Filesystem Walk** (ADR-0037): every recursive tree listing in `src/` goes through `iter_relative_files()` (`core/skill_packages/storage.py`) — iterative `os.scandir`, `/`-separated sorted output, symlinked files listed, symlinked directories never recursed, non-regular files excluded. Consumers (`skill_fingerprint`, `_relative_file_map`, MCP `static_analyze`) adapt it; no second inline walk may be added. Shallow single-level skill-directory listings (`quick_copy` discovery, `DiscoveryService` scans) use inline `os.scandir` with `entry.is_dir()` + `name.lower()` sorting instead, since they need per-entry type info rather than relative-path trees; `is_ignored()` there avoids `Path.relative_to()` via string slicing on the hot path.
 
 ### Add-Time Hooks
@@ -804,6 +805,26 @@ sequenceDiagram
 | `diskcache` | Local caching |
 | `orjson` | Fast JSON |
 | `joblib` | CPU-bound parallelism (ADR-0019) |
+
+### MCP Server Safety (`mcp/`)
+
+The MCP server (see [`MCP_SERVER.md`](MCP_SERVER.md)) leans on three guards
+that live in dedicated modules so every call path funnels through them:
+
+- **Write containment** (`mcp/bridge/_guard.py`): mutating tools may only touch
+  paths inside the configured skill sources. Containment is resolved against
+  the real filesystem (symlinks included) and every mutating bridge helper in
+  `_skills.py` runs through it before touching disk.
+- **Input-injection single source of truth** (`utils/input_guard.py`):
+  `injection_allowed()` (pytest/offscreen env guard) plus
+  `injection_refused_reason()` (live-SkillManager-GUI-window check) are the
+  only decision points for real mouse/keyboard injection. Platform modules
+  (`utils/linux.py`, `utils/win32.py`) never decide independently, and tests
+  must patch this module rather than guessed dispatch targets.
+- **Async bridge helpers**: all MCP bridge helpers that trigger a scan or do
+  blocking I/O are `async` and dispatch heavy work via `asyncio.to_thread`,
+  so the event loop serving the MCP session is never blocked (sm_lint /
+  sm_profile / sm_static_analyze included).
 
 ---
 
