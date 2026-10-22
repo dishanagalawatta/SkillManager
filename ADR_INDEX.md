@@ -39,6 +39,8 @@
 | [ADR-0042](docs/adr/ADR-0042-telemetry-privacy-boundaries.md) | Telemetry Privacy Boundaries (Scrubbing, Opt-Out, Credential Loading) | Accepted | 2026-10-18 | @DIKKA |
 | [ADR-0043](docs/adr/ADR-0043-pr-gated-main-manual-releases.md) | PR-Gated `main` and Manual, Two-Step Releases | Accepted | 2026-10-20 | @DIKKA |
 | [ADR-0044](docs/adr/ADR-0044-automatic-app-release-checks.md) | Automatic App-Release Checks with an Update Toast | Accepted | 2026-10-20 | @DIKKA |
+| [ADR-0045](docs/adr/ADR-0045-mcp-write-containment-and-injection-guard.md) | MCP Tool Containment and Input-Injection Guard | Accepted | 2026-10-22 | @DIKKA |
+| [ADR-0046](docs/adr/ADR-0046-schema-versioned-cache-index.md) | Schema-Versioned Cache Index | Accepted | 2026-10-22 | @DIKKA |
 
 
 ## Template
