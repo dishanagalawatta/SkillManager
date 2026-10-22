@@ -1,16 +1,24 @@
+# ruff: noqa: E402, ARG001
 """
-Offscreen smoke check for the command-edit project selector resync.
+Offscreen smoke check for the unified command workflow.
 
-Regression: GlassMultiSelect.selectedValues is a one-way binding that QML
-drops on the first user toggle, so re-opening CommandCreateDialog showed
-stale project checkboxes. The dialog now pushes editProjectLabels into the
-multi-select explicitly on every open.
+Replaces the old "command-edit project selector resync" check. The
+create/edit dialog no longer has a project selector — the Library owns
+the canonical command file and deployment goes through the Library's copy
+flow — so the stale-checkbox regression the old check guarded can no
+longer happen. The check now asserts the contract that replaced it:
+
+  1. The command dialog exposes no project selector.
+  2. Editing a command rewrites the canonical file IN PLACE and does not
+     fan out a copy into another project.
+  3. The copy flow DETECTS a command that already exists in the target
+     project instead of overwriting it silently.
 
 Drives the REAL app (real AppController + real Main.qml, same process) —
 no inline QML, no temp .qml files, no pytest. Property assertions only;
 visual layout is out of scope for this check.
 
-Usage: uv run python scripts/verify_command_selector_smoke.py
+Usage: uv run python scripts/verify_command_workflow_smoke.py
 Exit code 0 = all assertions held, 1 = regression detected.
 """
 
@@ -52,6 +60,15 @@ def check(name, actual, expected):
         print(f"  PASS: {name} = {actual}")
     else:
         msg = f"{name}: expected {expected}, got {actual}"
+        print(f"  FAIL: {msg}")
+        FAILURES.append(msg)
+
+
+def check_true(name, condition, detail=""):
+    if condition:
+        print(f"  PASS: {name}")
+    else:
+        msg = f"{name} {detail}".strip()
         print(f"  FAIL: {msg}")
         FAILURES.append(msg)
 
@@ -165,62 +182,84 @@ CTX: dict = {}
 
 
 def step_open_first():
-    print(f"[+{time.monotonic() - START_TIME:.1f}s] open #1 (fresh state)")
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] open the command dialog")
     dlg = find_dialog(window)
     if dlg is None:
         print("FATAL: CommandCreateDialog not found in QML tree!")
         os._exit(1)
     CTX["dlg"] = dlg
     dlg.openForEdit(SKILL)
-    QTimer.singleShot(800, step_assert_first)
+    QTimer.singleShot(800, step_assert_dialog)
 
 
-def step_assert_first():
+def step_assert_dialog():
+    """The dialog must not offer a project selector any more."""
     dlg = CTX["dlg"]
-    multi = find_multiselect(dlg)
-    if multi is None:
-        print("FATAL: GlassMultiSelect not found under dialog!")
-        os._exit(1)
-    CTX["multi"] = multi
-    print("assert open #1 state:")
-    check("editProjectLabels", dlg.property("editProjectLabels"), EXPECTED_HOLDERS)
-    check("multi.selectedValues", multi.property("selectedValues"), EXPECTED_HOLDERS)
-    # Simulate the user unchecking one project (this irreversibly drops the
-    # one-way binding — the regression trigger).
-    dropped = EXPECTED_HOLDERS[0]
-    CTX["dropped"] = dropped
-    multi.toggleItem(dropped)
-    QTimer.singleShot(400, step_assert_toggled)
-
-
-def step_assert_toggled():
-    dlg = CTX["dlg"]
-    print("assert toggle propagated upward:")
-    check(
-        "editProjectLabels after toggle",
-        dlg.property("editProjectLabels"),
-        [h for h in EXPECTED_HOLDERS if h != CTX["dropped"]],
+    print("assert the dialog has no project selector:")
+    check_true(
+        "no editProjectLabels property",
+        dlg.property("editProjectLabels") is None,
+        f"(got {dlg.property('editProjectLabels')!r})",
+    )
+    check_true(
+        "no GlassMultiSelect under the dialog",
+        find_multiselect(dlg) is None,
+        "(a project selector is still present)",
+    )
+    check_true(
+        "the edited command path is known",
+        bool(dlg.property("editLocalPath")),
+        f"(got {dlg.property('editLocalPath')!r})",
     )
     dlg.close()
-    QTimer.singleShot(600, step_reopen)
+    QTimer.singleShot(600, step_update_in_place)
 
 
-def step_reopen():
-    print(f"[+{time.monotonic() - START_TIME:.1f}s] open #2 (must resync, not stale)")
-    CTX["dlg"].openForEdit(SKILL)
-    QTimer.singleShot(800, step_assert_second)
-
-
-def step_assert_second():
-    dlg, multi = CTX["dlg"], CTX["multi"]
-    print("assert open #2 state:")
-    check("editProjectLabels on re-open", dlg.property("editProjectLabels"), EXPECTED_HOLDERS)
-    check(
-        "multi.selectedValues on re-open",
-        multi.property("selectedValues"),
-        EXPECTED_HOLDERS,
+def step_update_in_place():
+    """Editing a command rewrites the canonical file, in place only."""
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] update the canonical command")
+    controller.ops.updateCustomCommandFull(
+        str(proj_a / ".agents" / "commands" / "SmokeCmd.md"),
+        "SmokeCmd",
+        "Updated body",
+        "Custom Commands",
+        "",
     )
-    dlg.close()
+    QTimer.singleShot(1200, step_assert_in_place)
+
+
+def step_assert_in_place():
+    canonical = proj_a / ".agents" / "commands" / "SmokeCmd.md"
+    other = proj_b / ".agents" / "commands" / "SmokeCmd.md"
+    print("assert the update stayed in place:")
+    check_true(
+        "the canonical file carries the new body",
+        "Updated body" in canonical.read_text(encoding="utf-8"),
+        f"(got {canonical.read_text(encoding='utf-8')!r})",
+    )
+    check_true(
+        "the other project was NOT modified",
+        "Updated body" not in other.read_text(encoding="utf-8"),
+        "(the edit fanned out into another project)",
+    )
+    QTimer.singleShot(300, step_conflict_detection)
+
+
+def step_conflict_detection():
+    """The copy flow must detect the command that already exists."""
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] detect the copy conflict")
+    from skill_manager.core.copier import find_existing_commands_in_projects
+
+    existing = find_existing_commands_in_projects(
+        [{"local_path": str(proj_a / ".agents" / "commands" / "SmokeCmd.md"), "name": "SmokeCmd"}],
+        [str(proj_b)],
+    )
+    check("the conflicting command is reported", [e["name"] for e in existing], ["SmokeCmd"])
+    check_true(
+        "the conflict points at the target project",
+        bool(existing) and existing[0]["project"] == str(proj_b),
+        f"(got {existing[0]['project'] if existing else None!r})",
+    )
     QTimer.singleShot(300, finish)
 
 
@@ -231,7 +270,7 @@ def finish():
         for f in FAILURES:
             print(f"  - {f}")
         os._exit(1)
-    print(f"[+{time.monotonic() - START_TIME:.1f}s] SMOKE RESULT: all selector assertions held")
+    print(f"[+{time.monotonic() - START_TIME:.1f}s] SMOKE RESULT: all workflow assertions held")
     QTimer.singleShot(100, app.quit)
 
 
