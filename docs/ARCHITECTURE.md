@@ -249,7 +249,7 @@ When packages run tools such as `npx skills add <package>` or `npx skills update
 
 #### Package Deletion & Storage Cleanup Lifecycle
 
-When a package is removed from the Updates view, `UpdateController.removeUpdatePackage(index)` coordinates with `delete_package_storage()` to execute a multi-tier cleanup with strict safety guards:
+When a package is removed from the Packages view (view key stays `updates`), `UpdateController.removeUpdatePackage(index)` coordinates with `delete_package_storage()` to execute a multi-tier cleanup with strict safety guards:
 
 ```mermaid
 flowchart TD
@@ -600,7 +600,7 @@ flowchart LR
 - Update checks always run: startup scan (~2s after launch) + 6h periodic re-scan via `QtScheduler` (`skill-package-auto-scan` job).
 - Each scan force-refreshes `latest_version` (npm/git/commands), then `recalculateStats()` sets the header count to the number of outdated **packages** (`current_version != latest_version`) — a 1:1 match with the per-package Update buttons. Skill content drift stays in `_update_results` as inspector detail and never arms the header.
 - **On**: outdated packages install in the background via `updateNow()`; completion fires an `autoUpdateFinished` toast popup (bottom-right).
-- **Off**: an `updatesAvailable` toast popup (bottom-right) with an **Update** button appears whenever updates are found — clicking it opens the Updates view and starts Update All.
+- **Off**: an `updatesAvailable` toast popup (bottom-right) with an **Update** button appears whenever updates are found — clicking it opens the Packages view and starts Update All.
 - Both `updateNow` and `runPackageUpdate` recalculate stats in their finalize step, so the header count drops to 0 (and Update All disables) the moment promoted versions land — no follow-up scan required.
 
 ```mermaid
@@ -611,7 +611,7 @@ flowchart LR
     Stats -->|> 0, auto on| Auto[updateNow<br/>background]
     Auto --> DoneToast[toast: finished]
     Stats -->|> 0, auto off| ActionToast[toast + Update button]
-    ActionToast -->|click| Updates[Updates view<br/>+ updateAllOutdated]
+    ActionToast -->|click| Packages[Packages view<br/>+ updateAllOutdated]
     Timer[6h scheduler] --> Scan
 ```
 
@@ -720,7 +720,7 @@ flowchart TD
 - **Cancellation**: Generation counter (`_refresh_generation`) for cooperative cancellation
 - **Debounce**: 400 ms `QTimer` trailing-edge debounce for filesystem events
 - **Self-Healing Storage**: Automatically cleans missing leading slashes (`home/...` -> `/home/...`) and nested duplicated roots before watcher registration.
-- **Cache Version Stamping**: `cache.json` is written with a `cache_version` marker (`SKILL_LIBRARY_CACHE_VERSION` in `core/persistence.py`). On load, a missing or mismatched marker means on-disk shape expectations can no longer be trusted: the stale file is discarded and unlinked, forcing a clean rescan instead of serving entries from an incompatible layout.
+- **Cache Version Stamping** (ADR-0046): `cache.json` is written with a `cache_version` marker (`SKILL_LIBRARY_CACHE_VERSION` in `core/persistence.py`). On load, a missing or mismatched marker means on-disk shape expectations can no longer be trusted: the stale file is discarded and unlinked, forcing a clean rescan instead of serving entries from an incompatible layout.
 - **Canonical Filesystem Walk** (ADR-0037): every recursive tree listing in `src/` goes through `iter_relative_files()` (`core/skill_packages/storage.py`) — iterative `os.scandir`, `/`-separated sorted output, symlinked files listed, symlinked directories never recursed, non-regular files excluded. Consumers (`skill_fingerprint`, `_relative_file_map`, MCP `static_analyze`) adapt it; no second inline walk may be added. Shallow single-level skill-directory listings (`quick_copy` discovery, `DiscoveryService` scans) use inline `os.scandir` with `entry.is_dir()` + `name.lower()` sorting instead, since they need per-entry type info rather than relative-path trees; `is_ignored()` there avoids `Path.relative_to()` via string slicing on the hot path.
 
 ### Add-Time Hooks
@@ -806,7 +806,7 @@ sequenceDiagram
 | `orjson` | Fast JSON |
 | `joblib` | CPU-bound parallelism (ADR-0019) |
 
-### MCP Server Safety (`mcp/`)
+### MCP Server Safety (`mcp/`) (ADR-0045)
 
 The MCP server (see [`MCP_SERVER.md`](MCP_SERVER.md)) leans on three guards
 that live in dedicated modules so every call path funnels through them:

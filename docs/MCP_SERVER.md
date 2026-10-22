@@ -586,8 +586,11 @@ version skipped that step and rendered an empty shell, which is exactly the
 "looks different" failure this guards against. The load is cache-only and
 read-only: the MCP process never scans the filesystem or rewrites the index, so
 it cannot race a running GUI or shrink its library (an earlier build persisted
-620 skills over the GUI's 3240). A missing cache still falls back to a scan for
-the render, but with persistence disabled. Every headless result therefore
+620 skills over the GUI's 3240). The on-disk index is schema-stamped
+(`cache_version`): the headless loader discards a missing- or
+mismatched-version cache file and falls back to a scan for the render instead —
+so it can never resurrect a layout written by an incompatible older build (the
+fallback render has persistence disabled). Every headless result therefore
 includes `render`:
 
 ```json
