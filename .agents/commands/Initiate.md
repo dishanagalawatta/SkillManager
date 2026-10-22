@@ -2,7 +2,7 @@
 name: Initiate
 category: Custom Commands
 type: command
-date: 2026-09-13
+date: 2026-10-12
 ---
 
 # Role & Identity

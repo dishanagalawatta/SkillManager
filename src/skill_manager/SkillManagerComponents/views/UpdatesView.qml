@@ -11,11 +11,47 @@ Item {
     id: updatesRoot
     objectName: "UpdatesView"
 
+    // The catalog search query (kept on the view so the filter survives a
+    // package-list change).
+    property string uv_catalogQuery: ""
+
     function cleanup() {
         uv_packagesList.cacheBuffer = 0
         uv_projectsList.cacheBuffer = 0
+        uv_catalogList.cacheBuffer = 0
         uv_packagesList.model = null
         uv_projectsList.model = null
+        uv_catalogList.model = null
+    }
+
+    // The curated catalog, filtered by the search field.
+    function uv_filteredCatalog() {
+        var all = AppController.update_controller ? AppController.update_controller.catalogPackages : []
+        if (!all || all.length === 0) return []
+        var needle = (updatesRoot.uv_catalogQuery || "").trim().toLowerCase()
+        if (needle === "") return all
+        var out = []
+        for (var i = 0; i < all.length; i++) {
+            var e = all[i]
+            var haystack = ((e.display_name || "") + " " + (e.description || "") + " "
+                + (e.author || "") + " " + (e.category || "") + " "
+                + (e.tags || []).join(" ")).toLowerCase()
+            if (haystack.indexOf(needle) !== -1) out.push(e)
+        }
+        return out
+    }
+
+    // Index of the installed package that matches a catalog entry.
+    function uv_installedPackageIndex(entry) {
+        if (!entry) return -1
+        var packages = AppController.updatePackages || []
+        for (var i = 0; i < packages.length; i++) {
+            var p = packages[i]
+            if (!p) continue
+            if (entry.installed_package_id && p.package_id === entry.installed_package_id) return i
+            if (p.repository_url && entry.repository_url && p.repository_url === entry.repository_url) return i
+        }
+        return -1
     }
 
     Component.onDestruction: {
@@ -47,6 +83,15 @@ Item {
                 uv_packagesList.model = newModel
                 uv_packagesList.cacheBuffer = Math.max(uv_packagesList.height * 2, 1000)
             }
+            // The catalog's install badges depend on the package list.
+            uv_catalogList.model = updatesRoot.uv_filteredCatalog()
+        }
+    }
+
+    Connections {
+        target: AppController.update_controller ? AppController.update_controller : null
+        function onCatalogChanged() {
+            uv_catalogList.model = updatesRoot.uv_filteredCatalog()
         }
     }
 
@@ -111,7 +156,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: 10
                     Text {
-                        text: "Sync & Updates"
+                        text: "Packages"
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.sizeBody
                         font.weight: Font.Bold
@@ -123,12 +168,45 @@ Item {
                         color: Theme.separator
                         visible: updatesRoot.width >= 420
                     }
-                    Text {
-                        text: AppController.isLoading ? "Checking..." : (AppController.statsOutdated + " updates")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeCaption
-                        color: AppController.isLoading ? Theme.accent : Theme.secondaryLabel
+                    // Status summary: how many packages are installed, how
+                    // many are outdated and how many could not be checked.
+                    Rectangle {
+                        Layout.preferredWidth: uv_installedCountText.implicitWidth + 16
+                        Layout.preferredHeight: 22
+                        radius: 11
+                        color: Theme.glassHover
+                        border.color: Theme.glassBorder
+                        border.width: 1
+                        visible: updatesRoot.width >= 380
+
+                        Text {
+                            id: uv_installedCountText
+                            anchors.centerIn: parent
+                            text: (AppController.updatePackages ? AppController.updatePackages.length : 0) + " installed"
+                            color: Theme.secondaryLabel
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                        }
+                    }
+                    Rectangle {
+                        Layout.preferredWidth: uv_outdatedCountText.implicitWidth + 16
+                        Layout.preferredHeight: 22
+                        radius: 11
+                        color: Theme.alpha(Theme.accent, 0.12)
+                        border.color: Theme.alpha(Theme.accent, 0.3)
+                        border.width: 1
                         visible: updatesRoot.width >= 420
+
+                        Text {
+                            id: uv_outdatedCountText
+                            anchors.centerIn: parent
+                            text: AppController.isLoading
+                                ? "Checking..."
+                                : (AppController.statsOutdated + " outdated")
+                            color: AppController.isLoading ? Theme.accent : Theme.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                        }
                     }
                     // "0 updates" is not the same as "0 packages checked":
                     // say so when a remote could not be reached.
@@ -145,8 +223,20 @@ Item {
                     spacing: 8
 
                     ActionButton {
+                        objectName: "addCustomPackageBtn"
+                        labelText: "+ Add Custom Package"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
+                        role: "secondary"
+                        tooltipText: "Add a package from a repository, an npx command or a script"
+                        onClicked: (mouse) => {
+                            uv_packageEditDialog.editIndex = -1
+                            uv_packageEditDialog.open()
+                        }
+                    }
+
+                    ActionButton {
                         objectName: "scanUpdatesBtn"
-                        labelText: "Scan"
+                        labelText: "Check for Updates"
                         role: "secondary"
                         tooltipText: enabled ? "Check configured projects for available skill updates." : "Update scan is already running."
                         enabled: !AppController.isLoading
@@ -155,7 +245,7 @@ Item {
 
                     ActionButton {
                         property bool hasPendingUpdates: AppController.statsOutdated > 0
-                        labelText: hasPendingUpdates ? "Update All" : "Up to Date"
+                        labelText: hasPendingUpdates ? "Sync All" : "Up to Date"
                         role: hasPendingUpdates ? "primary" : "secondary"
                         tooltipText: enabled ? "Update every package currently marked outdated." : "Already up to date"
                         enabled: !AppController.isLoading && hasPendingUpdates
@@ -166,25 +256,72 @@ Item {
         }
 
 
-        // Main Layout with SplitView
-        SplitView {
+        // Page switcher: Installed / Discover / Project Sync
+        RowLayout {
+            id: uv_tabs
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            orientation: updatesRoot.width < 520 ? Qt.Vertical : Qt.Horizontal
-            handle: Rectangle {
-                implicitWidth: 4
-                implicitHeight: 4
-                color: "transparent"
+            spacing: 0
+
+            Repeater {
+                model: [
+                    { key: "installed", label: "Installed" },
+                    { key: "discover", label: "Discover" },
+                    { key: "sync", label: "Project Sync" }
+                ]
+
+                delegate: Rectangle {
+                    id: uv_tab
+                    required property var modelData
+                    required property int index
+                    readonly property bool selected: uv_pages.currentIndex === uv_tab.index
+
+                    Layout.preferredWidth: uv_tabText.implicitWidth + 32
+                    Layout.preferredHeight: 34
+                    radius: Theme.radiusButton
+                    color: selected ? Theme.glassActive : "transparent"
+                    border.color: selected ? Theme.accent : Theme.glassBorder
+                    border.width: 1
+                    activeFocusOnTab: true
+
+                    Accessible.role: Accessible.PageTab
+                    Accessible.checked: selected
+                    Accessible.name: modelData.label + " tab"
+
+                    Text {
+                        id: uv_tabText
+                        anchors.centerIn: parent
+                        text: uv_tab.modelData.label
+                        color: uv_tab.selected ? Theme.label : Theme.secondaryLabel
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeBody
+                        font.weight: uv_tab.selected ? Font.DemiBold : Font.Medium
+                    }
+
+                    TapHandler {
+                        onTapped: uv_pages.currentIndex = uv_tab.index
+                    }
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return) {
+                            uv_pages.currentIndex = uv_tab.index
+                            event.accepted = true
+                        }
+                    }
+                }
             }
 
-            // Left Pane: Packages Manager
+            Item { Layout.fillWidth: true }
+        }
+
+        // Pages: Installed packages / Curated catalog / Project sync
+        StackLayout {
+            id: uv_pages
+            objectName: "uv_pages"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: 0
+
+            // Page 1: Installed packages
             ColumnLayout {
-                SplitView.preferredWidth: parent.width * 0.45
-                SplitView.preferredHeight: parent.height * 0.45
-                SplitView.minimumWidth: 100
-                SplitView.minimumHeight: 140
-                SplitView.fillWidth: true
-                SplitView.fillHeight: true
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 16
@@ -212,17 +349,6 @@ Item {
                             }
                             RowLayout {
                                 spacing: 6
-                                ActionButton {
-                                    labelText: "Add Package"
-                                    iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
-                                    iconOnlyMode: uv_packagesHeader.width < 340
-                                    role: "secondary"
-                                    tooltipText: "Add Package"
-                                    onClicked: (mouse) => {
-                                        uv_packageEditDialog.editIndex = -1
-                                        uv_packageEditDialog.open()
-                                    }
-                                }
                                 ActionButton {
                                     labelText: "Folder"
                                     iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
@@ -453,14 +579,239 @@ Item {
                 }
             }
 
-            // Right Pane: Projects Manager
+            // Page 2: Discover — the curated package catalog
             ColumnLayout {
-                SplitView.preferredWidth: parent.width * 0.55
-                SplitView.preferredHeight: parent.height * 0.55
-                SplitView.minimumWidth: 100
-                SplitView.minimumHeight: 140
-                SplitView.fillWidth: true
-                SplitView.fillHeight: true
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 16
+
+                GlassPill {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 12
+
+                        RowLayout {
+                            id: uv_catalogHeader
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            Text {
+                                text: "Discover Library"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeSectionTitle
+                                font.weight: Font.Bold
+                                color: Theme.label
+                                elide: Text.ElideRight
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            GlassSearchInput {
+                                id: uv_catalogSearch
+                                // Bound to the view width, not the row width:
+                                // a child sized from its layout parent causes a
+                                // recursive rearrange.
+                                Layout.preferredWidth: Math.min(220, updatesRoot.width * 0.25)
+                                placeholderText: "Search packages..."
+                                Accessible.name: "Search the package catalog"
+                                onDebouncedTextChanged: (text) => {
+                                    updatesRoot.uv_catalogQuery = text
+                                    uv_catalogList.model = updatesRoot.uv_filteredCatalog()
+                                }
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Curated, ready-to-install skill packages. Install one with a click, "
+                                + "or configure it first."
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.sizeCaption
+                            color: Theme.secondaryLabel
+                            wrapMode: Text.WordWrap
+                        }
+
+                        SmoothListView {
+                            id: uv_catalogList
+                            objectName: "uv_catalogList"
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            spacing: 8
+                            model: uv_filteredCatalog()
+
+                            delegate: Rectangle {
+                                id: uv_catalogCard
+                                required property var modelData
+                                readonly property var entry: modelData
+
+                                width: uv_catalogList.width
+                                height: uv_cardLayout.implicitHeight + 24
+                                radius: Theme.radiusCard
+                                color: Theme.glassPill
+                                border.color: Theme.glassBorder
+                                border.width: 1
+
+                                ColumnLayout {
+                                    id: uv_cardLayout
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.margins: 12
+                                    spacing: 6
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Text {
+                                            text: uv_catalogCard.entry.display_name || ""
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.sizeBody
+                                            font.weight: Font.DemiBold
+                                            color: Theme.label
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+
+                                        // Author badge
+                                        Rectangle {
+                                            Layout.preferredWidth: uv_authorText.implicitWidth + 14
+                                            Layout.preferredHeight: 20
+                                            radius: 10
+                                            color: Theme.glassHover
+                                            border.color: Theme.glassBorder
+                                            border.width: 1
+                                            visible: uv_catalogCard.entry.author !== ""
+
+                                            Text {
+                                                id: uv_authorText
+                                                anchors.centerIn: parent
+                                                text: uv_catalogCard.entry.author || ""
+                                                color: Theme.secondaryLabel
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.sizeCaption
+                                            }
+                                        }
+
+                                        // Source type badge
+                                        Rectangle {
+                                            Layout.preferredWidth: uv_typeText.implicitWidth + 14
+                                            Layout.preferredHeight: 20
+                                            radius: 10
+                                            color: Theme.alpha(Theme.accent, 0.12)
+                                            border.color: Theme.alpha(Theme.accent, 0.3)
+                                            border.width: 1
+
+                                            Text {
+                                                id: uv_typeText
+                                                anchors.centerIn: parent
+                                                text: uv_catalogCard.entry.source_type || ""
+                                                color: Theme.accent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.sizeCaption
+                                                font.weight: Font.Medium
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: uv_catalogCard.entry.description || ""
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.sizeCaption
+                                        color: Theme.secondaryLabel
+                                        wrapMode: Text.WordWrap
+                                        maximumLineCount: 2
+                                        elide: Text.ElideRight
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        // Tags
+                                        Text {
+                                            text: (uv_catalogCard.entry.tags || []).join(" · ")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.sizeCaption
+                                            color: Theme.secondaryLabel
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+
+                                        // Installed badge
+                                        Rectangle {
+                                            visible: uv_catalogCard.entry.is_installed === true
+                                            Layout.preferredWidth: uv_installedText.implicitWidth + 16
+                                            Layout.preferredHeight: 22
+                                            radius: 11
+                                            color: Theme.alpha(Theme.success, 0.14)
+                                            border.color: Theme.alpha(Theme.success, 0.4)
+                                            border.width: 1
+
+                                            Text {
+                                                id: uv_installedText
+                                                anchors.centerIn: parent
+                                                text: "Installed ✓"
+                                                color: Theme.success
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.sizeCaption
+                                                font.weight: Font.Medium
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            labelText: "Configure…"
+                                            role: "secondary"
+                                            tooltipText: "Configure the package before installing it"
+                                            buttonHeight: 30
+                                            visible: !uv_catalogCard.entry.is_installed
+                                            onClicked: (mouse) => {
+                                                uv_packageEditDialog.openWithTemplate(uv_catalogCard.entry)
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            labelText: "Install"
+                                            role: "primary"
+                                            tooltipText: "Install with the default settings"
+                                            buttonHeight: 30
+                                            visible: !uv_catalogCard.entry.is_installed
+                                            onClicked: (mouse) => {
+                                                AppController.update_controller.installCatalogPackageDefault(
+                                                    uv_catalogCard.entry.id)
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            labelText: "Reconfigure"
+                                            role: "secondary"
+                                            tooltipText: "Open the installed package for editing"
+                                            buttonHeight: 30
+                                            visible: uv_catalogCard.entry.is_installed === true
+                                            onClicked: (mouse) => {
+                                                var idx = uv_installedPackageIndex(uv_catalogCard.entry)
+                                                if (idx >= 0) {
+                                                    uv_packageEditDialog.editIndex = idx
+                                                    uv_packageEditDialog.open()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Page 3: Project sync
+            ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 16

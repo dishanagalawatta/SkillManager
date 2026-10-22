@@ -181,9 +181,6 @@ def test_controller_setters(controller):
     controller.reducedMotion = True
     assert controller.reducedMotion is True
 
-    controller.compactListRows = True
-    assert controller.compactListRows is True
-
     controller.windowX = 100
     assert controller.windowX == 100
     controller.windowY = 200
@@ -376,11 +373,13 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
         from skill_manager.core.commands import CommandCreateResult
 
         mock_create.return_value = CommandCreateResult(
-            ok=True, message="Created command: Deploy.md"
+            ok=True,
+            message="Created command: Deploy.md",
+            path=project_path / ".agents" / "commands" / "Deploy.md",
         )
-        controller.createCustomCommand("Deploy", "body", ["proj"], "Ops")
+        controller.createCustomCommand("Deploy", "body", "Ops")
 
-    assert controller.statusMessage == "Created command in 1 project(s)"
+    assert controller.statusMessage.startswith("Created command in")
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -510,8 +509,6 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.rememberFilters is False
     controller.setReducedMotion(True)
     assert controller.reducedMotion is True
-    controller.setCompactListRows(True)
-    assert controller.compactListRows is True
     assert controller.ui.triggerSave.call_count >= 3
 
     controller.libraryModel.filterText = "abc"
@@ -525,7 +522,6 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.currentView == "Library"
     assert controller.startupView == "Library"
     assert controller.rememberFilters is True
-    assert controller.compactListRows is False
 
 
 def test_controller_load_initial_data_success_and_error(controller, temp_dir):
@@ -867,7 +863,6 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
     On main (pre-fix), this fails because discover_single returns
     None for bare .md command files.
     """
-    from skill_manager.core.quick_copy import project_label as compute_project_label
 
     project_path = temp_dir / "proj"
     project_path.mkdir(parents=True, exist_ok=True)
@@ -883,10 +878,7 @@ def test_update_custom_command_refreshes_selected_skill_real_discovery(
         {"local_path": str(cmd_file), "name": "Cmd", "body_content": "old body"}
     )
 
-    proj_label = compute_project_label(project_path)
-    controller.updateCustomCommandFull(
-        str(cmd_file), "Cmd", "new body", "Commands", [proj_label], ""
-    )
+    controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", "")
 
     from PySide6.QtWidgets import QApplication
 
@@ -917,10 +909,6 @@ def test_create_custom_command_refreshes_selected_skill_real_discovery(
     project_path = temp_dir / "proj"
     project_path.mkdir(parents=True, exist_ok=True)
 
-    from skill_manager.core.quick_copy import project_label as compute_project_label
-
-    label = compute_project_label(project_path)
-
     # Pre-create the command file so discover_single can parse it
     cmd_file = project_path / ".agents" / "commands" / "NewCmd.md"
     _write_command_file(cmd_file, "NewCmd", "echo hello")
@@ -931,7 +919,7 @@ def test_create_custom_command_refreshes_selected_skill_real_discovery(
     emissions = []
     controller.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    controller.createCustomCommand("NewCmd2", "echo hello", [label], "Commands")
+    controller.createCustomCommand("NewCmd2", "echo hello", "Commands")
 
     # Verify the new command file was created and discover_single works
     new_cmd_file = project_path / ".agents" / "commands" / "NewCmd2.md"

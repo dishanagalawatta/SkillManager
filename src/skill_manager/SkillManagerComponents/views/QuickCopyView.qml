@@ -21,6 +21,20 @@ Item {
         && AppController.selectedSkill.local_path !== undefined
         && AppController.selectedSkill.local_path !== ""
 
+    // Path of the active project (empty when no project is selected).
+    // The task panel works on paths, the UI works on labels.
+    readonly property string _activeProjectPath: {
+        var label = AppController.currentProject
+        if (!label || label === "All Projects") return ""
+        // getProjectPath scans the configured projects directly, so it does
+        // not depend on the cached project-label list.
+        return AppController.config_controller.getProjectPath(label) || ""
+    }
+
+    // Number of open tasks in the active project (project badge).
+    readonly property int _activeTaskCount:
+        AppController.task_controller.projectTaskCounts[qcv_root._activeProjectPath] || 0
+
 
     // === Dynamic Collapse System ===
     // Collapse phases (0 = all expanded, 8 = most collapsed):
@@ -494,6 +508,59 @@ Item {
                             }
                         }
 
+                        // Open-task badge for the active project
+                        Rectangle {
+                            id: qcv_taskBadge
+                            objectName: "projectTaskBadge"
+                            visible: !qcv_root.isEditingCollection
+                                && qcv_root._activeTaskCount > 0
+                            Layout.preferredWidth: Math.max(22, qcv_taskBadgeText.implicitWidth + 14)
+                            Layout.preferredHeight: 22
+                            radius: 11
+                            color: Theme.alpha(Theme.accent, 0.15)
+                            border.color: Theme.alpha(Theme.accent, 0.35)
+                            border.width: 1
+
+                            Text {
+                                id: qcv_taskBadgeText
+                                anchors.centerIn: parent
+                                text: qcv_root._activeTaskCount.toString()
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.weight: Font.Bold
+                                font.pixelSize: Theme.sizeCaption
+                            }
+
+                            SleekToolTip {
+                                text: qcv_root._activeTaskCount + " open task(s) in "
+                                    + (AppController.currentProject || "this project")
+                                visible: qcv_taskBadgeMouse.hovered
+                            }
+
+                            HoverHandler {
+                                id: qcv_taskBadgeMouse
+                                cursorShape: Qt.PointingHandCursor
+                            }
+                            TapHandler {
+                                onTapped: AppController.ui_controller.setTasksPanelOpen(
+                                    !AppController.ui_controller.tasksPanelOpen)
+                            }
+                        }
+
+                        // Toggle the task panel
+                        IconButton {
+                            id: qcv_tasksToggleBtn
+                            objectName: "tasksPanelToggle"
+                            visible: !qcv_root.isEditingCollection
+                            buttonSize: 32
+                            iconSource: AppController.ui_controller.getAssetUri(
+                                "ui/check-circle-bold.svg")
+                            tooltipText: AppController.ui_controller.tasksPanelOpen
+                                ? "Hide tasks" : "Show tasks"
+                            onClicked: AppController.ui_controller.setTasksPanelOpen(
+                                !AppController.ui_controller.tasksPanelOpen)
+                        }
+
                         IconButton {
                             objectName: "cycleProjectButton"
                             visible: !qcv_root.isEditingCollection
@@ -807,9 +874,10 @@ Item {
         }
 
         // Main Content Area — inline inspectors removed, moved to overlay layer below
-        Item {
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: 12
 
             // Skill List
             // Scroll preservation (collapse/expand restore, refresh blink,
@@ -818,7 +886,8 @@ Item {
             SmoothListView {
                 id: qcv_skillList
                 objectName: "quickCopyList"
-                anchors.fill: parent
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
                 model: null
 
@@ -868,6 +937,16 @@ Item {
                 }
             }
 
+            // Per-project task panel
+            ProjectTasksPanel {
+                id: qcv_tasksPanel
+                objectName: "projectTasksPanel"
+                Layout.preferredWidth: 340
+                Layout.fillHeight: true
+                visible: AppController.ui_controller.tasksPanelOpen
+                projectPath: qcv_root._activeProjectPath
+                projectName: AppController.currentProject
+            }
         }
     }
 

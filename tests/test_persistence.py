@@ -217,3 +217,62 @@ def test_patch_cache_add_failure(temp_files):
         # Cache doesn't exist
         count = patch_cache_add([{"local_path": "/p1"}])
         assert count == 0
+
+
+def test_temp_registry_is_scoped_to_the_owning_process(temp_files):
+    """A live instance's temporary files must survive another instance's startup.
+
+    The registry is shared between SkillManager instances (and the headless
+    MCP process). Cleaning up on startup must therefore only touch the
+    entries whose owning process is gone — otherwise a second instance
+    deletes the temporary snapshots the first one is still writing.
+    """
+
+    from skill_manager.core.persistence import (
+        take_abandoned_temp_copies,
+        take_abandoned_temp_snaps,
+    )
+
+    with patch_config(temp_files):
+        # A path registered by *this* (live) process.
+        save_temp_registry(["/mine"])
+        assert load_temp_registry() == ["/mine"]
+
+        # Nothing is abandoned while the owner is alive.
+        assert take_abandoned_temp_copies() == []
+        assert take_abandoned_temp_snaps() == []
+
+        # Our own entry survives.
+        assert load_temp_registry() == ["/mine"]
+
+
+def test_temp_registry_cleans_up_entries_of_dead_processes(temp_files):
+    """Entries left behind by a process that is gone are cleaned up."""
+    import json
+    import os
+
+    import skill_manager.core.persistence as persistence
+
+    with patch_config(temp_files):
+        # Simulate a registry written by a process that no longer exists.
+        dead_pid = 999_999_999
+        payload = {"owners": {str(dead_pid): ["/abandoned"], str(os.getpid()): ["/mine"]}}
+        with open(persistence.TEMP_COPIES_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+
+        assert persistence.take_abandoned_temp_copies() == ["/abandoned"]
+        # The live process's entry is untouched.
+        assert load_temp_registry() == ["/mine"]
+
+
+def test_legacy_flat_temp_registry_is_treated_as_abandoned(temp_files):
+    """The pre-PID registry format had no owner, so it is cleaned up."""
+    import json
+
+    import skill_manager.core.persistence as persistence
+
+    with patch_config(temp_files):
+        with open(persistence.TEMP_COPIES_FILE, "w", encoding="utf-8") as f:
+            json.dump({"temp_paths": ["/legacy"]}, f)
+
+        assert persistence.take_abandoned_temp_copies() == ["/legacy"]

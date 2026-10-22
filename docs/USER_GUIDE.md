@@ -8,7 +8,7 @@ The application is divided into four main views, accessible from the top ribbon:
 
 1. **Library**: Your central repository for all agent skills. Features multi-select deployment and deep inspection.
 2. **Quick Copy**: A project-focused view for rapid reference copying during active development.
-3. **Updates**: A centralized hub for synchronizing your library with Git sources and project projects.
+3. **Packages**: A centralized hub for managing skill packages — install curated packages, track updates, and sync your library with Git sources and projects.
 4. **Settings**: Comprehensive configuration for paths, branding, deployment formats, shortcuts, and appearance.
 
 ---
@@ -51,14 +51,18 @@ The Quick Copy view is designed for daily workflow efficiency when working withi
 - **Manual Input**: Add raw text references or notes alongside your skill references.
 - **Starred Items**: Starred skills and commands are shown as first-class items in the Quick Copy workflow.
 - **Command Skill Carry**: When you copy a command to another project, SkillManager automatically detects which skills the command references (e.g., `/git-pr`, `@cavecrew`). If any of those skills are missing in the target project, a carry dialog appears listing them. You can toggle individual skills, carry all, or skip and copy commands only. This ensures commands work in every project without manual dependency tracking. When a command edit spans multiple projects, the missing skills are merged into a single prompt (one union list for all projects, copied per project on confirm). Re-editing after a full carry stays silent — if nothing is missing, no dialog appears.
+- **Per-Project Task List**: A collapsible panel next to the skill list holds a task list for the *active* project. Toggle it with the checklist button in the top bar or with `Ctrl+Shift+L`. The panel shows an open/done counter, an All/Active/Done filter, a quick-add field (with a low/medium/high priority picker), and per-row actions: copy the task for your agent, edit it inline, or delete it. The project dropdown carries a badge with the number of open tasks, so you can see at a glance which project still has work waiting. "Copy for Agent" puts the task title, its notes, and any linked skill references on the clipboard, formatted for the client format you selected.
 
 ---
 
-## 3. Updates View
+## 3. Packages View
 
 When you modify a skill in your central library, you need to push those changes to projects using it.
 
 - **Git Updates**: Manage your skill sources (Git repos). Check for new versions and update your local library.
+- **Three Tabs**: *Installed* lists the packages you have, *Discover* is a curated catalog of ready-to-install skill collections, and *Project Sync* shows the per-project skill status.
+- **Curated Catalog**: The *Discover* tab lists popular skill packages (Vercel Skills, Anthropic Skills, Agentic Awesome Skills, …). **Install** sets one up with its default configuration; **Configure…** opens the package dialog pre-filled so you can change the target directory, the arguments or the alias first. Packages you already have are badged **Installed ✓**. The catalog is extensible — drop a `package_catalog.json` into the app data directory to add your own entries.
+- **Status Summary**: The header shows how many packages are installed, how many are outdated, and how many could not be checked.
 - **Surgical Sync**: The system compares skill versions across projects and identifies precisely which skills are outdated.
 - **Syncing**: Update individual skills in specific projects, or use sync to bring all projects up to date.
 - **Skill Package Management**: Add, edit, and manage update sources across multiple protocols with an ultra-sleek, streamlined dialog:
@@ -87,7 +91,7 @@ Configure how SkillManager integrates with your system.
 - **Skill Sources**: Manage the directories and Git repositories that feed your library.
 - **Project Projects**: Configure project root directories. SkillManager manages the `.agents/skills/` folder in these locations.
 - **Branding & Client Selector**: Choose your preferred AI agent (Antigravity, Gemini CLI, Codex, Plain Text). This updates the application's logo and reference syntax.
-- **Appearance**: Toggle Dark/Light mode, enable Mica/Acrylic effects (Windows only), reduced motion, compact list rows, and adjust the Scroll Speed Multiplier (0.5x to 5.0x) with real-time UI feedback for customized trackpad and mouse wheel scroll speed across all views.
+- **Appearance**: Toggle Dark/Light mode, enable Mica/Acrylic effects (Windows only), reduced motion, and adjust the Scroll Speed Multiplier (0.5x to 5.0x) with real-time UI feedback for customized trackpad and mouse wheel scroll speed across all views. List rows always use the compact layout — there is no separate row-density setting.
 - **Shortcuts**: Customize keyboard shortcuts for all major operations (search, copy, archive, delete, refresh, navigation, theme toggle) and per-collection shortcuts for one-keystroke copy+paste.
 - **Updates**: SkillManager checks GitHub Releases automatically shortly after launch and once a day, showing a bottom-right "App update available" popup with a **View Release** button. You can also check on demand with the **Check for Updates** button; a newer release offers **View Release** to open the download page. Installation stays manual (see [INSTALL.md](INSTALL.md)).
 - **Skill Packages**: Toggle **Auto Update** on or off. Update checks always run at startup and every 6h. When on, updates install in the background and a bottom-right popup confirms completion. When off, a bottom-right popup with an **Update** button appears whenever updates are available — clicking it opens Updates and starts the update.
@@ -126,11 +130,12 @@ SkillManager includes a powerful screenshots and redaction feature.
 | **Navigate** | |
 | `Alt+1` | Quick Copy view |
 | `Alt+2` | Library view |
-| `Alt+3` | Updates view |
+| `Alt+3` | Packages view |
 | `Alt+4` | Settings view |
 | **Tools** | |
 | `Ctrl+T` | Toggle theme |
 | `Ctrl+Shift+S` | Take screenshot |
+| `Ctrl+Shift+L` | Toggle the Quick Copy task panel |
 | *Customizable* | All shortcuts can be remapped in Settings |
 | *Per-collection* | Each collection can have its own shortcut; pressing it copies the collection's skill references and pastes them into the focused field |
 
@@ -145,7 +150,7 @@ SkillManager is fully operable without a mouse, and screen readers announce cont
 - **Full keyboard flow**: `Tab` moves through lists, headers, checkboxes, and toolbar controls;
   `Space`/`Enter` activates the focused control; revealed-on-focus delete buttons and
   tooltip previews work from the keyboard, not just hover.
-- **Tabs & formats**: Library/QuickCopy/Updates/Settings nav and the Settings
+- **Tabs & formats**: Library/QuickCopy/Packages/Settings nav and the Settings
   General/Shortcuts/About tabs expose the selected tab; the QuickCopy client-format
   picker exposes the active format.
 - **Annotation canvas**: the screenshot canvas, color/size/eraser presets, and resize handles
@@ -201,6 +206,6 @@ When launching from the terminal or scripts:
 
 ## Tips & Tricks
 
-- **Drag & Drop**: Drag source and project directories directly into the Updates view to add them.
+- **Drag & Drop**: Drag source and project directories directly into the Packages view to add them.
 - **Project Aliases**: Give friendly names to project paths for easier identification in dropdowns.
 - **Temporary Copies**: Use "Copy to Project (Temporary)" for one-off testing without permanent deployment.

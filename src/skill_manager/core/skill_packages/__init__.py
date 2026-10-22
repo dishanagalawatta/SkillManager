@@ -1,3 +1,11 @@
+from .catalog import (
+    BUILTIN_CATALOG,
+    catalog_with_status,
+    find_catalog_entry,
+    get_catalog,
+    matches_installed_package,
+    template_to_package_data,
+)
 from .config import (
     detect_command_type,
     detect_package_config,
@@ -51,11 +59,13 @@ from .versioning import (
 )
 
 __all__ = [
+    "BUILTIN_CATALOG",
     "CHECK_STATUS_FAILED",
     "CHECK_STATUS_NEVER_CHECKED",
     "CHECK_STATUS_OK",
     "RemoteProbeCache",
     "VersionProbe",
+    "catalog_with_status",
     "check_skill_package_versions",
     "count_outdated_packages",
     "count_unchecked_packages",
@@ -64,6 +74,8 @@ __all__ = [
     "detect_git_remote",
     "detect_package_config",
     "diff_package_inventory",
+    "find_catalog_entry",
+    "get_catalog",
     "get_git_tag",
     "get_outdated_packages",
     "get_unchecked_packages",
@@ -73,6 +85,7 @@ __all__ = [
     "inventory_removals_verified",
     "is_package_outdated",
     "is_safe_deletion_target",
+    "matches_installed_package",
     "merge_and_move_lockfile",
     "normalize_skill_package_config",
     "normalize_version",
@@ -91,4 +104,5 @@ __all__ = [
     "sanitize_token",
     "scan_package_inventory",
     "split_args",
+    "template_to_package_data",
 ]

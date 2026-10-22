@@ -17,14 +17,14 @@ from skill_manager.app import AppController
 class OpsController(QObject):
     # Signals
     minimizeAppRequested: ClassVar[SignalInstance]
-    commandPendingRemovals: ClassVar[SignalInstance]  # str, list
     commandSkillsCarryPrompt: ClassVar[SignalInstance]  # str, str, str
     commandSkillsCarryBatchPrompt: ClassVar[SignalInstance]  # str (JSON batch)
+    commandCopyExistingDetected: ClassVar[SignalInstance]  # str, str, str
 
     # State
     app: AppController
     _is_deleting: bool
-    _pending_command_update: dict | None
+    _pending_command_copy: dict | None
 
     def __init__(self, app: AppController) -> None: ...
 
@@ -80,20 +80,15 @@ class OpsController(QObject):
     def _send_paste_to_focused_window(self) -> None: ...
 
     # ── Commands ───────────────────────────────────────────────────────
-    def createCustomCommand(
-        self, name: str, body: str, project_labels: list[str], category: str
-    ) -> str: ...
+    def createCustomCommand(self, name: str, body: str, category: str) -> str: ...
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
         body: str,
         category: str,
-        project_labels: list[str],
         on_conflict: str = ...,
-        confirmed_removals: list[str] | None = ...,
     ) -> None: ...
-    def confirmCommandRemovals(self, local_path: str, confirmed_labels: list[str]) -> None: ...
     def commandProjectsForPath(self, local_path: str) -> list[str]: ...
     def _get_all_known_skills(self) -> list: ...
     def _snapshot_affected_paths(self, affected_project_paths: set[Path]) -> set[str]: ...

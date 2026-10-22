@@ -8,11 +8,9 @@ from PySide6.QtCore import Q_ARG, QMetaObject, Qt, Slot
 from skill_manager.controllers.ops._helpers import _get_item_attr
 from skill_manager.core.analytics import capture_exception
 from skill_manager.core.persistence import (
-    load_temp_registry,
-    load_temp_snaps_registry,
     patch_cache_remove,
-    save_temp_registry,
-    save_temp_snaps_registry,
+    take_abandoned_temp_copies,
+    take_abandoned_temp_snaps,
 )
 from skill_manager.core.quick_copy import delete_project_skill_folders
 from skill_manager.core.schemas import SkillRecord
@@ -242,8 +240,13 @@ class DeleteMixin:
         self.deleteSkillsByPaths(selected_paths)
 
     def cleanup_temp_copies(self):
-        """Deletes all temporary copies recorded in the registry."""
-        temp_paths = load_temp_registry()
+        """Deletes the temporary copies left behind by a process that is gone.
+
+        Copies owned by a *live* SkillManager instance are left alone: they
+        are still in use by that instance, and deleting them would destroy
+        work that is still in flight.
+        """
+        temp_paths = take_abandoned_temp_copies()
         if not temp_paths:
             return
 
@@ -263,13 +266,16 @@ class DeleteMixin:
                 logger.error("[TEMP_CLEANUP] Failed to delete %s: %s", path_str, e)
                 capture_exception(e)
 
-        save_temp_registry([])
         if deleted_count > 0:
             logger.info("[TEMP_CLEANUP] Cleaned up %d temporary paths.", deleted_count)
 
     def cleanup_temp_snaps(self):
-        """Deletes all temporary screenshots recorded in the registry."""
-        temp_paths = load_temp_snaps_registry()
+        """Deletes the temporary screenshots left behind by a dead process.
+
+        Snapshots owned by a *live* instance are left alone — they may be
+        in flight right now.
+        """
+        temp_paths = take_abandoned_temp_snaps()
         if not temp_paths:
             return
 
@@ -287,7 +293,6 @@ class DeleteMixin:
         if temp_paths:
             patch_cache_remove(temp_paths)
 
-        save_temp_snaps_registry([])
         if deleted_count > 0:
             logger.info(
                 "[TEMP_SNAP_CLEANUP] Cleaned up %d temporary screenshots.",

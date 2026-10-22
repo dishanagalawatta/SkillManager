@@ -7,7 +7,6 @@ from skill_manager.core.copier import (
     get_installed_skill_folder_names,
 )
 from skill_manager.core.models.entities import Skill
-from skill_manager.core.quick_copy import project_label
 
 
 def test_find_missing_skills_with_skill_dataclasses(tmp_path: Path):
@@ -92,11 +91,9 @@ def test_ops_controller_create_command_carry_prompt_emitted(tmp_path: Path, qtbo
         )
     )
 
-    label_a = project_label(proj_a)
     cmd_path = ops.createCustomCommand(
         name="test-cmd",
         body="Use /helper-skill to do stuff",
-        project_labels=[label_a],
         category="General",
     )
 
@@ -141,12 +138,10 @@ def test_ops_controller_update_command_carry_prompt_emitted(tmp_path: Path, qtbo
 
     ops = OpsController(app_mock)
 
-    label_a = project_label(proj_a)
     # First create command without missing skills
     cmd_path = ops.createCustomCommand(
         name="my-cmd",
         body="Basic command text",
-        project_labels=[label_a],
         category="General",
     )
 
@@ -165,7 +160,6 @@ def test_ops_controller_update_command_carry_prompt_emitted(tmp_path: Path, qtbo
         name="my-cmd",
         body="Updated text referencing /my-helper",
         category="General",
-        project_labels=[label_a],
     )
 
     qtbot.wait(100)
@@ -177,12 +171,13 @@ def test_ops_controller_update_command_carry_prompt_emitted(tmp_path: Path, qtbo
     assert missing[0]["name"] == "my-helper"
 
 
-def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path, qtbot):
-    """Test editing a command to add a new project prompts carry if the new project lacks skills.
+def test_ops_controller_copy_command_to_project_carries_skills(tmp_path: Path, qtbot):
+    """Deploying a command to a project that lacks its skill offers the carry.
 
-    The command is initially held only in projA. Updating with project_labels=[A, B]
-    adds projB as an ``add_set`` project, which triggers the fan-out write and carry check
-    for projB. projB lacks the skill that projA has, so the carry prompt is emitted for projB.
+    The dialog no longer fans a command out to several projects, so the
+    "command added to a project" path is the Library copy flow. Copying a
+    command into a project that does not have the referenced skill must
+    emit the skill-carry prompt for that project.
     """
     from skill_manager.controllers.ops_controller import OpsController
 
@@ -200,14 +195,10 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
     app_mock._starred_paths = []
     app_mock._project_aliases = {}
 
-    # Pre-install skill in projA, but NOT in projB
+    # The referenced skill exists in the library but in neither project.
     skill_folder_global = source_dir / "multi-helper"
     skill_folder_global.mkdir()
     (skill_folder_global / "SKILL.md").write_text("# Multi Helper Skill\n")
-
-    skill_folder_a = proj_a / ".agents" / "skills" / "multi-helper"
-    skill_folder_a.mkdir(parents=True)
-    (skill_folder_a / "SKILL.md").write_text("# Multi Helper Skill in ProjA\n")
 
     skill_obj = Skill(
         name="multi-helper",
@@ -216,22 +207,18 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
     )
     app_mock._library_model._all_skills = [skill_obj]
     app_mock._selected_skill = skill_obj
+    app_mock._quick_copyModel = MagicMock()
     app_mock._quick_copy_model = MagicMock()
 
     ops = OpsController(app_mock)
 
-    label_a = project_label(proj_a)
-    label_b = project_label(proj_b)
-
-    # Create command in projA only (not in projB)
-    cmd_path_a = ops.createCustomCommand(
-        name="shared-cmd",
-        body="Initial shared body",
-        project_labels=[label_a],
-        category="General",
+    # The canonical command lives in projA and references /multi-helper.
+    cmd_file_a = proj_a / ".agents" / "commands" / "shared-cmd.md"
+    cmd_file_a.parent.mkdir(parents=True)
+    cmd_file_a.write_text(
+        "---\nname: shared-cmd\n---\nUpdated body referencing /multi-helper\n",
+        encoding="utf-8",
     )
-
-    qtbot.wait(50)
 
     received_signals = []
     ops.commandSkillsCarryPrompt.connect(
@@ -240,27 +227,16 @@ def test_ops_controller_update_command_multi_project_carry_prompt(tmp_path: Path
         )
     )
 
-    # Now edit command, adding reference to /multi-helper, targeting BOTH projects.
-    # projB is in add_set (doesn't hold the command yet) → fan-out writes to projB → carry check runs.
-    ops.updateCustomCommandFull(
-        local_path=cmd_path_a,
-        name="shared-cmd",
-        body="Updated body referencing /multi-helper",
-        category="General",
-        project_labels=[label_a, label_b],
+    ops._prompt_missing_skills_for_commands(
+        [{"local_path": str(cmd_file_a), "name": "shared-cmd"}], str(proj_b)
     )
 
     qtbot.wait(100)
 
-    # Verify projB's command file was created by the add_set fan-out
-    cmd_file_b = proj_b / ".agents" / "commands" / "shared-cmd.md"
-    assert cmd_file_b.exists()
-    assert "/multi-helper" in cmd_file_b.read_text()
-
-    # Verify carry prompt was emitted for projB (which lacks the skill)
     assert len(received_signals) >= 1
-    proj_b_signals = [s for s in received_signals if s[1] == str(proj_b)]
-    assert len(proj_b_signals) == 1
-    missing_b = json.loads(proj_b_signals[0][2])
-    assert len(missing_b) == 1
-    assert missing_b[0]["name"] == "multi-helper"
+    cmd_json, proj_path, missing_json = received_signals[0]
+    assert json.loads(cmd_json) == [str(cmd_file_a)]
+    assert proj_path == str(proj_b)
+    missing = json.loads(missing_json)
+    assert len(missing) == 1
+    assert missing[0]["name"] == "multi-helper"

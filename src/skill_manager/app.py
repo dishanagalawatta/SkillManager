@@ -52,6 +52,7 @@ from skill_manager.controllers.selected_skill_controller import (  # noqa: E402
     SelectedSkillController,
 )
 from skill_manager.controllers.snap_controller import SnapController  # noqa: E402
+from skill_manager.controllers.task_controller import TaskController  # noqa: E402
 from skill_manager.controllers.ui_controller import UIController  # noqa: E402
 from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
 from skill_manager.core.analytics import shutdown as posthog_shutdown  # noqa: E402
@@ -156,7 +157,6 @@ class AppController(AppControllerProxyMixin, QObject):
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
-    compactListRowsChanged = Signal()
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
@@ -166,7 +166,7 @@ class AppController(AppControllerProxyMixin, QObject):
     commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
     commandSkillsCarryPrompt = Signal(str, str, str)
     commandSkillsCarryBatchPrompt = Signal(str)
-    commandPendingRemovals = Signal(str, list)
+    commandCopyExistingDetected = Signal(str, str, str)  # project, commandPathsJson, existingJson
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
@@ -266,7 +266,8 @@ class AppController(AppControllerProxyMixin, QObject):
         self.updates = UpdateController(self)  # type: ignore[arg-type]
         self.discovery = DiscoveryController(self)  # type: ignore[arg-type]
         self.app_updater = AppUpdateController(self)  # type: ignore[arg-type]
-        self.global_hotkey = GlobalHotkeyManager(self)  # type: ignore[arg-type]
+        self.global_hotkey = GlobalHotkeyManager(self)
+        self.tasks = TaskController(self)  # type: ignore[arg-type]
 
         # 4. Connect Sub-Controller signals to Proxy Signals
         self.ui.currentViewChanged.connect(self.currentViewChanged.emit)
@@ -279,7 +280,6 @@ class AppController(AppControllerProxyMixin, QObject):
         self.ui.startupViewChanged.connect(self.startupViewChanged.emit)
         self.ui.rememberFiltersChanged.connect(self.rememberFiltersChanged.emit)
         self.ui.reducedMotionChanged.connect(self.reducedMotionChanged.emit)
-        self.ui.compactListRowsChanged.connect(self.compactListRowsChanged.emit)
 
         self.config_mgr.shortcutsChanged.connect(self.shortcutsChanged.emit)
         self.config_mgr.isRecordingShortcutChanged.connect(self.isRecordingShortcutChanged.emit)
@@ -288,9 +288,13 @@ class AppController(AppControllerProxyMixin, QObject):
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
 
-        self.ops.commandPendingRemovals.connect(self.commandPendingRemovals.emit)
+        # The task panel follows the active project, so it has to refresh
+        # whenever the project selection changes.
+        self.currentProjectChanged.connect(self._on_current_project_changed)
+
         self.ops.commandSkillsCarryPrompt.connect(self.commandSkillsCarryPrompt.emit)
         self.ops.commandSkillsCarryBatchPrompt.connect(self.commandSkillsCarryBatchPrompt.emit)
+        self.ops.commandCopyExistingDetected.connect(self.commandCopyExistingDetected.emit)
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
@@ -660,6 +664,10 @@ class AppController(AppControllerProxyMixin, QObject):
     def global_hotkey_controller(self):
         return self.global_hotkey
 
+    @Property(QObject, constant=True)
+    def task_controller(self):
+        return self.tasks
+
     @Property(str, notify=currentProjectChanged)
     def currentProject(self):  # type: ignore[reportRedeclaration]
         return self._current_project_label
@@ -926,14 +934,6 @@ class AppController(AppControllerProxyMixin, QObject):
     def reducedMotion(self, v):
         self.ui.reducedMotion = v
 
-    @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):  # type: ignore[reportRedeclaration]
-        return self.ui.compactListRows
-
-    @compactListRows.setter  # type: ignore[func-attr]
-    def compactListRows(self, v):
-        self.ui.compactListRows = v
-
     @Property(str, notify=shortcutsChanged)
     def shortcutSearch(self):
         return self.config_mgr.shortcutSearch
@@ -1151,6 +1151,12 @@ class AppController(AppControllerProxyMixin, QObject):
         if self._current_project_label not in labels:
             self._current_project_label = labels[0] if labels else ""
             self.currentProjectChanged.emit()
+
+    def _on_current_project_changed(self):
+        """The active project's task list changed — refresh the panel."""
+        tasks = getattr(self, "tasks", None)
+        if tasks is not None:
+            tasks.refresh()
 
     @Slot(str)
     def _set_status(self, msg):

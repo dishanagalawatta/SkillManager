@@ -23,6 +23,9 @@ Dialog {
     property bool userEditedName: false
     property bool userEditedProtocol: false
     property bool isInternalUpdating: false
+    // Set while the dialog is pre-filled from a curated catalog entry, so
+    // the open handler does not wipe the template's values.
+    property bool isTemplatePrefilled: false
     // Which "Verify" is in flight and for which URL.  Verification is
     // asynchronous (the probe is network-bound), so a result is only applied
     // when it still belongs to the latest click.
@@ -68,6 +71,8 @@ Dialog {
     }
 
     onOpened: {
+        // A template already filled the fields — do not reset them.
+        if (isTemplatePrefilled) return
         if (!isEdit) {
             nameInput.text = ""
             typeCombo.currentIndex = 0
@@ -158,6 +163,49 @@ Dialog {
     }
 
 
+
+    onClosed: {
+        root.isTemplatePrefilled = false
+    }
+
+    function openWithTemplate(templateData) {
+        // Pre-fill the dialog from a curated catalog entry. The user can
+        // still change the target directory, the arguments, the alias and
+        // the update command before installing.
+        if (!templateData) {
+            console.log("openWithTemplate called without a template")
+            return
+        }
+        root.editIndex = -1
+        root.isTemplatePrefilled = true
+        root.isInternalUpdating = true
+        root.userEditedName = true
+        root.userEditedProtocol = true
+
+        nameInput.text = templateData.display_name || templateData.name || ""
+        let types = ["npx", "git", "custom"]
+        let idx = types.indexOf(templateData.source_type)
+        typeCombo.currentIndex = idx !== -1 ? idx : 0
+
+        packageInput.text = templateData.package_name || ""
+        repoInput.text = templateData.repository_url || ""
+        npxRepoInput.text = templateData.repository_url || ""
+        tokenInput.text = ""
+        npxTokenInput.text = ""
+        pathInput.text = templateData.package_path || ""
+        argsInput.text = templateData.default_args || templateData.package_args || ""
+        cmdInput.text = templateData.update_command || ""
+        currentVerCmdInput.text = ""
+        latestVerCmdInput.text = ""
+
+        verificationStatus.text = ""
+        npxVerificationStatus.text = ""
+        root.saveError = ""
+        root.showAdvancedOverrides = false
+        root.isInternalUpdating = false
+
+        open()
+    }
 
     function setNpxAdvanced(val) {
         root.showAdvancedOverrides = val

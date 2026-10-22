@@ -15,6 +15,8 @@ import App 1.0
 Dialog {
     id: root
 
+    objectName: "commandCreateDialog"
+
     parent: Overlay.overlay
     anchors.centerIn: Overlay.overlay
     width: Math.min(750, Overlay.overlay ? Overlay.overlay.width - 32 : 750)
@@ -39,36 +41,21 @@ Dialog {
 
     property bool editMode: false
     property string editLocalPath: ""
-    property var editProjectLabels: []
     property string editCategoryValue: ""
     property string orphanCategory: ""
     property bool awaitingConflictResolution: false
     property var pendingArgs: ({})
-    property var removalDialog: null
     property string pendingEmoji: "\u26A1"
-
-    // Safety net: whenever the dialog becomes visible, push the source of
-    // truth (editProjectLabels) into the multi-select. User toggles replace
-    // the child's selectedValues array (breaking its one-way binding), so
-    // without this the popup would show stale checkboxes on re-open.
-    onOpened: {
-        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
-    }
 
     function openWithContext() {
         editMode = false
         editLocalPath = ""
-        editProjectLabels = AppController.currentProject ? [AppController.currentProject] : (AppController.projectLabels.length > 0 ? [AppController.projectLabels[0]] : [])
         editCategoryValue = ""
         orphanCategory = ""
         awaitingConflictResolution = false
         pendingEmoji = "\u26A1"
         cmdNameInput.text = ""
         cmdBodyInput.text = ""
-        // Re-sync the multi-select: its selectedValues binding is
-        // intentionally broken by user toggles (QML drops the binding on
-        // first imperative assignment), so push the fresh value explicitly.
-        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
         open()
     }
 
@@ -79,12 +66,6 @@ Dialog {
     function openForEdit(skill) {
         editMode = true
         editLocalPath = skill.local_path || ""
-        var holders = AppController.commandProjectsForPath(skill.local_path || "")
-        if (!holders || holders.length === 0) {
-            var pl = skill.project_label || (AppController.currentProject ? AppController.currentProject : "")
-            holders = pl ? [pl] : []
-        }
-        editProjectLabels = holders.slice()
         editCategoryValue = skill.category || ""
         orphanCategory = (skill.category
                           && AppController.categories.indexOf(skill.category) === -1)
@@ -93,9 +74,6 @@ Dialog {
         pendingEmoji = AppController.getCommandEmoji(skill.local_path || "")
         cmdNameInput.text = skill.name || ""
         cmdBodyInput.text = skill.body_content || ""
-        // Re-sync the multi-select explicitly (see openWithContext): the
-        // selectedValues binding is dropped after the first user toggle.
-        if (projectMultiSelect) projectMultiSelect.selectedValues = editProjectLabels.slice()
         open()
     }
 
@@ -306,28 +284,6 @@ Dialog {
                 }
             }
 
-            // Projects (multi-select)
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 16
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 4
-                    Text { text: "Projects"; font.family: Theme.fontFamily; font.pixelSize: Theme.sizeMetadata; color: Theme.secondaryLabel }
-                    GlassMultiSelect {
-                        id: projectMultiSelect
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 36
-                        model: AppController.projectLabels
-                        selectedValues: root.editProjectLabels
-                        placeholderText: "Select projects..."
-                        allLabel: "All Projects"
-                        onSelectionChanged: root.editProjectLabels = projectMultiSelect.selectedValues.slice()
-                    }
-                }
-            }
-
             // Command Body
             ColumnLayout {
                 Layout.fillWidth: true
@@ -412,15 +368,14 @@ Dialog {
                 text: editMode ? "Update Command" : "Create Command"
                 Layout.preferredWidth: 160
                 Layout.preferredHeight: 40
-                enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== "" && root.editProjectLabels.length > 0
+                enabled: cmdNameInput.text !== "" && cmdBodyInput.text !== ""
 
                 onClicked: {
                     root.pendingArgs = {
                         localPath: editMode ? editLocalPath : "",
                         name: cmdNameInput.text,
                         body: cmdBodyInput.text,
-                        category: editCategoryValue,
-                        projectLabels: projectMultiSelect.selectedValues.slice()
+                        category: editCategoryValue
                     }
                     root.awaitingConflictResolution = editMode
                     if (editMode) {
@@ -429,7 +384,6 @@ Dialog {
                             root.pendingArgs.name,
                             root.pendingArgs.body,
                             root.pendingArgs.category,
-                            root.pendingArgs.projectLabels,
                             ""
                         )
                         AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
@@ -437,7 +391,6 @@ Dialog {
                         let newPath = AppController.createCustomCommand(
                             root.pendingArgs.name,
                             root.pendingArgs.body,
-                            root.pendingArgs.projectLabels,
                             root.pendingArgs.category
                         )
                         AppController.setCommandEmoji(newPath, root.pendingEmoji)
@@ -461,12 +414,6 @@ Dialog {
                 }
             }
         }
-    }
-
-    // Removal confirmation dialog
-    CommandRemovalConfirmDialog {
-        id: removalConfirmDialog
-        parent: Overlay.overlay
     }
 
     // Emoji picker
@@ -499,7 +446,6 @@ Dialog {
                 root.pendingArgs.name,
                 root.pendingArgs.body,
                 root.pendingArgs.category,
-                root.pendingArgs.projectLabels,
                 "cancel"
             )
             conflictDialog.close()
@@ -611,7 +557,6 @@ Dialog {
                             root.pendingArgs.name,
                             root.pendingArgs.body,
                             root.pendingArgs.category,
-                            root.pendingArgs.projectLabels,
                             "overwrite"
                         )
                         AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
@@ -634,7 +579,6 @@ Dialog {
                             root.pendingArgs.name,
                             root.pendingArgs.body,
                             root.pendingArgs.category,
-                            root.pendingArgs.projectLabels,
                             "rename"
                         )
                         AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
@@ -659,8 +603,6 @@ Dialog {
                 cmdNameInput.text = root.pendingArgs.name
                 cmdBodyInput.text = root.pendingArgs.body
                 root.editCategoryValue = root.pendingArgs.category
-                root.editProjectLabels = root.pendingArgs.projectLabels.slice()
-                if (projectMultiSelect) projectMultiSelect.selectedValues = root.editProjectLabels.slice()
                 root.open()
             }
             conflictDialog.open()
@@ -673,11 +615,6 @@ Dialog {
                 AppController.setCommandEmoji(newPath, root.pendingEmoji)
             }
             root.accept()
-        }
-        function onCommandPendingRemovals(localPath, pendingRemovals) {
-            removalConfirmDialog.localPath = localPath
-            removalConfirmDialog.pendingRemovals = pendingRemovals
-            removalConfirmDialog.open()
         }
     }
 }

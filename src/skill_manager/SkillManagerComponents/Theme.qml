@@ -63,6 +63,19 @@ QtObject {
     readonly property real radiusField: 20 // Pill style fields
     readonly property real radiusSmall: 10 // Reverted from 12
     
+    // --- List Row Geometry ---
+    // Compact rows are the single, permanent list design. The former "normal"
+    // (46 px) variant and its user-facing toggle were removed; these metrics
+    // are the canonical values every skill/command row uses.
+    readonly property real rowHeight: 32
+    readonly property real rowTopMargin: 2
+    readonly property real rowIconSize: 22
+    readonly property real rowIconGlyphSize: 14
+    readonly property real rowTitleSize: 11
+    readonly property real rowCheckboxSize: 16
+    readonly property real rowCheckMarkSize: 10
+    readonly property real rowSelectionBarHeight: 16
+
     // --- Typography ---
     readonly property string fontFamily: "Segoe UI Variable Display, Segoe UI, system-ui"
     readonly property real sizeHeading: 28

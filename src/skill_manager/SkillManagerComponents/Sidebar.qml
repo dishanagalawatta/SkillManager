@@ -135,7 +135,7 @@ Rectangle {
 
         SidebarButton {
             iconSource: AppController.ui_controller.getAssetUri("ui/folder-sync-icon.svg")
-            labelText: "Updates"
+            labelText: "Packages"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"
             onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }

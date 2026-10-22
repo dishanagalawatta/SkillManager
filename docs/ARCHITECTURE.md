@@ -94,6 +94,29 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | `SkillReferences` | `skill_references.py` | Skill dependency detection |
 | `SearchEngine` | `search.py` | Fast skill lookup index |
 | `DiskCache` | (via `diskcache`) | Expensive computation caching |
+| `TaskStore` | `tasks.py` | Per-project task lists (atomic JSON + `FileLock`) |
+
+### Curated Package Catalog (`core/skill_packages/catalog.py`)
+
+| File | Purpose |
+|------|---------|
+| `catalog.py` | The curated, ready-to-install package catalog and its helpers |
+| `schemas.py` | `CatalogPackageTemplate` — one catalog entry |
+
+`BUILTIN_CATALOG` is the built-in starter list. A user can extend it by
+dropping a `package_catalog.json` into the app data directory; user
+entries are merged with the built-in ones and win on an id collision.
+
+`catalog_with_status(installed)` enriches every entry with
+`is_installed` and `installed_package_id`. The match is by repository
+(after the `KNOWN_SKILL_REPO_ALIASES` canonicalisation) or by npm
+package name, so `vercel-labs/find-skills` is recognised as the same
+package as `vercel-labs/skills`.
+
+`UpdateController` exposes the result as the notifying
+`catalogPackages` property and offers two install paths:
+`installCatalogPackageDefault(catalog_id)` (one click, default path) and
+`PackageEditDialog.openWithTemplate(template)` (pre-filled, editable).
 
 ### Skill Packages (`core/skill_packages/`)
 
@@ -317,39 +340,89 @@ sequenceDiagram
 2. **Package Label Invariance**: In `addOrUpdateSkills`, `project_label` recomputation is scoped exclusively to project skills (`not skill.is_package`), permanently preserving `"Master Library"` for package records.
 3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization. `equal` blocks are synced via `PipelineMixin._sync_equal_block()`, which reassigns only rows whose objects actually mutated (`!=`, preserving identity for identical items) and batches contiguous changed rows into single `dataChanged(topLeft, bottomRight)` emissions to prevent signal storms.
 
-#### Batched Command Skill Carry (ADR-0036)
+#### Per-Project Task List
 
-Editing a command deployed to several projects fans out the write,
-then collects missing skills per project into one batch and emits a
-single carry prompt (union skill list, one user decision). A 1-entry
-batch falls back to the legacy single-project signal.
+Quick Copy carries a collapsible task panel for the **active** project.
+
+- **Persistence** — `core/tasks.py` stores the lists in
+  `DATA_DIR / "project_tasks.json"` through the same atomic write +
+  cross-process `FileLock` the skill caches use. Project keys are
+  canonicalised (`canonical_key`), so a path written with a different case
+  or separator never orphans a project's list.
+- **Model** — `ProjectTaskRecord` (Pydantic): `id`, `title`, `description`,
+  `completed`, `priority` (`low`/`medium`/`high`), `linked_skills`,
+  `created_at`/`updated_at`, `order`.
+- **Controller** — `TaskController` exposes `currentProjectTasks`,
+  `activeTaskCount`, `completedTaskCount` and `projectTaskCounts` (a
+  notifying map used for the project badge) plus the CRUD slots and
+  `copyTaskAsPrompt`, which renders the linked skill references in the
+  active client format.
+- **UI** — `views/ProjectTasksPanel.qml`, hosted by `QuickCopyView.qml`
+  next to the skill list. The panel's open state lives in
+  `UIStateRecord.tasks_panel_open`, and `Ctrl+Shift+L` toggles it.
+
+```mermaid
+flowchart LR
+    QCV["QuickCopyView"] -->|projectPath / projectName| Panel["ProjectTasksPanel"]
+    Panel -->|add / toggle / update / delete / copy| Ctrl["TaskController"]
+    Ctrl --> Store["core/tasks.py"]
+    Store -->|atomic JSON + FileLock| File["DATA_DIR/project_tasks.json"]
+    Ctrl -->|tasksChanged| Panel
+    Ctrl -->|projectTaskCounts| Badge["Project badge"]
+```
+
+#### Unified Command Workflow
+
+The **Library is the single source of truth** for a custom command.
+
+- **Create / Edit** (`CommandCreateDialog.qml`) edits the canonical command
+  file where it lives — the Library's active project. There is no project
+  selector in the dialog and no fan-out: one file, one write.
+- **Deploy** to other projects happens through the Library's own copy flow
+  (`Copy to Project`). When a selected command already exists in the target
+  project, the copy **pauses** and the user decides:
+
+  | Action | Result |
+  |---|---|
+  | *Update Existing & Copy New* (`overwrite_commands=True`) | The project file is replaced by the Library version; new commands are copied. |
+  | *Copy Only New* (`overwrite_commands=False`) | The project's file is kept; only commands it does not have are copied. |
+  | *Cancel* | Nothing is written. |
+
+- **Skill carry** (ADR-0036) runs on **add and update** alike: after a
+  command is created, edited, or deployed, the controller scans it for
+  referenced skills (`find_referenced_skills_in_command`) and, when the
+  target project lacks one, emits a single carry prompt with the union of
+  the missing skills.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant UI as Command Dialog (QML)
-    participant Ops as OpsController (CommandsMixin)
-    participant Core as commands.py (multi fan-out)
+    participant Lib as LibraryView (QML)
+    participant Ops as OpsController
+    participant Core as commands.py / copier.py
     participant Disc as DiscoveryService
     participant QML as CommandCarrySkillsDialog
-    participant Copy as CopyMixin
 
-    UI->>Ops: updateCustomCommandFull(...)
-    Ops->>Core: update_custom_command_file_multi(...)
-    Core-->>Ops: Per-project write results
-    Ops->>Disc: discover_project() per affected project
-    Ops->>Ops: _collect_missing_skills_batch(pairs, body, UPDATE)
-    Ops->>Ops: _emit_missing_skills_batch(batch)
-    alt Multi-project batch
-        Ops->>QML: commandSkillsCarryBatchPrompt(batchJson)
-        QML->>QML: CommandCarrySkillsDialog.openWithBatch(batch)
-        QML->>Copy: confirmCommandSkillsCarryBatch(batchJson, skillsJson)
-    else Single-project entry
-        Ops->>QML: commandSkillsCarryPrompt(cmdJson, projPath, skillsJson)
-    else No missing skills
-        Ops-->>UI: Silent (no prompt)
+    UI->>Ops: createCustomCommand(name, body, category)
+    Ops->>Core: create_custom_command_file(...)  (canonical project)
+    Core-->>Ops: path
+    Ops->>Disc: discover_single + patch_cache_add
+    Ops->>Ops: _collect_missing_skills_batch(pairs, body, CREATE)
+    Ops-->>QML: commandSkillsCarryPrompt(...)  (when a skill is missing)
+
+    Lib->>Ops: copySelectedSkillsToProject(project)
+    Ops->>Core: find_existing_commands_in_projects(...)
+    alt Command already exists in the target
+        Ops-->>Lib: commandCopyExistingDetected(project, cmdPaths, existing)
+        Lib->>QML: CommandUpdateConfirmDialog.openForCopy(...)
+        QML->>Ops: confirmCommandCopyWithOverwrite(project, paths, overwrite)
+    else No conflict
+        Ops->>Core: copy_command_files_to_projects(...)
     end
-    Copy->>Copy: Per-project still-missing filter + copy + rescan
+    Ops->>Disc: discover_project(target)
+    Ops->>Ops: _prompt_missing_skills_for_commands(...)
+    Ops-->>QML: commandSkillsCarryPrompt(...)
 ```
 
 ```mermaid

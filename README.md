@@ -33,7 +33,7 @@
 | **[Quick Copy & Format Switcher](#quick-copy--format-switcher)** | Copy references in your agent's exact syntax, with project cycling and automatic dependency carry. |
 | **[Surgical Git Synchronization](#surgical-git-synchronization)** | See exactly which skills are stale in which repository, then sync only those. |
 | **[Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents)** | Hotkey capture, color-redact PII, save into the active project, paste into your terminal. |
-| **[Updates & Automatic Sync](#updates--automatic-sync)** | Track skill packages, install updates in the background, and hear about new SkillManager releases. |
+| **[Packages & Automatic Sync](#packages--automatic-sync)** | Install curated skill packages with one click, track updates, and hear about new SkillManager releases. |
 | **[MCP Automation Bridge](#mcp-automation-bridge)** | Drive the library, screenshots, and UI inspection from an AI agent over stdio MCP. |
 | **[Accessibility & Comfort](#accessibility--comfort)** | Screen-reader semantics, full keyboard operation, reduced motion, compact rows, and themes. |
 
@@ -123,7 +123,7 @@ flowchart LR
 ```
 
 1. **Launch SkillManager**: Open the app from your application launcher. (Note: the global hotkey `Ctrl+Shift+S` does not launch the app — it captures a screenshot; see [Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents).)
-2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into **Updates**), connect your central skills Git repository and local project folders.
+2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into **Packages**), connect your central skills Git repository and local project folders.
 3. **Deploy or Copy Reference**:
    - In **Library**, select skills and click **Copy to Projects** to install them.
    - In **Quick Copy**, click **Copy Reference** next to any skill to paste it formatted directly into your active prompt.
@@ -143,7 +143,7 @@ Manage thousands of agent skills with instant fuzzy search, automatic category d
 
 - **Instant Search & Intelligent Tagging**: Real-time fuzzy filtering powered by `rapidfuzz`. Automatically organizes skills into Architecture, Testing, Security, CRO, UI, and Marketing.
 - **Rich Skill Inspector**: Read full skill documentation, preview raw Markdown, inspect parameters, and view trigger keywords.
-- **Custom Project Commands**: Turn any skill into an actionable `.md` slash command with custom emojis, multi-project deployment, and smart duplicate detection.
+- **Custom Project Commands**: Turn any skill into an actionable `.md` slash command with custom emojis. The Library owns the canonical command; deploy it to any project from there, with a prompt before an existing project command is replaced.
 - **Multi-Select Batch Actions**: Star favorites, archive unused skills, or deploy collections across all repositories at once.
 
 ---
@@ -193,13 +193,14 @@ flowchart LR
 
 ---
 
-### Updates & Automatic Sync
+### Packages & Automatic Sync
 
 Keeping a fleet of repositories current shouldn't mean remembering which skill changed where.
 
+- **Curated catalog**: Install popular skill collections (Vercel Skills, Anthropic Skills, Agentic Awesome Skills, …) with one click, or open them pre-filled to adjust the target directory first. Already-installed packages are badged **Installed ✓**.
 - **Version-aware skill packages**: Track NPX packages, GitHub/GitLab repositories, and custom scripts. Versions are auto-detected from NPM and upstream tags, with live validation while you type.
-- **Background updates**: Checks run at startup and every six hours. With **Auto Update** on, outdated packages install automatically and a bottom-right toast confirms it; with it off, the toast offers an **Update** button that opens the Updates view and starts Update All.
-- **Honest counts**: The "N updates" badge matches the per-package buttons one-to-one, and **Update All** flips to **Up to Date** as the new versions land.
+- **Background updates**: Checks run at startup and every six hours. With **Auto Update** on, outdated packages install automatically and a bottom-right toast confirms it; with it off, the toast offers an **Update** button that opens the Packages view and starts Sync All.
+- **Honest counts**: The "N outdated" badge matches the per-package buttons one-to-one, and **Sync All** flips to **Up to Date** as the new versions land.
 - **Surgical project sync**: Compares version fingerprints across your library and every linked project, updates only what is stale, and links matching project skills to their package automatically.
 - **Clean removal**: Deleting a package removes its storage, clone cache, lockfiles, inventory, and the corresponding skills from the Library and Quick Copy — no orphans left behind.
 - **Release notices**: SkillManager checks GitHub Releases shortly after launch and once a day, and shows a **View Release** toast when a newer version exists. Installation stays manual and explicit.

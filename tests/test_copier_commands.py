@@ -157,4 +157,4 @@ def test_copy_command_files_empty_commands(tmp_path):
 
     result = copy_command_files_to_projects([], [str(target_root)])
 
-    assert result == {"copied": 0, "skipped": 0, "failed": 0, "details": []}
+    assert result == {"copied": 0, "updated": 0, "skipped": 0, "failed": 0, "details": []}

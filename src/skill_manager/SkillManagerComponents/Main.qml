@@ -241,6 +241,9 @@ Window {
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutThemeToggleEnabled; sequence: AppController.config_controller.shortcutThemeToggle; onActivated: AppController.ui_controller.darkMode = !AppController.ui_controller.darkMode }
     Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && AppController.config_controller.shortcutSnapEnabled && !(snapOverlay && snapOverlay.visible) && !AppController.global_hotkey_controller.portalBackendActive; sequence: AppController.config_controller.shortcutSnap; onActivated: AppController.snap_controller.takeSnap() }
 
+    // --- Task panel (Quick Copy) ---
+    Shortcut { enabled: !AppController.config_controller.isRecordingShortcut && window.currentView === "QuickCopy"; sequence: "Ctrl+Shift+L"; onActivated: AppController.ui_controller.setTasksPanelOpen(!AppController.ui_controller.tasksPanelOpen) }
+
     Instantiator {
         model: AppController.customCollections || []
         delegate: Shortcut {

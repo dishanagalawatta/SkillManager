@@ -37,8 +37,8 @@ class UIController(BaseController):
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
-    compactListRowsChanged = Signal()
     telemetryEnabledChanged = Signal()
+    tasksPanelOpenChanged = Signal()
     inspectorWidthChanged = Signal()
 
     def __init__(self, app):
@@ -231,20 +231,22 @@ class UIController(BaseController):
             self.triggerSave()
             self.reducedMotionChanged.emit()
 
-    @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):  # type: ignore[reportRedeclaration]
-        return self.state.compact_list_rows
-
-    @compactListRows.setter  # type: ignore[func-attr]
-    def compactListRows(self, value):
-        if self.state.compact_list_rows != value:
-            self.state.compact_list_rows = value
-            self.triggerSave()
-            self.compactListRowsChanged.emit()
-
     @Property(bool, notify=telemetryEnabledChanged)
     def telemetryEnabled(self):  # type: ignore[reportRedeclaration]
         return self.state.telemetry_enabled
+
+    @Property(bool, notify=tasksPanelOpenChanged)
+    def tasksPanelOpen(self):  # type: ignore[reportRedeclaration]
+        """Whether the Quick Copy task panel is expanded."""
+        return self.state.tasks_panel_open
+
+    @tasksPanelOpen.setter  # type: ignore[func-attr]
+    def tasksPanelOpen(self, value):
+        value = bool(value)
+        if self.state.tasks_panel_open != value:
+            self.state.tasks_panel_open = value
+            self.triggerSave()
+            self.tasksPanelOpenChanged.emit()
 
     @telemetryEnabled.setter  # type: ignore[func-attr]
     def telemetryEnabled(self, value):
@@ -313,12 +315,12 @@ class UIController(BaseController):
         self.reducedMotion = b
 
     @Slot(bool)
-    def setCompactListRows(self, b):
-        self.compactListRows = b
-
-    @Slot(bool)
     def setTelemetryEnabled(self, b):
         self.telemetryEnabled = b
+
+    @Slot(bool)
+    def setTasksPanelOpen(self, b):
+        self.tasksPanelOpen = b
 
     @Slot()
     def triggerSave(self):
@@ -353,8 +355,8 @@ class UIController(BaseController):
         self.startupViewChanged.emit()
         self.rememberFiltersChanged.emit()
         self.reducedMotionChanged.emit()
-        self.compactListRowsChanged.emit()
         self.telemetryEnabledChanged.emit()
+        self.tasksPanelOpenChanged.emit()
         self.inspectorWidthChanged.emit()
         # Defaults restore telemetry to on; keep the live client in step.
         set_telemetry_enabled(self.state.telemetry_enabled)
@@ -366,6 +368,9 @@ class UIController(BaseController):
             "quickcopy": "QuickCopy",
             "library": "Library",
             "updates": "Updates",
+            # The view is labelled "Packages" in the UI; the key stayed
+            # "Updates" so existing configs keep working.
+            "packages": "Updates",
             "settings": "Settings",
             "lastselected": "Last Selected",
         }

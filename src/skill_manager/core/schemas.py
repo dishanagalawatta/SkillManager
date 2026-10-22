@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -408,9 +409,11 @@ class UIStateRecord(BaseModel):
     startup_view: str = "Library"
     remember_filters: bool = True
     reduced_motion: bool = False
-    compact_list_rows: bool = False
     telemetry_enabled: bool = True
     inspector_width: int = Field(default=0, ge=0)
+    # The per-project task panel in Quick Copy is collapsible; its open
+    # state is remembered per user.
+    tasks_panel_open: bool = False
 
 
 class CacheState(BaseModel):
@@ -421,3 +424,79 @@ class CacheState(BaseModel):
     categories: list[str] = Field(default_factory=list)
     project_labels: list[str] = Field(default_factory=list)
     status: str = ""
+
+
+class ProjectTaskRecord(BaseModel):
+    """A single task in a project's task list.
+
+    Tasks are per-project: the same project key always maps to the same
+    record set, so a task list never orphans because the path was written
+    with a different case or separator.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    title: str = Field(..., min_length=1)
+    description: str = ""
+    completed: bool = False
+    priority: Literal["low", "medium", "high"] = "medium"
+    linked_skills: list[str] = Field(default_factory=list)
+    created_at: float = 0.0
+    updated_at: float = 0.0
+    order: int = 0
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _coerce_title(cls, value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+
+class ProjectTasksState(BaseModel):
+    """The persisted per-project task lists, keyed by canonical project path."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    projects: dict[str, list[ProjectTaskRecord]] = Field(default_factory=dict)
+
+
+class CatalogPackageTemplate(BaseModel):
+    """A curated, ready-to-install skill package.
+
+    The template carries everything the installer needs: the install command
+    that :func:`infer_package_metadata` understands, the repository it comes
+    from, and the metadata the catalog UI shows.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(..., min_length=1)
+    display_name: str = Field(..., min_length=1)
+    description: str = ""
+    author: str = ""
+    category: str = ""
+    tags: list[str] = Field(default_factory=list)
+    source_type: str = "git"  # git | npx | script
+    install_command: str = Field(..., min_length=1)
+    repository_url: str = ""
+    default_args: str = ""
+    featured: bool = False
+
+    @field_validator("source_type", mode="before")
+    @classmethod
+    def _normalise_source_type(cls, value: Any) -> str:
+        text = str(value or "git").strip().lower()
+        return text if text in ("git", "npx", "script") else "git"
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [tag.strip() for tag in value.split(",") if tag.strip()]
+        if isinstance(value, list):
+            return [str(tag) for tag in value if tag]
+        return []

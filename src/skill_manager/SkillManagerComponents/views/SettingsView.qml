@@ -231,14 +231,6 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Compact List Rows"
-                                    GlassSwitch {
-                                        checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
-                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
-                                    }
-                                }
-                                Separator {}
-                                SettingsRow {
                                     titleText: "Scroll Speed"
                                     descriptionText: "Multiplier: " + (scrollSpeedSlider.value ? scrollSpeedSlider.value.toFixed(1) : "1.0") + "x"
                                     GlassSlider {
@@ -449,9 +441,20 @@ Item {
                                     titleText: "Startup View"
                                     GlassDropdown {
                                         width: 170
-                                        model: ["Last Selected", "Library", "QuickCopy", "Updates", "Settings"]
-                                        currentIndex: AppController.ui_controller ? Math.max(0, model.indexOf(AppController.ui_controller.startupView)) : 0
-                                        onActivated: (index) => { if (AppController.ui_controller) AppController.ui_controller.setStartupView(model[index]) }
+                                        // The view key stays "Updates" — only the label
+                                        // was renamed to "Packages".
+                                        model: ["Last Selected", "Library", "QuickCopy", "Packages", "Settings"]
+                                        currentIndex: {
+                                            let view = AppController.ui_controller ? AppController.ui_controller.startupView : "Library"
+                                            let idx = model.indexOf(view)
+                                            if (idx === -1 && view === "Updates") idx = model.indexOf("Packages")
+                                            return Math.max(0, idx)
+                                        }
+                                        onActivated: (index) => {
+                                            if (!AppController.ui_controller) return
+                                            let label = model[index]
+                                            AppController.ui_controller.setStartupView(label === "Packages" ? "Updates" : label)
+                                        }
                                     }
                                 }
                                 Separator {}

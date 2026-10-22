@@ -313,90 +313,6 @@ def _extract_action_button_blocks(text: str) -> list[str]:
     return blocks
 
 
-def test_command_removal_dialog_uses_glass_dialog_base():
-    """CommandRemovalConfirmDialog must extend GlassDialog, not raw Dialog.
-
-    GlassDialog provides the unified "Solid Matte" surface: custom header
-    (icon + title + close button), drop shadow, and consistent background.
-    The old raw-Dialog version rendered the native OS title bar and had
-    no shadow — visually inconsistent with the rest of the delete family.
-    """
-    from pathlib import Path
-
-    dialog = (
-        Path(__file__).resolve().parent.parent.parent
-        / "src"
-        / "skill_manager"
-        / "SkillManagerComponents"
-        / "dialogs"
-        / "CommandRemovalConfirmDialog.qml"
-    )
-    assert dialog.exists(), "CommandRemovalConfirmDialog.qml not found"
-    content = dialog.read_text(encoding="utf-8")
-
-    # Root element must be GlassDialog, not a raw Dialog
-    assert re.search(r"^GlassDialog\s*\{", content, re.MULTILINE), (
-        "CommandRemovalConfirmDialog must root in GlassDialog — "
-        "raw Dialog renders the native OS title bar and has no drop shadow."
-    )
-    # Must set dialogTitle/dialogIcon (GlassDialog custom header) and NOT
-    # the native `title:` property.
-    assert "dialogTitle:" in content, (
-        "CommandRemovalConfirmDialog must set dialogTitle for the GlassDialog header"
-    )
-    assert "dialogIcon:" in content, (
-        "CommandRemovalConfirmDialog must set dialogIcon for the GlassDialog header"
-    )
-    # The native `title:` property must not appear (it renders the OS bar).
-    # Allow `dialogTitle` to match but reject a bare `title:` assignment.
-    bare_title = re.search(r"^\s*title:\s*", content, re.MULTILINE)
-    assert bare_title is None, (
-        "CommandRemovalConfirmDialog must not set the native `title:` property — "
-        "use dialogTitle instead so the custom GlassDialog header renders."
-    )
-
-
-def test_command_removal_dialog_registered_in_qmldir():
-    """qmldir must register CommandRemovalConfirmDialog for consistent loading."""
-    from pathlib import Path
-
-    qmldir = (
-        Path(__file__).resolve().parent.parent.parent
-        / "src"
-        / "skill_manager"
-        / "SkillManagerComponents"
-        / "qmldir"
-    )
-    content = qmldir.read_text(encoding="utf-8")
-    assert "CommandRemovalConfirmDialog 1.0 dialogs/CommandRemovalConfirmDialog.qml" in content, (
-        "qmldir must register CommandRemovalConfirmDialog"
-    )
-
-
-def test_command_removal_dialog_uses_danger_role_button():
-    """The 'Remove Checked' button must use role: 'danger' (solid red).
-
-    A destructive action painted in Theme.accent (blue/green) misreads as
-    a confirmation. role:'danger' gives a solid red fill via ActionButton's
-    design-system theming.
-    """
-    from pathlib import Path
-
-    dialog = (
-        Path(__file__).resolve().parent.parent.parent
-        / "src"
-        / "skill_manager"
-        / "SkillManagerComponents"
-        / "dialogs"
-        / "CommandRemovalConfirmDialog.qml"
-    )
-    content = dialog.read_text(encoding="utf-8")
-    assert 'role: "danger"' in content, (
-        'CommandRemovalConfirmDialog must use role: "danger" for the Remove Checked button'
-    )
-    assert "Remove Checked" in content, "Remove Checked button label must be present"
-
-
 def test_delete_dialogs_do_not_hand_roll_action_button_overrides():
     """Delete-family dialogs must not override ActionButton background/contentItem.
 
@@ -416,7 +332,6 @@ def test_delete_dialogs_do_not_hand_roll_action_button_overrides():
     )
     targets = [
         "CommandDeleteDialog.qml",
-        "CommandRemovalConfirmDialog.qml",
     ]
     for name in targets:
         path = base / name
@@ -485,7 +400,7 @@ def test_delete_dialog_footer_has_no_button_overflow():
         / "SkillManagerComponents"
         / "dialogs"
     )
-    targets = ["CommandDeleteDialog.qml", "CommandRemovalConfirmDialog.qml"]
+    targets = ["CommandDeleteDialog.qml"]
     for name in targets:
         path = base / name
         text = path.read_text(encoding="utf-8")

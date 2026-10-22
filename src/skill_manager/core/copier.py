@@ -14,6 +14,8 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
+from skill_manager.core.quick_copy import project_label
+
 logger = logging.getLogger(__name__)
 
 
@@ -187,13 +189,75 @@ def get_commands_dir(project_path: str | Path) -> Path:
     return root / ".agents" / "commands"
 
 
-def copy_command_files_to_projects(commands: list[dict], projects: list) -> dict:
+def _same_file(a: Path, b: Path) -> bool:
+    """True when *a* and *b* are the same file on disk."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        try:
+            return canonical_key(a) == canonical_key(b)
+        except Exception:
+            return False
+
+
+def find_existing_commands_in_projects(commands: list[dict], projects: list) -> list[dict]:
+    """Return the (command, project) pairs whose destination file already exists.
+
+    Used by the Library copy flow to decide whether the user has to confirm
+    an overwrite before commands are deployed. Each entry carries:
+
+    ``name``          the command name (file stem)
+    ``source_path``   the Library-side command file
+    ``project``       the target project path
+    ``project_label`` the target project's display label
+    ``dest_path``     the existing file that would be overwritten
+    """
+    existing: list[dict] = []
+    normalized_projects = []
+    for project in projects:
+        project_path, project_error = _normalize_project_path(project)
+        normalized_projects.append((project_path, project_error, project))
+
+    for cmd in commands:
+        raw_path = cmd.get("local_path") or ""
+        source_file = Path(os.path.expanduser(raw_path)).resolve()
+        cmd_name = cmd.get("name") or source_file.stem
+        if not source_file.is_file():
+            continue
+
+        for project_path, project_error, project in normalized_projects:
+            if project_error:
+                continue
+            dest = get_commands_dir(project_path) / source_file.name
+            if not dest.exists():
+                continue
+            existing.append(
+                {
+                    "name": cmd_name,
+                    "source_path": str(source_file),
+                    "project": str(project),
+                    # The label comes from the normalized (skills-dir) form so
+                    # it renders as the plain project name, not "Name (path)".
+                    "project_label": project_label(Path(project_path)),
+                    "dest_path": str(dest),
+                }
+            )
+    return existing
+
+
+def copy_command_files_to_projects(
+    commands: list[dict], projects: list, *, overwrite: bool = False
+) -> dict:
     """Copy command .md files from source to each project's .agents/commands/ dir.
 
-    Skips (does not overwrite) when the destination file already exists.
-    Returns ``{copied, skipped, failed, details}``.
+    When ``overwrite`` is False (the default) an existing destination file is
+    skipped, so the user's project copy is never clobbered silently. When it
+    is True the destination is overwritten with the Library version and the
+    pair is reported under the ``updated`` counter.
+
+    Returns ``{copied, updated, skipped, failed, details}``.
     """
-    result = {"copied": 0, "skipped": 0, "failed": 0, "details": []}
+    result = {"copied": 0, "updated": 0, "skipped": 0, "failed": 0, "details": []}
 
     normalized_projects = [_normalize_project_path(project) for project in projects]
 
@@ -230,7 +294,7 @@ def copy_command_files_to_projects(commands: list[dict], projects: list) -> dict
             commands_dir = get_commands_dir(project_path)
             dest = commands_dir / source_file.name
 
-            if dest.exists():
+            if dest.exists() and not overwrite:
                 result["skipped"] += 1
                 result["details"].append(
                     {
@@ -242,6 +306,22 @@ def copy_command_files_to_projects(commands: list[dict], projects: list) -> dict
                 )
                 continue
 
+            # Copying a command into the project it already lives in is a
+            # no-op: shutil.copy2 would raise SameFileError and the copy
+            # would be reported as a failure.
+            if dest.exists() and _same_file(source_file, dest):
+                result["skipped"] += 1
+                result["details"].append(
+                    {
+                        "skill": cmd_name,
+                        "project": str(project_path),
+                        "status": "skipped",
+                        "message": f"Command is already the project's copy: {dest}",
+                    }
+                )
+                continue
+
+            was_update = dest.exists()
             try:
                 commands_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_file, dest)
@@ -257,19 +337,25 @@ def copy_command_files_to_projects(commands: list[dict], projects: list) -> dict
                 )
                 continue
 
-            result["copied"] += 1
+            if was_update:
+                result["updated"] += 1
+                status = "updated"
+            else:
+                result["copied"] += 1
+                status = "copied"
             result["details"].append(
                 {
                     "skill": cmd_name,
                     "project": str(project_path),
-                    "status": "copied",
+                    "status": status,
                     "message": str(dest),
                 }
             )
 
     logger.info(
-        "command_copy_batch: copied=%d skipped=%d failed=%d",
+        "command_copy_batch: copied=%d updated=%d skipped=%d failed=%d",
         result["copied"],
+        result["updated"],
         result["skipped"],
         result["failed"],
     )
@@ -484,6 +570,7 @@ def copy_commands_with_skill_carry(
     all_skills: list,
     *,
     confirmed_skills: list[dict] | None = None,
+    overwrite_commands: bool = False,
 ) -> dict:
     """Copy commands + (optionally) their referenced skills to *project_path*.
 
@@ -497,10 +584,15 @@ def copy_commands_with_skill_carry(
        ``dirs_exist_ok=True`` → always overwrites to source version,
        matching the user's chosen overwrite policy).
 
+    *overwrite_commands* is forwarded to the command copy: when True an
+    existing project command is replaced with the Library version (the
+    "Update Existing & Copy New" action of the copy-confirmation flow).
+
     Returns::
 
         {
             "copied": <int>,          # commands copied
+            "updated": <int>,         # commands overwritten
             "skipped": <int>,
             "failed": <int>,
             "details": [...],         # command copy details
@@ -509,7 +601,9 @@ def copy_commands_with_skill_carry(
             "missing_skills": [...],  # skills needed but not yet confirmed
         }
     """
-    cmd_result = copy_command_files_to_projects(commands, [project_path])
+    cmd_result = copy_command_files_to_projects(
+        commands, [project_path], overwrite=overwrite_commands
+    )
 
     if confirmed_skills is None:
         missing = find_missing_skills_for_commands(commands, project_path, all_skills)

@@ -15,7 +15,6 @@ def test_ui_controller_init(ui_controller):
     assert ui_controller.currentView == "Library"
     assert ui_controller.windowWidth == 1300
     assert ui_controller.windowHeight == 650
-    assert ui_controller.compactListRows is False
     assert ui_controller.inspectorWidth == 0
 
 
@@ -40,7 +39,7 @@ def test_ui_controller_save_state(ui_controller, mock_app):
     assert last_args[0] == "ui_state"
     assert last_args[1]["current_view"] == "QuickCopy"
     assert last_args[1]["window_width"] == 1400
-    assert last_args[1]["compact_list_rows"] is False
+    assert "compact_list_rows" not in last_args[1]
 
 
 def test_ui_controller_window_geometry_persistence(ui_controller, mock_app):
@@ -197,10 +196,6 @@ def test_ui_controller_preference_toggles(ui_controller):
     ui_controller.reducedMotion = True
     assert ui_controller.reducedMotion is True
 
-    # Compact Rows
-    ui_controller.compactListRows = True
-    assert ui_controller.compactListRows is True
-
     # Remember Filters
     ui_controller.rememberFilters = False
     assert ui_controller.rememberFilters is False
@@ -332,3 +327,41 @@ def test_disable_state_persistence_stops_pending_save(ui_controller, mock_app):
     ui_controller.disable_state_persistence()
 
     assert ui_controller._save_timer.isActive() is False
+
+
+def test_legacy_compact_list_rows_config_is_ignored_silently(mock_app):
+    """A pre-existing user config may still carry ``compact_list_rows``.
+
+    The compact-row toggle was removed, so the legacy key must be dropped
+    quietly instead of raising a validation error and resetting the whole
+    UI state (which would silently discard the user's window geometry).
+    """
+    mock_app._config.get.side_effect = lambda key, default=None: (
+        {
+            "window_width": 1440,
+            "window_height": 900,
+            "dark_mode": True,
+            "compact_list_rows": True,
+        }
+        if key == "ui_state"
+        else default
+    )
+
+    ui_controller = UIController(mock_app)
+
+    # The legacy key is ignored, the rest of the state survives.
+    assert not hasattr(ui_controller, "compactListRows")
+    assert ui_controller.windowWidth == 1440
+    assert ui_controller.windowHeight == 900
+    assert ui_controller.darkMode is True
+
+
+def test_legacy_top_level_compact_list_rows_config_is_ignored_silently(mock_app):
+    """The legacy key may also sit at the top level of ``config.json``."""
+    mock_app._config.get.side_effect = lambda key, default=None: (
+        False if key == "compact_list_rows" else default
+    )
+
+    ui_controller = UIController(mock_app)
+
+    assert ui_controller.currentView == "Library"

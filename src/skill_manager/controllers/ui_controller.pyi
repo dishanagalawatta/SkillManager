@@ -27,7 +27,8 @@ class UIController(QObject):
     startupViewChanged: ClassVar[SignalInstance]
     rememberFiltersChanged: ClassVar[SignalInstance]
     reducedMotionChanged: ClassVar[SignalInstance]
-    compactListRowsChanged: ClassVar[SignalInstance]
+    telemetryEnabledChanged: ClassVar[SignalInstance]
+    tasksPanelOpenChanged: ClassVar[SignalInstance]
     inspectorWidthChanged: ClassVar[SignalInstance]
 
     # Writable properties (have @propname.setter in ui_controller.py)
@@ -40,7 +41,8 @@ class UIController(QObject):
     startupView: str
     rememberFilters: bool
     reducedMotion: bool
-    compactListRows: bool
+    telemetryEnabled: bool
+    tasksPanelOpen: bool
     inspectorWidth: int
 
     # Read-only properties
@@ -60,7 +62,6 @@ class UIController(QObject):
     def setStartupView(self, v: str) -> None: ...
     def setRememberFilters(self, b: bool) -> None: ...
     def setReducedMotion(self, b: bool) -> None: ...
-    def setCompactListRows(self, b: bool) -> None: ...
     def triggerSave(self) -> None: ...
     def saveUiState(self) -> None: ...
     def resetUiState(self) -> None: ...

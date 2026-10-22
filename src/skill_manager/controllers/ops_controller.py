@@ -32,9 +32,9 @@ class OpsController(
     minimizeAppRequested = Signal()
     commandSkillsCarryPrompt = Signal(str, str, str)
     commandSkillsCarryBatchPrompt = Signal(str)
-    commandPendingRemovals = Signal(str, list)
+    commandCopyExistingDetected = Signal(str, str, str)  # project, commandPathsJson, existingJson
 
-    _pending_command_update: dict | None = None
+    _pending_command_copy: dict | None = None
 
     def __init__(self, app):
         super().__init__(app)
