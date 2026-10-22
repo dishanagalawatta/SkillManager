@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -21,13 +22,12 @@ from ._telemetry import _log_call, logger
 # ---------------------------------------------------------------------------
 # Read-only state accessors & Skill Management
 # ---------------------------------------------------------------------------
-def sync_skills(force_full_scan: bool = False) -> dict[str, Any]:
-    """Re-scan configured skill sources and project directories, updating the library model."""
-    _log_call("sync_skills")
-    controller = _controller_or_none()
-    if controller is None:
-        return {"synced": False, "count": 0, "message": "AppController unavailable"}
+def _scan_sources(controller: Any, force_full_scan: bool = False) -> list[dict[str, Any]]:
+    """Scan the configured sources and projects.
 
+    Pure with respect to the Qt model: it only touches the filesystem, so it
+    is safe to run on a worker thread.
+    """
     sources: list[str] = list(getattr(controller, "_sources", []) or [])
     projects: list[str] = list(getattr(controller, "_projects", []) or [])
 
@@ -51,18 +51,34 @@ def sync_skills(force_full_scan: bool = False) -> dict[str, Any]:
     if s_cwd not in projects:
         projects.append(s_cwd)
 
-    try:
-        from skill_manager.core.discovery import DiscoveryService
+    from skill_manager.core.discovery import DiscoveryService
 
-        service = DiscoveryService(
-            sources=sources,
-            projects=projects,
-            archive_paths=getattr(controller, "_archive_paths", set()),
-            starred_paths=getattr(controller, "_starred_paths", set()),
-            project_aliases=getattr(controller, "_project_aliases", {}),
-        )
-        res = service.discover_all(force_full_scan=force_full_scan)
-        raw_skills = res.get("skills", [])
+    service = DiscoveryService(
+        sources=sources,
+        projects=projects,
+        archive_paths=getattr(controller, "_archive_paths", set()),
+        starred_paths=getattr(controller, "_starred_paths", set()),
+        project_aliases=getattr(controller, "_project_aliases", {}),
+    )
+    res = service.discover_all(force_full_scan=force_full_scan)
+    return res.get("skills", [])
+
+
+async def sync_skills(force_full_scan: bool = False) -> dict[str, Any]:
+    """Re-scan the configured sources and projects, updating the library model.
+
+    The scan runs on a worker thread: it used to run inline on the MCP
+    event loop, which stalled every other request for the whole duration of
+    a full discovery.  Only the model update happens on the calling (Qt)
+    thread, where it belongs.
+    """
+    _log_call("sync_skills")
+    controller = _controller_or_none()
+    if controller is None:
+        return {"synced": False, "count": 0, "message": "AppController unavailable"}
+
+    try:
+        raw_skills = await asyncio.to_thread(_scan_sources, controller, force_full_scan)
         if hasattr(controller, "_library_model"):
             controller._library_model.addOrUpdateSkills(raw_skills)
     except Exception as exc:  # noqa: BLE001
@@ -76,7 +92,9 @@ def sync_skills(force_full_scan: bool = False) -> dict[str, Any]:
     }
 
 
-def list_skills(include_commands: bool = True, project_label: str = "") -> list[dict[str, Any]]:
+async def list_skills(
+    include_commands: bool = True, project_label: str = ""
+) -> list[dict[str, Any]]:
     """Enumerate skills from ``AppController._library_model``.
 
     The model stores skills in ``_all_skills`` (a list of ``Skill`` dataclasses).
@@ -92,7 +110,7 @@ def list_skills(include_commands: bool = True, project_label: str = "") -> list[
     model = controller._library_model  # noqa: SLF001 - intentional bridge access
     skills: list[Any] = getattr(model, "_all_skills", []) or []
     if not skills:
-        sync_skills()
+        await sync_skills()
         skills = getattr(model, "_all_skills", []) or []
 
     out: list[dict[str, Any]] = []
@@ -119,7 +137,7 @@ def list_skills(include_commands: bool = True, project_label: str = "") -> list[
     return out
 
 
-def get_skill(skill_id: str) -> dict[str, Any]:
+async def get_skill(skill_id: str) -> dict[str, Any]:
     """Retrieve full content and metadata for a skill by name, folder name, or path."""
     _log_call("get_skill")
     controller = _controller_or_none()
@@ -129,7 +147,7 @@ def get_skill(skill_id: str) -> dict[str, Any]:
     model = controller._library_model  # noqa: SLF001
     skills: list[Any] = getattr(model, "_all_skills", []) or []
     if not skills:
-        sync_skills()
+        await sync_skills()
         skills = getattr(model, "_all_skills", []) or []
 
     found_skill: Any | None = None
@@ -188,7 +206,7 @@ def get_skill(skill_id: str) -> dict[str, Any]:
     return {"found": True, "skill": skill_detail}
 
 
-def search_skills(
+async def search_skills(
     query: str,
     category: str = "",
     project_label: str = "",
@@ -204,7 +222,7 @@ def search_skills(
     model = controller._library_model  # noqa: SLF001
     skills: list[Any] = getattr(model, "_all_skills", []) or []
     if not skills:
-        sync_skills()
+        await sync_skills()
         skills = getattr(model, "_all_skills", []) or []
 
     q = query.lower().strip()
@@ -274,7 +292,7 @@ def list_projects() -> list[str]:
 # ---------------------------------------------------------------------------
 # Destructive / Mutating operations
 # ---------------------------------------------------------------------------
-def create_skill(
+async def create_skill(
     name: str,
     content: str,
     source_path: str = "",
@@ -333,7 +351,7 @@ def create_skill(
     skill_md = skill_dir / "SKILL.md"
     skill_md.write_text(final_content, encoding="utf-8")
 
-    sync_skills()
+    await sync_skills()
 
     return {
         "created": True,
@@ -343,7 +361,7 @@ def create_skill(
     }
 
 
-def update_skill(
+async def update_skill(
     skill_id: str,
     content: str = "",
     description: str = "",
@@ -400,7 +418,7 @@ def update_skill(
     if final_content:
         skill_md.write_text(final_content, encoding="utf-8")
 
-    sync_skills()
+    await sync_skills()
 
     return {
         "updated": True,
@@ -410,7 +428,7 @@ def update_skill(
     }
 
 
-def delete_skill(skill_id: str) -> dict[str, Any]:
+async def delete_skill(skill_id: str) -> dict[str, Any]:
     """Delete a skill by name or local_path."""
     _log_call("delete_skill")
     controller = _controller_or_none()
@@ -457,7 +475,7 @@ def delete_skill(skill_id: str) -> dict[str, Any]:
             else:
                 target_path.unlink()
 
-    sync_skills()
+    await sync_skills()
 
     return {
         "deleted": True,
@@ -467,7 +485,7 @@ def delete_skill(skill_id: str) -> dict[str, Any]:
     }
 
 
-def deploy(skill_id: str, target: str) -> dict[str, Any]:
+async def deploy(skill_id: str, target: str) -> dict[str, Any]:
     """Deploy a skill or package to a target project directory."""
     _log_call("deploy")
     controller = _controller_or_none()
@@ -520,7 +538,7 @@ def deploy(skill_id: str, target: str) -> dict[str, Any]:
     }
     res = copy_skill_folders_to_projects([skill_dict], [str(target_path)])
 
-    sync_skills()
+    await sync_skills()
 
     return {
         "deployed": res.get("copied", 0) > 0

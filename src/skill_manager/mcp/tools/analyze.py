@@ -145,7 +145,7 @@ async def _handle_list_skills(args: dict[str, Any]) -> ToolResult:
     project_label: str = str(args.get("project_label", ""))
     _emit({"include_commands": include_commands, "project_label": project_label})
     try:
-        skills = list_skills(include_commands=include_commands, project_label=project_label)
+        skills = await list_skills(include_commands=include_commands, project_label=project_label)
         return ok(tool, {"skills": skills})
     except Exception as exc:
         return err(tool, str(exc))

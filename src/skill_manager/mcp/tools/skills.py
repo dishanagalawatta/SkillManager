@@ -145,7 +145,7 @@ async def _handle_get_skill(args: dict[str, Any]) -> ToolResult:
     if not skill_id:
         return err(tool, "argument 'skill_id' is required and must be non-empty")
     try:
-        res = get_skill(skill_id)
+        res = await get_skill(skill_id)
         if not res.get("found"):
             return err(tool, f"skill {skill_id!r} not found")
         return ok(tool, res)
@@ -163,7 +163,7 @@ async def _handle_search_skills(args: dict[str, Any]) -> ToolResult:
 
     _emit({"query": query, "category": category, "project_label": project_label})
     try:
-        skills = search_skills(
+        skills = await search_skills(
             query=query,
             category=category,
             project_label=project_label,
@@ -180,7 +180,7 @@ async def _handle_sync_skills(args: dict[str, Any]) -> ToolResult:
     force_full_scan: bool = bool(args.get("force_full_scan", False))
     _emit({"force_full_scan": force_full_scan})
     try:
-        res = sync_skills(force_full_scan=force_full_scan)
+        res = await sync_skills(force_full_scan=force_full_scan)
         return ok(tool, res)
     except Exception as exc:  # noqa: BLE001
         return err(tool, str(exc))

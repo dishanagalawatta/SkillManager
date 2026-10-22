@@ -26,6 +26,14 @@ from skill_manager.mcp.bridge._guard import (
 )
 from skill_manager.utils.input_guard import gui_window_present
 
+
+def _run(coro):
+    """Drive a coroutine to completion without an async plugin."""
+    import anyio
+
+    return anyio.run(lambda: coro)
+
+
 # ── B6: the input guard must fail closed ─────────────────────────────────
 
 
@@ -193,7 +201,7 @@ def test_create_skill_refuses_a_traversing_name(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="not a valid folder name"),
     ):
-        create_skill(name="../../evil", content="x")
+        _run(create_skill(name="../../evil", content="x"))
 
     assert not (tmp_path / "evil").exists()
 
@@ -207,7 +215,7 @@ def test_create_skill_refuses_a_parent_outside_the_sources(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="outside the configured sources"),
     ):
-        create_skill(name="skill", content="x", source_path=str(outside))
+        _run(create_skill(name="skill", content="x", source_path=str(outside)))
 
     assert not (outside / "skill").exists()
 
@@ -220,7 +228,7 @@ def test_create_skill_writes_inside_a_configured_source(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         patch("skill_manager.mcp.bridge._skills.sync_skills"),
     ):
-        result = create_skill(name="my-skill", content="# hi")
+        result = _run(create_skill(name="my-skill", content="# hi"))
 
     assert (source / "my-skill" / "SKILL.md").exists()
     assert result["created"] is True
@@ -238,7 +246,7 @@ def test_update_skill_refuses_an_unknown_path(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="refusing to guess a write target"),
     ):
-        update_skill(skill_id=str(stray), content="y")
+        _run(update_skill(skill_id=str(stray), content="y"))
 
     assert stray.read_text(encoding="utf-8") == "x"
 
@@ -256,7 +264,7 @@ def test_update_skill_refuses_an_excluded_path(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="excluded path"),
     ):
-        update_skill(skill_id=str(excluded), content="overwritten")
+        _run(update_skill(skill_id=str(excluded), content="overwritten"))
 
     assert (excluded / "SKILL.md").read_text(encoding="utf-8") == "original"
 
@@ -273,7 +281,7 @@ def test_delete_skill_refuses_an_unknown_path(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="refusing to guess a deletion target"),
     ):
-        delete_skill(skill_id=str(stray))
+        _run(delete_skill(skill_id=str(stray)))
 
     assert stray.exists()
 
@@ -292,7 +300,7 @@ def test_deploy_refuses_an_unknown_target(tmp_path):
         patch("skill_manager.mcp.bridge._skills._controller_or_none", return_value=controller),
         pytest.raises(ValueError, match="refusing to deploy to an arbitrary directory"),
     ):
-        deploy(skill_id="x", target=str(stray))
+        _run(deploy(skill_id="x", target=str(stray)))
 
     assert not (stray / ".agents").exists()
 
@@ -303,6 +311,45 @@ def test_delete_tool_checks_the_exclusion_before_deleting(tmp_path):
 
     handlers = get_handlers(allow_write=True)
     with patch("skill_manager.mcp.tools.write.delete_skill") as mock_delete:
-        result = handlers["sm_delete_skill"]({"skill_id": "/repo/.agents/skills/x"})
+        result = _run(handlers["sm_delete_skill"]({"skill_id": "/repo/.agents/skills/x"}))
     assert result.ok is False
     mock_delete.assert_not_called()
+
+
+# ── The MCP read path must not block the event loop ─────────────────────
+
+
+def test_sync_skills_scans_off_the_event_loop(monkeypatch, tmp_path):
+    """The discovery scan must not run on the MCP event-loop thread.
+
+    It used to run inline, so a full scan stalled every other MCP request
+    for its whole duration.  The scan now runs on a worker thread and only
+    the model update happens on the calling thread.
+    """
+    import threading
+
+    from skill_manager.mcp.bridge import _skills as skills_mod
+
+    controller = MagicMock()
+    controller._sources = []
+    controller._projects = []
+    controller._library_model._all_skills = []
+
+    scan_thread: dict = {}
+
+    def fake_scan(_controller, force_full_scan=False):  # noqa: ARG001
+        scan_thread["id"] = threading.get_ident()
+        return []
+
+    monkeypatch.setattr(skills_mod, "_scan_sources", fake_scan)
+
+    async def _drive():
+        return await skills_mod.sync_skills()
+
+    import anyio
+
+    caller_thread = threading.get_ident()
+    result = anyio.run(_drive)
+
+    assert result["synced"] is True
+    assert scan_thread["id"] != caller_thread

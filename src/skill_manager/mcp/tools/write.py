@@ -163,7 +163,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 # Per-tool handlers (return ToolResult)
 # ---------------------------------------------------------------------------
-def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
+async def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     name: str = str(args.get("name", ""))
     content: str = str(args.get("content", ""))
     source_path: str = str(args.get("source_path", ""))
@@ -183,7 +183,7 @@ def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
         return err("sm_create_skill", "refused: target resolves under an AGENTS.md-excluded path.")
 
     try:
-        result = create_skill(
+        result = await create_skill(
             name=name,
             content=content,
             source_path=source_path,
@@ -195,7 +195,7 @@ def _handle_create_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
         return err("sm_create_skill", str(exc))
 
 
-def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
+async def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = str(args.get("skill_id", ""))
     content: str = str(args.get("content", ""))
     description: str = str(args.get("description", ""))
@@ -214,7 +214,7 @@ def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
         return err("sm_update_skill", "refused: target resolves under an AGENTS.md-excluded path.")
 
     try:
-        result = update_skill(
+        result = await update_skill(
             skill_id=skill_id,
             content=content,
             description=description,
@@ -225,7 +225,7 @@ def _handle_update_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
         return err("sm_update_skill", str(exc))
 
 
-def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
+async def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = args.get("skill_id", "")
 
     capture_mcp_tool_call(
@@ -245,7 +245,7 @@ def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
         )
 
     try:
-        result = delete_skill(skill_id)
+        result = await delete_skill(skill_id)
     except (ValueError, RuntimeError) as exc:
         return err("sm_delete_skill", str(exc))
 
@@ -258,7 +258,7 @@ def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     return ok("sm_delete_skill", result)
 
 
-def _handle_deploy(args: dict[str, Any], allow_write: bool) -> ToolResult:
+async def _handle_deploy(args: dict[str, Any], allow_write: bool) -> ToolResult:
     skill_id: str = args.get("skill_id", "")
     target: str = args.get("target", "")
 
@@ -275,7 +275,7 @@ def _handle_deploy(args: dict[str, Any], allow_write: bool) -> ToolResult:
         return err("sm_deploy", "refused: skill_id resolves under an AGENTS.md-excluded path.")
 
     try:
-        result = deploy(skill_id, target)
+        result = await deploy(skill_id, target)
         return ok("sm_deploy", result)
     except ValueError as exc:
         return err("sm_deploy", str(exc))

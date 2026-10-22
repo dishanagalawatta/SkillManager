@@ -37,11 +37,22 @@ def _ensure_qapp() -> None:
 
 
 def _sync_controller() -> None:
-    """Best-effort initial skill sync so model-backed tools see data immediately."""
-    with contextlib.suppress(Exception):
-        from ._skills import sync_skills  # function-local: breaks _skills<->_controller cycle
+    """Best-effort initial skill sync so model-backed tools see data immediately.
 
-        sync_skills()
+    This runs on the startup path, before any tool call is served, so it
+    stays synchronous: the tool handlers use the async variant, which moves
+    the scan off the event loop.
+    """
+    with contextlib.suppress(Exception):
+        # function-local import: breaks the _skills <->_controller cycle
+        from ._skills import _scan_sources
+
+        controller = _controller_or_none()
+        if controller is None:
+            return
+        raw_skills = _scan_sources(controller)
+        if hasattr(controller, "_library_model"):
+            controller._library_model.addOrUpdateSkills(raw_skills)
 
 
 def get_app_controller() -> Any:
