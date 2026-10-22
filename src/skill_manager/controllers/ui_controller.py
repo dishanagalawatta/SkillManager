@@ -117,8 +117,12 @@ class UIController(BaseController):
                 self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.windowWidthChanged.emit()
-            except Exception:
-                pass
+            except Exception as exc:
+                # The value is rejected (the record enforces the bounds),
+                # but it must not vanish silently: an unsignalled property
+                # leaves the QML binding and the model out of sync with no
+                # way to tell why.
+                logger.warning("Rejected window width %r: %s", value, exc)
 
     @Property(int, notify=windowHeightChanged)
     def windowHeight(self):  # type: ignore[reportRedeclaration]
@@ -133,8 +137,8 @@ class UIController(BaseController):
                 self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.windowHeightChanged.emit()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Rejected window height %r: %s", value, exc)
 
     @Property(int, notify=windowXChanged)
     def windowX(self):  # type: ignore[reportRedeclaration]
@@ -272,8 +276,8 @@ class UIController(BaseController):
                 self.state = UIStateRecord.model_validate(update)
                 self.triggerSave()
                 self.inspectorWidthChanged.emit()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Rejected inspector width %r: %s", value, exc)
 
     @Slot(int)
     def setInspectorWidth(self, value):

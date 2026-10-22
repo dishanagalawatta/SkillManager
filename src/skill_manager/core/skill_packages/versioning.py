@@ -128,6 +128,51 @@ def looks_like_git_remote(value: str) -> bool:
     return len(parts) == 2 and bool(parts[0]) and bool(parts[1])
 
 
+def _run_git(args: list[str], env: dict[str, str], timeout: float) -> str:
+    """Run a git command with a hard timeout, on every platform.
+
+    GitPython's ``kill_after_timeout`` is **not supported on Windows** — it
+    raises ``GitCommandError("kill_after_timeout feature is not supported
+    on Windows")`` before the command even starts.  Passing it therefore
+    made every git package probe fail on Windows, so the platform's
+    packages were permanently reported as "could not check".
+
+    The Windows path drives the process itself so the deadline is enforced
+    there too.
+    """
+    git_cmd = cmd.Git()
+    if os.name != "nt":
+        return _decode_git_output(
+            git_cmd.execute(  # type: ignore[reportCallIssue]
+                ["git"] + args,
+                env=env,
+                kill_after_timeout=timeout,
+            )
+        )
+
+    wrapper = git_cmd.execute(  # type: ignore[reportCallIssue]
+        ["git"] + args,
+        env=env,
+        as_process=True,
+        stdout_as_string=False,
+    )
+    proc = getattr(wrapper, "proc", None)
+    if proc is None:
+        # GitPython did not hand back a process handle — treat the return
+        # value as the command output (this is also what a test double
+        # returns).
+        return _decode_git_output(wrapper)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise TimeoutError(f"git timed out after {timeout:.0f}s") from None
+    if proc.returncode not in (0, None):
+        raise cmd.GitCommandError(args, proc.returncode, stderr)
+    return _decode_git_output(stdout)
+
+
 def probe_git_remote_version(
     url: str, token: str | None = None, timeout: float = DEFAULT_GIT_TIMEOUT
 ) -> VersionProbe:
@@ -152,38 +197,33 @@ def probe_git_remote_version(
     reason = ""
 
     try:
-        git_cmd = cmd.Git()
+        cmd.Git()
     except Exception as e:  # pragma: no cover - git binary missing / not runnable
         logger.warning("Git unavailable for %s: %s", url, e)
         return VersionProbe(reason=_probe_reason(e, timeout))
 
     # 1. Tags, newest semantic version first.
     try:
-        output = git_cmd.execute(  # type: ignore[reportCallIssue]
-            ["git"] + config_args + ["ls-remote", "--tags", "--sort=-v:refname", "--", url],
-            env=env,
-            kill_after_timeout=timeout,
+        output = _run_git(
+            config_args + ["ls-remote", "--tags", "--sort=-v:refname", "--", url],
+            env,
+            timeout,
         )
-        for line in _decode_git_output(output).strip().split("\n"):
+        for line in output.strip().split("\n"):
             if "^{}" in line:
                 continue
             tag = line.split("\t")[-1].replace("refs/tags/", "")
             if tag:
                 return VersionProbe(version=tag, ok=True)
     except Exception as e:
-        # GitCommandError from kill_after_timeout lands here; so does a
+        # GitCommandError from a killed process lands here; so does a
         # non-zero exit for an unknown host.
         reason = _probe_reason(e, timeout)
         logger.debug("Remote tag fetch failed, trying HEAD: %s", e)
 
     # 2. HEAD hash fallback for untagged repositories.
     try:
-        output = git_cmd.execute(  # type: ignore[reportCallIssue]
-            ["git"] + config_args + ["ls-remote", "--", url, "HEAD"],
-            env=env,
-            kill_after_timeout=timeout,
-        )
-        text = _decode_git_output(output)
+        text = _run_git(config_args + ["ls-remote", "--", url, "HEAD"], env, timeout)
         if text.strip():
             return VersionProbe(version=text.split("\t")[0][:7], ok=True)
     except Exception as e:

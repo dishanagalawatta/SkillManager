@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -276,3 +277,55 @@ def test_legacy_flat_temp_registry_is_treated_as_abandoned(temp_files):
             json.dump({"temp_paths": ["/legacy"]}, f)
 
         assert persistence.take_abandoned_temp_copies() == ["/legacy"]
+
+
+def test_cache_version_invalidates_a_stale_index(temp_files):
+    """A cache written by a different schema version is discarded.
+
+    ``SKILL_LIBRARY_CACHE_VERSION`` existed but was never enforced, so an
+    index written before a record-layout change survived it and the model
+    was populated from the stale shape.
+    """
+    import orjson
+
+    from skill_manager.core.config import SKILL_LIBRARY_CACHE_VERSION
+    from skill_manager.core.persistence import load_cache
+
+    cache_file = Path(temp_files["cache"])
+    with open(cache_file, "wb") as f:
+        f.write(orjson.dumps({"skills": [], "cache_version": SKILL_LIBRARY_CACHE_VERSION - 1}))
+
+    with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
+        assert load_cache() is None
+    # The stale index is removed so the next scan starts clean.
+    assert not cache_file.exists()
+
+
+def test_cache_without_a_version_is_discarded(temp_files):
+    """An unversioned (legacy) index cannot be trusted either."""
+    import orjson
+
+    from skill_manager.core.persistence import load_cache
+
+    cache_file = Path(temp_files["cache"])
+    with open(cache_file, "wb") as f:
+        f.write(orjson.dumps({"skills": []}))
+
+    with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
+        assert load_cache() is None
+
+
+def test_saved_cache_carries_the_current_version(temp_files):
+    """``save_cache`` stamps the schema version."""
+    import orjson
+
+    from skill_manager.core.config import SKILL_LIBRARY_CACHE_VERSION
+    from skill_manager.core.persistence import save_cache
+
+    cache_file = Path(temp_files["cache"])
+    with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
+        assert save_cache({"skills": []}) is True
+
+    with open(cache_file, "rb") as f:
+        data = orjson.loads(f.read())
+    assert data["cache_version"] == SKILL_LIBRARY_CACHE_VERSION

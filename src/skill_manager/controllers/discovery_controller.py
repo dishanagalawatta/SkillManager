@@ -81,9 +81,8 @@ class DiscoveryController(BaseController):
             background thread works.
         skip_discovery:
             When True, load the existing cache without running a new
-            discovery scan.  Used by the peer-heartbeat optimization:
-            if a sibling instance recently wrote the cache, skip the
-            expensive scan and load from disk directly.
+            discovery scan.  Used by the headless MCP server, which must
+            not pay for a full scan on startup.
         """
         with self._refresh_lock:
             self._refresh_generation += 1

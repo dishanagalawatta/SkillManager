@@ -11,6 +11,7 @@ for the four dev-tooling tools:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -22,7 +23,11 @@ from skill_manager.mcp.models import ToolResult, err, ok
 # ---------------------------------------------------------------------------
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "sm_lint": {
-        "description": "Run the project linter (ruff) over the source tree.",
+        "description": (
+            "Run the project linter (ruff) over the source tree. "
+            "Read-only unless `fix` is requested, which rewrites files and "
+            "therefore requires write mode (--mcp-allow-write)."
+        ),
         "annotations": {
             "readOnlyHint": True,
             "destructiveHint": False,
@@ -39,7 +44,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
                 "fix": {
                     "type": "boolean",
-                    "description": "Apply auto-fixes where safe.",
+                    "description": (
+                        "Apply auto-fixes where safe. This rewrites files and requires write mode."
+                    ),
                     "default": False,
                 },
             },
@@ -113,10 +120,20 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 # Per-tool handlers (return ToolResult)
 # ---------------------------------------------------------------------------
-def _handle_lint(args: dict[str, Any]) -> ToolResult:
+async def _handle_lint(args: dict[str, Any], allow_write: bool = False) -> ToolResult:
     path: str = args.get("path", "src")
     fix: bool = bool(args.get("fix", False))
-    result = run_lint(path=path, fix=fix)
+    if fix and not allow_write:
+        # ``ruff check --fix`` rewrites the source tree, so it is a write
+        # and must be gated behind the write capability like every other
+        # mutating tool.
+        return err(
+            "sm_lint",
+            "write mode disabled — restart with --mcp-allow-write to apply auto-fixes",
+        )
+    # The linter is a subprocess with a multi-minute timeout: running it
+    # inline would block every other MCP request for its whole duration.
+    result = await asyncio.to_thread(run_lint, path=path, fix=fix)
     return ok("sm_lint", result)
 
 
@@ -145,15 +162,18 @@ def _handle_job_status(args: dict[str, Any]) -> ToolResult:
 # Dispatch table
 # ---------------------------------------------------------------------------
 _HANDLERS: dict[str, Callable[[dict[str, Any]], ToolResult]] = {
-    "sm_lint": _handle_lint,
     "sm_run_tests": _handle_run_tests,
     "sm_build": _handle_build,
     "sm_job_status": _handle_job_status,
 }
 
 
-def get_handlers(_allow_write: bool = False) -> dict[str, Callable[..., Any]]:
-    return dict(_HANDLERS)
+def get_handlers(allow_write: bool = False) -> dict[str, Callable[..., Any]]:
+    from functools import partial
+
+    handlers: dict[str, Callable[..., Any]] = dict(_HANDLERS)
+    handlers["sm_lint"] = partial(_handle_lint, allow_write=allow_write)
+    return handlers
 
 
 __all__ = ["TOOL_SCHEMAS", "get_handlers"]

@@ -4,8 +4,6 @@ from typing import Any
 from .constants import CATEGORIES, MAIN_CATEGORIES_MAPPING
 
 _CATEGORY_PATTERNS = None
-_COMBINED_REGEX = None
-_KW_TO_CAT = {}
 
 _MAIN_CATEGORY_REVERSE_MAP = {
     sub.lower(): main for main, sub_cats in MAIN_CATEGORIES_MAPPING.items() for sub in sub_cats

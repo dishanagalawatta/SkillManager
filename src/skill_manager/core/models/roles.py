@@ -25,26 +25,25 @@ class RolesMixin:
     ProjectRole = Qt.ItemDataRole.UserRole + 5
     IsStarredRole = Qt.ItemDataRole.UserRole + 6
     IsSelectedRole = Qt.ItemDataRole.UserRole + 7
-    SearchTextRole = Qt.ItemDataRole.UserRole + 8
-    IsArchivedRole = Qt.ItemDataRole.UserRole + 9
-    IsCollectionRole = Qt.ItemDataRole.UserRole + 10
-    SectionRole = Qt.ItemDataRole.UserRole + 11
-    RawContentRole = Qt.ItemDataRole.UserRole + 12
-    BodyContentRole = Qt.ItemDataRole.UserRole + 13
-    RiskRole = Qt.ItemDataRole.UserRole + 14
-    SourceRole = Qt.ItemDataRole.UserRole + 15
-    DateRole = Qt.ItemDataRole.UserRole + 16
-    IsCollapsedRole = Qt.ItemDataRole.UserRole + 17
-    IsCommandRole = Qt.ItemDataRole.UserRole + 18
-    ClientRole = Qt.ItemDataRole.UserRole + 19
-    MainCategoryNameRole = Qt.ItemDataRole.UserRole + 20
-    IsFirstInSubcategoryRole = Qt.ItemDataRole.UserRole + 21
-    IsMainCollapsedRole = Qt.ItemDataRole.UserRole + 22
-    IsSubCollapsedRole = Qt.ItemDataRole.UserRole + 23
-    SubCategoryNameRole = Qt.ItemDataRole.UserRole + 24
-    IsPackageRole = Qt.ItemDataRole.UserRole + 25
-    IsSnapRole = Qt.ItemDataRole.UserRole + 26
-    EmojiRole = Qt.ItemDataRole.UserRole + 27
+    IsArchivedRole = Qt.ItemDataRole.UserRole + 8
+    IsCollectionRole = Qt.ItemDataRole.UserRole + 9
+    SectionRole = Qt.ItemDataRole.UserRole + 10
+    RawContentRole = Qt.ItemDataRole.UserRole + 11
+    BodyContentRole = Qt.ItemDataRole.UserRole + 12
+    RiskRole = Qt.ItemDataRole.UserRole + 13
+    SourceRole = Qt.ItemDataRole.UserRole + 14
+    DateRole = Qt.ItemDataRole.UserRole + 15
+    IsCollapsedRole = Qt.ItemDataRole.UserRole + 16
+    IsCommandRole = Qt.ItemDataRole.UserRole + 17
+    ClientRole = Qt.ItemDataRole.UserRole + 18
+    MainCategoryNameRole = Qt.ItemDataRole.UserRole + 19
+    IsFirstInSubcategoryRole = Qt.ItemDataRole.UserRole + 20
+    IsMainCollapsedRole = Qt.ItemDataRole.UserRole + 21
+    IsSubCollapsedRole = Qt.ItemDataRole.UserRole + 22
+    SubCategoryNameRole = Qt.ItemDataRole.UserRole + 23
+    IsPackageRole = Qt.ItemDataRole.UserRole + 24
+    IsSnapRole = Qt.ItemDataRole.UserRole + 25
+    EmojiRole = Qt.ItemDataRole.UserRole + 26
 
     _ALL_ROLES = [
         NameRole,
@@ -54,7 +53,6 @@ class RolesMixin:
         ProjectRole,
         IsStarredRole,
         IsSelectedRole,
-        SearchTextRole,
         IsArchivedRole,
         IsCollectionRole,
         SectionRole,
@@ -99,7 +97,6 @@ PathRole = RolesMixin.PathRole
 ProjectRole = RolesMixin.ProjectRole
 IsStarredRole = RolesMixin.IsStarredRole
 IsSelectedRole = RolesMixin.IsSelectedRole
-SearchTextRole = RolesMixin.SearchTextRole
 IsArchivedRole = RolesMixin.IsArchivedRole
 IsCollectionRole = RolesMixin.IsCollectionRole
 SectionRole = RolesMixin.SectionRole

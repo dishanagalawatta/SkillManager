@@ -1,12 +1,13 @@
+from skill_manager.core.parsing.constants import MAIN_CATEGORIES_MAPPING
+
 from .entities import FilterState, Skill
 
-MAIN_CATEGORY_ORDER = {
-    "⚙️ System & Workflow": "1_⚙️ System & Workflow",
-    "💻 Core Engineering & Technology": "2_💻 Core Engineering & Technology",
-    "💼 Business & Operations": "3_💼 Business & Operations",
-    "🧪 Quality & Data": "4_🧪 Quality & Data",
-    "📚 Content & Knowledge": "5_📚 Content & Knowledge",
-    "🎨 Specialized & Lifestyle": "6_🎨 Specialized & Lifestyle",
+#: Sort prefix per main category, derived from the canonical mapping so the
+#: two can never drift apart.  A hard-coded copy once kept the *old* emoji
+#: (💻/💼/🧪/🎨), which silently pushed four of the six main categories
+#: into the "99_" fallback bucket and sorted them by code point.
+MAIN_CATEGORY_ORDER: dict[str, str] = {
+    name: f"{index}_{name}" for index, name in enumerate(MAIN_CATEGORIES_MAPPING, start=1)
 }
 
 

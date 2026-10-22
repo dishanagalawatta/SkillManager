@@ -306,6 +306,58 @@ def clean_models(app_controller):
     yield
 
 
+#: The filter fields a test can change on a model.  They are restored
+#: after every test so one test cannot leak its filter state into the
+#: next one.
+_FILTER_FIELDS = (
+    "is_package_only",
+    "filter_by_client",
+    "client_filter",
+    "filter_text",
+    "category_filter",
+    "collection_filter",
+    "project_filter",
+    "show_commands",
+    "show_starred",
+    "show_archived",
+)
+
+
+@pytest.fixture(autouse=True)
+def restore_session_model_filters():
+    """Restore the session-scoped models' filter state after each test.
+
+    The AppController (and therefore both SkillModels) lives for the whole
+    session, so a test that changes a filter — e.g. the discovery flow
+    clearing ``is_package_only`` — used to leak that state into every
+    later test in the same worker.  The Quick Copy view would then list
+    package skills as well, and the row order would depend on which test
+    ran before.
+
+    The controller is only reused when it already exists; this fixture
+    never creates one.
+    """
+    import skill_manager.app
+
+    controller = getattr(skill_manager.app, "current_test_controller", None)
+    if controller is None:
+        yield
+        return
+
+    models = [controller.libraryModel, controller.quickCopyModel]
+    saved = [
+        {name: getattr(model.state, name, None) for name in _FILTER_FIELDS} for model in models
+    ]
+
+    yield
+
+    for model, values in zip(models, saved, strict=True):
+        for name, value in values.items():
+            # A restore must never fail a test.
+            with contextlib.suppress(Exception):
+                setattr(model.state, name, value)
+
+
 @pytest.fixture(autouse=True)
 def reset_shutdown_flag():
     """Ensure sys.is_shutting_down is reset to False before each test."""

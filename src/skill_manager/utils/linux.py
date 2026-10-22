@@ -26,6 +26,12 @@ from skill_manager.utils.input_guard import injection_allowed
 
 logger = logging.getLogger(__name__)
 
+#: Sentinel for "the window could not be located" (pure Wayland without
+#: ``xdotool``/``wmctrl``).  ``0`` is never a valid X11 window id, so it
+#: cannot be confused with a real match.  Safety guards must treat it as
+#: "not found" — see ``skill_manager.utils.input_guard``.
+WINDOW_ID_UNKNOWN = 0
+
 # ---------------------------------------------------------------------------
 # Tool probes & Environment Sanitization
 # ---------------------------------------------------------------------------
@@ -450,11 +456,13 @@ def send_paste_to_focused_window() -> bool:
 
 
 def find_window_by_title(title_fragment: str) -> int | None:
-    """Return a window identifier (X11 window ID or 0) matching *title_fragment*.
+    """Return a window identifier (X11 window ID) matching *title_fragment*.
 
-    On Wayland without ``xdotool``, returns ``0`` as a sentinel (callers
-    should treat any non-``None`` value as "found").  On X11 returns the
-    actual window ID.
+    Returns the real window id on X11.  On Wayland without ``xdotool`` the
+    window cannot be located, so :data:`WINDOW_ID_UNKNOWN` is returned as a
+    sentinel — ``0`` is never a valid X11 window id, so callers can tell
+    "not found / unknown" apart from an actual match.  ``None`` means the
+    window was positively looked for and not found.
     """
     clean_env = get_clean_env()
     xdotool_bin = find_system_binary("xdotool")
@@ -490,9 +498,10 @@ def find_window_by_title(title_fragment: str) -> int | None:
         except Exception as exc:  # noqa: BLE001
             logger.debug("wmctrl -l failed: %s", exc)
 
-    # Wayland fallback: return 0 to mean "assume found"
+    # Wayland fallback: the window cannot be located without a portal, so
+    # report "unknown" rather than a bogus id.
     if os.environ.get("WAYLAND_DISPLAY"):
-        return 0
+        return WINDOW_ID_UNKNOWN
 
     return None
 

@@ -149,7 +149,7 @@ mcp/
     _visual_analysis.py# visual comparison and layout-issue detection
     _bug_detection.py  # QML errors and UI scenario replay
     _win32.py          # Windows-specific wrappers
-  models.py            # pydantic request/response schemas
+  models.py            # the ToolResult envelope shared by every tool
   tools/               # 13 modules, 40 tools
     build.py analysis.py monitor.py debug.py screenshot.py ui_inspection.py
     accessibility.py performance.py frame_timing.py bug_detection.py
@@ -159,8 +159,32 @@ mcp/
 ### Lifecycle guard
 - `--mcp` uses its own mutex `SkillManagerMcpMutex` (never fights the GUI instance).
 - Write tools refuse paths under `TODO.md`, `.agents/commands/`, `.agents/skills/`
-  (AGENTS.md exclusions).
+  (AGENTS.md exclusions). The exclusion is checked **before** anything is
+  written or deleted, not after.
 - `--mcp-allow-write` absent → write tools return `{ok:false, error:"write mode disabled"}`.
+  `sm_lint` with `fix: true` also requires it: `ruff check --fix` rewrites
+  files, so it is a write even though the tool is otherwise read-only.
+
+### Write containment
+The write tools may only touch files inside a directory SkillManager
+manages — a configured **skill source** or a configured **project**. The
+rules live in `mcp/bridge/_guard.py` and are enforced before any I/O:
+
+| Rule | Effect |
+|---|---|
+| A skill name is a single path segment | `../../evil` is refused — no separators, no `..`, no absolute path, no drive letter |
+| A write target resolves inside a source or project | An arbitrary path (or a symlink pointing out of a root) is refused |
+| A delete target resolves to a known skill | `sm_delete_skill` no longer falls back to "any existing path" |
+
+### Input injection
+Real input injection (`ydotool` uinput, `pyautogui`, Win32 `SendInput`) is
+gated by `utils/input_guard.py`, the single source of truth:
+
+- never under pytest or in offscreen mode;
+- only when the SkillManager window can be **positively identified**. On
+  Wayland without `xdotool`/`wmctrl` the window cannot be located, so the
+  guard **refuses** — injecting blind would type into whatever window the
+  user had focused.
 - The process pins `QT_QPA_PLATFORM=offscreen`; `SKILL_MANAGER_MCP_PLATFORM`
   overrides it for debugging (e.g. `xcb` to compare against a real display).
 - Headless UI state is never persisted: `UIController.disable_state_persistence()`
@@ -176,7 +200,8 @@ mcp/
 All tools return structured JSON, names prefixed `sm_`.
 
 **Build** (always on)
-- `sm_lint` — `ruff check src tests`, structured error list.
+- `sm_lint` — `ruff check src tests`, structured error list. `fix: true`
+  rewrites files and therefore needs `--mcp-allow-write`.
 - `sm_run_tests` — `pytest` (subset/full), pass/fail/coverage. Async.
 - `sm_build` — `skill-manager-build` (PyInstaller), artifact path. Async.
 

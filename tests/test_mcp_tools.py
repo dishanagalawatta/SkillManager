@@ -28,6 +28,24 @@ from skill_manager.mcp.tools import (
 )
 
 
+def _async_return(value: Any):
+    """Build a coroutine function that returns *value*."""
+
+    async def _fake(*args, **kwargs):  # noqa: ARG001
+        return value
+
+    return _fake
+
+
+def _async_raise(exc: Exception):
+    """Build a coroutine function that raises *exc*."""
+
+    async def _fake(*args, **kwargs):  # noqa: ARG001
+        raise exc
+
+    return _fake
+
+
 def _run(coro: Any) -> Any:
     """Drive an async analyze handler to completion without an async plugin."""
     return anyio.run(lambda: coro)
@@ -41,7 +59,9 @@ def test_build_lint_returns_structured_result(monkeypatch: pytest.MonkeyPatch) -
     fake_lint = {"returncode": 0, "passed": True, "stdout": "clean", "stderr": ""}
     monkeypatch.setattr(build_mod, "run_lint", lambda path, fix: fake_lint)
 
-    result = build_mod._HANDLERS["sm_lint"]({"path": "src", "fix": False})
+    result = _run(
+        build_mod.get_handlers(allow_write=False)["sm_lint"]({"path": "src", "fix": False})
+    )
 
     assert result.ok is True
     assert result.tool == "sm_lint"
@@ -60,7 +80,8 @@ def test_build_lint_passes_fix_flag(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(build_mod, "run_lint", _fake_lint)
 
-    build_mod._HANDLERS["sm_lint"]({"path": "custom", "fix": True})
+    # ``fix`` rewrites files, so it only runs with the write capability.
+    _run(build_mod.get_handlers(allow_write=True)["sm_lint"]({"path": "custom", "fix": True}))
 
     assert captured == {"path": "custom", "fix": True}
 
@@ -127,7 +148,11 @@ def test_build_tool_schemas_present() -> None:
 def test_analyze_list_skills_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     """sm_list_skills returns a ToolResult envelope with a skills list."""
     skills = [{"name": "a", "local_path": "/a"}, {"name": "b", "local_path": "/b"}]
-    monkeypatch.setattr(analyze_mod, "list_skills", lambda include_commands, project_label: skills)
+
+    async def _fake_list_skills(include_commands, project_label):  # noqa: ARG001
+        return skills
+
+    monkeypatch.setattr(analyze_mod, "list_skills", _fake_list_skills)
 
     result = _run(
         analyze_mod._HANDLERS["sm_list_skills"]({"include_commands": True, "project_label": ""})
@@ -277,7 +302,7 @@ def test_monitor_profile_cached_path() -> None:
     handlers = monitor_mod.get_handlers()
     assert "sm_profile" in handlers
 
-    result = handlers["sm_profile"]({})
+    result = _run(handlers["sm_profile"]({}))
 
     assert isinstance(result, ToolResult)
     assert result.ok is True
@@ -300,7 +325,7 @@ def test_monitor_profile_full_scan_path() -> None:
     """sm_profile with force_full_scan=True still returns a valid report."""
     handlers = monitor_mod.get_handlers()
 
-    result = handlers["sm_profile"]({"force_full_scan": True})
+    result = _run(handlers["sm_profile"]({"force_full_scan": True}))
 
     assert result.ok is True
     assert result.tool == "sm_profile"
@@ -379,8 +404,8 @@ def test_write_gated_when_disabled() -> None:
     """With allow_write=False both write tools refuse with a clear error."""
     handlers = write_mod._bind_handlers(allow_write=False)
 
-    del_result = handlers["sm_delete_skill"]({"skill_id": "my-skill"})
-    dep_result = handlers["sm_deploy"]({"skill_id": "my-skill", "target": "x"})
+    del_result = _run(handlers["sm_delete_skill"]({"skill_id": "my-skill"}))
+    dep_result = _run(handlers["sm_deploy"]({"skill_id": "my-skill", "target": "x"}))
 
     for result in (del_result, dep_result):
         assert result.ok is False
@@ -393,11 +418,11 @@ def test_write_delete_skill_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         write_mod,
         "delete_skill",
-        lambda skill_id: {"deleted": True, "skill_id": skill_id, "resolved_path": "/ok/path"},
+        _async_return({"deleted": True, "skill_id": "my-skill", "resolved_path": "/ok/path"}),
     )
 
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_delete_skill"]({"skill_id": "my-skill"})
+    result = _run(handlers["sm_delete_skill"]({"skill_id": "my-skill"}))
 
     assert result.ok is True
     assert result.tool == "sm_delete_skill"
@@ -408,7 +433,7 @@ def test_write_delete_skill_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_write_delete_skill_excluded_by_skill_id() -> None:
     """A delete targeting an AGENTS.md-excluded path is refused even when allowed."""
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_delete_skill"]({"skill_id": ".agents/skills/secret"})
+    result = _run(handlers["sm_delete_skill"]({"skill_id": ".agents/skills/secret"}))
 
     assert result.ok is False
     assert result.error is not None
@@ -422,15 +447,17 @@ def test_write_delete_skill_excluded_by_resolved_path(
     monkeypatch.setattr(
         write_mod,
         "delete_skill",
-        lambda skill_id: {
-            "deleted": True,
-            "skill_id": skill_id,
-            "resolved_path": "repo/.agents/commands/blocked",
-        },
+        _async_return(
+            {
+                "deleted": True,
+                "skill_id": "anything",
+                "resolved_path": "repo/.agents/commands/blocked",
+            }
+        ),
     )
 
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_delete_skill"]({"skill_id": "anything"})
+    result = _run(handlers["sm_delete_skill"]({"skill_id": "anything"}))
 
     assert result.ok is False
     assert result.error is not None
@@ -442,11 +469,11 @@ def test_write_delete_skill_bridge_value_error(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(
         write_mod,
         "delete_skill",
-        lambda skill_id: (_ for _ in ()).throw(ValueError("missing")),
+        _async_raise(ValueError("missing")),
     )
 
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_delete_skill"]({"skill_id": "ghost"})
+    result = _run(handlers["sm_delete_skill"]({"skill_id": "ghost"}))
 
     assert result.ok is False
     assert result.error is not None
@@ -462,7 +489,7 @@ def test_write_deploy_allowed_and_fails(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_deploy"]({"skill_id": "s", "target": "t"})
+    result = _run(handlers["sm_deploy"]({"skill_id": "s", "target": "t"}))
 
     assert result.ok is False
     assert result.error is not None
@@ -472,7 +499,7 @@ def test_write_deploy_allowed_and_fails(monkeypatch: pytest.MonkeyPatch) -> None
 def test_write_deploy_excluded_skill_id() -> None:
     """A deploy targeting an AGENTS.md-excluded path is refused even when allowed."""
     handlers = write_mod._bind_handlers(allow_write=True)
-    result = handlers["sm_deploy"]({"skill_id": "TODO.md", "target": "x"})
+    result = _run(handlers["sm_deploy"]({"skill_id": "TODO.md", "target": "x"}))
 
     assert result.ok is False
     assert result.error is not None

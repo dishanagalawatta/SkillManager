@@ -13,6 +13,7 @@ with ``ok=False`` rather than propagating to the MCP transport.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -145,7 +146,7 @@ async def _handle_list_skills(args: dict[str, Any]) -> ToolResult:
     project_label: str = str(args.get("project_label", ""))
     _emit({"include_commands": include_commands, "project_label": project_label})
     try:
-        skills = list_skills(include_commands=include_commands, project_label=project_label)
+        skills = await list_skills(include_commands=include_commands, project_label=project_label)
         return ok(tool, {"skills": skills})
     except Exception as exc:
         return err(tool, str(exc))
@@ -179,7 +180,9 @@ async def _handle_static_analyze(args: dict[str, Any]) -> ToolResult:
     if not pattern:
         return err(tool, "argument 'pattern' is required and must be non-empty")
     try:
-        matches = static_analyze(pattern=pattern, path=path)
+        # The scan walks the tree: run it off the event loop so other
+        # requests keep being served.
+        matches = await asyncio.to_thread(static_analyze, pattern=pattern, path=path)
         return ok(tool, {"matches": matches})
     except Exception as exc:
         return err(tool, str(exc))

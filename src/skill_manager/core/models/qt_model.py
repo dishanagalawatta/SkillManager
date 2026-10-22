@@ -43,7 +43,6 @@ from skill_manager.core.models.roles import (
     RawContentRole,
     RiskRole,
     RolesMixin,
-    SearchTextRole,
     SectionRole,
     SourceRole,
     SubCategoryNameRole,
@@ -101,6 +100,11 @@ class SkillModel(
         self.state = FilterState()
         self._suppress_layout = False
         self._batch_apply_needed = False
+        # Set by _begin_batch() when the deferred pass must reset the model
+        # rather than patch it.  Initialised here so the attribute always
+        # exists — onIncubationReady() reads it, and it was only ever
+        # assigned inside the batch helpers.
+        self._batch_reset_needed = False
         self._selections_by_project: dict[str, list[str]] = {}
         self._project_selections_save_timer = None
         self._collapse_save_timer = None
@@ -233,7 +237,6 @@ class SkillModel(
             ProjectRole: QByteArray(b"project"),
             IsStarredRole: QByteArray(b"isStarred"),
             IsSelectedRole: QByteArray(b"isSelected"),
-            SearchTextRole: QByteArray(b"searchText"),
             IsArchivedRole: QByteArray(b"isArchived"),
             IsCollectionRole: QByteArray(b"isCollection"),
             SectionRole: QByteArray(b"sectionName"),

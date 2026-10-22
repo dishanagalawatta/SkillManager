@@ -101,7 +101,12 @@ def test_filter_engine_sort_key(engine):
     key2 = engine.sort_key(s2)
 
     assert key1 < key2
-    assert "1_⚙️ System & Workflow" in key1[0]
+    # The prefix comes from the canonical mapping, so it cannot drift.
+    from skill_manager.core.models.filter_engine import MAIN_CATEGORY_ORDER
+
+    expected = MAIN_CATEGORY_ORDER["⚙️ System & Workflow"]
+    assert expected in key1[0]
+    assert not expected.startswith("99_")
 
 
 def test_filter_engine_build_visible_rows_collapsed(engine):

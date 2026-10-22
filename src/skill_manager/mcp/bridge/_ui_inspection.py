@@ -11,8 +11,9 @@ import base64
 import io
 from typing import Any
 
+from . import _controller
 from ._capture import capture_app_window_info
-from ._controller import _APP_CONTROLLER_ERROR, _controller_or_none
+from ._controller import _controller_or_none
 from ._qml_headless import ensure_qml_engine
 from ._qml_object import accessible_info, qml_class_name
 from ._telemetry import _log_call
@@ -121,7 +122,7 @@ def get_current_view() -> dict[str, Any]:
             return {
                 "view": "unknown",
                 "ok": False,
-                "error": _APP_CONTROLLER_ERROR or "no_controller",
+                "error": _controller._APP_CONTROLLER_ERROR or "no_controller",
             }
         ui = getattr(controller, "ui", None)
         view = str(_attr(ui, "currentView", "unknown") or "unknown")
@@ -144,7 +145,7 @@ def inspect_qml_tree(max_depth: int = 5) -> dict[str, Any]:
                 "ok": False,
                 "root_count": 0,
                 "tree": [],
-                "error": _APP_CONTROLLER_ERROR or "no_controller",
+                "error": _controller._APP_CONTROLLER_ERROR or "no_controller",
             }
         engine = ensure_qml_engine()
         if engine is None or not hasattr(engine, "rootObjects"):

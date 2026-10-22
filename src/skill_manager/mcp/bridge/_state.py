@@ -5,7 +5,8 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from ._controller import _APP_CONTROLLER_ERROR, _controller_or_none
+from . import _controller
+from ._controller import _controller_or_none
 from ._skills import list_projects, list_sources
 from ._telemetry import _log_call, get_diagnostic_logger
 
@@ -58,7 +59,7 @@ def get_health() -> dict[str, Any]:
 
     controller = _controller_or_none()
     if controller is None:
-        health["degraded_reason"] = _APP_CONTROLLER_ERROR or "controller_unavailable"
+        health["degraded_reason"] = _controller._APP_CONTROLLER_ERROR or "controller_unavailable"
         return health
 
     health["controller_present"] = True
@@ -102,7 +103,10 @@ def dump_state() -> dict[str, Any]:
     _log_call("dump_state")
     controller = _controller_or_none()
     if controller is None:
-        return {"available": False, "reason": _APP_CONTROLLER_ERROR or "no_controller"}
+        return {
+            "available": False,
+            "reason": _controller._APP_CONTROLLER_ERROR or "no_controller",
+        }
 
     state: dict[str, Any] = {"available": True}
     try:

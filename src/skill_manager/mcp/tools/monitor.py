@@ -8,6 +8,7 @@ mutate app state.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections.abc import Callable
@@ -141,21 +142,64 @@ def _handle_tail_events(limit: int) -> ToolResult:
     return ok("sm_tail_events", {"events": events})
 
 
-def _handle_profile(force_full_scan: bool) -> ToolResult:
+async def _handle_profile(force_full_scan: bool) -> ToolResult:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("SKILL_MANAGER_SKIP_INITIAL_LOAD", "1")
+    # A profiling run must not report itself as product usage, so the
+    # analytics calls are muted for its duration — and restored afterwards.
+    # Leaving them muted would silently disable telemetry for the rest of
+    # the MCP process.
+    restore_analytics = _mute_analytics()
+    try:
+        return await _profile(force_full_scan)
+    finally:
+        restore_analytics()
+
+
+def _mute_analytics():
+    """Silence the analytics module and return a callable that restores it."""
+    saved: dict[str, Any] = {}
+
+    def _restore() -> None:
+        import skill_manager.core.analytics as _analytics
+
+        for _name, _fn in saved.items():
+            setattr(_analytics, _name, _fn)
+
     try:
         import skill_manager.core.analytics as _analytics
 
         for _n in ("capture_event", "capture_exception", "capture"):
             if hasattr(_analytics, _n):
+                saved[_n] = getattr(_analytics, _n)
                 setattr(_analytics, _n, lambda *_, **__: None)
     except Exception:
         pass
+    return _restore
 
+
+def _profile_discover(force_full_scan: bool) -> tuple[list[dict[str, Any]], float]:
+    """Run the discovery scan and time it.
+
+    Pure with respect to the Qt model, so it is safe on a worker thread.
+    """
+    from skill_manager.core.config import ConfigManager
+    from skill_manager.core.discovery import DiscoveryService
+
+    cfg = ConfigManager()
+    sources = cfg.get("sources", []) or []
+    projects = cfg.get("projects", []) or []
+
+    svc = DiscoveryService(sources=sources, projects=projects)
+
+    t0 = time.perf_counter()
+    result = svc.discover_all(cache_callback=None, force_full_scan=force_full_scan)
+    discover_ms = (time.perf_counter() - t0) * 1000.0
+    return list(result.get("skills", []) or []), discover_ms
+
+
+async def _profile(force_full_scan: bool) -> ToolResult:
     try:
-        from skill_manager.core.config import ConfigManager
-        from skill_manager.core.discovery import DiscoveryService
         from skill_manager.core.models.entities import (
             FilterState,
             PreparedModelState,
@@ -165,17 +209,9 @@ def _handle_profile(force_full_scan: bool) -> ToolResult:
         from skill_manager.core.models.qt_model import SkillModel
         from skill_manager.core.search import SearchEngine
 
-        cfg = ConfigManager()
-        sources = cfg.get("sources", []) or []
-        projects = cfg.get("projects", []) or []
-
-        svc = DiscoveryService(sources=sources, projects=projects)
-
-        t0 = time.perf_counter()
-        result = svc.discover_all(cache_callback=None, force_full_scan=force_full_scan)
-        discover_ms = (time.perf_counter() - t0) * 1000.0
-
-        records = result.get("skills", []) or []
+        # The scan is the expensive stage: run it off the event loop so the
+        # other MCP requests keep being served while it runs.
+        records, discover_ms = await asyncio.to_thread(_profile_discover, force_full_scan)
 
         t0 = time.perf_counter()
         all_skills = [Skill.from_dict_fast(rec) for rec in records]

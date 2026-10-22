@@ -17,6 +17,7 @@ from skill_manager.core.config import (
     PROJECT_SKILL_OWNERSHIP_FILE,
     SKILL_LIBRARY_ARCHIVE_FILE,
     SKILL_LIBRARY_CACHE_FILE,
+    SKILL_LIBRARY_CACHE_VERSION,
     SKILL_LIBRARY_STARRED_FILE,
     TEMP_COPIES_FILE,
     TEMP_SNAPS_FILE,
@@ -184,6 +185,10 @@ def save_cache(data: dict[str, Any]) -> bool:
     """
     try:
         slim_data = dict(data)
+        # Stamp the schema version so a changed record layout invalidates
+        # an index written by an older build.  The constant existed but was
+        # never enforced, so a stale index survived every schema change.
+        slim_data["cache_version"] = SKILL_LIBRARY_CACHE_VERSION
         if "skills" in slim_data:
             slim_data["skills"] = [
                 _normalize_skill_project_path(
@@ -213,6 +218,21 @@ def load_cache() -> dict[str, Any] | None:
     try:
         with open(cache_path, "rb") as f:
             data = orjson.loads(f.read())
+
+        # A cache written by a different schema version cannot be trusted.
+        # The version is read before validation because CacheState drops
+        # unknown keys.
+        cache_version = data.get("cache_version") if isinstance(data, dict) else None
+        if cache_version != SKILL_LIBRARY_CACHE_VERSION:
+            logger.info(
+                "[CACHE] Discarding cache with version %r (current %r).",
+                cache_version,
+                SKILL_LIBRARY_CACHE_VERSION,
+            )
+            with contextlib.suppress(BaseException):
+                cache_path.unlink()
+            return None
+
         validated = CacheState.model_validate(data).model_dump()
         # Normalize project_path in-memory for all skills
         if "skills" in validated:
