@@ -94,6 +94,7 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | `SkillReferences` | `skill_references.py` | Skill dependency detection |
 | `SearchEngine` | `search.py` | Fast skill lookup index |
 | `DiskCache` | (via `diskcache`) | Expensive computation caching |
+| `TaskStore` | `tasks.py` | Per-project task lists (atomic JSON + `FileLock`) |
 
 ### Skill Packages (`core/skill_packages/`)
 
@@ -316,6 +317,37 @@ sequenceDiagram
 1. **Strict Project Boundary Enforcement**: Any skill residing inside an `.agents/skills` or `.agents/commands` folder is explicitly identified as `is_package = False`. Even if the workspace root or parent folder is registered in `sources`, the project boundary prevents misclassifying project copies as Master Library packages.
 2. **Package Label Invariance**: In `addOrUpdateSkills`, `project_label` recomputation is scoped exclusively to project skills (`not skill.is_package`), permanently preserving `"Master Library"` for package records.
 3. **Differential Model Synchronization**: Non-empty model updates use `_apply_filter_with_diff()` via `difflib.SequenceMatcher` to emit surgical Qt row mutation signals (`beginInsertRows`/`endInsertRows`, `beginRemoveRows`/`endRemoveRows`, `dataChanged`), preventing QML `ListView` delegate cache corruption and index desynchronization. `equal` blocks are synced via `PipelineMixin._sync_equal_block()`, which reassigns only rows whose objects actually mutated (`!=`, preserving identity for identical items) and batches contiguous changed rows into single `dataChanged(topLeft, bottomRight)` emissions to prevent signal storms.
+
+#### Per-Project Task List
+
+Quick Copy carries a collapsible task panel for the **active** project.
+
+- **Persistence** — `core/tasks.py` stores the lists in
+  `DATA_DIR / "project_tasks.json"` through the same atomic write +
+  cross-process `FileLock` the skill caches use. Project keys are
+  canonicalised (`canonical_key`), so a path written with a different case
+  or separator never orphans a project's list.
+- **Model** — `ProjectTaskRecord` (Pydantic): `id`, `title`, `description`,
+  `completed`, `priority` (`low`/`medium`/`high`), `linked_skills`,
+  `created_at`/`updated_at`, `order`.
+- **Controller** — `TaskController` exposes `currentProjectTasks`,
+  `activeTaskCount`, `completedTaskCount` and `projectTaskCounts` (a
+  notifying map used for the project badge) plus the CRUD slots and
+  `copyTaskAsPrompt`, which renders the linked skill references in the
+  active client format.
+- **UI** — `views/ProjectTasksPanel.qml`, hosted by `QuickCopyView.qml`
+  next to the skill list. The panel's open state lives in
+  `UIStateRecord.tasks_panel_open`, and `Ctrl+Shift+L` toggles it.
+
+```mermaid
+flowchart LR
+    QCV["QuickCopyView"] -->|projectPath / projectName| Panel["ProjectTasksPanel"]
+    Panel -->|add / toggle / update / delete / copy| Ctrl["TaskController"]
+    Ctrl --> Store["core/tasks.py"]
+    Store -->|atomic JSON + FileLock| File["DATA_DIR/project_tasks.json"]
+    Ctrl -->|tasksChanged| Panel
+    Ctrl -->|projectTaskCounts| Badge["Project badge"]
+```
 
 #### Unified Command Workflow
 

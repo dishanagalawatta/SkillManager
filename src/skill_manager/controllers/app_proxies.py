@@ -294,6 +294,49 @@ class AppControllerProxyMixin:
     def cancelCommandCopyWithOverwrite(self):
         self.ops.cancelCommandCopyWithOverwrite()
 
+    # ── Per-project task list ───────────────────────────────────────────
+
+    @Slot(str, str, str, str, result=bool)
+    def addProjectTask(
+        self, project_path: str, title: str, priority: str, description: str
+    ) -> bool:
+        return self.tasks.addProjectTask(project_path, title, priority, description)
+
+    @Slot(str, str, result=bool)
+    def toggleProjectTask(self, project_path: str, task_id: str) -> bool:
+        return self.tasks.toggleProjectTask(project_path, task_id)
+
+    @Slot(str, str, str, str, str, result=bool)
+    def updateProjectTask(
+        self,
+        project_path: str,
+        task_id: str,
+        title: str,
+        description: str,
+        priority: str,
+    ) -> bool:
+        return self.tasks.updateProjectTask(project_path, task_id, title, description, priority)
+
+    @Slot(str, str, result=bool)
+    def deleteProjectTask(self, project_path: str, task_id: str) -> bool:
+        return self.tasks.deleteProjectTask(project_path, task_id)
+
+    @Slot(str, result=int)
+    def clearCompletedProjectTasks(self, project_path: str) -> int:
+        return self.tasks.clearCompletedProjectTasks(project_path)
+
+    @Slot(str, str, result=bool)
+    def copyTaskAsPrompt(self, project_path: str, task_id: str) -> bool:
+        return self.tasks.copyTaskAsPrompt(project_path, task_id)
+
+    @Slot(str, result=int)
+    def openTaskCountForProject(self, project_path: str) -> int:
+        return self.tasks.openTaskCountForProject(project_path)
+
+    @Slot(bool)
+    def setTasksPanelOpen(self, b: bool) -> None:
+        self.ui.setTasksPanelOpen(b)
+
     @Slot(str, list)
     def deleteSkillFromProjects(self, path, projects):
         self.ops.deleteSkillFromProjects(path, projects)

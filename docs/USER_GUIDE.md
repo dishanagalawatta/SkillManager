@@ -51,6 +51,7 @@ The Quick Copy view is designed for daily workflow efficiency when working withi
 - **Manual Input**: Add raw text references or notes alongside your skill references.
 - **Starred Items**: Starred skills and commands are shown as first-class items in the Quick Copy workflow.
 - **Command Skill Carry**: When you copy a command to another project, SkillManager automatically detects which skills the command references (e.g., `/git-pr`, `@cavecrew`). If any of those skills are missing in the target project, a carry dialog appears listing them. You can toggle individual skills, carry all, or skip and copy commands only. This ensures commands work in every project without manual dependency tracking. When a command edit spans multiple projects, the missing skills are merged into a single prompt (one union list for all projects, copied per project on confirm). Re-editing after a full carry stays silent — if nothing is missing, no dialog appears.
+- **Per-Project Task List**: A collapsible panel next to the skill list holds a task list for the *active* project. Toggle it with the checklist button in the top bar or with `Ctrl+Shift+L`. The panel shows an open/done counter, an All/Active/Done filter, a quick-add field (with a low/medium/high priority picker), and per-row actions: copy the task for your agent, edit it inline, or delete it. The project dropdown carries a badge with the number of open tasks, so you can see at a glance which project still has work waiting. "Copy for Agent" puts the task title, its notes, and any linked skill references on the clipboard, formatted for the client format you selected.
 
 ---
 
@@ -131,6 +132,7 @@ SkillManager includes a powerful screenshots and redaction feature.
 | **Tools** | |
 | `Ctrl+T` | Toggle theme |
 | `Ctrl+Shift+S` | Take screenshot |
+| `Ctrl+Shift+L` | Toggle the Quick Copy task panel |
 | *Customizable* | All shortcuts can be remapped in Settings |
 | *Per-collection* | Each collection can have its own shortcut; pressing it copies the collection's skill references and pastes them into the focused field |
 

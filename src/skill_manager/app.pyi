@@ -26,6 +26,7 @@ from skill_manager.controllers.discovery_controller import DiscoveryController
 from skill_manager.controllers.image_inspector_controller import ImageInspectorController
 from skill_manager.controllers.ops_controller import OpsController
 from skill_manager.controllers.screenshot_controller import ScreenshotController
+from skill_manager.controllers.task_controller import TaskController
 from skill_manager.controllers.ui_controller import UIController
 from skill_manager.controllers.update_controller import UpdateController
 from skill_manager.core.file_watch import SkillFolderWatcher
@@ -76,6 +77,7 @@ class AppController(AppControllerProxyMixin, QObject):
     app_update_controller: AppUpdateController
     screenshot_controller: ScreenshotController
     image_inspector_controller: ImageInspectorController
+    task_controller: TaskController
 
     # --- Core Properties ---
     skillModel: SkillModel

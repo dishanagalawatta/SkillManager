@@ -28,6 +28,7 @@ AppScrollBar 1.0 AppScrollBar.qml
 SleekProgressBar 1.0 SleekProgressBar.qml
 ShortcutsSettings 1.0 views/ShortcutsSettings.qml
 DiagnosticsPane 1.0 views/DiagnosticsPane.qml
+ProjectTasksPanel 1.0 views/ProjectTasksPanel.qml
 KeySequenceCapture 1.0 KeySequenceCapture.qml
 
 CommandCreateDialog 1.0 dialogs/CommandCreateDialog.qml

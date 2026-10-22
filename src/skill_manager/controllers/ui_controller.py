@@ -38,6 +38,7 @@ class UIController(BaseController):
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
     telemetryEnabledChanged = Signal()
+    tasksPanelOpenChanged = Signal()
     inspectorWidthChanged = Signal()
 
     def __init__(self, app):
@@ -234,6 +235,19 @@ class UIController(BaseController):
     def telemetryEnabled(self):  # type: ignore[reportRedeclaration]
         return self.state.telemetry_enabled
 
+    @Property(bool, notify=tasksPanelOpenChanged)
+    def tasksPanelOpen(self):  # type: ignore[reportRedeclaration]
+        """Whether the Quick Copy task panel is expanded."""
+        return self.state.tasks_panel_open
+
+    @tasksPanelOpen.setter  # type: ignore[func-attr]
+    def tasksPanelOpen(self, value):
+        value = bool(value)
+        if self.state.tasks_panel_open != value:
+            self.state.tasks_panel_open = value
+            self.triggerSave()
+            self.tasksPanelOpenChanged.emit()
+
     @telemetryEnabled.setter  # type: ignore[func-attr]
     def telemetryEnabled(self, value):
         value = bool(value)
@@ -304,6 +318,10 @@ class UIController(BaseController):
     def setTelemetryEnabled(self, b):
         self.telemetryEnabled = b
 
+    @Slot(bool)
+    def setTasksPanelOpen(self, b):
+        self.tasksPanelOpen = b
+
     @Slot()
     def triggerSave(self):
         """Triggers a debounced save of the UI state."""
@@ -338,6 +356,7 @@ class UIController(BaseController):
         self.rememberFiltersChanged.emit()
         self.reducedMotionChanged.emit()
         self.telemetryEnabledChanged.emit()
+        self.tasksPanelOpenChanged.emit()
         self.inspectorWidthChanged.emit()
         # Defaults restore telemetry to on; keep the live client in step.
         set_telemetry_enabled(self.state.telemetry_enabled)

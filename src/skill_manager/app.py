@@ -52,6 +52,7 @@ from skill_manager.controllers.selected_skill_controller import (  # noqa: E402
     SelectedSkillController,
 )
 from skill_manager.controllers.snap_controller import SnapController  # noqa: E402
+from skill_manager.controllers.task_controller import TaskController  # noqa: E402
 from skill_manager.controllers.ui_controller import UIController  # noqa: E402
 from skill_manager.controllers.update_controller import UpdateController  # noqa: E402
 from skill_manager.core.analytics import shutdown as posthog_shutdown  # noqa: E402
@@ -265,7 +266,8 @@ class AppController(AppControllerProxyMixin, QObject):
         self.updates = UpdateController(self)  # type: ignore[arg-type]
         self.discovery = DiscoveryController(self)  # type: ignore[arg-type]
         self.app_updater = AppUpdateController(self)  # type: ignore[arg-type]
-        self.global_hotkey = GlobalHotkeyManager(self)  # type: ignore[arg-type]
+        self.global_hotkey = GlobalHotkeyManager(self)
+        self.tasks = TaskController(self)  # type: ignore[arg-type]
 
         # 4. Connect Sub-Controller signals to Proxy Signals
         self.ui.currentViewChanged.connect(self.currentViewChanged.emit)
@@ -285,6 +287,10 @@ class AppController(AppControllerProxyMixin, QObject):
         self.projectsChanged.connect(self._on_projects_changed)
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
+
+        # The task panel follows the active project, so it has to refresh
+        # whenever the project selection changes.
+        self.currentProjectChanged.connect(self._on_current_project_changed)
 
         self.ops.commandSkillsCarryPrompt.connect(self.commandSkillsCarryPrompt.emit)
         self.ops.commandSkillsCarryBatchPrompt.connect(self.commandSkillsCarryBatchPrompt.emit)
@@ -657,6 +663,10 @@ class AppController(AppControllerProxyMixin, QObject):
     @Property(QObject, constant=True)
     def global_hotkey_controller(self):
         return self.global_hotkey
+
+    @Property(QObject, constant=True)
+    def task_controller(self):
+        return self.tasks
 
     @Property(str, notify=currentProjectChanged)
     def currentProject(self):  # type: ignore[reportRedeclaration]
@@ -1141,6 +1151,12 @@ class AppController(AppControllerProxyMixin, QObject):
         if self._current_project_label not in labels:
             self._current_project_label = labels[0] if labels else ""
             self.currentProjectChanged.emit()
+
+    def _on_current_project_changed(self):
+        """The active project's task list changed — refresh the panel."""
+        tasks = getattr(self, "tasks", None)
+        if tasks is not None:
+            tasks.refresh()
 
     @Slot(str)
     def _set_status(self, msg):
