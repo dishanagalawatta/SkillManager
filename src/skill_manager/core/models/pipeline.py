@@ -283,10 +283,20 @@ class PipelineMixin:
             }
             results = self._search_engine.query(self.state.filter_text, valid_paths=valid_paths)
             path_to_skill = {s.local_path: s for s in self._all_skills}
-            return [
-                path_to_skill.get(r[0].get("local_path", ""), Skill.from_dict(r[0]))
-                for r in results
-            ]
+            # ``dict.get(key, default)`` evaluates the default eagerly, so
+            # building ``Skill.from_dict(r[0])`` here would run a full
+            # Pydantic validation for every hit on every keystroke — and
+            # raise on a record the model already holds a valid copy of.
+            found: list[Skill] = []
+            for result in results:
+                skill_dict = result[0]
+                local_path = skill_dict.get("local_path", "")
+                known = path_to_skill.get(local_path)
+                if known is not None:
+                    found.append(known)
+                else:
+                    found.append(Skill.from_dict(skill_dict))
+            return found
         skills = self._engine.filter_skills(self._all_skills, self.state)
         skills.sort(key=self._engine.sort_key)
         return skills

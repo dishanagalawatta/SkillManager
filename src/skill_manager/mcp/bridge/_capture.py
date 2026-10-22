@@ -21,6 +21,19 @@ from ._win32 import (
 )
 
 
+def _buffer_has_content(buf) -> bool:
+    """True when a captured bitmap contains more than empty black pixels.
+
+    A window that refused to paint leaves an all-zero buffer; that is the
+    only case where the desktop-DC fallback is used.
+    """
+    try:
+        raw = bytes(buf)
+    except Exception:  # noqa: BLE001
+        return True
+    return any(raw)
+
+
 def _capture_window_to_image(
     hwnd: int,
     width: int,
@@ -35,7 +48,11 @@ def _capture_window_to_image(
        call PrintWindow (own-content, unaffected by overlapping windows).
     2. If visible — call PrintWindow directly.
     3. Always emit WM_PRINT message as a secondary capture attempt.
-    4. Desktop DC ``BitBlt`` as the final reliable fallback.
+    4. Desktop DC ``BitBlt`` **only as a fallback**, when the window painted
+       nothing into the memory DC.  Running it unconditionally used to
+       overwrite a good ``PrintWindow`` result with the on-screen pixels at
+       those coordinates, so an overlapping window (or a different Z-order)
+       bled into the capture.
     5. If the window was minimised, re-minimise after capture.
 
     Returns ``None`` on failure.
@@ -85,22 +102,6 @@ def _capture_window_to_image(
             None,
         )
 
-        # Desktop DC BitBlt — reliable when the window is visible on screen
-        desk_dc = user32.GetDC(0)
-        if desk_dc:
-            gdi32.BitBlt(
-                mem_dc,
-                0,
-                0,
-                width,
-                height,
-                desk_dc,
-                window_left,
-                window_top,
-                0x00CC0020,
-            )
-            user32.ReleaseDC(0, desk_dc)
-
         if was_minimized:
             user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
 
@@ -116,6 +117,27 @@ def _capture_window_to_image(
         buf_size = width * height * 4
         buf = ctypes.create_string_buffer(buf_size)
         success = gdi32.GetDIBits(mem_dc, bitmap, 0, height, buf, ctypes.byref(bmi), 0)
+
+        # The desktop BitBlt is a *fallback*: it is only used when the
+        # window painted nothing at all.  Running it unconditionally
+        # replaced the PrintWindow result with whatever was on screen at
+        # those coordinates.
+        if success and not _buffer_has_content(buf):
+            desk_dc = user32.GetDC(0)
+            if desk_dc:
+                gdi32.BitBlt(
+                    mem_dc,
+                    0,
+                    0,
+                    width,
+                    height,
+                    desk_dc,
+                    window_left,
+                    window_top,
+                    0x00CC0020,
+                )
+                user32.ReleaseDC(0, desk_dc)
+                success = gdi32.GetDIBits(mem_dc, bitmap, 0, height, buf, ctypes.byref(bmi), 0)
 
         gdi32.DeleteObject(bitmap)
         gdi32.DeleteDC(mem_dc)
