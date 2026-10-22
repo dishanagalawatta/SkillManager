@@ -1,9 +1,11 @@
 {
   "slug": "skill_package_workflow_20261019",
   "title": "Skill Package Update Workflow Reliability",
-  "status": "active",
+  "status": "completed",
   "owner": "@dishanagalawatta",
   "created": "2026-10-19",
+  "completed": "2026-10-22",
   "description": "Make the in-app Skill Packages (Sync & Updates) workflow reliable, responsive and efficient, anchored on the report that updates sometimes silently stop working.",
-  "related_adrs": ["ADR-0028"]
+  "related_adrs": ["ADR-0028"],
+  "notes": "Archived 2026-10-22 after all plan workstreams (WS1–WS5) and the regression suite were merged; regression tests ship in tests/test_update_reliability.py and friends on main."
 }
