@@ -179,7 +179,7 @@ def test_sm_lint_fix_requires_write_mode():
     from skill_manager.mcp.tools.build import get_handlers
 
     handlers = get_handlers(allow_write=False)
-    result = handlers["sm_lint"]({"path": "src", "fix": True})
+    result = _run(handlers["sm_lint"]({"path": "src", "fix": True}))
     assert result.ok is False
     assert "write mode disabled" in (result.error or "")
 
@@ -190,7 +190,7 @@ def test_sm_lint_without_fix_is_allowed_in_read_only_mode():
     handlers = get_handlers(allow_write=False)
     with patch("skill_manager.mcp.tools.build.run_lint") as mock_lint:
         mock_lint.return_value = {"passed": True, "returncode": 0}
-        result = handlers["sm_lint"]({"path": "src", "fix": False})
+        result = _run(handlers["sm_lint"]({"path": "src", "fix": False}))
     assert result.ok is True
     mock_lint.assert_called_once_with(path="src", fix=False)
 
@@ -201,7 +201,7 @@ def test_sm_lint_fix_runs_in_write_mode():
     handlers = get_handlers(allow_write=True)
     with patch("skill_manager.mcp.tools.build.run_lint") as mock_lint:
         mock_lint.return_value = {"passed": True, "returncode": 0}
-        result = handlers["sm_lint"]({"path": "src", "fix": True})
+        result = _run(handlers["sm_lint"]({"path": "src", "fix": True}))
     assert result.ok is True
     mock_lint.assert_called_once_with(path="src", fix=True)
 
@@ -378,3 +378,45 @@ def test_sync_skills_scans_off_the_event_loop(monkeypatch, tmp_path):
 
     assert result["synced"] is True
     assert scan_thread["id"] != caller_thread
+
+
+# ── The slow tools must not block the event loop ─────────────────────────
+
+
+def test_slow_tools_run_off_the_event_loop():
+    """sm_lint, sm_profile and sm_static_analyze must not block the loop.
+
+    They run a subprocess, a full discovery scan and a tree walk
+    respectively.  Run inline, each one stalled every other MCP request
+    for its whole duration.
+    """
+    import threading
+
+    from skill_manager.mcp.tools import analyze as analyze_mod
+    from skill_manager.mcp.tools import build as build_mod
+    from skill_manager.mcp.tools import monitor as monitor_mod
+
+    caller = threading.get_ident()
+    seen: dict[str, int] = {}
+
+    def _record(name):
+        def _inner(*args, **kwargs):  # noqa: ARG001
+            seen[name] = threading.get_ident()
+            return {}
+
+        return _inner
+
+    import anyio
+
+    with (
+        patch.object(build_mod, "run_lint", _record("lint")),
+        patch.object(analyze_mod, "static_analyze", _record("analyze")),
+        patch.object(monitor_mod, "_profile_discover", _record("profile")),
+    ):
+        anyio.run(lambda: build_mod.get_handlers(allow_write=False)["sm_lint"]({}))
+        anyio.run(lambda: analyze_mod._HANDLERS["sm_static_analyze"]({"pattern": "x"}))
+        anyio.run(lambda: monitor_mod.get_handlers()["sm_profile"]({}))
+
+    assert set(seen) == {"lint", "analyze", "profile"}
+    for name, thread_id in seen.items():
+        assert thread_id != caller, f"{name} still runs on the event-loop thread"

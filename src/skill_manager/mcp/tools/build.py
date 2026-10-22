@@ -11,6 +11,7 @@ for the four dev-tooling tools:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -119,7 +120,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 # Per-tool handlers (return ToolResult)
 # ---------------------------------------------------------------------------
-def _handle_lint(args: dict[str, Any], allow_write: bool = False) -> ToolResult:
+async def _handle_lint(args: dict[str, Any], allow_write: bool = False) -> ToolResult:
     path: str = args.get("path", "src")
     fix: bool = bool(args.get("fix", False))
     if fix and not allow_write:
@@ -130,7 +131,9 @@ def _handle_lint(args: dict[str, Any], allow_write: bool = False) -> ToolResult:
             "sm_lint",
             "write mode disabled — restart with --mcp-allow-write to apply auto-fixes",
         )
-    result = run_lint(path=path, fix=fix)
+    # The linter is a subprocess with a multi-minute timeout: running it
+    # inline would block every other MCP request for its whole duration.
+    result = await asyncio.to_thread(run_lint, path=path, fix=fix)
     return ok("sm_lint", result)
 
 

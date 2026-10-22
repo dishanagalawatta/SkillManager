@@ -59,7 +59,9 @@ def test_build_lint_returns_structured_result(monkeypatch: pytest.MonkeyPatch) -
     fake_lint = {"returncode": 0, "passed": True, "stdout": "clean", "stderr": ""}
     monkeypatch.setattr(build_mod, "run_lint", lambda path, fix: fake_lint)
 
-    result = build_mod.get_handlers(allow_write=False)["sm_lint"]({"path": "src", "fix": False})
+    result = _run(
+        build_mod.get_handlers(allow_write=False)["sm_lint"]({"path": "src", "fix": False})
+    )
 
     assert result.ok is True
     assert result.tool == "sm_lint"
@@ -79,7 +81,7 @@ def test_build_lint_passes_fix_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(build_mod, "run_lint", _fake_lint)
 
     # ``fix`` rewrites files, so it only runs with the write capability.
-    build_mod.get_handlers(allow_write=True)["sm_lint"]({"path": "custom", "fix": True})
+    _run(build_mod.get_handlers(allow_write=True)["sm_lint"]({"path": "custom", "fix": True}))
 
     assert captured == {"path": "custom", "fix": True}
 
@@ -300,7 +302,7 @@ def test_monitor_profile_cached_path() -> None:
     handlers = monitor_mod.get_handlers()
     assert "sm_profile" in handlers
 
-    result = handlers["sm_profile"]({})
+    result = _run(handlers["sm_profile"]({}))
 
     assert isinstance(result, ToolResult)
     assert result.ok is True
@@ -323,7 +325,7 @@ def test_monitor_profile_full_scan_path() -> None:
     """sm_profile with force_full_scan=True still returns a valid report."""
     handlers = monitor_mod.get_handlers()
 
-    result = handlers["sm_profile"]({"force_full_scan": True})
+    result = _run(handlers["sm_profile"]({"force_full_scan": True}))
 
     assert result.ok is True
     assert result.tool == "sm_profile"
