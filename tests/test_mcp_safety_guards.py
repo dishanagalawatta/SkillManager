@@ -14,6 +14,7 @@ Covers the defects found while auditing the bridge:
 
 import os
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -164,8 +165,11 @@ def test_roots_come_from_the_controller():
     controller = MagicMock()
     controller._sources = ["/a", "/b"]
     controller._projects = ["/p"]
-    assert [str(p) for p in skill_source_roots(controller)] == ["/a", "/b"]
-    assert [str(p) for p in project_roots(controller)] == ["/p"]
+    assert [str(p) for p in skill_source_roots(controller)] == [
+        str(Path("/a")),
+        str(Path("/b")),
+    ]
+    assert [str(p) for p in project_roots(controller)] == [str(Path("/p"))]
 
 
 # ── B9: sm_lint --fix must be write-gated ────────────────────────────────

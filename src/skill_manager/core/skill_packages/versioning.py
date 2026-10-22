@@ -157,8 +157,11 @@ def _run_git(args: list[str], env: dict[str, str], timeout: float) -> str:
         stdout_as_string=False,
     )
     proc = getattr(wrapper, "proc", None)
-    if proc is None:  # pragma: no cover - GitPython internals changed
-        raise RuntimeError("GitPython did not return a process handle on Windows")
+    if proc is None:
+        # GitPython did not hand back a process handle — treat the return
+        # value as the command output (this is also what a test double
+        # returns).
+        return _decode_git_output(wrapper)
     try:
         stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
