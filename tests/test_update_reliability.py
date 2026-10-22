@@ -16,6 +16,7 @@ report:
 """
 
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import orjson
@@ -40,11 +41,15 @@ from skill_manager.core.update_service import UpdateService
 
 @patch("skill_manager.core.skill_packages.versioning.cmd.Git")
 def test_probe_bounds_and_deinteractivates_git(mock_git):
-    """The probe must pass kill_after_timeout and a non-interactive env.
+    """The probe must bound the git call and use a non-interactive env.
 
     Regression guard: the previous implementation built an ``env`` dict and
     then never passed it to ``execute``, and had no timeout at all — so a
     credential-gated remote blocked the scan thread forever.
+
+    The bound is expressed differently per platform: GitPython's
+    ``kill_after_timeout`` is not supported on Windows (it raises), so
+    there the deadline is enforced by killing the process ourselves.
     """
     mock_git.return_value.execute.return_value = "h\trefs/tags/v1.0.0\n"
 
@@ -52,7 +57,11 @@ def test_probe_bounds_and_deinteractivates_git(mock_git):
 
     assert probe == VersionProbe(version="v1.0.0", ok=True)
     _, kwargs = mock_git.return_value.execute.call_args
-    assert kwargs["kill_after_timeout"] == 7.5
+    if os.name == "nt":
+        # The Windows branch drives the process itself.
+        assert kwargs.get("as_process") is True
+    else:
+        assert kwargs["kill_after_timeout"] == 7.5
     assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
 
 
