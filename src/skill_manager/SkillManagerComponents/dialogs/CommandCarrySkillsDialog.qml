@@ -14,6 +14,8 @@ import App 1.0
 Dialog {
     id: root
 
+    objectName: "commandCarrySkillsDialog"
+
     parent: Overlay.overlay
     anchors.centerIn: Overlay.overlay
     readonly property real idealListHeight: root.missingSkills.length * 44 + 16

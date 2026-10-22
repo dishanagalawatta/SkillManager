@@ -225,17 +225,17 @@ class AppControllerProxyMixin:
     def copySelectedSkillsToProjectTemporarily(self, p):
         self.ops.copySelectedSkillsToProjectTemporarily(p)
 
-    @Slot(str, str, str, str, list, str)
-    def updateCustomCommandFull(self, lp, n, b, cat, proj, on_conflict=""):
-        self.ops.updateCustomCommandFull(lp, n, b, cat, proj, on_conflict)
+    @Slot(str, str, str, str, str)
+    def updateCustomCommandFull(self, lp, n, b, cat, on_conflict=""):
+        self.ops.updateCustomCommandFull(lp, n, b, cat, on_conflict)
 
     @Slot(str, str)
     def notify_command_updated(self, old_path: str, new_path: str) -> None:
         self.commandUpdateCompleted.emit(old_path, new_path)
 
-    @Slot(str, str, list, str, result=str)
-    def createCustomCommand(self, n, b, pl, cat) -> str:
-        return str(self.ops.createCustomCommand(n, b, pl, cat))
+    @Slot(str, str, str, result=str)
+    def createCustomCommand(self, n, b, cat) -> str:
+        return str(self.ops.createCustomCommand(n, b, cat))
 
     @Slot(str, result=str)
     def getCommandEmoji(self, path: str) -> str:
@@ -276,10 +276,6 @@ class AppControllerProxyMixin:
     def deleteCustomCommand(self, name, project_labels):
         self.ops.deleteCustomCommand(name, project_labels)
 
-    @Slot(str, list)
-    def confirmCommandRemovals(self, local_path, confirmed_labels):
-        self.ops.confirmCommandRemovals(local_path, confirmed_labels)
-
     @Slot(str, str, str)
     def confirmCommandSkillsCarry(self, project_path, command_paths_json, confirmed_skills_json):
         self.ops.confirmCommandSkillsCarry(project_path, command_paths_json, confirmed_skills_json)
@@ -287,6 +283,16 @@ class AppControllerProxyMixin:
     @Slot(str, str)
     def confirmCommandSkillsCarryBatch(self, batch_json, confirmed_skills_json):
         self.ops.confirmCommandSkillsCarryBatch(batch_json, confirmed_skills_json)
+
+    @Slot(str, str, bool)
+    def confirmCommandCopyWithOverwrite(self, project_path, command_paths_json, overwrite_commands):
+        self.ops.confirmCommandCopyWithOverwrite(
+            project_path, command_paths_json, overwrite_commands
+        )
+
+    @Slot()
+    def cancelCommandCopyWithOverwrite(self):
+        self.ops.cancelCommandCopyWithOverwrite()
 
     @Slot(str, list)
     def deleteSkillFromProjects(self, path, projects):

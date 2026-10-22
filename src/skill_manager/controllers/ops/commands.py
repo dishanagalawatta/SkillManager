@@ -8,7 +8,6 @@ from PySide6.QtCore import Slot
 from skill_manager.controllers.ops._helpers import QTimer, _build_discovery_service, _get_item_attr
 from skill_manager.core.diagnostics import (
     CATEGORY_COMMAND_CREATED,
-    CATEGORY_COMMAND_TARGETED_REFRESH,
     CATEGORY_COMMAND_UPDATED,
     CATEGORY_SELECTION_REFRESHED,
     get_diagnostic_logger,
@@ -20,70 +19,96 @@ logger = logging.getLogger(__name__)
 class CommandsMixin:
     """Create/update/remove custom commands across projects."""
 
-    @Slot(str, str, list, str, result=str)
-    def createCustomCommand(
-        self, name: str, body: str, project_labels: "list[str]", category: str
-    ) -> str:
-        """Creates Custom Command .md files in one or more projects.
+    def _canonical_command_project(self) -> Path | None:
+        """Resolve the project that owns the canonical command file.
 
-        Returns the local path of the first successfully created command
-        ``.md`` file (empty string if none were created).
+        The Library is the single source of truth for a command: the dialog
+        no longer asks for a set of projects, it edits the command where it
+        lives. New commands are created in the Library's active project;
+        when no project is active the first configured project is used.
+        """
+        from skill_manager.core.commands import find_project_path_by_label
+
+        projects = list(self.app._projects)
+        if not projects:
+            return None
+
+        label = getattr(self.app, "_current_project_label", "") or ""
+        if label:
+            found = find_project_path_by_label(
+                label, projects, project_aliases=self.app._project_aliases
+            )
+            if found:
+                return found
+        return Path(projects[0])
+
+    @Slot(str, str, str, result=str)
+    def createCustomCommand(self, name: str, body: str, category: str) -> str:
+        """Create the canonical command file in the Library's active project.
+
+        The dialog does not pick projects any more: the command is created
+        once, in the Library, and deployed to other projects later through
+        the Library's own copy flow.
+
+        Returns the local path of the created command ``.md`` file (empty
+        string when nothing was created).
         """
         diag = get_diagnostic_logger()
-        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, projects={project_labels}")
-        from skill_manager.core.commands import create_custom_command_files_multi
+        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}")
+        from skill_manager.core.commands import create_custom_command_file
 
-        results = create_custom_command_files_multi(
+        project_path = self._canonical_command_project()
+        if project_path is None:
+            self.app._set_status("Add a project before creating a command.")
+            return ""
+
+        from skill_manager.core.quick_copy import project_label
+
+        result = create_custom_command_file(
             name=name,
             body=body,
-            project_labels=list(project_labels),
+            project_label_name=project_label(project_path),
             category=category,
-            project_paths=self.app._projects,
+            project_paths=list(self.app._projects),
             project_aliases=self.app._project_aliases,
         )
 
-        created = [r for r in results if r.ok]
-        failed = [r for r in results if not r.ok]
-
-        if not created:
-            msg = failed[0].message if failed else "Error: No projects selected"
-            self.app._set_status(msg)
+        if not result.ok:
+            self.app._set_status(result.message)
+            return ""
+        if not result.path:
+            self.app._set_status(result.message)
             return ""
 
-        self.app._set_status(f"Created command in {len(created)} project(s)")
+        self.app._set_status(f"Created command in {project_label(project_path)}")
 
-        for result in created:
-            if result.path:
-                from skill_manager.core.persistence import patch_cache_add
+        from skill_manager.core.persistence import patch_cache_add
 
-                service = _build_discovery_service(self.app)
-                try:
-                    skill_data = service.discover_single(result.path, result.path.parent)
-                    if skill_data:
-                        patch_cache_add([skill_data])
-                        self._merge_discovered_skills([skill_data])
-                        self._refresh_selected_skill(str(result.path))
-                    else:
-                        diag.log_event(
-                            "WARNING",
-                            CATEGORY_SELECTION_REFRESHED,
-                            f"discover_single returned None for command: {result.path}",
-                        )
-                except Exception as exc:
-                    logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
+        service = _build_discovery_service(self.app)
+        try:
+            skill_data = service.discover_single(result.path, result.path.parent)
+            if skill_data:
+                patch_cache_add([skill_data])
+                self._merge_discovered_skills([skill_data])
+                self._refresh_selected_skill(str(result.path))
+            else:
+                diag.log_event(
+                    "WARNING",
+                    CATEGORY_SELECTION_REFRESHED,
+                    f"discover_single returned None for command: {result.path}",
+                )
+        except Exception as exc:
+            logger.error("[CREATE COMMAND] Failed scanning %s: %s", result.path, exc)
 
-        # Check for missing skill dependencies (batched: one prompt total,
-        # so multi-project creates never overwrite each other in QML).
+        # A new command can reference skills the owning project does not
+        # have yet, so the carry check runs for creates exactly like it
+        # does for updates and for project deployments.
         from skill_manager.core.quick_copy import project_root_for_project
 
-        pairs = [
-            (project_root_for_project(result.path), result.path)
-            for result in created
-            if result.path
-        ]
+        pairs = [(project_root_for_project(result.path), result.path)]
         self._emit_missing_skills_batch(self._collect_missing_skills_batch(pairs, body, "CREATE"))
 
-        return str(created[0].path) if created else ""
+        return str(result.path)
 
     def _snapshot_affected_paths(self, affected_project_paths: set[Path]) -> set[str]:
         """Return local_paths in both models whose project_path matches an affected project."""
@@ -244,82 +269,58 @@ class CommandsMixin:
                 ),
             )
 
-    @Slot(str, str, str, str, list, str)
+    @Slot(str, str, str, str, str)
     def updateCustomCommandFull(
         self,
         local_path: str,
         name: str,
         body: str,
         category: str,
-        project_labels: "list[str]",
         on_conflict: str = "",
-        confirmed_removals: list[str] | None = None,
     ):
-        """Updates an existing Custom Command .md file across projects."""
+        """Update the canonical command file in place.
+
+        The dialog edits the Library's own copy of the command — there is no
+        project fan-out any more. Deploying the updated command to other
+        projects is the Library copy flow's job (Copy to Project), which
+        detects the already-present files and asks whether to overwrite
+        them.
+        """
         diag = get_diagnostic_logger()
         diag.log_event(
             "INFO",
             CATEGORY_COMMAND_UPDATED,
-            f"path={local_path}, name={name}, projects={project_labels}, on_conflict={on_conflict}",
+            f"path={local_path}, name={name}, on_conflict={on_conflict}",
         )
-        from skill_manager.core.commands import update_custom_command_file_multi
+        from skill_manager.core.commands import update_custom_command_file
 
-        results = update_custom_command_file_multi(
+        result = update_custom_command_file(
             local_path=local_path,
             name=name,
             body=body,
             category=category,
-            project_labels=list(project_labels),
-            project_paths=self.app._projects,
-            project_aliases=self.app._project_aliases,
             on_conflict=on_conflict or None,
-            confirmed_removals=confirmed_removals,
         )
 
-        canonical = results[0] if results else None
-        if canonical and canonical.needs_conflict_resolution and canonical.conflicting_path:
+        # A conflict takes precedence over a generic failure: the user has
+        # to choose between overwrite, rename and cancel.
+        if result.needs_conflict_resolution and result.conflicting_path:
             self.app.commandUpdateConflict.emit(
                 local_path,
-                str(canonical.conflicting_path),
-                canonical.suggested_rename or "",
+                str(result.conflicting_path),
+                result.suggested_rename or "",
             )
             return
 
-        # Check if confirmation is needed for project removals
-        confirm_results = [r for r in results if r.needs_confirm]
-        if confirm_results:
-            pending: list[str] = []
-            for r in confirm_results:
-                pending.extend(r.pending_removals)
-            # Store args so confirmCommandRemovals can re-invoke
-            self._pending_command_update = {
-                "local_path": local_path,
-                "name": name,
-                "body": body,
-                "category": category,
-                "project_labels": list(project_labels),
-                "on_conflict": on_conflict,
-            }
-            self.commandPendingRemovals.emit(local_path, pending)
+        if not result.ok:
+            self.app._set_status(result.message)
             return
 
-        updated = [r for r in results if r.ok]
-        failed = [r for r in results if not r.ok]
-
-        if not updated:
-            msg = failed[0].message if failed else "Error: No projects updated"
-            self.app._set_status(msg)
+        if not result.path:
+            self.app._set_status("Error: Command update produced no file")
             return
 
-        added = sum(1 for r in updated if r.set_membership in ("canonical", "fanout_add"))
-        skipped = sum(1 for r in updated if r.set_membership == "fanout_skip")
-        removed = sum(1 for r in updated if r.set_membership == "removal")
-        parts = [f"Updated command in {added} project(s)"]
-        if skipped:
-            parts.append(f"{skipped} already up to date")
-        if removed:
-            parts.append(f"{removed} removed")
-        self.app._set_status(", ".join(parts))
+        self.app._set_status(f"Updated command {name}")
 
         # ── Instant body refresh: update _selected_skill immediately
         # so the CommandInspector reflects the new content without
@@ -334,38 +335,11 @@ class CommandsMixin:
                 sel["body_content"] = body
                 sel["name"] = name
 
-        # ── Targeted rescan: collect unique affected project paths
-        from skill_manager.core.commands import find_project_path_by_label
+        # ── Targeted rescan of the project that owns the command.
         from skill_manager.core.quick_copy import project_root_for_project
 
         service = _build_discovery_service(self.app)
-
-        affected_project_paths: set[Path] = set()
-
-        for result in updated:
-            if result.path:
-                # Walk up from result.path.parent to find project root
-                proj_path = project_root_for_project(result.path.parent)
-                affected_project_paths.add(proj_path)
-
-        # Include paths of any removed projects
-        if canonical and canonical.pending_removals:
-            for label in canonical.pending_removals:
-                target = find_project_path_by_label(
-                    label, self.app._projects, project_aliases=self.app._project_aliases
-                )
-                if target:
-                    affected_project_paths.add(project_root_for_project(target))
-
-        # Also include paths from confirmed removals (the re-invocation case
-        # where pending_removals is empty but the user confirmed deletions)
-        if confirmed_removals:
-            for label in confirmed_removals:
-                target = find_project_path_by_label(
-                    label, self.app._projects, project_aliases=self.app._project_aliases
-                )
-                if target:
-                    affected_project_paths.add(project_root_for_project(target))
+        affected_project_paths: set[Path] = {project_root_for_project(result.path.parent)}
 
         all_discovered: list[dict] = []
         for proj_path in affected_project_paths:
@@ -375,75 +349,19 @@ class CommandsMixin:
             except Exception as exc:
                 logger.error("[UPDATE COMMAND] Failed rescan of %s: %s", proj_path, exc)
 
-        # Defer merge to avoid blocking UI
         def _apply_merge():
-            stale_paths = self._apply_targeted_refresh(affected_project_paths, all_discovered)
+            self._apply_targeted_refresh(affected_project_paths, all_discovered)
+            self._refresh_selected_skill(local_path, rename_path=str(result.path))
+            self.app.notify_command_updated(local_path, str(result.path))
 
-            if updated and updated[0].path:
-                self._refresh_selected_skill(local_path, rename_path=str(updated[0].path))
-                # Force-update body_content on _selected_skill with the
-                # authoritative value from the update args.  The model
-                # may still carry stale data if the discovery rescan
-                # re-read the file before the write flushed.
-                selected = self.app._selected_skill
-                sel_path = None
-                if hasattr(selected, "value"):
-                    sel_path = selected.value("local_path")
-                elif isinstance(selected, dict):
-                    sel_path = selected.get("local_path")
-                target_path = str(updated[0].path)
-                if sel_path == target_path and body:
-                    if hasattr(selected, "setSelection"):
-                        # SelectedSkillController (QObject): push through
-                        # property setters so change signals fire.
-                        selected.body_content = body
-                        selected.name = name
-                    elif hasattr(selected, "insert"):
-                        selected.insert("body_content", body)
-                    elif isinstance(selected, dict):
-                        selected["body_content"] = body
-                self.app.notify_command_updated(local_path, str(updated[0].path))
-
-            if stale_paths:
-                diag = get_diagnostic_logger()
-                diag.log_event(
-                    "INFO",
-                    CATEGORY_COMMAND_TARGETED_REFRESH,
-                    "targeted_refresh_complete",
-                    data={
-                        "added_or_updated": len(all_discovered),
-                        "stale_removed": len(stale_paths),
-                        "affected_projects": len(affected_project_paths),
-                    },
-                )
-
-            # Check for missing skill dependencies after merge
-            from skill_manager.core.quick_copy import project_root_for_project
-
-            pairs = [(project_root_for_project(r.path), r.path) for r in updated if r.path]
+            # An update can introduce a new skill reference, so the carry
+            # check runs for updates exactly like it does for adds.
+            pairs = [(project_root_for_project(result.path), result.path)]
             self._emit_missing_skills_batch(
                 self._collect_missing_skills_batch(pairs, body, "UPDATE")
             )
 
         QTimer.singleShot(0, _apply_merge)
-
-    @Slot(str, list)
-    def confirmCommandRemovals(self, local_path: str, confirmed_labels: list[str]):
-        """Re-invoke updateCustomCommandFull with confirmed removals."""
-        pending = self._pending_command_update
-        if not pending or pending.get("local_path") != local_path:
-            logger.warning("[UPDATE COMMAND] No pending command update for %s", local_path)
-            return
-        self._pending_command_update = None
-        self.updateCustomCommandFull(
-            local_path=pending["local_path"],
-            name=pending["name"],
-            body=pending["body"],
-            category=pending["category"],
-            project_labels=pending["project_labels"],
-            on_conflict=pending["on_conflict"],
-            confirmed_removals=confirmed_labels,
-        )
 
     @Slot(str, result=list)
     def commandProjectsForPath(self, local_path: str) -> "list[str]":

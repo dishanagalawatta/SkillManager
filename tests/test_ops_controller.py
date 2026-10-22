@@ -233,7 +233,7 @@ def test_ops_controller_copy_selected(mock_timer, mock_copy, ops_controller, moc
     ops_controller.copySelectedSkillsToProject("/project")
 
     mock_copy.assert_called_once()
-    mock_app._set_status.assert_any_call("Copying 1 skills...")
+    mock_app._set_status.assert_any_call("Copying 1 item(s)...")
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")
@@ -532,12 +532,13 @@ def test_ops_controller_create_custom_command(
     }
     mock_app._sources = []
     mock_app._projects = ["/project"]
+    mock_app._current_project_label = "project"
     mock_app._archive_paths = []
     mock_app._starred_paths = []
     mock_app._project_aliases = {}
     mock_app._categories = []
 
-    ops_controller.createCustomCommand("cmd", "body", ["proj"], "cat")
+    ops_controller.createCustomCommand("cmd", "body", "cat")
     mock_create.assert_called_once()
     mock_discover.assert_called_once_with(
         Path("/project/.agents/commands/test.md"), Path("/project/.agents/commands")
@@ -549,7 +550,7 @@ def test_ops_controller_create_custom_command(
     # Verify category update
     assert "Commands" in mock_app._categories
     mock_app.categoriesChanged.emit.assert_called()
-    mock_app._set_status.assert_called_with("Created command in 1 project(s)")
+    assert "Created command in" in mock_app._set_status.call_args[0][0]
 
 
 def test_ops_controller_toggle_starred_none(ops_controller, mock_app):
@@ -623,16 +624,16 @@ def test_set_project_alias_no_refresh(mock_app):
 
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
+@patch("skill_manager.core.commands.update_custom_command_file")
 def test_update_custom_command_full(
-    mock_update_multi,
+    mock_update,
     mock_discover,
     mock_patch_cache,
     ops_controller,
     mock_app,
     tmp_path,
 ):
-    """updateCustomCommandFull updates a single command file."""
+    """updateCustomCommandFull updates the canonical command file in place."""
     mock_app._sources = []
     mock_app._projects = ["/project"]
     mock_app._archive_paths = []
@@ -653,11 +654,8 @@ def test_update_custom_command_full(
         needs_conflict_resolution=False,
         conflicting_path=None,
         suggested_rename=None,
-        needs_confirm=False,
-        pending_removals=[],
-        set_membership="canonical",
     )
-    mock_update_multi.return_value = [update_result]
+    mock_update.return_value = update_result
 
     mock_discover.return_value = [
         {
@@ -672,38 +670,34 @@ def test_update_custom_command_full(
         "Cmd",
         "new body",
         "NewCat",
-        ["Old"],
         "",
     )
 
-    mock_update_multi.assert_called_once_with(
+    # No project fan-out: the dialog edits the Library's own copy.
+    mock_update.assert_called_once_with(
         local_path=str(local_path),
         name="Cmd",
         body="new body",
         category="NewCat",
-        project_labels=["Old"],
-        project_paths=mock_app._projects,
-        project_aliases=mock_app._project_aliases,
         on_conflict=None,
-        confirmed_removals=None,
     )
     mock_discover.assert_called_once()
     mock_patch_cache.assert_called_once()
-    mock_app._set_status.assert_called_with("Updated command in 1 project(s)")
+    mock_app._set_status.assert_called_with("Updated command Cmd")
 
 
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
-def test_update_custom_command_full_moves_to_new_project(
-    mock_update_multi,
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_update_custom_command_full_does_not_fan_out_to_projects(
+    mock_update,
     mock_discover,
     mock_patch_cache,
     ops_controller,
     mock_app,
     tmp_path,
 ):
-    """updateCustomCommandFull moves file to a new project."""
+    """The dialog must not move or copy the command into other projects."""
     mock_app._sources = []
     mock_app._projects = ["/projectA", "/projectB"]
     mock_app._archive_paths = []
@@ -714,50 +708,38 @@ def test_update_custom_command_full_moves_to_new_project(
     local_path = tmp_path / "cmd.md"
     local_path.write_text("---\nname: cmd\n---\nbody")
 
-    new_path = tmp_path / "cmd_new.md"
     update_result = MagicMock(
         ok=True,
-        message="Updated command: cmd_new.md",
-        path=new_path,
+        message="Updated command: cmd.md",
+        path=local_path,
         needs_conflict_resolution=False,
         conflicting_path=None,
         suggested_rename=None,
-        needs_confirm=False,
-        pending_removals=[],
-        set_membership="canonical",
     )
-    mock_update_multi.return_value = [update_result]
+    mock_update.return_value = update_result
 
     mock_discover.return_value = [
         {
-            "local_path": str(new_path),
+            "local_path": str(local_path),
             "name": "cmd",
             "category": "NewCat",
         }
     ]
 
-    ops_controller.updateCustomCommandFull(
-        str(local_path), "cmd", "new body", "NewCat", ["ProjectB"], ""
-    )
+    ops_controller.updateCustomCommandFull(str(local_path), "cmd", "new body", "NewCat", "")
 
-    mock_update_multi.assert_called_once_with(
-        local_path=str(local_path),
-        name="cmd",
-        body="new body",
-        category="NewCat",
-        project_labels=["ProjectB"],
-        project_paths=mock_app._projects,
-        project_aliases=mock_app._project_aliases,
-        on_conflict=None,
-        confirmed_removals=None,
-    )
-    mock_app._set_status.assert_called_with("Updated command in 1 project(s)")
+    # No project selection is passed to the core writer, so the command
+    # stays exactly where it is.
+    call_kwargs = mock_update.call_args.kwargs
+    assert "project_label_name" not in call_kwargs
+    assert "project_paths" not in call_kwargs
+    mock_app._set_status.assert_called_with("Updated command cmd")
     mock_patch_cache.assert_called_once()
 
 
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
+@patch("skill_manager.core.commands.update_custom_command_file")
 def test_update_custom_command_full_emits_conflict_signal(
-    mock_update_multi,
+    mock_update,
     ops_controller,
     mock_app,
     tmp_path,
@@ -781,15 +763,10 @@ def test_update_custom_command_full_emits_conflict_signal(
         needs_conflict_resolution=True,
         conflicting_path=conflict_path,
         suggested_rename="cmd-1.md",
-        needs_confirm=False,
-        pending_removals=[],
-        set_membership="canonical",
     )
-    mock_update_multi.return_value = [update_result]
+    mock_update.return_value = update_result
 
-    ops_controller.updateCustomCommandFull(
-        str(local_path), "cmd", "new body", "NewCat", ["ProjectB"]
-    )
+    ops_controller.updateCustomCommandFull(str(local_path), "cmd", "new body", "NewCat", "")
 
     # The controller calls self.app.commandUpdateConflict.emit(...)
     # With MagicMock, the attribute creates a new mock each time, so we
@@ -1091,10 +1068,7 @@ def test_create_custom_command_refreshes_selection_real_discovery(
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Act — uses real create_custom_command_file + real DiscoveryService
-    from skill_manager.core.quick_copy import project_label as compute_project_label
-
-    label = compute_project_label(project_path)
-    real_ops_controller.createCustomCommand("NewCmd", "echo world", [label], "Commands")
+    real_ops_controller.createCustomCommand("NewCmd", "echo world", "Commands")
 
     # The new command was created; verify it exists on disk and discover_single works
     new_cmd_file = commands_dir / "NewCmd.md"
@@ -1147,13 +1121,8 @@ def test_update_custom_command_refreshes_selection_real_discovery(
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Act — uses real update_custom_command_file + real DiscoveryService
-    from skill_manager.core.quick_copy import project_label as compute_project_label
-
-    proj_label = compute_project_label(project_path)
     real_ops_controller.app._projects = [str(project_path)]
-    real_ops_controller.updateCustomCommandFull(
-        str(cmd_file), "Cmd", "new body", "Commands", [proj_label]
-    )
+    real_ops_controller.updateCustomCommandFull(str(cmd_file), "Cmd", "new body", "Commands", "")
 
     from PySide6.QtWidgets import QApplication
 
@@ -1193,12 +1162,9 @@ def test_update_custom_command_rename_refreshes_selection_real_discovery(
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
     # Act — rename to NewCmd.md
-    from skill_manager.core.quick_copy import project_label as compute_project_label
-
-    proj_label = compute_project_label(project_path)
     real_ops_controller.app._projects = [str(project_path)]
     real_ops_controller.updateCustomCommandFull(
-        str(old_file), "NewCmd", "updated body", "Commands", [proj_label]
+        str(old_file), "NewCmd", "updated body", "Commands", ""
     )
 
     from PySide6.QtWidgets import QApplication
@@ -1239,141 +1205,11 @@ def test_create_custom_command_no_selection_refresh_for_different_skill_real_dis
     emissions = []
     app.selectedSkillChanged.connect(lambda: emissions.append(True))
 
-    from skill_manager.core.quick_copy import project_label as compute_project_label
-
-    label = compute_project_label(project_path)
-    real_ops_controller.createCustomCommand("NewCmd", "body", label, "cat")
+    real_ops_controller.createCustomCommand("NewCmd", "body", "cat")
 
     # selectedSkillChanged should NOT fire — the created command is different
     # from the currently selected skill
     assert not emissions, "selectedSkillChanged should not fire for a different skill"
-
-
-# ---------------------------------------------------------------------------
-# Tests 9-10: multi-project confirm flow in updateCustomCommandFull
-# ---------------------------------------------------------------------------
-
-
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
-def test_update_custom_command_full_needs_confirm_emits_signal(
-    mock_multi,
-    ops_controller,
-    mock_app,
-    tmp_path,
-):
-    """updateCustomCommandFull emits commandPendingRemovals when needs_confirm."""
-    mock_app._sources = []
-    mock_app._projects = ["/projectA", "/projectB"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
-
-    local_path = tmp_path / "Cmd.md"
-    local_path.write_text("---\nname: Cmd\n---\nbody", encoding="utf-8")
-
-    # Mock multi to return needs_confirm
-    confirm_result = MagicMock(
-        ok=True,
-        message="Confirmation required",
-        needs_conflict_resolution=False,
-        conflicting_path=None,
-        suggested_rename=None,
-        needs_confirm=True,
-        pending_removals=["projB"],
-    )
-    mock_multi.return_value = [confirm_result]
-
-    # Track signal emissions
-    signal_payloads = []
-
-    # In PySide6, we can't easily mock a real Signal object on an instantiated QObject.
-    # Instead, we just connect a slot to capture emissions.
-    ops_controller.commandPendingRemovals.connect(
-        lambda path, labels: signal_payloads.append((path, labels))
-    )
-
-    ops_controller.updateCustomCommandFull(
-        str(local_path),
-        "Cmd",
-        "new body",
-        "Commands",
-        ["projA", "projB"],
-        "",
-    )
-
-    # Signal should be emitted
-    assert len(signal_payloads) == 1
-    assert signal_payloads[0][0] == str(local_path)
-    assert "projB" in signal_payloads[0][1]
-
-    # Pending update stored
-    assert ops_controller._pending_command_update is not None
-    assert ops_controller._pending_command_update["local_path"] == str(local_path)
-    assert ops_controller._pending_command_update["name"] == "Cmd"
-    assert ops_controller._pending_command_update["project_labels"] == ["projA", "projB"]
-
-
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
-def test_confirm_command_removals_reinvokes_with_confirmed(
-    mock_multi,
-    ops_controller,
-    mock_app,
-    tmp_path,
-):
-    """confirmCommandRemovals re-invoke updateCustomCommandFull with confirmed labels."""
-    mock_app._sources = []
-    mock_app._projects = ["/projectA", "/projectB"]
-    mock_app._archive_paths = []
-    mock_app._starred_paths = []
-    mock_app._project_aliases = {}
-    mock_app._categories = []
-
-    local_path = tmp_path / "Cmd.md"
-    local_path.write_text("---\nname: Cmd\n---\nbody", encoding="utf-8")
-
-    # Set up _pending_command_update as if confirm flow stored it
-    ops_controller._pending_command_update = {
-        "local_path": str(local_path),
-        "name": "Cmd",
-        "body": "body",
-        "category": "Commands",
-        "project_labels": ["projA", "projB"],
-        "on_conflict": "",
-    }
-
-    # After confirm, multi returns ok=False (no rescan path) — we only
-    # need to verify that confirmCommandRemovals re-invoked with the
-    # right confirmed_removals.
-    fail_result = MagicMock(
-        ok=False,
-        message="Simulated failure to stop before rescan",
-        path=None,
-        needs_conflict_resolution=False,
-        conflicting_path=None,
-        suggested_rename=None,
-        needs_confirm=False,
-        pending_removals=[],
-    )
-    mock_multi.return_value = [fail_result]
-
-    ops_controller.confirmCommandRemovals(str(local_path), ["projB"])
-
-    # _pending_command_update cleared
-    assert ops_controller._pending_command_update is None
-
-    # multi was re-invoked with confirmed_removals
-    mock_multi.assert_called_once_with(
-        local_path=str(local_path),
-        name="Cmd",
-        body="body",
-        category="Commands",
-        project_labels=["projA", "projB"],
-        project_paths=mock_app._projects,
-        project_aliases=mock_app._project_aliases,
-        on_conflict=None,
-        confirmed_removals=["projB"],
-    )
 
 
 def test_ops_controller_confirm_command_skills_carry(ops_controller, mock_app):
@@ -1408,7 +1244,7 @@ def test_ops_controller_create_custom_command_emits_carry_prompt(
     from skill_manager.core.commands import CommandCreateResult
 
     cmd_path = tmp_path / ".agents" / "commands" / "Cmd.md"
-    results = [CommandCreateResult(ok=True, message="Success", path=cmd_path)]
+    result = CommandCreateResult(ok=True, message="Success", path=cmd_path)
 
     emissions = []
     ops_controller.commandSkillsCarryPrompt.connect(
@@ -1416,15 +1252,15 @@ def test_ops_controller_create_custom_command_emits_carry_prompt(
     )
 
     with (
-        patch(
-            "skill_manager.core.commands.create_custom_command_files_multi", return_value=results
-        ),
+        patch("skill_manager.core.commands.create_custom_command_file", return_value=result),
         patch(
             "skill_manager.core.copier.find_missing_skills_for_commands",
             return_value=[{"name": "Skill1"}],
         ),
     ):
-        ops_controller.createCustomCommand("Cmd", "body", ["projA"], "Commands")
+        mock_app._projects = [str(tmp_path)]
+        mock_app._current_project_label = ""
+        ops_controller.createCustomCommand("Cmd", "body", "Commands")
 
         assert len(emissions) == 1
         cmd_json, proj_str, miss_json = emissions[0]
@@ -1443,7 +1279,7 @@ def test_ops_controller_update_custom_command_emits_carry_prompt(
     from skill_manager.core.commands import CommandUpdateResult
 
     cmd_path = tmp_path / ".agents" / "commands" / "Cmd.md"
-    results = [CommandUpdateResult(ok=True, message="Success", path=cmd_path)]
+    result = CommandUpdateResult(ok=True, message="Success", path=cmd_path)
 
     emissions = []
     ops_controller.commandSkillsCarryPrompt.connect(
@@ -1451,13 +1287,13 @@ def test_ops_controller_update_custom_command_emits_carry_prompt(
     )
 
     with (
-        patch("skill_manager.core.commands.update_custom_command_file_multi", return_value=results),
+        patch("skill_manager.core.commands.update_custom_command_file", return_value=result),
         patch(
             "skill_manager.core.copier.find_missing_skills_for_commands",
             return_value=[{"name": "Skill1"}],
         ),
     ):
-        ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "body", "Commands", ["projA"])
+        ops_controller.updateCustomCommandFull(str(cmd_path), "Cmd", "body", "Commands", "")
 
         assert len(emissions) == 1
         cmd_json, proj_str, miss_json = emissions[0]

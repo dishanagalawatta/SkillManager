@@ -61,83 +61,60 @@ def _setup_models(mock_app):
 # ---------------------------------------------------------------------------
 
 
-@patch("skill_manager.core.commands.find_project_path_by_label")
-@patch("skill_manager.core.commands.find_command_holder_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
-def test_removal_drops_stale_path_immediately(
-    mock_update_multi,
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_removed_command_drops_stale_path_immediately(
+    mock_update,
     mock_discover,
     mock_patch_cache,
-    mock_find_holders,
-    mock_find_label,
     ops_controller,
     mock_app,
     tmp_path,
 ):
-    """Removing a command from project B (via pending_removals) should drop its stale path."""
+    """A command that vanished from its project must drop its stale path."""
     _setup_models(mock_app)
-    mock_app._projects = ["/projectA", "/projectB"]
+    mock_app._projects = ["/projectA"]
     mock_app._project_aliases = {}
 
-    # Simulate existing skill entries for both projects
     path_a = tmp_path / "projA" / ".agents" / "commands" / "Cmd.md"
-    path_b = tmp_path / "projB" / ".agents" / "commands" / "Cmd.md"
     path_a.parent.mkdir(parents=True, exist_ok=True)
-    path_b.parent.mkdir(parents=True, exist_ok=True)
     path_a.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
-    path_b.write_text("---\nname: Cmd\n---\nold body", encoding="utf-8")
 
     proj_a = tmp_path / "projA"
-    proj_b = tmp_path / "projB"
 
-    # Both models have entries for both projects BEFORE the update
     for model in (mock_app._library_model, mock_app._quick_copy_model):
         model._all_skills = [
             _FakeSkill(str(path_a), str(proj_a)),
-            _FakeSkill(str(path_b), str(proj_b)),
         ]
 
-    # Mock: find_project_path_by_label resolves removal target
-    mock_find_label.return_value = proj_b
+    mock_update.return_value = _ok_result(path_a)
 
-    mock_update_multi.return_value = [_ok_result(path_a)]
+    # After the rescan the project no longer has the command.
+    mock_discover.return_value = []
 
-    # After rescan of A and B: A has Cmd, B has nothing (removed)
-    mock_discover.side_effect = [
-        [_skill_dict("Cmd", path_a, proj_a)],  # projectA rescan
-        [],  # projectB rescan — nothing found
-    ]
-
-    # updateCustomCommandFull with confirmed_removals=["projectB"]
     ops_controller.updateCustomCommandFull(
         str(path_a),
         "Cmd",
         "new body",
         "Commands",
-        ["projectA"],
         "",
-        confirmed_removals=["projectB"],
     )
 
     for model_name in ("_library_model", "_quick_copy_model"):
         model = getattr(mock_app, model_name)
         model.removeSkillsByPath.assert_called_once()
         removed = model.removeSkillsByPath.call_args[0][0]
-        assert str(path_b) in removed
-        assert str(path_a) not in removed
+        assert str(path_a) in removed
 
 
-@patch("skill_manager.core.commands.find_command_holder_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
+@patch("skill_manager.core.commands.update_custom_command_file")
 def test_rename_removes_old_local_path(
-    mock_update_multi,
+    mock_update,
     mock_discover,
     mock_patch_cache,
-    mock_find_holders,
     ops_controller,
     mock_app,
     tmp_path,
@@ -160,17 +137,14 @@ def test_rename_removes_old_local_path(
             _FakeSkill(str(old_path), str(proj_a)),
         ]
 
-    mock_find_holders.return_value = ["projectA"]
-    mock_update_multi.return_value = [_ok_result(new_path)]
+    mock_update.return_value = _ok_result(new_path)
 
     # After rescan, only the NEW path is discovered
     mock_discover.return_value = [
         _skill_dict("NewCmd", new_path, proj_a),
     ]
 
-    ops_controller.updateCustomCommandFull(
-        str(old_path), "NewCmd", "body", "Commands", ["projectA"], ""
-    )
+    ops_controller.updateCustomCommandFull(str(old_path), "NewCmd", "body", "Commands", "")
 
     for model_name in ("_library_model", "_quick_copy_model"):
         model = getattr(mock_app, model_name)
@@ -179,20 +153,18 @@ def test_rename_removes_old_local_path(
         assert str(old_path) in removed
 
 
-@patch("skill_manager.core.commands.find_command_holder_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
-def test_add_to_new_project_inserts_entry(
-    mock_update_multi,
+@patch("skill_manager.core.commands.update_custom_command_file")
+def test_command_deployed_to_another_project_inserts_entry(
+    mock_update,
     mock_discover,
     mock_patch_cache,
-    mock_find_holders,
     ops_controller,
     mock_app,
     tmp_path,
 ):
-    """Adding a command to a new project should insert an entry, not remove anything."""
+    """Deploying a command to a second project inserts an entry, removes nothing."""
     _setup_models(mock_app)
     mock_app._projects = ["/projectA", "/projectB"]
     mock_app._project_aliases = {}
@@ -204,25 +176,22 @@ def test_add_to_new_project_inserts_entry(
     proj_a = tmp_path / "projA"
     proj_b = tmp_path / "projB"
 
-    # Model only has projA BEFORE the update
+    # Model only has projA BEFORE the deployment
     for model in (mock_app._library_model, mock_app._quick_copy_model):
         model._all_skills = [
             _FakeSkill(str(path_a), str(proj_a)),
         ]
 
-    mock_find_holders.return_value = ["projectA"]
-    mock_update_multi.return_value = [_ok_result(path_a)]
+    mock_update.return_value = _ok_result(path_a)
 
-    # After rescan, both projects have the skill (projB now has it too)
+    # After rescan, both projects have the command (projB now has it too)
     path_b = tmp_path / "projB" / ".agents" / "commands" / "Cmd.md"
     mock_discover.return_value = [
         _skill_dict("Cmd", path_a, proj_a),
         _skill_dict("Cmd", path_b, proj_b),
     ]
 
-    ops_controller.updateCustomCommandFull(
-        str(path_a), "Cmd", "body", "Commands", ["projectA", "projectB"], ""
-    )
+    ops_controller.updateCustomCommandFull(str(path_a), "Cmd", "body", "Commands", "")
 
     for model_name in ("_library_model", "_quick_copy_model"):
         model = getattr(mock_app, model_name)
@@ -234,15 +203,13 @@ def test_add_to_new_project_inserts_entry(
         assert len(added) == 2
 
 
-@patch("skill_manager.core.commands.find_command_holder_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
+@patch("skill_manager.core.commands.update_custom_command_file")
 def test_unaffected_projects_not_touched(
-    mock_update_multi,
+    mock_update,
     mock_discover,
     mock_patch_cache,
-    mock_find_holders,
     ops_controller,
     mock_app,
     tmp_path,
@@ -260,7 +227,6 @@ def test_unaffected_projects_not_touched(
     path_c.write_text("---\nname: Cmd\n---\nbody", encoding="utf-8")
 
     proj_a = tmp_path / "projA"
-    proj_b = tmp_path / "projB"
     proj_c = tmp_path / "projC"
 
     # Model has entries for A and C
@@ -271,19 +237,12 @@ def test_unaffected_projects_not_touched(
         ]
 
     # Command is updated in projectA only — no removal needed
-    mock_find_holders.return_value = ["projectA"]
-    mock_update_multi.return_value = [_ok_result(path_a)]
+    mock_update.return_value = _ok_result(path_a)
 
-    # After rescan of A and B, A's skill is still there
-    path_b = tmp_path / "projB" / ".agents" / "commands" / "Cmd.md"
-    mock_discover.side_effect = [
-        [_skill_dict("Cmd", path_a, proj_a)],  # projectA rescan
-        [_skill_dict("Cmd", path_b, proj_b)],  # projectB rescan
-    ]
+    # After the rescan of the owning project, A's command is still there
+    mock_discover.return_value = [_skill_dict("Cmd", path_a, proj_a)]
 
-    ops_controller.updateCustomCommandFull(
-        str(path_a), "Cmd", "body", "Commands", ["projectA", "projectB"], ""
-    )
+    ops_controller.updateCustomCommandFull(str(path_a), "Cmd", "body", "Commands", "")
 
     for model_name in ("_library_model", "_quick_copy_model"):
         model = getattr(mock_app, model_name)
@@ -291,15 +250,13 @@ def test_unaffected_projects_not_touched(
         model.removeSkillsByPath.assert_not_called()
 
 
-@patch("skill_manager.core.commands.find_command_holder_projects")
 @patch("skill_manager.core.persistence.patch_cache_add")
 @patch("skill_manager.core.discovery.DiscoveryService.discover_project")
-@patch("skill_manager.core.commands.update_custom_command_file_multi")
+@patch("skill_manager.core.commands.update_custom_command_file")
 def test_no_stale_paths_when_command_only_renames_in_place(
-    mock_update_multi,
+    mock_update,
     mock_discover,
     mock_patch_cache,
-    mock_find_holders,
     ops_controller,
     mock_app,
     tmp_path,
@@ -322,17 +279,14 @@ def test_no_stale_paths_when_command_only_renames_in_place(
             _FakeSkill(str(old_path), str(proj_a)),
         ]
 
-    mock_find_holders.return_value = ["projectA"]
-    mock_update_multi.return_value = [_ok_result(new_path)]
+    mock_update.return_value = _ok_result(new_path)
 
     # After rescan, only the new path is discovered
     mock_discover.return_value = [
         _skill_dict("New", new_path, proj_a),
     ]
 
-    ops_controller.updateCustomCommandFull(
-        str(old_path), "New", "body", "Commands", ["projectA"], ""
-    )
+    ops_controller.updateCustomCommandFull(str(old_path), "New", "body", "Commands", "")
 
     for model_name in ("_library_model", "_quick_copy_model"):
         model = getattr(mock_app, model_name)

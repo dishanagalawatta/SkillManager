@@ -24,9 +24,36 @@ logger = logging.getLogger(__name__)
 class CopyMixin:
     """Copy skills/commands into projects, with optional carry and rescan."""
 
+    def _partition_selection(self, model, selected_paths):
+        """Split the current selection into (skills, commands).
+
+        A command is any selected item whose path points at a ``.md`` file
+        inside an ``.agents/commands`` directory.
+        """
+        skills: list = []
+        commands: list = []
+        for skill in getattr(model, "_all_skills", []):
+            local_path = _get_item_attr(skill, "local_path")
+            if local_path not in selected_paths:
+                continue
+            is_command = bool(_get_item_attr(skill, "is_command"))
+            if not is_command:
+                local = str(local_path).replace("\\", "/").lower()
+                is_command = local.endswith(".md") and "/commands/" in f"/{local}"
+            if is_command:
+                commands.append(skill)
+            else:
+                skills.append(skill)
+        return skills, commands
+
     @Slot(str)
     def copySelectedSkillsToProject(self, project_path: str, is_temporary: bool = False):
-        """Copies selected skills to a project."""
+        """Copies selected skills and commands to a project.
+
+        Commands that already exist in the target project are not silently
+        overwritten: the flow pauses and asks the user whether to replace
+        them (or to copy only the new ones).
+        """
         if not project_path:
             return
 
@@ -47,31 +74,134 @@ class CopyMixin:
             model = self.app.quickCopyModel
             selected_paths = model.getSelectedPaths()
 
-        selected_skills = []
+        selected_skills: list = []
+        selected_commands: list = []
         if model is not None:
-            selected_skills = [
-                s
-                for s in getattr(model, "_all_skills", [])
-                if _get_item_attr(s, "local_path") in selected_paths
-            ]
+            selected_skills, selected_commands = self._partition_selection(model, selected_paths)
 
-        if not selected_skills:
+        if not selected_skills and not selected_commands:
             self.app._set_status("No skills selected to copy")
             return
 
-        self.app._set_status(f"Copying {len(selected_skills)} skills...")
+        command_dicts = [
+            {"local_path": _get_item_attr(c, "local_path"), "name": _get_item_attr(c, "name")}
+            for c in selected_commands
+        ]
+
+        # ── Detect commands that already exist in the target project.
+        # The user has to confirm before an existing project command is
+        # replaced, so the copy pauses here and the dialog decides.
+        existing: list[dict] = []
+        if command_dicts:
+            from skill_manager.core.copier import find_existing_commands_in_projects
+
+            existing = find_existing_commands_in_projects(command_dicts, [project_path])
+
+        if existing:
+            import json
+
+            self._pending_command_copy = {
+                "project_path": project_path,
+                "command_paths": [c["local_path"] for c in command_dicts],
+                "skills": selected_skills,
+            }
+            self.app.commandCopyExistingDetected.emit(
+                project_path,
+                json.dumps([c["local_path"] for c in command_dicts]),
+                json.dumps(existing),
+            )
+            return
+
+        self._run_copy_to_project(
+            project_path,
+            selected_skills,
+            command_dicts,
+            is_temporary=is_temporary,
+            overwrite_commands=False,
+        )
+
+    @Slot(str, str, bool)
+    def confirmCommandCopyWithOverwrite(
+        self, project_path: str, command_paths_json: str, overwrite_commands: bool
+    ):
+        """Resume a paused copy after the user chose how to handle conflicts.
+
+        ``overwrite_commands=True`` replaces the existing project commands
+        with the Library versions ("Update Existing & Copy New"); ``False``
+        keeps them and copies only the commands that do not exist yet
+        ("Copy Only New").
+        """
+        import json
+
+        pending = getattr(self, "_pending_command_copy", None)
+        try:
+            command_paths = json.loads(command_paths_json or "[]")
+        except Exception:
+            command_paths = []
+
+        skills: list = []
+        if pending and pending.get("project_path") == project_path:
+            skills = pending.get("skills", [])
+        self._pending_command_copy = None
+
+        command_dicts = [{"local_path": p, "name": Path(p).stem} for p in command_paths]
+        if not command_dicts and not skills:
+            return
+
+        self._run_copy_to_project(
+            project_path,
+            skills,
+            command_dicts,
+            is_temporary=False,
+            overwrite_commands=bool(overwrite_commands),
+        )
+
+    @Slot()
+    def cancelCommandCopyWithOverwrite(self):
+        """Abandon a paused copy; nothing was written."""
+        self._pending_command_copy = None
+        self.app._set_status("Copy cancelled.")
+
+    def _run_copy_to_project(
+        self,
+        project_path: str,
+        selected_skills: list,
+        command_dicts: list[dict],
+        *,
+        is_temporary: bool = False,
+        overwrite_commands: bool = False,
+    ):
+        """Copy skills + commands to *project_path* on a worker thread."""
+        self.app._set_status(f"Copying {len(selected_skills) + len(command_dicts)} item(s)...")
 
         def run_copy():
             try:
-                from skill_manager.core.copier import copy_skill_folders_to_projects
+                from skill_manager.core.copier import (
+                    copy_command_files_to_projects,
+                    copy_skill_folders_to_projects,
+                )
 
-                result = copy_skill_folders_to_projects(selected_skills, [project_path])
+                result = {"copied": 0, "merged": 0, "failed": 0, "details": []}
+                if selected_skills:
+                    result = copy_skill_folders_to_projects(selected_skills, [project_path])
+
+                cmd_result: dict = {}
+                if command_dicts:
+                    cmd_result = copy_command_files_to_projects(
+                        command_dicts, [project_path], overwrite=overwrite_commands
+                    )
 
                 parts = []
-                if result["copied"]:
+                if result.get("copied"):
                     parts.append(f"{result['copied']} new")
-                if result["merged"]:
+                if result.get("merged"):
                     parts.append(f"{result['merged']} updated")
+                if cmd_result.get("copied"):
+                    parts.append(f"{cmd_result['copied']} command(s) copied")
+                if cmd_result.get("updated"):
+                    parts.append(f"{cmd_result['updated']} command(s) updated")
+                if cmd_result.get("skipped"):
+                    parts.append(f"{cmd_result['skipped']} command(s) kept")
 
                 msg = f"Copy complete: {', '.join(parts) or 'nothing copied'}"
 
@@ -82,6 +212,8 @@ class CopyMixin:
                         "skills_merged": result.get("merged", 0),
                         "skills_failed": result.get("failed", 0),
                         "skills_count": len(selected_skills),
+                        "commands_copied": cmd_result.get("copied", 0),
+                        "commands_updated": cmd_result.get("updated", 0),
                     },
                 )
 
@@ -186,6 +318,19 @@ class CopyMixin:
                                     "[TARGETED SCAN] Failed scanning %s: %s", skill_path, exc
                                 )
 
+                # ── Commands deployed: rescan the project so the new/updated
+                # command files show up in the models, and check whether they
+                # reference skills the project does not have yet.
+                if cmd_result:
+                    from skill_manager.core.quick_copy import project_root_for_project
+
+                    proj_root = project_root_for_project(Path(project_path))
+                    service = _build_discovery_service(self.app)
+                    try:
+                        discovered_skills.extend(service.discover_project(proj_root))
+                    except Exception as exc:
+                        logger.error("[COPY COMMAND] Failed rescan of %s: %s", proj_root, exc)
+
                 if discovered_skills:
                     patch_cache_add(discovered_skills)
 
@@ -199,12 +344,48 @@ class CopyMixin:
                     QTimer.singleShot(0, self.app, lambda: self.app._set_status(msg))
                     QTimer.singleShot(0, self.app, self.app.skillModel.clearSelection)
 
+                # ── Skill carry: a command that references a skill the
+                # target project does not have must offer to carry it.
+                if cmd_result and command_dicts:
+                    self._prompt_missing_skills_for_commands(command_dicts, project_path)
+
             except Exception as e:
                 err_msg = f"Copy failed: {e}"
                 capture_exception(e)
                 QTimer.singleShot(0, self.app, lambda: self.app._set_status(err_msg))
 
         self.app.task_runner.run(run_copy)
+
+    def _prompt_missing_skills_for_commands(self, command_dicts: list[dict], project_path: str):
+        """Emit the skill-carry prompt for commands deployed to a project."""
+        import json
+
+        from skill_manager.core.copier import find_missing_skills_for_commands
+
+        try:
+            missing = find_missing_skills_for_commands(
+                command_dicts,
+                project_path,
+                self.app._library_model._all_skills,  # type: ignore[attr-defined]
+            )
+        except Exception as exc:
+            logger.error("[COPY COMMAND] Skill carry check failed: %s", exc)
+            return
+
+        if not missing:
+            return
+
+        from dataclasses import asdict
+
+        missing_dicts = [asdict(m) if hasattr(m, "__dataclass_fields__") else m for m in missing]
+        command_paths = [c.get("local_path", "") for c in command_dicts if c.get("local_path")]
+        QTimer.singleShot(
+            0,
+            self,
+            lambda: self.commandSkillsCarryPrompt.emit(
+                json.dumps(command_paths), project_path, json.dumps(missing_dicts)
+            ),
+        )
 
     @Slot(str)
     def copySelectedSkillsToProjectTemporarily(self, project_path: str):

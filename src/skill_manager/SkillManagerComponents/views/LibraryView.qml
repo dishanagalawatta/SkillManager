@@ -575,6 +575,10 @@ Item {
         id: lv_commandDialog
     }
 
+    CommandUpdateConfirmDialog {
+        id: lv_commandUpdateConfirmDialog
+    }
+
     CommandCarrySkillsDialog {
         id: lv_carrySkillsDialog
         onCarryConfirmed: (confirmedSkills) => {
@@ -604,6 +608,11 @@ Item {
         function onCommandSkillsCarryBatchPrompt(batchJson) {
             var batch = JSON.parse(batchJson || "[]")
             lv_carrySkillsDialog.openWithBatch(batch)
+        }
+        function onCommandCopyExistingDetected(projectPath, commandPathsJson, existingJson) {
+            var cmdPaths = JSON.parse(commandPathsJson || "[]")
+            var existing = JSON.parse(existingJson || "[]")
+            lv_commandUpdateConfirmDialog.openForCopy(projectPath, cmdPaths, existing)
         }
     }
 

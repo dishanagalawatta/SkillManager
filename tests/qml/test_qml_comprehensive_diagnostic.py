@@ -54,7 +54,6 @@ DIALOGS = [
     "ProjectRenameDialog.qml",
     "FolderPickerNative.qml",
     "MissingSkillsDialog.qml",
-    "CommandRemovalConfirmDialog.qml",
 ]
 
 # Shared components that other QML files import via the local module.

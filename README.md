@@ -143,7 +143,7 @@ Manage thousands of agent skills with instant fuzzy search, automatic category d
 
 - **Instant Search & Intelligent Tagging**: Real-time fuzzy filtering powered by `rapidfuzz`. Automatically organizes skills into Architecture, Testing, Security, CRO, UI, and Marketing.
 - **Rich Skill Inspector**: Read full skill documentation, preview raw Markdown, inspect parameters, and view trigger keywords.
-- **Custom Project Commands**: Turn any skill into an actionable `.md` slash command with custom emojis, multi-project deployment, and smart duplicate detection.
+- **Custom Project Commands**: Turn any skill into an actionable `.md` slash command with custom emojis. The Library owns the canonical command; deploy it to any project from there, with a prompt before an existing project command is replaced.
 - **Multi-Select Batch Actions**: Star favorites, archive unused skills, or deploy collections across all repositories at once.
 
 ---

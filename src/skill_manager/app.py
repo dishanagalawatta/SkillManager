@@ -165,7 +165,7 @@ class AppController(AppControllerProxyMixin, QObject):
     commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
     commandSkillsCarryPrompt = Signal(str, str, str)
     commandSkillsCarryBatchPrompt = Signal(str)
-    commandPendingRemovals = Signal(str, list)
+    commandCopyExistingDetected = Signal(str, str, str)  # project, commandPathsJson, existingJson
 
     def __init__(self, skip_initial_load=False, config=None):
         super().__init__()
@@ -286,9 +286,9 @@ class AppController(AppControllerProxyMixin, QObject):
         self.config_mgr.clientFormatsChanged.connect(self.clientFormatsChanged.emit)
         self.config_mgr.customCollectionsChanged.connect(self.customCollectionsChanged.emit)
 
-        self.ops.commandPendingRemovals.connect(self.commandPendingRemovals.emit)
         self.ops.commandSkillsCarryPrompt.connect(self.commandSkillsCarryPrompt.emit)
         self.ops.commandSkillsCarryBatchPrompt.connect(self.commandSkillsCarryBatchPrompt.emit)
+        self.ops.commandCopyExistingDetected.connect(self.commandCopyExistingDetected.emit)
 
         # 5. Lifecycle Hooks
         self.ops.cleanup_temp_copies()  # Crash recovery
