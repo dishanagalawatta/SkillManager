@@ -392,9 +392,11 @@ def test_slow_tools_run_off_the_event_loop():
     """
     import threading
 
-    from skill_manager.mcp.tools import analyze as analyze_mod
-    from skill_manager.mcp.tools import build as build_mod
-    from skill_manager.mcp.tools import monitor as monitor_mod
+    from skill_manager.mcp.tools import (
+        analyze as analyze_mod,
+        build as build_mod,
+        monitor as monitor_mod,
+    )
 
     caller = threading.get_ident()
     seen: dict[str, int] = {}
