@@ -6,6 +6,7 @@ project_path through get_skills_dir for consistency.
 
 from unittest.mock import patch
 
+from skill_manager.core.config import SKILL_LIBRARY_CACHE_VERSION
 from skill_manager.core.persistence import (
     _normalize_skill_project_path,
     load_cache,
@@ -61,6 +62,7 @@ def test_save_cache_normalizes_project_paths(tmp_path):
         ],
         "categories": ["General"],
         "status": "test",
+        "cache_version": SKILL_LIBRARY_CACHE_VERSION,
     }
 
     with patch("skill_manager.core.persistence.SKILL_LIBRARY_CACHE_FILE", str(cache_file)):
@@ -112,6 +114,7 @@ def test_load_cache_normalizes_project_paths(tmp_path):
         "categories": ["General"],
         "project_labels": [],
         "status": "test",
+        "cache_version": SKILL_LIBRARY_CACHE_VERSION,
     }
 
     import orjson

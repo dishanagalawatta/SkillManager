@@ -10,8 +10,16 @@ def _write_cache(tmp_path, skills):
     """Write a cache file with the given skills list."""
     import orjson
 
+    from skill_manager.core.config import SKILL_LIBRARY_CACHE_VERSION
+
     cache_path = tmp_path / "skill_library_index.json"
-    data = {"skills": skills, "categories": []}
+    # The version stamp is required: load_cache discards an index written
+    # by a different schema version.
+    data = {
+        "skills": skills,
+        "categories": [],
+        "cache_version": SKILL_LIBRARY_CACHE_VERSION,
+    }
     cache_path.write_bytes(orjson.dumps(data))
     return cache_path
 

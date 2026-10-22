@@ -173,6 +173,9 @@ def _commands_fingerprint(dir_path: Path) -> tuple[int, float, str]:
 
 # In-process memo: normcase(dir) -> (prefix_tuple, child_names_hash, snap_tuple, cmd_tuple, fp).
 # Keyed by normcase so Windows paths differing only in case share an entry.
+# Bounded: a long-running app that watches many directories would otherwise
+# grow this dict forever.
+_FP_MEMO_MAX_ENTRIES = 4096
 _fp_memo: dict[
     str,
     tuple[tuple[float, int, int, float], str, tuple[int, float, str], tuple[int, float, str], str],
@@ -233,6 +236,10 @@ def compute_dir_fingerprint(dir_path: Path) -> str:
             f"{cmd_tuple[0]}:{cmd_tuple[1]}:{cmd_tuple[2]}"
         )
         fp = hashlib.md5(raw.encode()).hexdigest()
+        if len(_fp_memo) >= _FP_MEMO_MAX_ENTRIES:
+            # Drop the oldest entry; the memo is a pure cache, so evicting
+            # only costs a recomputation.
+            _fp_memo.pop(next(iter(_fp_memo)), None)
         _fp_memo[key] = (prefix_tuple, child_names_hash, snap_tuple, cmd_tuple, fp)
         return fp
     except OSError as e:
