@@ -408,7 +408,6 @@ class UIStateRecord(BaseModel):
     startup_view: str = "Library"
     remember_filters: bool = True
     reduced_motion: bool = False
-    compact_list_rows: bool = False
     telemetry_enabled: bool = True
     inspector_width: int = Field(default=0, ge=0)
 

@@ -231,14 +231,6 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Compact List Rows"
-                                    GlassSwitch {
-                                        checked: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
-                                        onCheckedChanged: if (AppController.ui_controller) AppController.ui_controller.setCompactListRows(checked)
-                                    }
-                                }
-                                Separator {}
-                                SettingsRow {
                                     titleText: "Scroll Speed"
                                     descriptionText: "Multiplier: " + (scrollSpeedSlider.value ? scrollSpeedSlider.value.toFixed(1) : "1.0") + "x"
                                     GlassSlider {

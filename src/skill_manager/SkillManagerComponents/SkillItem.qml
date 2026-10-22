@@ -13,18 +13,18 @@ Item {
     property string subCat: model && model.subCategoryName ? model.subCategoryName : ""
     property bool isMainCollapsed: model && model.isMainCollapsed !== undefined ? model.isMainCollapsed : false
     property bool isSubCollapsed: model && model.isSubCollapsed !== undefined ? model.isSubCollapsed : false
-    property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false
 
-    // Row metrics. Normal rows carry one title line, so a 46 px row wasted
-    // vertical space; 40 px still clears the 28 px icon and reads comfortably.
-    readonly property int rowContentHeight: compactRows ? 32 : 40
-    readonly property int rowTopMargin: compactRows ? 2 : 3
-    readonly property int rowIconSize: compactRows ? 22 : 28
-    readonly property int rowIconGlyphSize: compactRows ? 14 : 16
-    readonly property int rowTitleSize: compactRows ? 11 : 13
-    readonly property int rowCheckboxSize: compactRows ? 16 : 18
-    readonly property int rowCheckMarkSize: compactRows ? 10 : 11
-    readonly property int rowSelectionBarHeight: compactRows ? 16 : 20
+    // Row metrics. Compact rows are the permanent list design (the former
+    // "normal" variant was removed), so the values come straight from the
+    // Theme tokens — there is no runtime mode switch any more.
+    readonly property int rowContentHeight: Theme.rowHeight
+    readonly property int rowTopMargin: Theme.rowTopMargin
+    readonly property int rowIconSize: Theme.rowIconSize
+    readonly property int rowIconGlyphSize: Theme.rowIconGlyphSize
+    readonly property int rowTitleSize: Theme.rowTitleSize
+    readonly property int rowCheckboxSize: Theme.rowCheckboxSize
+    readonly property int rowCheckMarkSize: Theme.rowCheckMarkSize
+    readonly property int rowSelectionBarHeight: Theme.rowSelectionBarHeight
 
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false

@@ -61,7 +61,6 @@ class AppController(AppControllerProxyMixin, QObject):
     startupViewChanged: ClassVar[SignalInstance]
     rememberFiltersChanged: ClassVar[SignalInstance]
     reducedMotionChanged: ClassVar[SignalInstance]
-    compactListRowsChanged: ClassVar[SignalInstance]
     statsChanged: ClassVar[SignalInstance]
     shortcutsChanged: ClassVar[SignalInstance]
     isRecordingShortcutChanged: ClassVar[SignalInstance]
@@ -113,7 +112,6 @@ class AppController(AppControllerProxyMixin, QObject):
     startupView: str
     rememberFilters: bool
     reducedMotion: bool
-    compactListRows: bool
     shortcutSearch: str
     shortcutSelectAll: str
     shortcutClearSelection: str
@@ -201,7 +199,6 @@ class AppController(AppControllerProxyMixin, QObject):
     def setStartupView(self, v: str) -> None: ...
     def setRememberFilters(self, b: bool) -> None: ...
     def setReducedMotion(self, b: bool) -> None: ...
-    def setCompactListRows(self, b: bool) -> None: ...
     def addSource(self, u: str) -> None: ...
     def removeSource(self, p: str) -> None: ...
     def removeSourceByIndex(self, i: int) -> None: ...

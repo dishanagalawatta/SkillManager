@@ -181,9 +181,6 @@ def test_controller_setters(controller):
     controller.reducedMotion = True
     assert controller.reducedMotion is True
 
-    controller.compactListRows = True
-    assert controller.compactListRows is True
-
     controller.windowX = 100
     assert controller.windowX == 100
     controller.windowY = 200
@@ -510,8 +507,6 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.rememberFilters is False
     controller.setReducedMotion(True)
     assert controller.reducedMotion is True
-    controller.setCompactListRows(True)
-    assert controller.compactListRows is True
     assert controller.ui.triggerSave.call_count >= 3
 
     controller.libraryModel.filterText = "abc"
@@ -525,7 +520,6 @@ def test_controller_daily_speed_preferences(controller):
     assert controller.currentView == "Library"
     assert controller.startupView == "Library"
     assert controller.rememberFilters is True
-    assert controller.compactListRows is False
 
 
 def test_controller_load_initial_data_success_and_error(controller, temp_dir):

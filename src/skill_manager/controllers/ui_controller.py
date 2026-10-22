@@ -37,7 +37,6 @@ class UIController(BaseController):
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
-    compactListRowsChanged = Signal()
     telemetryEnabledChanged = Signal()
     inspectorWidthChanged = Signal()
 
@@ -231,17 +230,6 @@ class UIController(BaseController):
             self.triggerSave()
             self.reducedMotionChanged.emit()
 
-    @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):  # type: ignore[reportRedeclaration]
-        return self.state.compact_list_rows
-
-    @compactListRows.setter  # type: ignore[func-attr]
-    def compactListRows(self, value):
-        if self.state.compact_list_rows != value:
-            self.state.compact_list_rows = value
-            self.triggerSave()
-            self.compactListRowsChanged.emit()
-
     @Property(bool, notify=telemetryEnabledChanged)
     def telemetryEnabled(self):  # type: ignore[reportRedeclaration]
         return self.state.telemetry_enabled
@@ -313,10 +301,6 @@ class UIController(BaseController):
         self.reducedMotion = b
 
     @Slot(bool)
-    def setCompactListRows(self, b):
-        self.compactListRows = b
-
-    @Slot(bool)
     def setTelemetryEnabled(self, b):
         self.telemetryEnabled = b
 
@@ -353,7 +337,6 @@ class UIController(BaseController):
         self.startupViewChanged.emit()
         self.rememberFiltersChanged.emit()
         self.reducedMotionChanged.emit()
-        self.compactListRowsChanged.emit()
         self.telemetryEnabledChanged.emit()
         self.inspectorWidthChanged.emit()
         # Defaults restore telemetry to on; keep the live client in step.

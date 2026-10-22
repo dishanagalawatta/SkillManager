@@ -61,6 +61,7 @@ paired per mode: **Dark** (Matte Graphite) / **Light** (Warm Stone).
 - **Layouts & Separators**: Flatten `RowLayout` groupings when elements have conditional visibility (`visible: condition`). Apply `visible` to individual elements instead of wrapper layouts to prevent orphaned separators when elements are hidden.
 - **Icon naming**: All icons use the `solar:` URI scheme (e.g., `solar:copy-bold-duotone`, `solar:trash-bin-2-broken`). Use `bold-duotone` for primary actions, `broken` for secondary/inactive state.
 - **Starred icons**: The starred (pinned) icon color comes from `Theme.accent` everywhere it renders (list rows, inspector header). Never reintroduce a hardcoded gold color for stars.
+- **List rows**: The compact row layout is the single, permanent list design — there is no row-density setting. All row metrics come from the `Theme.row*` tokens (`rowHeight`, `rowTopMargin`, `rowIconSize`, `rowIconGlyphSize`, `rowTitleSize`, `rowCheckboxSize`, `rowCheckMarkSize`, `rowSelectionBarHeight`); never hardcode a row dimension in a delegate.
 
 **`IconButton` pattern:**
 

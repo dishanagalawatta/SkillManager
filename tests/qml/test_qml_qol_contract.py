@@ -134,21 +134,43 @@ def test_shared_buttons_center_content_and_use_role_tokens():
     assert "Theme.dangerHover" in icon_button
 
 
-def test_compact_rows_are_persisted_and_wired_to_skill_items():
+def test_compact_rows_are_permanent_and_have_no_toggle():
+    """Compact rows are the single, permanent list design.
+
+    The former "normal" row variant and its user-facing toggle were removed:
+    the metrics are baked into Theme tokens and no runtime switch remains.
+    """
     settings = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
     skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
+    theme = (QML_DIR / "Theme.qml").read_text(encoding="utf-8")
     ui_controller_py = (QML_DIR.parent / "controllers" / "ui_controller.py").read_text(
         encoding="utf-8"
     )
 
-    assert "Compact List Rows" in settings
-    assert "AppController.ui_controller.compactListRows" in settings
-    assert "AppController.ui_controller.setCompactListRows(checked)" in settings
-    assert (
-        "property bool compactRows: AppController.ui_controller ? AppController.ui_controller.compactListRows : false"
-        in skill_item
-    )
-    assert "compactListRows" in ui_controller_py
+    # The toggle is gone from Settings and from the controller surface.
+    assert "Compact List Rows" not in settings
+    assert "compactListRows" not in settings
+    assert "setCompactListRows" not in settings
+    assert "compactListRows" not in ui_controller_py
+    assert "setCompactListRows" not in ui_controller_py
+
+    # The delegate no longer branches on a mode flag.
+    assert "compactRows" not in skill_item
+    assert "compactListRows" not in skill_item
+
+    # The canonical metrics live in Theme as semantic tokens.
+    for token in (
+        "rowHeight",
+        "rowTopMargin",
+        "rowIconSize",
+        "rowIconGlyphSize",
+        "rowTitleSize",
+        "rowCheckboxSize",
+        "rowCheckMarkSize",
+        "rowSelectionBarHeight",
+    ):
+        assert f"readonly property real {token}:" in theme
+        assert f"Theme.{token}" in skill_item
 
 
 def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
@@ -158,10 +180,9 @@ def test_raw_skill_rows_show_name_only_and_use_tighter_heights():
 
     assert 'text: model ? model.name : ""' in skill_item
     assert 'model.project + " • " + model.category' not in skill_item
-    # Row metrics live in one place so normal rows stay tighter than the old
-    # 46 px (one-line rows were wasting vertical space) and compact rows keep
-    # their own scale.
-    assert "readonly property int rowContentHeight: compactRows ? 32 : 40" in skill_item
+    # Row metrics live in one place (Theme tokens) so every row uses the same
+    # compact scale — the old 46 px one-line row was wasting vertical space.
+    assert "readonly property int rowContentHeight: Theme.rowHeight" in skill_item
     assert "height: root.rowContentHeight" in skill_item
     assert "delegate: SkillItem" in quick_copy
     assert "delegate: SkillItem" in library

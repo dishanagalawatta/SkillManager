@@ -33,7 +33,6 @@ class TestUIFiltersFlow:
 
         # Change a preference
         ui.darkMode = True
-        ui.compactListRows = True
 
         # Trigger an immediate save (bypassing debounce for the test)
         ui.saveUiState()
@@ -41,14 +40,12 @@ class TestUIFiltersFlow:
         # Verify it went to the config manager
         stored_state = app_controller._config.get("ui_state")
         assert stored_state["dark_mode"] is True
-        assert stored_state["compact_list_rows"] is True
 
         # Reset and verify persistence
         ui.resetUiState()
         ui.saveUiState()
         stored_state = app_controller._config.get("ui_state")
         assert stored_state["dark_mode"] is False
-        assert stored_state["compact_list_rows"] is False
 
     def test_view_switching_flow(self, qml_engine, app_controller, qtbot):
         ui = app_controller.ui

@@ -156,7 +156,6 @@ class AppController(AppControllerProxyMixin, QObject):
     startupViewChanged = Signal()
     rememberFiltersChanged = Signal()
     reducedMotionChanged = Signal()
-    compactListRowsChanged = Signal()
     statsChanged = Signal()
     shortcutsChanged = Signal()
     isRecordingShortcutChanged = Signal()
@@ -279,7 +278,6 @@ class AppController(AppControllerProxyMixin, QObject):
         self.ui.startupViewChanged.connect(self.startupViewChanged.emit)
         self.ui.rememberFiltersChanged.connect(self.rememberFiltersChanged.emit)
         self.ui.reducedMotionChanged.connect(self.reducedMotionChanged.emit)
-        self.ui.compactListRowsChanged.connect(self.compactListRowsChanged.emit)
 
         self.config_mgr.shortcutsChanged.connect(self.shortcutsChanged.emit)
         self.config_mgr.isRecordingShortcutChanged.connect(self.isRecordingShortcutChanged.emit)
@@ -925,14 +923,6 @@ class AppController(AppControllerProxyMixin, QObject):
     @reducedMotion.setter  # type: ignore[func-attr]
     def reducedMotion(self, v):
         self.ui.reducedMotion = v
-
-    @Property(bool, notify=compactListRowsChanged)
-    def compactListRows(self):  # type: ignore[reportRedeclaration]
-        return self.ui.compactListRows
-
-    @compactListRows.setter  # type: ignore[func-attr]
-    def compactListRows(self, v):
-        self.ui.compactListRows = v
 
     @Property(str, notify=shortcutsChanged)
     def shortcutSearch(self):

@@ -93,10 +93,6 @@ class AppControllerProxyMixin:
     def setReducedMotion(self, b):
         self.ui.setReducedMotion(b)
 
-    @Slot(bool)
-    def setCompactListRows(self, b):
-        self.ui.setCompactListRows(b)
-
     @Slot(str)
     def addSource(self, u):
         self.config_mgr.addSource(u)
