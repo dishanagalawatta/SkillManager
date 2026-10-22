@@ -122,7 +122,7 @@ def create_mcp_server(allow_write: bool = False) -> Server[Any]:
     schemas: dict[str, dict[str, Any]] = {}
     handlers: dict[str, Any] = {}
     for module_schemas, module_handlers in (
-        (BUILD_SCHEMAS, build_handlers()),
+        (BUILD_SCHEMAS, build_handlers(allow_write)),
         (ANALYZE_SCHEMAS, analyze_handlers()),
         (ACCESSIBILITY_SCHEMAS, accessibility_handlers()),
         (SKILLS_SCHEMAS, skills_handlers()),

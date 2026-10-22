@@ -237,6 +237,8 @@ def _handle_delete_skill(args: dict[str, Any], allow_write: bool) -> ToolResult:
     if not allow_write:
         return err("sm_delete_skill", WRITE_DISABLED_ERROR)
 
+    # The exclusion has to be checked BEFORE anything is deleted — a
+    # post-hoc check cannot undo a deletion that already happened.
     if _is_excluded(skill_id):
         return err(
             "sm_delete_skill", "refused: skill_id resolves under an AGENTS.md-excluded path."

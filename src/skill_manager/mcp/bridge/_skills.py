@@ -8,6 +8,13 @@ from typing import Any
 from skill_manager.core.skill_packages.storage import iter_relative_files
 
 from ._controller import _controller_or_none
+from ._guard import (
+    is_excluded,
+    is_within,
+    project_roots,
+    safe_skill_name,
+    skill_source_roots,
+)
 from ._telemetry import _log_call, logger
 
 
@@ -283,7 +290,15 @@ def create_skill(
     if not name or not name.strip():
         raise ValueError("Skill name is required and cannot be empty.")
 
-    clean_name = name.strip()
+    # The name is a single folder name: a path separator or a traversal
+    # would place the new folder outside the source directory.
+    clean_name = safe_skill_name(name)
+    if clean_name is None:
+        raise ValueError(
+            f"Skill name {name!r} is not a valid folder name "
+            "(no path separators, no '..', no absolute path)."
+        )
+
     parent_dir: Path | None = None
     if source_path:
         parent_dir = Path(source_path)
@@ -297,6 +312,12 @@ def create_skill(
         parent_dir.mkdir(parents=True, exist_ok=True)
 
     skill_dir = parent_dir / clean_name
+
+    # Containment: the new folder has to land inside a configured source.
+    roots = skill_source_roots(controller)
+    if not is_within(skill_dir, roots):
+        raise ValueError(f"Refusing to create a skill outside the configured sources: {skill_dir}")
+
     skill_dir.mkdir(parents=True, exist_ok=True)
 
     final_content = content
@@ -345,7 +366,20 @@ def update_skill(
             break
 
     if not resolved:
-        resolved = skill_id
+        # Not a known skill: only allow an explicit path that lives inside
+        # a configured source. An arbitrary path must never be written to.
+        candidate = Path(skill_id)
+        if candidate.exists() and is_within(candidate, skill_source_roots(controller)):
+            resolved = str(candidate)
+
+    if not resolved:
+        raise ValueError(
+            f"Skill target {skill_id!r} does not resolve to a known skill "
+            "inside a configured source; refusing to guess a write target."
+        )
+
+    if is_excluded(resolved):
+        raise ValueError(f"Refusing to write to an excluded path: {resolved}")
 
     skill_path = Path(resolved)
     if not skill_path.exists():
@@ -396,7 +430,9 @@ def delete_skill(skill_id: str) -> dict[str, Any]:
 
     if not resolved:
         cand = Path(skill_id)
-        if cand.exists():
+        # Only a path inside a configured source may be deleted. An
+        # arbitrary existing path is not a valid deletion target.
+        if cand.exists() and is_within(cand, skill_source_roots(controller)):
             resolved = str(cand.resolve())
 
     if not resolved:
@@ -404,6 +440,9 @@ def delete_skill(skill_id: str) -> dict[str, Any]:
             f"Skill id {skill_id!r} did not resolve to a known local_path; "
             "refusing to guess a deletion target."
         )
+
+    if is_excluded(resolved):
+        raise ValueError(f"Refusing to delete an excluded path: {resolved}")
 
     ops = getattr(controller, "ops", None)
     if ops is not None and hasattr(ops, "deleteSkill"):
@@ -456,7 +495,18 @@ def deploy(skill_id: str, target: str) -> dict[str, Any]:
             break
 
     if target_path is None:
-        target_path = Path(target)
+        # An unknown target is only accepted when it is a configured
+        # project — an arbitrary directory must never be created or
+        # written to.
+        candidate = Path(target)
+        if candidate.exists() and is_within(candidate, project_roots(controller)):
+            target_path = candidate
+
+    if target_path is None:
+        raise ValueError(
+            f"Target {target!r} did not resolve to a configured project; "
+            "refusing to deploy to an arbitrary directory."
+        )
 
     if not target_path.exists():
         target_path.mkdir(parents=True, exist_ok=True)

@@ -39,19 +39,25 @@ def injection_allowed() -> bool:
 def gui_window_present() -> bool:
     """Return True only when a live SkillManager GUI window can be found.
 
-    Mirrors the ``get_window_info`` presence semantics: on Linux any
-    non-``None`` value from ``find_window_by_title`` counts (including the
-    Wayland "assume found" sentinel ``0``); on Windows a non-zero HWND from
-    ``FindWindowW`` counts.  Fail-closed when the window cannot be found.
+    Mirrors the ``get_window_info`` presence semantics, but **fails closed**:
+    the window has to be positively identified before anything is injected.
+    On Windows that means a non-zero HWND from ``FindWindowW``; on Linux a
+    real window id from ``find_window_by_title``.
+
+    The Wayland "cannot locate the window" sentinel (``WINDOW_ID_UNKNOWN``)
+    counts as *absent*: without ``xdotool``/``wmctrl`` there is no way to
+    prove the SkillManager window is the one that would receive the
+    keystrokes, so injecting would risk typing into an unrelated window.
     """
     if sys.platform == "win32":
         try:
             return bool(ctypes.windll.user32.FindWindowW(None, _WINDOW_TITLE))
         except Exception:  # noqa: BLE001 - never crash the guard
             return False
-    from skill_manager.utils.linux import find_window_by_title
+    from skill_manager.utils.linux import WINDOW_ID_UNKNOWN, find_window_by_title
 
-    return find_window_by_title(_WINDOW_TITLE) is not None
+    window_id = find_window_by_title(_WINDOW_TITLE)
+    return window_id is not None and window_id != WINDOW_ID_UNKNOWN
 
 
 def injection_refused_reason() -> str | None:

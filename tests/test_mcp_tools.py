@@ -41,7 +41,7 @@ def test_build_lint_returns_structured_result(monkeypatch: pytest.MonkeyPatch) -
     fake_lint = {"returncode": 0, "passed": True, "stdout": "clean", "stderr": ""}
     monkeypatch.setattr(build_mod, "run_lint", lambda path, fix: fake_lint)
 
-    result = build_mod._HANDLERS["sm_lint"]({"path": "src", "fix": False})
+    result = build_mod.get_handlers(allow_write=False)["sm_lint"]({"path": "src", "fix": False})
 
     assert result.ok is True
     assert result.tool == "sm_lint"
@@ -60,7 +60,8 @@ def test_build_lint_passes_fix_flag(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(build_mod, "run_lint", _fake_lint)
 
-    build_mod._HANDLERS["sm_lint"]({"path": "custom", "fix": True})
+    # ``fix`` rewrites files, so it only runs with the write capability.
+    build_mod.get_handlers(allow_write=True)["sm_lint"]({"path": "custom", "fix": True})
 
     assert captured == {"path": "custom", "fix": True}
 

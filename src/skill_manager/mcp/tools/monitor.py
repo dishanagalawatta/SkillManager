@@ -144,15 +144,40 @@ def _handle_tail_events(limit: int) -> ToolResult:
 def _handle_profile(force_full_scan: bool) -> ToolResult:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("SKILL_MANAGER_SKIP_INITIAL_LOAD", "1")
+    # A profiling run must not report itself as product usage, so the
+    # analytics calls are muted for its duration — and restored afterwards.
+    # Leaving them muted would silently disable telemetry for the rest of
+    # the MCP process.
+    restore_analytics = _mute_analytics()
+    try:
+        return _profile(force_full_scan)
+    finally:
+        restore_analytics()
+
+
+def _mute_analytics():
+    """Silence the analytics module and return a callable that restores it."""
+    saved: dict[str, Any] = {}
+
+    def _restore() -> None:
+        import skill_manager.core.analytics as _analytics
+
+        for _name, _fn in saved.items():
+            setattr(_analytics, _name, _fn)
+
     try:
         import skill_manager.core.analytics as _analytics
 
         for _n in ("capture_event", "capture_exception", "capture"):
             if hasattr(_analytics, _n):
+                saved[_n] = getattr(_analytics, _n)
                 setattr(_analytics, _n, lambda *_, **__: None)
     except Exception:
         pass
+    return _restore
 
+
+def _profile(force_full_scan: bool) -> ToolResult:
     try:
         from skill_manager.core.config import ConfigManager
         from skill_manager.core.discovery import DiscoveryService
