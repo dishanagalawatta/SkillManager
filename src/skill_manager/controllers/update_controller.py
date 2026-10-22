@@ -8,7 +8,7 @@ import json
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 from skill_manager.controllers.base import BaseController
 from skill_manager.core.analytics import capture_event, capture_exception
@@ -30,6 +30,9 @@ class UpdateController(BaseController):
     # Toast signals consumed by the UpdateToast host in Main.qml.
     updatesAvailable = Signal(int)  # count of outdated packages
     autoUpdateFinished = Signal(int, int)  # updated, failed
+    # Emitted whenever the package list changes; the curated catalog is
+    # derived from it.
+    catalogChanged = Signal()
 
     def __init__(self, app):
         super().__init__(app)
@@ -39,6 +42,100 @@ class UpdateController(BaseController):
         self._scan_generation = 0
         self._scan_finished = False
         self._scan_watchdog = None
+
+    # ── Curated catalog ───────────────────────────────────────────────
+
+    def _emit_packages_changed(self) -> None:
+        """Notify every listener that the package list changed.
+
+        The curated catalog is derived from the package list, so it has to
+        be refreshed together with it.
+        """
+        self.app.updatePackagesChanged.emit()
+        self.catalogChanged.emit()
+
+    @Property("QVariantList", notify=catalogChanged)
+    def catalogPackages(self) -> list:
+        """The curated package catalog, enriched with the install status.
+
+        Each entry carries ``is_installed`` and ``installed_package_id`` so
+        the UI can show an "Installed" badge and offer a reconfigure action.
+        """
+        from skill_manager.core.skill_packages import catalog_with_status
+
+        try:
+            return catalog_with_status(list(self.app._update_packages))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not build the package catalog: %s", exc)
+            return []
+
+    @Slot(str, result=dict)
+    def catalogPackage(self, catalog_id: str) -> dict:
+        """Return one catalog entry (as a dict) by id."""
+        from skill_manager.core.skill_packages import find_catalog_entry
+
+        entry = find_catalog_entry(catalog_id)
+        if entry is None:
+            return {}
+        data = entry.model_dump()
+        from skill_manager.core.skill_packages import matches_installed_package
+
+        match = matches_installed_package(entry, list(self.app._update_packages))
+        data["is_installed"] = match is not None
+        data["installed_package_id"] = match or ""
+        return data
+
+    @Slot(str, result=str)
+    def installCatalogPackageDefault(self, catalog_id: str) -> str:
+        """Install a catalog entry with its default configuration.
+
+        The catalog's install command is parsed into a normal package
+        config, the default storage path is resolved, and the regular
+        add-package flow takes over (version probe, save, background
+        install). Returns a JSON dict with ``ok``/``error``/``name``.
+        """
+        from skill_manager.core.skill_packages import (
+            find_catalog_entry,
+            template_to_package_data,
+        )
+
+        entry = find_catalog_entry(catalog_id)
+        if entry is None:
+            error = f"Unknown catalog package: {catalog_id}"
+            self.app._set_status(error)
+            return json.dumps({"ok": False, "error": error, "name": ""})
+
+        try:
+            data = template_to_package_data(entry)
+            target_path = self._default_package_storage_path(entry)
+            if target_path:
+                data["package_path"] = target_path
+
+            self.app._set_status(f"Installing {entry.display_name}...")
+            return self.addSkillPackage(data)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Catalog install failed for %s: %s", catalog_id, exc)
+            error = str(exc)
+            self.app._set_status(f"Install failed: {error}")
+            return json.dumps({"ok": False, "error": error, "name": entry.display_name})
+
+    def _default_package_storage_path(self, _entry=None) -> str:
+        """The default storage location for a catalog package.
+
+        Uses the same directory the other packages live in, so a catalog
+        install lands next to the packages the user already has.
+        """
+        import os
+
+        try:
+            from skill_manager.core.config import DATA_DIR
+
+            base = os.path.join(str(DATA_DIR), "packages")
+            os.makedirs(base, exist_ok=True)
+            return base
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not resolve the default package path: %s", exc)
+            return ""
 
     def _publish_project_sync_state(self):
         """Publish a ``_syncing_projects`` change to every QML binding.
@@ -107,7 +204,7 @@ class UpdateController(BaseController):
         del self.app._update_packages[len(refreshed) :]
 
         self.config.set("skills", self.app._update_packages)
-        self.app.updatePackagesChanged.emit()
+        self._emit_packages_changed()
 
     @Slot()
     def updateNow(self):
@@ -132,7 +229,7 @@ class UpdateController(BaseController):
         for s in self.app._update_packages:
             s["is_updating"] = True
             s["just_finished"] = False
-        self.app.updatePackagesChanged.emit()
+        self._emit_packages_changed()
 
         service = UpdateService(
             sources=self.app._sources,
@@ -146,7 +243,7 @@ class UpdateController(BaseController):
             def update_item():
                 if 0 <= idx < len(self.app._update_packages):
                     self.app._update_packages[idx] = data
-                    self.app.updatePackagesChanged.emit()
+                    self._emit_packages_changed()
 
             _safe_single_shot(0, self.app, update_item)
 
@@ -157,7 +254,7 @@ class UpdateController(BaseController):
                 # spinner.  just_finished is left as delivered per package.
                 for s in self.app._update_packages:
                     s["is_updating"] = False
-                self.app.updatePackagesChanged.emit()
+                self._emit_packages_changed()
                 # Refresh the header/button immediately: updated packages
                 # carry promoted versions, so the outdated count drops to 0
                 # without waiting for the next scan.
@@ -198,7 +295,7 @@ class UpdateController(BaseController):
             self._auto_update_in_flight = False
             for s in self.app._update_packages:
                 s["is_updating"] = False
-            self.app.updatePackagesChanged.emit()
+            self._emit_packages_changed()
             self.app._syncing_projects = []
             self._publish_project_sync_state()
             self.app._set_status(f"Failed to start global update: {e}")
@@ -307,7 +404,7 @@ class UpdateController(BaseController):
         self.recalculateStats()
         self.app._is_loading = False
         self.app.isLoadingChanged.emit()
-        self.app.updatePackagesChanged.emit()
+        self._emit_packages_changed()
 
         if timed_out:
             logger.warning(
@@ -936,7 +1033,7 @@ class UpdateController(BaseController):
             source["just_finished"] = False
             source["update_error"] = ""
             self.app._update_packages[index] = source
-            self.app.updatePackagesChanged.emit()
+            self._emit_packages_changed()
             self.app._set_status(f"Updating {source.get('name')}...")
 
             diag.log_event(
@@ -1029,7 +1126,7 @@ class UpdateController(BaseController):
                         else:
                             # Replace dict to force QML re-eval of final state.
                             self.app._update_packages[target] = dict(source)
-                            self.app.updatePackagesChanged.emit()
+                            self._emit_packages_changed()
                         # Refresh the header/button: a promoted version clears
                         # this package from the outdated count immediately.
                         self.recalculateStats()
@@ -1107,7 +1204,7 @@ class UpdateController(BaseController):
                 target = self._resolve_package_index(index, package_id)
                 if target is not None:
                     self.app._update_packages[target]["is_updating"] = False
-                    self.app.updatePackagesChanged.emit()
+                    self._emit_packages_changed()
                 self.app._set_status(f"Failed to start update for {source.get('name')}: {e}")
 
     def _resolve_package_index(self, index: int, package_id: str | None) -> int | None:
@@ -1171,7 +1268,7 @@ class UpdateController(BaseController):
                 self.app._update_packages[current].update(result)
                 self.config.set("skills", self.app._update_packages)
                 self.recalculateStats()
-                self.app.updatePackagesChanged.emit()
+                self._emit_packages_changed()
                 if result.get("check_status") == "failed":
                     reason = result.get("check_error") or "unknown error"
                     self.app._set_status(f"Could not check {label}: {reason}")
@@ -1280,4 +1377,4 @@ class UpdateController(BaseController):
     def clearPackageJustFinished(self, index: int):
         if 0 <= index < len(self.app._update_packages):
             self.app._update_packages[index]["just_finished"] = False
-            self.app.updatePackagesChanged.emit()
+            self._emit_packages_changed()

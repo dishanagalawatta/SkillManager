@@ -368,6 +368,9 @@ class UIController(BaseController):
             "quickcopy": "QuickCopy",
             "library": "Library",
             "updates": "Updates",
+            # The view is labelled "Packages" in the UI; the key stayed
+            # "Updates" so existing configs keep working.
+            "packages": "Updates",
             "settings": "Settings",
             "lastselected": "Last Selected",
         }

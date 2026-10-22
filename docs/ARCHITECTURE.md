@@ -96,6 +96,28 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 | `DiskCache` | (via `diskcache`) | Expensive computation caching |
 | `TaskStore` | `tasks.py` | Per-project task lists (atomic JSON + `FileLock`) |
 
+### Curated Package Catalog (`core/skill_packages/catalog.py`)
+
+| File | Purpose |
+|------|---------|
+| `catalog.py` | The curated, ready-to-install package catalog and its helpers |
+| `schemas.py` | `CatalogPackageTemplate` — one catalog entry |
+
+`BUILTIN_CATALOG` is the built-in starter list. A user can extend it by
+dropping a `package_catalog.json` into the app data directory; user
+entries are merged with the built-in ones and win on an id collision.
+
+`catalog_with_status(installed)` enriches every entry with
+`is_installed` and `installed_package_id`. The match is by repository
+(after the `KNOWN_SKILL_REPO_ALIASES` canonicalisation) or by npm
+package name, so `vercel-labs/find-skills` is recognised as the same
+package as `vercel-labs/skills`.
+
+`UpdateController` exposes the result as the notifying
+`catalogPackages` property and offers two install paths:
+`installCatalogPackageDefault(catalog_id)` (one click, default path) and
+`PackageEditDialog.openWithTemplate(template)` (pre-filled, editable).
+
 ### Skill Packages (`core/skill_packages/`)
 
 | File | Purpose |

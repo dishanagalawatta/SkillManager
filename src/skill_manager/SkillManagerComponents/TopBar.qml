@@ -152,7 +152,7 @@ Rectangle {
             TopBarButton {
                 objectName: "navUpdates"
                 iconSource: AppController.ui_controller.getAssetUri("ui/folder-sync-icon.svg")
-                labelText: "Updates"
+                labelText: "Packages"
                 visible: true
                 showLabel: root._topPhase < 2
                 Layout.alignment: Qt.AlignVCenter

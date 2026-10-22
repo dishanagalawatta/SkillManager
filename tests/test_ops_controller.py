@@ -161,18 +161,14 @@ def test_ops_controller_cleanup_temp_copies(ops_controller, tmp_path):
     temp_file = tmp_path / "temp_file.txt"
     temp_file.write_text("temp")
 
-    with (
-        patch(
-            "skill_manager.controllers.ops.delete.load_temp_registry",
-            return_value=[str(temp_dir), str(temp_file)],
-        ),
-        patch("skill_manager.controllers.ops.delete.save_temp_registry") as mock_save,
+    with patch(
+        "skill_manager.controllers.ops.delete.take_abandoned_temp_copies",
+        return_value=[str(temp_dir), str(temp_file)],
     ):
         ops_controller.cleanup_temp_copies()
 
         assert not temp_dir.exists()
         assert not temp_file.exists()
-        mock_save.assert_called_with([])
 
 
 def test_ops_controller_cleanup_temp_snaps(ops_controller, tmp_path):
@@ -182,22 +178,20 @@ def test_ops_controller_cleanup_temp_snaps(ops_controller, tmp_path):
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
+            "skill_manager.controllers.ops.delete.take_abandoned_temp_snaps",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
         ops_controller.cleanup_temp_snaps()
 
         assert not snap.exists()
         mock_cache_remove.assert_called_with([cache_entry_path])
-        mock_save.assert_called_with([])
 
 
 def test_ops_controller_cleanup_temp_snaps_empty(ops_controller):
     with patch(
-        "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
+        "skill_manager.controllers.ops.delete.take_abandoned_temp_snaps",
         return_value=[],
     ):
         ops_controller.cleanup_temp_snaps()
@@ -210,16 +204,14 @@ def test_ops_controller_cleanup_temp_snaps_crash_recovery(ops_controller, tmp_pa
 
     with (
         patch(
-            "skill_manager.controllers.ops.delete.load_temp_snaps_registry",
+            "skill_manager.controllers.ops.delete.take_abandoned_temp_snaps",
             return_value=[cache_entry_path],
         ),
         patch("skill_manager.controllers.ops.delete.patch_cache_remove") as mock_cache_remove,
-        patch("skill_manager.controllers.ops.delete.save_temp_snaps_registry") as mock_save,
     ):
         ops_controller.cleanup_temp_snaps()
 
         mock_cache_remove.assert_called_with([cache_entry_path])
-        mock_save.assert_called_with([])
 
 
 @patch("skill_manager.core.copier.copy_skill_folders_to_projects")

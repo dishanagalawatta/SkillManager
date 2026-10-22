@@ -345,37 +345,128 @@ def patch_cache_add(
         return 0
 
 
+def _pid_is_alive(pid: int) -> bool:
+    """True when a process with *pid* is still running."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # The process exists but belongs to another user.
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _load_pid_registry(path) -> dict[int, list[str]]:
+    """Read a PID-keyed temporary-file registry.
+
+    The registry maps the owning process id to the files it created. A
+    legacy flat list (written before the registry became PID-scoped) is
+    returned as ``{-1: paths}`` — an unknown owner, which the cleanup
+    treats as abandoned.
+    """
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "rb") as f:
+            data = orjson.loads(f.read())
+    except Exception as e:
+        logger.warning("Error loading temp registry %s: %s", path, e)
+        return {}
+
+    if isinstance(data, list):
+        # Legacy format: a flat list with no owner.
+        return {-1: [str(p) for p in data]}
+
+    owners: dict[int, list[str]] = {}
+    if not isinstance(data, dict):
+        return owners
+
+    legacy = data.get("temp_paths")
+    if isinstance(legacy, list):
+        # Legacy format: {"temp_paths": [...]} with no owner.
+        return {-1: [str(p) for p in legacy]}
+
+    for key, value in (data.get("owners") or {}).items():
+        try:
+            pid = int(key)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, list):
+            owners[pid] = [str(p) for p in value]
+    return owners
+
+
+def _save_pid_registry(path, owners: dict[int, list[str]]) -> None:
+    """Write a PID-keyed temporary-file registry."""
+    payload = {"owners": {str(pid): list(paths) for pid, paths in owners.items() if paths}}
+    _atomic_write_json(path, payload)
+
+
+def _register_temp_paths(path, new_paths: list[str]) -> None:
+    """Record *new_paths* under the current process id."""
+    owners = _load_pid_registry(path)
+    pid = os.getpid()
+    merged = list(dict.fromkeys(owners.get(pid, []) + [str(p) for p in new_paths]))
+    owners[pid] = merged
+    _save_pid_registry(path, owners)
+
+
+def _take_abandoned_temp_paths(path) -> list[str]:
+    """Remove and return the entries whose owning process is gone.
+
+    Entries owned by a *live* process are left untouched: another running
+    SkillManager instance (or the headless MCP process) owns them, and
+    deleting them would destroy work that is still in flight.
+    """
+    owners = _load_pid_registry(path)
+    if not owners:
+        return []
+
+    abandoned: list[str] = []
+    remaining: dict[int, list[str]] = {}
+    for pid, paths in owners.items():
+        if pid == -1 or not _pid_is_alive(pid):
+            abandoned.extend(paths)
+        else:
+            remaining[pid] = paths
+
+    if abandoned:
+        _save_pid_registry(path, remaining)
+    return abandoned
+
+
 def save_temp_registry(paths: list[str]) -> None:
-    """Saves the list of temporary copy paths to the registry."""
-    _atomic_write_json(TEMP_COPIES_FILE, {"temp_paths": paths})
+    """Records temporary copy paths under the current process id."""
+    _register_temp_paths(TEMP_COPIES_FILE, paths)
 
 
 def load_temp_registry() -> list[str]:
-    """Loads the list of temporary copy paths from the registry."""
-    if not os.path.exists(TEMP_COPIES_FILE):
-        return []
-    try:
-        with open(TEMP_COPIES_FILE, "rb") as f:
-            data = orjson.loads(f.read())
-            return data.get("temp_paths", [])
-    except Exception as e:
-        logger.warning("Error loading temp registry: %s", e)
-        return []
+    """Loads the temporary copy paths owned by the current process."""
+    owners = _load_pid_registry(TEMP_COPIES_FILE)
+    return list(owners.get(os.getpid(), []))
 
 
 def save_temp_snaps_registry(paths: list[str]) -> None:
-    """Saves the list of temporary snap paths to the registry."""
-    _atomic_write_json(TEMP_SNAPS_FILE, {"temp_paths": paths})
+    """Records temporary snap paths under the current process id."""
+    _register_temp_paths(TEMP_SNAPS_FILE, paths)
 
 
 def load_temp_snaps_registry() -> list[str]:
-    """Loads the list of temporary snap paths from the registry."""
-    if not os.path.exists(TEMP_SNAPS_FILE):
-        return []
-    try:
-        with open(TEMP_SNAPS_FILE, "rb") as f:
-            data = orjson.loads(f.read())
-            return data.get("temp_paths", [])
-    except Exception as e:
-        logger.warning("Error loading temp screenshots registry: %s", e)
-        return []
+    """Loads the temporary snap paths owned by the current process."""
+    owners = _load_pid_registry(TEMP_SNAPS_FILE)
+    return list(owners.get(os.getpid(), []))
+
+
+def take_abandoned_temp_copies() -> list[str]:
+    """Returns the temporary copies left behind by a process that is gone."""
+    return _take_abandoned_temp_paths(TEMP_COPIES_FILE)
+
+
+def take_abandoned_temp_snaps() -> list[str]:
+    """Returns the temporary snaps left behind by a process that is gone."""
+    return _take_abandoned_temp_paths(TEMP_SNAPS_FILE)

@@ -460,3 +460,43 @@ class ProjectTasksState(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     projects: dict[str, list[ProjectTaskRecord]] = Field(default_factory=dict)
+
+
+class CatalogPackageTemplate(BaseModel):
+    """A curated, ready-to-install skill package.
+
+    The template carries everything the installer needs: the install command
+    that :func:`infer_package_metadata` understands, the repository it comes
+    from, and the metadata the catalog UI shows.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(..., min_length=1)
+    display_name: str = Field(..., min_length=1)
+    description: str = ""
+    author: str = ""
+    category: str = ""
+    tags: list[str] = Field(default_factory=list)
+    source_type: str = "git"  # git | npx | script
+    install_command: str = Field(..., min_length=1)
+    repository_url: str = ""
+    default_args: str = ""
+    featured: bool = False
+
+    @field_validator("source_type", mode="before")
+    @classmethod
+    def _normalise_source_type(cls, value: Any) -> str:
+        text = str(value or "git").strip().lower()
+        return text if text in ("git", "npx", "script") else "git"
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [tag.strip() for tag in value.split(",") if tag.strip()]
+        if isinstance(value, list):
+            return [str(tag) for tag in value if tag]
+        return []

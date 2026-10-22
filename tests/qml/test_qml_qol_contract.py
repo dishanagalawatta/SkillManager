@@ -596,17 +596,20 @@ def test_main_window_minimum_dimensions_contract():
 
 
 def test_updates_view_responsive_layout_contract():
-    """Verify that UpdatesView.qml dynamically switches SplitView orientation and uses responsive height/button/text properties."""
+    """Verify the Packages view uses a tabbed layout with responsive sizing.
+
+    The view was redesigned from a side-by-side SplitView into three
+    tabbed pages (Installed / Discover / Project Sync) so the catalog has
+    room to breathe; the pages stack, so there is no orientation to switch.
+    """
     updates_qml = (QML_DIR / "views" / "UpdatesView.qml").read_text(encoding="utf-8")
-    assert "orientation: updatesRoot.width < 520 ? Qt.Vertical : Qt.Horizontal" in updates_qml, (
-        "UpdatesView.qml must switch SplitView orientation dynamically for narrow widths"
+    assert "SplitView" not in updates_qml, (
+        "UpdatesView.qml must use the tabbed page layout, not a SplitView"
     )
-    assert "SplitView.preferredHeight: parent.height * 0.45" in updates_qml, (
-        "Packages manager pane must set preferredHeight for vertical layout mode"
-    )
-    assert "SplitView.preferredHeight: parent.height * 0.55" in updates_qml, (
-        "Projects manager pane must set preferredHeight for vertical layout mode"
-    )
+    assert "StackLayout {" in updates_qml, "UpdatesView.qml must stack its three pages"
+    assert "id: uv_pages" in updates_qml
+    for tab in ("Installed", "Discover", "Project Sync"):
+        assert f'label: "{tab}"' in updates_qml, f"the {tab} tab must exist"
     assert "iconOnlyMode: uv_packagesHeader.width < 340" in updates_qml
     assert "iconOnlyMode: uv_projectsHeader.width < 320" in updates_qml
 
@@ -699,7 +702,7 @@ def test_update_all_button_mirrors_package_up_to_date_state():
     # Bulk button must share one predicate and mirror the per-package
     # "Up to Date" pattern instead of a permanently-primary "Update All".
     assert "property bool hasPendingUpdates: AppController.statsOutdated > 0" in updates
-    assert 'labelText: hasPendingUpdates ? "Update All" : "Up to Date"' in updates
+    assert 'labelText: hasPendingUpdates ? "Sync All" : "Up to Date"' in updates
     assert 'role: hasPendingUpdates ? "primary" : "secondary"' in updates
     assert "enabled: !AppController.isLoading && hasPendingUpdates" in updates
     assert "AppController.update_controller.updateAllOutdated()" in updates
