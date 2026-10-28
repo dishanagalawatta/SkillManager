@@ -936,18 +936,22 @@ Item {
                     }
                 }
             }
-
-            // Per-project task panel
-            ProjectTasksPanel {
-                id: qcv_tasksPanel
-                objectName: "projectTasksPanel"
-                Layout.preferredWidth: 340
-                Layout.fillHeight: true
-                visible: AppController.ui_controller.tasksPanelOpen
-                projectPath: qcv_root._activeProjectPath
-                projectName: AppController.currentProject
-            }
         }
+    }
+
+    // ── Per-project task panel ───────────────────────────────────
+    // Same shell and behaviour as the inspector side panels: right-anchored
+    // overlay, resizable, closable, width persisted. Hosting it as an overlay
+    // keeps the skill list at full width instead of squeezing it.
+    ProjectTasksPanel {
+        id: qcv_tasksPanel
+        objectName: "projectTasksPanel"
+        anchors.fill: parent
+        topMargin: qcv_headerRow.height + qcv_mainLayout.spacing
+        open: AppController.ui_controller.tasksPanelOpen
+        projectPath: qcv_root._activeProjectPath
+        projectName: AppController.currentProject
+        z: 9
     }
 
     // ── Shared Inspector Overlay ─────────────────────────────────

@@ -41,6 +41,7 @@
 | [ADR-0044](docs/adr/ADR-0044-automatic-app-release-checks.md) | Automatic App-Release Checks with an Update Toast | Accepted | 2026-10-20 | @DIKKA |
 | [ADR-0045](docs/adr/ADR-0045-mcp-write-containment-and-injection-guard.md) | MCP Tool Containment and Input-Injection Guard | Accepted | 2026-10-22 | @DIKKA |
 | [ADR-0046](docs/adr/ADR-0046-schema-versioned-cache-index.md) | Schema-Versioned Cache Index | Accepted | 2026-10-22 | @DIKKA |
+| [ADR-0047](docs/adr/ADR-0047-common-side-panel-shell.md) | Common Side-Panel Shell with Swappable Content | Accepted | 2026-10-28 | @DIKKA |
 
 
 ## Template

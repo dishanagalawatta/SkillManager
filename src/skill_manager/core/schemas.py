@@ -411,6 +411,10 @@ class UIStateRecord(BaseModel):
     reduced_motion: bool = False
     telemetry_enabled: bool = True
     inspector_width: int = Field(default=0, ge=0)
+    # Per-panel width overrides, keyed by a stable string such as
+    # "quickcopy.tasks". A missing key means "use the panel's own preferred
+    # width"; the controller clamps whatever gets written here.
+    panel_widths: dict[str, int] = Field(default_factory=dict)
     # The per-project task panel in Quick Copy is collapsible; its open
     # state is remembered per user.
     tasks_panel_open: bool = False

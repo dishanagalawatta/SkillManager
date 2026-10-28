@@ -163,6 +163,88 @@ def test_ui_controller_set_inspector_width_slot(ui_controller):
     assert ui_controller.state.inspector_width == 450
 
 
+# ── Persisted side-panel widths ─────────────────────────────────────
+# Every side panel (task list, inspectors) remembers its own width so a
+# resize survives a restart without a schema change per panel.
+
+
+def test_get_panel_width_defaults_to_zero(ui_controller):
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 0
+
+
+def test_set_panel_width_persists_under_ui_state(ui_controller, mock_app):
+    ui_controller.setPanelWidth("quickcopy.tasks", 420)
+
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 420
+    mock_app._config.set.assert_not_called()  # debounced
+
+    ui_controller.saveUiState()
+    payload = mock_app._config.set.call_args[0][1]
+    assert payload["panel_widths"]["quickcopy.tasks"] == 420
+
+
+def test_panel_widths_are_independent_per_key(ui_controller):
+    ui_controller.setPanelWidth("quickcopy.tasks", 420)
+    ui_controller.setPanelWidth("inspector.skill", 640)
+
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 420
+    assert ui_controller.getPanelWidth("inspector.skill") == 640
+
+
+def test_set_panel_width_clamps_values(ui_controller):
+    ui_controller.setPanelWidth("quickcopy.tasks", -50)
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 0
+
+    ui_controller.setPanelWidth("quickcopy.tasks", 99999)
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 4096
+
+
+def test_set_panel_width_ignores_empty_key(ui_controller):
+    ui_controller.setPanelWidth("", 400)
+    assert ui_controller.state.panel_widths == {}
+
+
+def test_set_panel_width_zero_clears_the_override(ui_controller):
+    """0 means "no override", so the key must not linger as a dead entry."""
+    ui_controller.setPanelWidth("quickcopy.tasks", 400)
+    ui_controller.setPanelWidth("quickcopy.tasks", 0)
+
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 0
+    assert "quickcopy.tasks" not in ui_controller.state.panel_widths
+
+
+def test_set_panel_width_rejects_non_numeric(ui_controller):
+    """A bad value from QML must log, not raise across the slot boundary."""
+    ui_controller.setPanelWidth("quickcopy.tasks", "not-a-number")
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 0
+
+
+def test_set_panel_width_is_idempotent(ui_controller, mock_app):
+    ui_controller.setPanelWidth("quickcopy.tasks", 400)
+    ui_controller.setPanelWidth("quickcopy.tasks", 400)
+
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 400
+    mock_app._config.set.assert_not_called()
+
+
+def test_panel_widths_load_from_config(mock_app):
+    mock_app._config.get.return_value = {
+        "panel_widths": {"quickcopy.tasks": 360, "inspector.skill": 700}
+    }
+    ctrl = UIController(mock_app)
+
+    assert ctrl.getPanelWidth("quickcopy.tasks") == 360
+    assert ctrl.getPanelWidth("inspector.skill") == 700
+    assert ctrl.getPanelWidth("unknown.panel") == 0
+
+
+def test_reset_ui_state_clears_panel_widths(ui_controller):
+    ui_controller.setPanelWidth("quickcopy.tasks", 400)
+    ui_controller.resetUiState()
+
+    assert ui_controller.getPanelWidth("quickcopy.tasks") == 0
+
+
 def test_ui_controller_window_geometry_properties(ui_controller):
     # Width (constraint: ge=400)
     ui_controller.windowWidth = 1100

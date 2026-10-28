@@ -283,6 +283,42 @@ class UIController(BaseController):
     def setInspectorWidth(self, value):
         self.inspectorWidth = value
 
+    @Slot(str, result=int)
+    def getPanelWidth(self, key):
+        """Persisted width for a named side panel, 0 when never resized."""
+        return int(self.state.panel_widths.get(str(key), 0))
+
+    @Slot(str, int)
+    def setPanelWidth(self, key, value):
+        """Persist a named side panel's width.
+
+        ``0`` (and anything below it) means "no override": the key is dropped
+        so the panel falls back to its own preferred width. Everything else is
+        clamped to a range a panel can actually use.
+        """
+        key = str(key or "")
+        if not key:
+            return
+        try:
+            value = max(0, min(4096, int(value)))
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rejected panel width %r=%r: %s", key, value, exc)
+            return
+        if self.state.panel_widths.get(key, 0) == value:
+            return
+        try:
+            update = self.state.model_dump()
+            widths = dict(update.get("panel_widths") or {})
+            if value < 1:
+                widths.pop(key, None)
+            else:
+                widths[key] = value
+            update["panel_widths"] = widths
+            self.state = UIStateRecord.model_validate(update)
+            self.triggerSave()
+        except Exception as exc:
+            logger.warning("Rejected panel width %r=%r: %s", key, value, exc)
+
     @Property(str, notify=currentViewChanged)
     def logoSource(self):
         return self.getAssetUri(logo_asset_for_client(self.app.clientFormat))

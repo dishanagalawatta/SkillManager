@@ -357,18 +357,34 @@ Quick Copy carries a collapsible task panel for the **active** project.
   notifying map used for the project badge) plus the CRUD slots and
   `copyTaskAsPrompt`, which renders the linked skill references in the
   active client format.
-- **UI** — `views/ProjectTasksPanel.qml`, hosted by `QuickCopyView.qml`
-  next to the skill list. The panel's open state lives in
-  `UIStateRecord.tasks_panel_open`, and `Ctrl+Shift+L` toggles it.
+- **UI** — `views/ProjectTasksPanel.qml`, a right-hand overlay hosted by
+  `QuickCopyView.qml` next to the skill list. The panel's open state lives in
+  `UIStateRecord.tasks_panel_open`, `Ctrl+Shift+L` toggles it, and its width
+  is persisted per panel kind in `UIStateRecord.panel_widths`.
+- **Shared shell** — the panel derives from `SidePanel.qml`, the same
+  resize / close / persist shell the inspector panels use, so every
+  right-hand panel behaves identically ([ADR-0047](adr/ADR-0047-common-side-panel-shell.md)).
+  Its body is swapped in as the default content: `SegmentedFilter` for the
+  All/Active/Done tabs and `TaskItem` for each row.
 
 ```mermaid
 flowchart LR
     QCV["QuickCopyView"] -->|projectPath / projectName| Panel["ProjectTasksPanel"]
+    subgraph Shell["SidePanel.qml (shared shell)"]
+        direction TB
+        Header["Title · badge · close"]
+        Grip["PanelResizeHandle"]
+        Body["Default content slot"]
+    end
+    Panel -->|derives| Shell
+    Body --> Filter["SegmentedFilter"]
+    Body -->|delegate| Row["TaskItem"]
     Panel -->|add / toggle / update / delete / copy| Ctrl["TaskController"]
     Ctrl --> Store["core/tasks.py"]
     Store -->|atomic JSON + FileLock| File["DATA_DIR/project_tasks.json"]
     Ctrl -->|tasksChanged| Panel
     Ctrl -->|projectTaskCounts| Badge["Project badge"]
+    Grip -->|widthEdited / widthCommitted| UIState["UIStateRecord.panel_widths"]
 ```
 
 #### Unified Command Workflow
@@ -540,6 +556,10 @@ SkillManagerComponents/
 ├── SkillItem.qml         # Skill row representation
 ├── SkillInspector.qml    # Skill preview pane
 ├── CommandInspector.qml  # Command details with skill pills
+├── SidePanel.qml         # Shared right-hand panel shell (resize/close/persist)
+├── PanelResizeHandle.qml # Left-edge drag grip used by every side panel
+├── SegmentedFilter.qml   # Reusable pill tab strip (All/Active/Done, …)
+├── TaskItem.qml          # Per-project task row (title, note, priority)
 ├── GlassMenu.qml         # Ultra-glass context menus
 ├── FrostOverlay.qml      # Glass blur for popups
 ├── ScreenshotOverlay.qml # Screen capture

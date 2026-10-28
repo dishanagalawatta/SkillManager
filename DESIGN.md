@@ -18,10 +18,11 @@
 | Group | Examples |
 |-------|----------|
 | Surface | `appBackground`, `sidebarBackground`, `glassPill`, `glassHover`, `glassActive`, `glassShadow` |
-| Text | `label`, `secondaryLabel`, `iconLabel`, `iconSecondaryLabel` |
+| Text | `label`, `secondaryLabel`, `tertiaryLabel`, `iconLabel`, `iconSecondaryLabel` |
 | Border | `glassBorder`, `glassInnerBorder`, `separator` |
-| Accent | `accent`, `success`, `danger`, `selectedRowBorder` |
+| Accent | `accent`, `success`, `danger`, `info`, `selectedRowBorder` |
 | State | `selectedRow`, `selectedRowHover`, `disabledControl`, `dangerHover` |
+| Type | `sizeBody`, `sizeMetadata`, `sizeCaption`, `sizeSubtext` |
 
 ### Color Palette & Roles
 
@@ -40,6 +41,7 @@ paired per mode: **Dark** (Matte Graphite) / **Light** (Warm Stone).
 | `accent` | `#3B82F6` (Modern Blue) | `#059669` (Sage) | Primary actions, active states, starred/pinned icons |
 | `success` | `#10B981` | `#10B981` | Success indicators; emerald in both modes |
 | `danger` | `#EF4444` | `#DC2626` | Destructive actions and error states |
+| `info` | `#60A5FA` | `#1D4ED8` | Informational status (diagnostics `DEBUG` rows); never a failure state |
 | `dangerHover` | `#3F1A1A` | `#FEF2F2` | Destructive hover tint; deep red vs. rose wash |
 | `selectedRow` | `#1E293B` | `#ECFDF5` | Selected list row fill; slate vs. mint |
 | `selectedRowHover` | `#2A3B56` | `#D1FAE5` | Selected row hover; brightened row fill |
@@ -47,6 +49,7 @@ paired per mode: **Dark** (Matte Graphite) / **Light** (Warm Stone).
 | `label` | `#F3F4F6` | `#000000` | Primary text; near-white vs. true black |
 | `secondaryLabel` | `#9CA3AF` | `#3F3F46` | Secondary/muted text |
 | `disabledControl` | `#1D1D21` | `#F1F5F9` | Disabled control fill |
+| `tertiaryLabel` | `#6B7280` | `#71717A` | Third-level text: hint/guidance copy that must recede past `secondaryLabel` |
 
 > Rule: QML must reference these tokens only — never hardcode hex values
 > (enforced by the "No hardcoded values" convention above).
@@ -74,6 +77,41 @@ IconButton {
     ToolTip.visible: hovered
 }
 ```
+
+### Side Panels (ADR-0047)
+
+Every right-hand panel — skill/command/image inspectors, the Quick Copy task
+list — is built on **`SidePanel.qml`** and must not re-implement the shell.
+
+```qml
+SidePanel {
+    anchors.fill: parent
+    topMargin: headerRow.height     // never cover the ribbon
+    open: AppController.ui_controller.tasksPanelOpen
+    title: "Tasks"
+    badgeText: "2 Open · 1 Done"
+    widthKey: "quickcopy.tasks"     // empty disables persistence
+    onCloseRequested: AppController.ui_controller.setTasksPanelOpen(false)
+
+    // default content slot — swapped per panel
+    SegmentedFilter { model: [...] }
+    ListView { delegate: TaskItem {} }
+}
+```
+
+- **Owned by the shell**: matte surface (`Theme.glassPill` + `glassBorder`),
+  16 px insets, header (title / optional `badgeText` pill / close button),
+  left-edge `PanelResizeHandle`, 85 % max width, fade in/out (suppressed by
+  `reducedMotion`), and width persistence through
+  `UIController.getPanelWidth/setPanelWidth` under `UIStateRecord.panel_widths`.
+- **Owned by the host**: the `open` state (the shell only emits
+  `closeRequested`), the content, and the `topMargin`. `Esc` stays with
+  `Main.qml` so two Shortcuts never compete.
+- **Swappable inner elements**: keep the body as composition — a shared
+  `SegmentedFilter` for tab strips, a dedicated delegate component
+  (`TaskItem`) per row — instead of nesting layout code in the shell.
+- **Sizing**: `preferredWidth` is the default until the user drags;
+  `minimumPanelWidth` clamps both paths. Never hardcode a panel width in a view.
 
 ### Accessibility (screen readers + keyboard, ADR-0031)
 

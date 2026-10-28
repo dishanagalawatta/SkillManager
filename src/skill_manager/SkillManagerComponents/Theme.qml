@@ -39,6 +39,9 @@ QtObject {
     
     readonly property color label: darkMode ? "#F3F4F6" : "#000000"
     readonly property color secondaryLabel: darkMode ? "#9CA3AF" : "#3F3F46"
+    // Third-level text: hint/guidance copy that must recede further than
+    // secondaryLabel without disappearing.
+    readonly property color tertiaryLabel: darkMode ? "#6B7280" : "#71717A"
     
     // Icon Contrast System (Pure Black #000000 for Light Mode - Whole Icon Dark & Contrasty)
     readonly property color iconLabel: darkMode ? "#F3F4F6" : "#000000"
@@ -47,6 +50,9 @@ QtObject {
     readonly property color accent: darkMode ? "#3B82F6" : "#059669" // Modern Blue for Dark, Sage for Light
     readonly property color success: darkMode ? "#10B981" : "#10B981"
     readonly property color danger: darkMode ? "#EF4444" : "#DC2626"
+    // Informational status colour: DEBUG rows in the diagnostics pane. Not a
+    // failure state, so it must stay distinct from danger and warning.
+    readonly property color info: darkMode ? "#60A5FA" : "#1D4ED8"
     // "Needs attention but nothing failed": e.g. a version check that could not
     // reach its remote.  Distinct from danger (an action failed) and accent
     // (an update is available).
@@ -84,6 +90,8 @@ QtObject {
     readonly property real sizeBody: 14
     readonly property real sizeMetadata: 12
     readonly property real sizeCaption: sizeMetadata
+    // Alias kept for guidance/hint copy that reads better at body-adjacent size.
+    readonly property real sizeSubtext: sizeCaption
 
     function alpha(colorVal, opacity) {
         var c = Qt.color(colorVal)

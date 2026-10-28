@@ -118,56 +118,19 @@ Item {
     }
 
     // ── Resize Handle (side-panel mode only) ────────────────────
-    Rectangle {
-        id: resizeHandle
+    PanelResizeHandle {
+        objectName: "inspectorResizeHandle"
         x: root._panelX - width
         y: root.usePopupMode ? 0 : root.topMargin
-        width: 6
         height: root.usePopupMode ? (parent ? parent.height : root.height) : (parent ? parent.height - root.topMargin : root.height - root.topMargin)
-        z: 11
         visible: !root.usePopupMode && root._anyInspectorVisible
-
-        color: resizeMouse.containsMouse || resizeMouse.pressed
-               ? Qt.rgba(1, 1, 1, 0.25) : "transparent"
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: 2
-            height: parent.height * 0.6
-            color: Qt.rgba(1, 1, 1, (resizeMouse.containsMouse || resizeMouse.pressed) ? 0.15 : 0)
-            radius: 1
-        }
-
-        MouseArea {
-            id: resizeMouse
-            anchors.fill: parent
-            anchors.leftMargin: -4
-            anchors.rightMargin: -4
-            hoverEnabled: true
-            cursorShape: Qt.SizeHorCursor
-
-            property int pressScreenX: 0
-            property int pressPanelW: 0
-
-            onPressed: {
-                pressScreenX = mapToGlobal(mouse.x, 0).x
-                pressPanelW = root._panelW
-            }
-            onPositionChanged: {
-                if (!pressed) return
-                var curX = mapToGlobal(mouse.x, 0).x
-                var delta = curX - pressScreenX
-                var newW = pressPanelW - delta
-                var baseMin = root.showImageInspector ? 320
-                            : root.showCommandInspector ? 300
-                            : 300
-                var maxW = (parent && parent.parent ? parent.parent.width : root.width) * 0.85
-                root._savedPanelW = Math.max(baseMin, Math.min(maxW, newW))
-            }
-            onReleased: {
-                root._debouncedWidth = root._panelW
-                _widthDebouncer.restart()
-            }
+        panelWidth: root._panelW
+        minimumPanelWidth: root.showImageInspector ? 320 : 300
+        maximumPanelWidth: root.width * 0.85
+        onWidthEdited: (w) => root._savedPanelW = w
+        onWidthCommitted: (w) => {
+            root._debouncedWidth = root._panelW
+            _widthDebouncer.restart()
         }
     }
 
