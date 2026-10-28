@@ -5,19 +5,48 @@ import pytest
 
 @pytest.mark.usefixtures("setup_qml_style")
 class TestUIConfigFlow:
-    def test_settings_propagation(self, qml_engine, app_controller, qtbot):
-        """Verify that UI-driven config changes propagate to the persistence layer."""
+    def test_settings_propagation(self, qml_engine, app_controller):
+        """Verify that UI-driven config changes propagate to the persistence layer.
+
+        ``app_controller`` is session-scoped and its ConfigManager persists to a
+        session temp dir, so another test may already have left these settings
+        at the value we want to write. ``_set_config_value`` only emits when the
+        stored value actually changes, so each step picks a target that differs
+        from the current one, and asserts the notification synchronously instead
+        of waiting on a timeout.
+        """
         config_mgr = app_controller.config_mgr
 
         # 1. Test numeric validation propagation
-        with qtbot.waitSignal(config_mgr.scrollSpeedMultiplierChanged, timeout=1000):
-            config_mgr.scrollSpeedMultiplier = 2.5
-        assert app_controller._config.get("scroll_speed_multiplier") == 2.5
+        current_speed = config_mgr.scrollSpeedMultiplier
+        target_speed = 3.0 if current_speed == 2.5 else 2.5
+        speed_signals = []
+
+        def _on_speed_changed():
+            speed_signals.append(1)
+
+        config_mgr.scrollSpeedMultiplierChanged.connect(_on_speed_changed)
+        try:
+            config_mgr.scrollSpeedMultiplier = target_speed
+        finally:
+            config_mgr.scrollSpeedMultiplierChanged.disconnect(_on_speed_changed)
+        assert app_controller._config.get("scroll_speed_multiplier") == target_speed
+        assert speed_signals, "scrollSpeedMultiplierChanged did not fire"
 
         # 2. Test auto-update toggle propagation
-        with qtbot.waitSignal(config_mgr.skillPackageAutoUpdateChanged, timeout=1000):
-            config_mgr.skillPackageAutoUpdate = True
-        assert app_controller._config.get("skill_package_auto_update") is True
+        target_auto_update = not config_mgr.skillPackageAutoUpdate
+        auto_update_signals = []
+
+        def _on_auto_update_changed():
+            auto_update_signals.append(1)
+
+        config_mgr.skillPackageAutoUpdateChanged.connect(_on_auto_update_changed)
+        try:
+            config_mgr.skillPackageAutoUpdate = target_auto_update
+        finally:
+            config_mgr.skillPackageAutoUpdateChanged.disconnect(_on_auto_update_changed)
+        assert app_controller._config.get("skill_package_auto_update") is target_auto_update
+        assert auto_update_signals, "skillPackageAutoUpdateChanged did not fire"
 
     def test_add_source_project_ui_flow(self, qml_engine, app_controller, qtbot, tmp_path):
         """Verify adding sources and projects via UI slots."""
