@@ -180,6 +180,23 @@ Item {
         qcv_skillList.model = null
     }
 
+    /*!
+        Re-attach the list model after the view was cached and hidden.
+
+        Views are created once and kept alive (see ``Main.qml``); leaving a view
+        runs \l cleanup so its model is detached, and re-entering calls this.
+    */
+    function activate() {
+        var m = AppController.quickCopyModel
+        if (!m) return
+        qcv_skillList.model = m
+        if (!m.incubating) {
+            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+        } else {
+            qcv_skillList.cacheBuffer = 0
+        }
+    }
+
     Component.onDestruction: {
         cleanup()
     }
@@ -187,15 +204,7 @@ Item {
     Component.onCompleted: {
         // Mode is handled by AppController currentView
         // Update top bar search input if needed, handled globally
-        var m = AppController.quickCopyModel
-        if (m) {
-            qcv_skillList.model = m
-            if (!m.incubating) {
-                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-            } else {
-                qcv_skillList.cacheBuffer = 0
-            }
-        }
+        activate()
     }
 
     Connections {

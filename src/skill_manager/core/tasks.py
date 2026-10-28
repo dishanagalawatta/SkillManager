@@ -158,23 +158,52 @@ def project_task_key(project_path: str | Path) -> str:
     return canonical_key(project_path)
 
 
-def load_state() -> ProjectTasksState:
-    """Load the persisted task state; a missing/corrupt file yields empty state."""
-    path = _tasks_file()
+#: (mtime_ns, size, inode) -> parsed state. QML re-reads the whole task list
+#: whenever a task property is evaluated (counts, badges, panel rows), so the
+#: file is parsed once per change instead of once per read. The signature makes
+#: writes from another process (or the headless MCP server) visible.
+_STATE_CACHE: tuple[tuple[int, int, int], ProjectTasksState] | None = None
+
+
+def _state_signature(path: Path) -> tuple[int, int, int] | None:
     try:
-        if not path.exists():
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+
+
+def load_state() -> ProjectTasksState:
+    """Load the persisted task state; a missing/corrupt file yields empty state.
+
+    The returned object is the shared cache: read from it, and copy it before
+    mutating (``_mutate`` does). Deep-copying on every read cost ~1 ms with a
+    few hundred tasks, and QML re-reads the state on every task access.
+    """
+    global _STATE_CACHE
+    path = _tasks_file()
+    signature = _state_signature(path)
+    if signature is not None and _STATE_CACHE is not None and _STATE_CACHE[0] == signature:
+        return _STATE_CACHE[1]
+    try:
+        if signature is None:
+            _STATE_CACHE = None
             return ProjectTasksState()
         import orjson
 
         raw = orjson.loads(path.read_bytes())
-        return ProjectTasksState.model_validate(raw)
+        state = ProjectTasksState.model_validate(raw)
     except Exception as exc:
         logger.warning("Failed to load project tasks from %s: %s", path, exc)
+        _STATE_CACHE = None
         return ProjectTasksState()
+    _STATE_CACHE = (signature, state)
+    return state
 
 
 def save_state(state: ProjectTasksState) -> bool:
     """Persist the task state atomically. Returns False when a peer holds the lock."""
+    global _STATE_CACHE
     path = _tasks_file()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,18 +220,22 @@ def save_state(state: ProjectTasksState) -> bool:
     try:
         with FileLock(str(path)):
             _atomic_write_json(str(path), payload)
-        return True
     except LockTimeout:
         logger.warning("Task state write skipped: another instance holds the lock")
         return False
     except Exception as exc:
         logger.warning("Failed to save project tasks to %s: %s", path, exc)
         return False
+    # We just wrote this exact state: cache it under the file's new signature
+    # so the read that always follows a write costs nothing.
+    signature = _state_signature(path)
+    _STATE_CACHE = (signature, state.model_copy(deep=True)) if signature else None
+    return True
 
 
 def _mutate(mutator) -> ProjectTasksState:
-    """Apply *mutator* to the loaded state and persist the result."""
-    state = load_state()
+    """Apply *mutator* to a copy of the loaded state and persist the result."""
+    state = load_state().model_copy(deep=True)
     mutator(state)
     save_state(state)
     return state

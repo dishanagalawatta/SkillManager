@@ -496,3 +496,63 @@ def test_controller_clipboard_image_is_optional(task_controller):
     """A text-only clipboard must return "" instead of raising."""
     controller, _app, proj = task_controller
     assert controller.attachClipboardImage(str(proj)) == ""
+
+
+# ── read caching ──────────────────────────────────────────────────────────
+
+
+def _count_reads(monkeypatch):
+    """Record every read of the tasks JSON file."""
+    reads: list = []
+    original = Path.read_bytes
+
+    def counting(self):
+        reads.append(self)
+        return original(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting)
+    return reads
+
+
+def test_repeated_reads_hit_the_cache(tmp_path, monkeypatch):
+    """QML re-reads the task state constantly; the file must be parsed once."""
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+    reads = _count_reads(monkeypatch)
+
+    for _ in range(25):
+        task_store.get_tasks(str(proj))
+        task_store.counts_for_project(str(proj))
+
+    assert reads == [], "the state should be served from the cache"
+
+
+def test_external_writes_invalidate_the_cache(tmp_path):
+    """Another process (or the MCP server) writing the file must be seen."""
+    import json
+
+    import skill_manager.core.config as config_mod
+
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+    key = task_store.project_task_key(str(proj))
+    assert task_store.get_tasks(str(proj))[0].title == "One"
+
+    path = config_mod.resolve_data_file("project_tasks.json")
+    payload = json.loads(path.read_bytes())
+    payload["projects"][key].append({"id": "external", "title": "From elsewhere", "order": 1})
+    path.write_bytes(json.dumps(payload).encode("utf-8"))
+
+    titles = [record.title for record in task_store.get_tasks(str(proj))]
+    assert titles == ["One", "From elsewhere"]
+
+
+def test_mutations_return_a_copy_not_the_cache(tmp_path):
+    """A failed write must not leave the cache holding unsaved changes."""
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+
+    cached = task_store.load_state()
+    copy = cached.model_copy(deep=True)
+    copy.projects["/unrelated"] = []
+    assert "/unrelated" not in task_store.load_state().projects

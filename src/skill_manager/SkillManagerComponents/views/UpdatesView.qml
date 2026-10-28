@@ -58,7 +58,13 @@ Item {
         cleanup()
     }
 
-    Component.onCompleted: {
+    /*!
+        Re-attach the list models after the view was cached and hidden.
+
+        Views are created once and kept alive (see ``Main.qml``); leaving a view
+        runs \l cleanup so its models are detached, and re-entering calls this.
+    */
+    function activate() {
         var p = AppController.updatePackages
         if (p) {
             uv_packagesList.model = p
@@ -69,6 +75,11 @@ Item {
             uv_projectsList.model = proj
             uv_projectsList.cacheBuffer = Math.max(uv_projectsList.height * 2, 1000)
         }
+        uv_catalogList.model = updatesRoot.uv_filteredCatalog()
+    }
+
+    Component.onCompleted: {
+        activate()
     }
 
     Connections {

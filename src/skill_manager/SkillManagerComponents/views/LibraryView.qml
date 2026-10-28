@@ -129,6 +129,23 @@ Item {
         lv_listView.cacheBuffer = 0
         lv_listView.model = null
     }
+
+    /*!
+        Re-attach the list model after the view was cached and hidden.
+
+        Views are created once and kept alive (see ``Main.qml``); leaving a view
+        runs \l cleanup so its model is detached, and re-entering calls this.
+    */
+    function activate() {
+        var m = AppController.libraryModel
+        if (!m) return
+        lv_listView.model = m
+        if (!m.incubating) {
+            lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
+        } else {
+            lv_listView.cacheBuffer = 0
+        }
+    }
     
     Component.onDestruction: {
         cleanup()
@@ -136,15 +153,7 @@ Item {
     
     Component.onCompleted: {
         // Mode is handled by AppController currentView setter
-        var m = AppController.libraryModel
-        if (m) {
-            lv_listView.model = m
-            if (!m.incubating) {
-                lv_listView.cacheBuffer = Math.max(lv_listView.height * 2, 1000)
-            } else {
-                lv_listView.cacheBuffer = 0
-            }
-        }
+        activate()
         Qt.callLater(dumpLayoutChain)
     }
 
