@@ -42,6 +42,8 @@
 | [ADR-0045](docs/adr/ADR-0045-mcp-write-containment-and-injection-guard.md) | MCP Tool Containment and Input-Injection Guard | Accepted | 2026-10-22 | @DIKKA |
 | [ADR-0046](docs/adr/ADR-0046-schema-versioned-cache-index.md) | Schema-Versioned Cache Index | Accepted | 2026-10-22 | @DIKKA |
 | [ADR-0047](docs/adr/ADR-0047-common-side-panel-shell.md) | Common Side-Panel Shell with Swappable Content | Accepted | 2026-10-28 | @DIKKA |
+| [ADR-0048](docs/adr/ADR-0048-cached-view-host.md) | Cached View Host (create once, flip visibility) | Accepted | 2026-10-28 | @DIKKA |
+| [ADR-0049](docs/adr/ADR-0049-inline-task-composer.md) | Inline Task Composer with Image Attachments | Accepted | 2026-10-28 | @DIKKA |
 
 
 ## Template

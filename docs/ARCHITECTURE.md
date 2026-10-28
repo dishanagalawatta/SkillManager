@@ -349,18 +349,32 @@ Quick Copy carries a collapsible task panel for the **active** project.
   cross-process `FileLock` the skill caches use. Project keys are
   canonicalised (`canonical_key`), so a path written with a different case
   or separator never orphans a project's list.
+- **Read cache** — the parsed state is cached under the file's
+  `(mtime_ns, size, inode)` signature. QML re-reads the state on every task
+  access (panel rows, project badges, counts); parsing per read cost ~2 ms
+  with a few hundred tasks, so the cache is keyed to the file and copies are
+  made only on the write path (`_mutate`).
 - **Model** — `ProjectTaskRecord` (Pydantic): `id`, `title`, `description`,
   `completed`, `priority` (`low`/`medium`/`high`), `linked_skills`,
-  `created_at`/`updated_at`, `order`.
+  `attachments`, `created_at`/`updated_at`, `order`.
+- **Attachments** — images are copied into
+  `DATA_DIR / "task_attachments"/<sha256(project key)[:16]>/` (never into the
+  project tree) by `store_attachment` / `store_attachment_bytes`. Files are
+  pruned when the attachment is removed, or when the owning task is deleted or
+  cleared; unlink is restricted to paths inside the store.
 - **Controller** — `TaskController` exposes `currentProjectTasks`,
   `activeTaskCount`, `completedTaskCount` and `projectTaskCounts` (a
-  notifying map used for the project badge) plus the CRUD slots and
-  `copyTaskAsPrompt`, which renders the linked skill references in the
-  active client format.
+  notifying map used for the project badge) plus the CRUD slots,
+  `attachTaskImage` / `attachClipboardImage` and `copyTaskAsPrompt`, which
+  renders the linked skill references in the active client format and lists
+  the attachment paths.
 - **UI** — `views/ProjectTasksPanel.qml`, a right-hand overlay hosted by
-  `QuickCopyView.qml` next to the skill list. The panel's open state lives in
-  `UIStateRecord.tasks_panel_open`, `Ctrl+Shift+L` toggles it, and its width
-  is persisted per panel kind in `UIStateRecord.panel_widths`.
+  `QuickCopyView.qml` next to the skill list. Tasks are written inline: the
+  panel's list box hosts `TaskComposer.qml` as a footer ([ADR-0049](adr/ADR-0049-inline-task-composer.md)),
+  so the editor grows with the text instead of forcing a one-line pill. The
+  panel's open state lives in `UIStateRecord.tasks_panel_open`,
+  `Ctrl+Shift+L` toggles it, and its width is persisted per panel kind in
+  `UIStateRecord.panel_widths`.
 - **Shared shell** — the panel derives from `SidePanel.qml`, the same
   resize / close / persist shell the inspector panels use, so every
   right-hand panel behaves identically ([ADR-0047](adr/ADR-0047-common-side-panel-shell.md)).
@@ -379,9 +393,12 @@ flowchart LR
     Panel -->|derives| Shell
     Body --> Filter["SegmentedFilter"]
     Body -->|delegate| Row["TaskItem"]
+    Body -->|footer| Composer["TaskComposer"]
     Panel -->|add / toggle / update / delete / copy| Ctrl["TaskController"]
+    Panel -->|attachTaskImage| Ctrl
     Ctrl --> Store["core/tasks.py"]
     Store -->|atomic JSON + FileLock| File["DATA_DIR/project_tasks.json"]
+    Store -->|copied images| Attach["DATA_DIR/task_attachments/<key>/"]
     Ctrl -->|tasksChanged| Panel
     Ctrl -->|projectTaskCounts| Badge["Project badge"]
     Grip -->|widthEdited / widthCommitted| UIState["UIStateRecord.panel_widths"]
@@ -559,7 +576,8 @@ SkillManagerComponents/
 ├── SidePanel.qml         # Shared right-hand panel shell (resize/close/persist)
 ├── PanelResizeHandle.qml # Left-edge drag grip used by every side panel
 ├── SegmentedFilter.qml   # Reusable pill tab strip (All/Active/Done, …)
-├── TaskItem.qml          # Per-project task row (title, note, priority)
+├── TaskComposer.qml      # Inline task editor (notes, subtask bullets, images)
+├── TaskItem.qml          # Per-project task row (title, note, priority, images)
 ├── GlassMenu.qml         # Ultra-glass context menus
 ├── FrostOverlay.qml      # Glass blur for popups
 ├── ScreenshotOverlay.qml # Screen capture
@@ -575,6 +593,36 @@ SkillManagerComponents/
     ├── PackageEditDialog.qml
     ├── CommandCreateDialog.qml
     └── ProjectRenameDialog.qml
+```
+
+### View Navigation & Cached Views (ADR-0048)
+
+`Main.qml` hosts one `Loader` per view and **creates each view on its first
+visit, then keeps it alive**. Switching is a visibility flip, not a rebuild:
+rebuilding `QuickCopyView` cost ~0.5 s of frame work on the GUI thread, which
+was the lag felt when flipping between Workbench and Library.
+
+- `viewLoader.show(view)` — loads the target if it has never been visited,
+  calls its `activate()` when it already exists, hides the rest.
+- `cleanup()` on leave detaches the list models (clearing `cacheBuffer` first,
+  per the incubation contract in §10) so hidden views hold no delegates.
+- `activate()` re-attaches them on return; the pair is pinned by
+  `tests/qml/test_qml_view_cache_contract.py`.
+
+```mermaid
+flowchart TD
+    Nav["navigateTo(view)"] --> Same{"already showing?"}
+    Same -->|yes| Noop["no-op"]
+    Same -->|no| Clean["outgoing.cleanup()<br/>cacheBuffer = 0, model = null"]
+    Clean --> Timer["viewTransitionTimer (50 ms)"]
+    Timer --> Show["window.currentView = view"]
+    Show --> Host["viewLoader.show(view)"]
+    Host --> First{"loader.status == Null?"}
+    First -->|yes| Load["loader.source = views/View.qml<br/>(construction, once)"]
+    First -->|no| Activate["item.activate()<br/>(re-attach models)"]
+    Load --> Visible["loader.visible = true<br/>others visible = false"]
+    Activate --> Visible
+    Visible --> Frame["frames rendered: 2-3<br/>vs 14-17 when rebuilt"]
 ```
 
 ---
