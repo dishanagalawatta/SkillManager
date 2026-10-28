@@ -49,6 +49,36 @@ def test_command_dialog_no_longer_prompts_for_project_removals():
     assert "onCommandPendingRemovals" not in dialog
 
 
+def test_create_name_clash_reuses_the_conflict_dialog():
+    """A duplicate command is a choice, not a failure.
+
+    The Library shows one global command list, but each command file lives in
+    a project. A name that is already taken there must offer overwrite /
+    rename / cancel through the same dialog the update path uses, and the
+    typed name and body must survive it.
+    """
+    dialog = _read("dialogs", "CommandCreateDialog.qml")
+
+    assert "function onCommandCreateConflict(" in dialog
+    assert "createCustomCommand(\n                        root.pendingArgs.name" in dialog
+    assert '"overwrite"' in dialog
+    assert '"rename"' in dialog
+    # The existing file's own name is what the banner must name.
+    assert "conflictDialog.conflictName" in dialog
+
+    create_btn = dialog.split("id: createBtn", 1)[1].split("onClicked:", 1)[1]
+    assert 'if (newPath === "")' in create_btn
+    assert "return" in create_btn
+
+
+def test_create_conflict_cancel_does_not_touch_the_existing_file():
+    """Cancelling a create conflict writes nothing; only update must notify."""
+    dialog = _read("dialogs", "CommandCreateDialog.qml")
+    on_rejected = dialog.split("onRejected: {", 1)[1].split("conflictDialog.close()", 1)[0]
+
+    assert "if (root.editMode)" in on_rejected
+
+
 def test_removed_removal_dialog_is_not_registered():
     """The dead component must not linger in the module registry."""
     qmldir = _read("qmldir")

@@ -233,9 +233,9 @@ class AppControllerProxyMixin:
     def notify_command_updated(self, old_path: str, new_path: str) -> None:
         self.commandUpdateCompleted.emit(old_path, new_path)
 
-    @Slot(str, str, str, result=str)
-    def createCustomCommand(self, n, b, cat) -> str:
-        return str(self.ops.createCustomCommand(n, b, cat))
+    @Slot(str, str, str, str, result=str)
+    def createCustomCommand(self, n, b, cat, on_conflict="") -> str:
+        return str(self.ops.createCustomCommand(n, b, cat, on_conflict))
 
     @Slot(str, result=str)
     def getCommandEmoji(self, path: str) -> str:

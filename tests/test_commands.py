@@ -95,7 +95,8 @@ def test_create_custom_command_file_project_not_found(tmp_path):
     assert "Could not find project directory" in result.message
 
 
-def test_create_custom_command_file_duplicate(tmp_path):
+def _duplicate_project(tmp_path):
+    """A project that already holds ``Cmd.md`` with *different* content."""
     project_root = tmp_path / "proj"
     project_path = project_root / ".agents" / "skills"
     project_path.mkdir(parents=True)
@@ -103,6 +104,17 @@ def test_create_custom_command_file_duplicate(tmp_path):
     commands_dir.mkdir(parents=True)
     existing_file = commands_dir / "Cmd.md"
     existing_file.write_text("existing")
+    return project_path, commands_dir, existing_file
+
+
+def test_create_custom_command_file_duplicate_asks_for_resolution(tmp_path):
+    """A same-name file is a decision, not a hard error.
+
+    The Library looks global but the file lives in a project, so a name that
+    is already taken there must offer overwrite / rename / cancel instead of
+    failing the whole create.
+    """
+    project_path, commands_dir, existing_file = _duplicate_project(tmp_path)
 
     result = create_custom_command_file(
         name="Cmd",
@@ -111,8 +123,87 @@ def test_create_custom_command_file_duplicate(tmp_path):
         category="cat",
         project_paths=[str(project_path)],
     )
+
     assert not result.ok
-    assert "already exists" in result.message
+    assert result.needs_conflict_resolution is True
+    assert result.conflicting_path == existing_file
+    assert result.suggested_rename == "Cmd-1.md"
+    assert existing_file.read_text() == "existing"
+
+
+def test_create_custom_command_file_overwrite(tmp_path):
+    project_path, _commands_dir, existing_file = _duplicate_project(tmp_path)
+
+    result = create_custom_command_file(
+        name="Cmd",
+        body="new body",
+        project_label_name="proj",
+        category="cat",
+        project_paths=[str(project_path)],
+        on_conflict="overwrite",
+    )
+
+    assert result.ok
+    assert result.path == existing_file
+    assert "new body" in existing_file.read_text()
+    assert not result.needs_conflict_resolution
+
+
+def test_create_custom_command_file_rename(tmp_path):
+    project_path, commands_dir, existing_file = _duplicate_project(tmp_path)
+
+    result = create_custom_command_file(
+        name="Cmd",
+        body="new body",
+        project_label_name="proj",
+        category="cat",
+        project_paths=[str(project_path)],
+        on_conflict="rename",
+    )
+
+    assert result.ok
+    assert result.path == commands_dir / "Cmd-1.md"
+    assert existing_file.read_text() == "existing"
+    assert "new body" in (commands_dir / "Cmd-1.md").read_text()
+
+
+def test_create_custom_command_file_cancel_writes_nothing(tmp_path):
+    project_path, commands_dir, existing_file = _duplicate_project(tmp_path)
+
+    result = create_custom_command_file(
+        name="Cmd",
+        body="new body",
+        project_label_name="proj",
+        category="cat",
+        project_paths=[str(project_path)],
+        on_conflict="cancel",
+    )
+
+    assert not result.ok
+    assert existing_file.read_text() == "existing"
+    assert sorted(p.name for p in commands_dir.iterdir()) == ["Cmd.md"]
+
+
+def test_create_custom_command_file_identical_content_is_a_noop(tmp_path):
+    """Re-creating an unchanged command must not demand a decision."""
+    project_path, _commands_dir, existing_file = _duplicate_project(tmp_path)
+    existing_file.write_text(
+        build_command_content("Cmd", "same body", "cat", date(2026, 1, 2)),
+        encoding="utf-8",
+    )
+
+    result = create_custom_command_file(
+        name="Cmd",
+        body="same body",
+        project_label_name="proj",
+        category="cat",
+        project_paths=[str(project_path)],
+        created_on=date(2026, 1, 2),
+    )
+
+    assert result.ok
+    assert result.path == existing_file
+    assert not result.needs_conflict_resolution
 
 
 def test_create_custom_command_file_filesystem_error(tmp_path):

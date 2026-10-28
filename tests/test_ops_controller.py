@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from skill_manager.controllers.ops_controller import OpsController
+from skill_manager.core.commands import CommandCreateResult
 from skill_manager.utils.task_runner import SynchronousTaskRunner
 
 
@@ -513,8 +514,10 @@ def test_ops_controller_copy_selection_orchestration(ops_controller, mock_app):
 def test_ops_controller_create_custom_command(
     mock_create, mock_discover, mock_patch_cache, ops_controller, mock_app
 ):
-    mock_result = MagicMock(
-        ok=True, message="Created command: test.md", path=Path("/project/.agents/commands/test.md")
+    mock_result = CommandCreateResult(
+        ok=True,
+        message="Created command: test.md",
+        path=Path("/project/.agents/commands/test.md"),
     )
     mock_create.return_value = mock_result
     mock_discover.return_value = {
@@ -542,7 +545,64 @@ def test_ops_controller_create_custom_command(
     # Verify category update
     assert "Commands" in mock_app._categories
     mock_app.categoriesChanged.emit.assert_called()
-    assert "Created command in" in mock_app._set_status.call_args[0][0]
+    assert mock_app._set_status.call_args[0][0] == "Created command: test.md"
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
+@patch("skill_manager.core.commands.create_custom_command_file")
+def test_ops_controller_create_custom_command_forwards_conflict_choice(
+    mock_create, mock_discover, mock_patch_cache, ops_controller, mock_app
+):
+    """The overwrite/rename choice must reach the core, not be dropped."""
+    mock_create.return_value = CommandCreateResult(
+        ok=True,
+        message="Created command: test.md",
+        path=Path("/project/.agents/commands/test.md"),
+    )
+    mock_discover.return_value = None
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._current_project_label = "project"
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    ops_controller.createCustomCommand("cmd", "body", "cat", "rename")
+
+    assert mock_create.call_args.kwargs["on_conflict"] == "rename"
+
+
+@patch("skill_manager.core.persistence.patch_cache_add")
+@patch("skill_manager.core.discovery.DiscoveryService.discover_single")
+@patch("skill_manager.core.commands.create_custom_command_file")
+def test_ops_controller_create_custom_command_emits_conflict(
+    mock_create, mock_discover, mock_patch_cache, ops_controller, mock_app
+):
+    """A name clash is reported to the dialog so it can offer a choice."""
+    existing = Path("/project/.agents/commands/test.md")
+    mock_create.return_value = CommandCreateResult(
+        ok=False,
+        message="Command test.md already exists",
+        path=existing,
+        needs_conflict_resolution=True,
+        conflicting_path=existing,
+        suggested_rename="test-1.md",
+    )
+    mock_app._sources = []
+    mock_app._projects = ["/project"]
+    mock_app._current_project_label = "project"
+    mock_app._archive_paths = []
+    mock_app._starred_paths = []
+    mock_app._project_aliases = {}
+    mock_app._categories = []
+
+    created = ops_controller.createCustomCommand("cmd", "body", "cat")
+
+    assert created == ""
+    mock_app.commandCreateConflict.emit.assert_called_once_with(str(existing), "test-1.md")
+    mock_app._set_status.assert_not_called()
 
 
 def test_ops_controller_toggle_starred_none(ops_controller, mock_app):

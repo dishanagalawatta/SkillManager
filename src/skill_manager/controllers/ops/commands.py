@@ -42,19 +42,25 @@ class CommandsMixin:
                 return found
         return Path(projects[0])
 
-    @Slot(str, str, str, result=str)
-    def createCustomCommand(self, name: str, body: str, category: str) -> str:
+    @Slot(str, str, str, str, result=str)
+    def createCustomCommand(
+        self, name: str, body: str, category: str, on_conflict: str = ""
+    ) -> str:
         """Create the canonical command file in the Library's active project.
 
         The dialog does not pick projects any more: the command is created
         once, in the Library, and deployed to other projects later through
         the Library's own copy flow.
 
+        A name that already exists in that project is not an error: the
+        conflict is reported through ``commandCreateConflict`` so the dialog
+        can offer overwrite / rename / cancel, exactly like the update path.
+
         Returns the local path of the created command ``.md`` file (empty
         string when nothing was created).
         """
         diag = get_diagnostic_logger()
-        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}")
+        diag.log_event("INFO", CATEGORY_COMMAND_CREATED, f"name={name}, on_conflict={on_conflict}")
         from skill_manager.core.commands import create_custom_command_file
 
         project_path = self._canonical_command_project()
@@ -71,7 +77,14 @@ class CommandsMixin:
             category=category,
             project_paths=list(self.app._projects),
             project_aliases=self.app._project_aliases,
+            on_conflict=on_conflict or None,
         )
+
+        if result.needs_conflict_resolution and result.conflicting_path:
+            self.app.commandCreateConflict.emit(
+                str(result.conflicting_path), result.suggested_rename or ""
+            )
+            return ""
 
         if not result.ok:
             self.app._set_status(result.message)
@@ -80,7 +93,7 @@ class CommandsMixin:
             self.app._set_status(result.message)
             return ""
 
-        self.app._set_status(f"Created command in {project_label(project_path)}")
+        self.app._set_status(result.message)
 
         from skill_manager.core.persistence import patch_cache_add
 
