@@ -1,7 +1,7 @@
 ---
 name: unit-testing-test-generate
 description: "Generate comprehensive, maintainable unit tests across languages with strong coverage and edge case focus."
-risk: unknown
+risk: critical
 source: community
 date_added: "2026-02-27"
 ---
@@ -31,6 +31,8 @@ The user needs automated test generation that analyzes code structure, identifie
 $ARGUMENTS
 
 ## Instructions
+
+The generator classes below are illustrative scaffolds, not a bundled or complete multi-language generator: helper methods are omitted. Derive expected values, valid/invalid input and exception types from the actual contract; `not None`, broad Exception assertions and guessed UI roles do not establish correctness. Do not generate tests for nonexistent component props or methods.
 
 ### 1. Analyze Code for Test Generation
 
@@ -166,13 +168,13 @@ class JestTestGenerator {
     const tests: TestCase[] = [
       {
         name: `${functionName} returns expected result with valid input`,
-        execution: `const result = ${functionName}(${this.generateMockParams(params)})`,
-        assertions: ['expect(result).toBeDefined()', 'expect(result).not.toBeNull()']
+        execution: `${functionName}(${this.generateMockParams(params)})`,
+        assertions: ['expect(execution).toBeDefined()', 'expect(execution).not.toBeNull()']
       },
       {
         name: `${functionName} handles null input gracefully`,
-        execution: `const result = ${functionName}(null)`,
-        assertions: ['expect(result).toBeDefined()']
+        execution: `${functionName}(null)`,
+        assertions: ['expect(execution).toBeDefined()']
       },
       {
         name: `${functionName} throws error for invalid input`,

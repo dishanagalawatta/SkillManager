@@ -1,7 +1,7 @@
 ---
 name: environment-setup-guide
 description: "Guide developers through setting up development environments with proper tools, dependencies, and configurations"
-risk: unknown
+risk: critical
 source: community
 date_added: "2026-02-27"
 ---
@@ -20,6 +20,8 @@ Help developers set up complete development environments from scratch. This skil
 - Use when troubleshooting environment-related issues
 - Use when documenting setup instructions for a project
 - Use when creating development environment documentation
+
+Versions below are historical examples, not current supported-version recommendations. Use the project lockfiles, runtime constraints and official support matrix before installing; do not assume a newer major is compatible. Dependency installs may execute lifecycle scripts. Protect and gitignore secret environment files. Docker group membership grants root-equivalent host control; use rootless Docker where appropriate. The Compose stack is local development only: use unique credentials, bind published ports to loopback and add readiness checks rather than assuming `depends_on` means the database is ready.
 
 ## How It Works
 
@@ -107,13 +109,10 @@ sudo -E bash "$tmpdir/nodesource-setup.sh"
 sudo apt install -y nodejs
 \`\`\`
 
-**Windows (using Chocolatey):**
+**Windows (using winget):**
 \`\`\`powershell
-# Install Chocolatey if not installed
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
 # Install Node.js
-choco install nodejs
+winget install OpenJS.NodeJS.LTS
 \`\`\`
 
 ### Step 2: Verify Installation
@@ -271,6 +270,7 @@ brew install --cask docker
 \`\`\`bash
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
+cat get-docker.sh  # inspect the complete installer before execution
 sudo sh get-docker.sh
 
 # Add user to docker group
@@ -285,10 +285,10 @@ Download Docker Desktop from docker.com
 
 \`\`\`bash
 docker --version        # Should show Docker version 24.x.x
-docker-compose --version # Should show Docker Compose version 2.x.x
+docker compose --version # Should show Docker Compose version 2.x.x
 \`\`\`
 
-### Step 3: Create docker-compose.yml
+### Step 3: Create docker compose.yml
 
 \`\`\`yaml
 version: '3.8'
@@ -297,7 +297,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:password@db:5432/mydb
@@ -314,7 +314,7 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=mydb
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -326,13 +326,13 @@ volumes:
 
 \`\`\`bash
 # Build and start containers
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop services
-docker-compose down
+docker compose down
 \`\`\`
 
 ### Step 5: Verify Services
@@ -342,7 +342,7 @@ docker-compose down
 docker ps
 
 # Test database connection
-docker-compose exec db psql -U postgres -d mydb
+docker compose exec db psql -U postgres -d mydb
 \`\`\`
 ```
 
@@ -411,7 +411,7 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 lsof -i :3000
 
 # Kill process
-kill -9 <PID>
+kill -TERM <verified-owned-PID>
 
 # Or use different port
 PORT=3001 npm start
@@ -437,6 +437,8 @@ Create a `setup.sh` script to automate setup:
 
 ```bash
 #!/bin/bash
+set -euo pipefail
+umask 077
 
 echo "🚀 Setting up development environment..."
 
@@ -457,6 +459,7 @@ if [ ! -f .env ]; then
     echo "⚠️  Please edit .env with your configuration"
 fi
 
+ # Confirm a disposable/local database target before running this project-specific migration.
 # Run database migrations
 echo "🗄️  Running database migrations..."
 npm run migrate
