@@ -45,17 +45,17 @@ Rectangle {
     }
 
     // --- Dynamic Collapse Phases ---
-    //   Phase 0: All expanded (nav labels + search bar + refresh)
+    //   Phase 0: All expanded (nav labels + search bar + snap + refresh)
     //   Phase 1: Search bar → search icon
     //   Phase 2: Nav buttons → icon-only
-    //   Phase 3: Refresh + Settings → overflow
+    //   Phase 3: Snap + Settings → overflow
 
-    readonly property int _wSnap: 88
-    readonly property int _wQC: 118
+    readonly property int _wWorkbench: 126
     readonly property int _wLib: 93
-    readonly property int _wUpd: 98
+    readonly property int _wHub: 76
     readonly property int _wSet: 103
     readonly property int _wNavIcon: 40
+    readonly property int _wSnap: 32
     readonly property int _wRefresh: 32
     readonly property int _wSearchIcon: 28
     readonly property int _wOverflow: 32
@@ -66,26 +66,37 @@ Rectangle {
         var ns = 4      // spacing between nav layout children
         var as = 8      // spacing between action items
 
+        // Snap folds into the overflow menu at phase 3.
+        var snapW = phase >= 3 ? 0 : _wSnap
+        var navIcons = 4        // Workbench, Library, Hub, Settings
+        var navWidth
+        var navGaps
+        if (phase >= 2) {
+            var iconCount = phase >= 3 ? navIcons - 1 : navIcons
+            navWidth = _wNavIcon * iconCount
+            navGaps = iconCount        // icon buttons + the fill spacer
+        } else {
+            navWidth = _wWorkbench + _wLib + _wHub + _wSet
+            navGaps = navIcons + 1     // labelled buttons + the fill spacer
+        }
+        var navW = navWidth + ns * navGaps
+
         if (phase === 0) {
             var searchW = Math.min(200, root.width * 0.3)
-            var navW = _wSnap + _wQC + _wLib + _wUpd + _wSet + ns * 5   // 5 buttons + 1 spacer = 6 children
-            var actW = _wRefresh + searchW + as
+            var actW = snapW + _wRefresh + searchW + as * 2
             return m + navW + os + actW
         }
         if (phase === 1) {
-            var navW1 = _wSnap + _wQC + _wLib + _wUpd + _wSet + ns * 5
-            var actW1 = _wRefresh + _wSearchIcon + as
-            return m + navW1 + os + actW1
+            var actW1 = snapW + _wRefresh + _wSearchIcon + as * 2
+            return m + navW + os + actW1
         }
         if (phase === 2) {
-            var navW2 = _wNavIcon * 5 + ns * 5   // 5 icons + 1 spacer = 6 children
-            var actW2 = _wRefresh + _wSearchIcon + as
-            return m + navW2 + os + actW2
+            var actW2 = snapW + _wRefresh + _wSearchIcon + as * 2
+            return m + navW + os + actW2
         }
-        // phase 3 — Settings hidden, 4 icon-only buttons + 1 spacer = 5 children
-        var navW3 = _wNavIcon * 4 + ns * 4
-        var actW3 = _wOverflow + _wSearchIcon + as
-        return m + navW3 + os + actW3
+        // phase 3 — Snap and Settings live in the overflow menu
+        var actW3 = _wOverflow + _wRefresh + _wSearchIcon + as * 2
+        return m + navW + os + actW3
     }
 
     property int _topPhase: {
@@ -111,20 +122,10 @@ Rectangle {
             Behavior on opacity { NumberAnimation { duration: 180 } }
             
             TopBarButton {
-                id: topSnapBtn
-                objectName: "topSnapBtn"
-                labelText: "Snap"
-                visible: true
-                iconSource: AppController.ui_controller.getAssetUri("ui/snap-icon.svg")
-                showLabel: root._topPhase < 2
-                Layout.alignment: Qt.AlignVCenter
-                onClicked: (mouse) => AppController.snap_controller.takeSnap()
-            }
-
-            TopBarButton {
-                objectName: "navQuickCopy"
+                objectName: "navWorkbench"
                 iconSource: AppController.ui_controller.getAssetUri("ui/lightning-icon.svg")
-                labelText: "Quick Copy"
+                labelText: "Workbench"
+                tooltipText: "Workbench — project skills and tasks"
                 visible: true
                 showLabel: root._topPhase < 2
                 Layout.alignment: Qt.AlignVCenter
@@ -152,7 +153,8 @@ Rectangle {
             TopBarButton {
                 objectName: "navUpdates"
                 iconSource: AppController.ui_controller.getAssetUri("ui/folder-sync-icon.svg")
-                labelText: "Packages"
+                labelText: "Hub"
+                tooltipText: "Hub — installed packages and project sync"
                 visible: true
                 showLabel: root._topPhase < 2
                 Layout.alignment: Qt.AlignVCenter
@@ -191,6 +193,23 @@ Rectangle {
             }
 
             IconButton {
+                id: topSnapBtn
+                objectName: "topSnapBtn"
+                visible: root._topPhase < 3 && !root.searchExpanded
+                buttonSize: 32
+                iconSource: AppController.ui_controller.getAssetUri("ui/snap-icon.svg")
+                tooltipText: "Take a snap"
+                onClicked: (mouse) => AppController.snap_controller.takeSnap()
+                background: Rectangle {
+                    radius: 16
+                    color: topSnapBtn.hovered ? Theme.glassHover : "transparent"
+                    border.color: Theme.alpha(Theme.label, 0.15)
+                    border.width: 1
+                }
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            IconButton {
                 id: topRefreshBtn
                 visible: root._topPhase < 3 && !root.searchExpanded
                 buttonSize: 32
@@ -225,6 +244,11 @@ Rectangle {
 
                 GlassMenu {
                     id: topOverflowMenu
+                    GlassMenuItem {
+                        text: "Take Snap"
+                        iconSource: AppController.ui_controller.getAssetUri("ui/snap-icon.svg")
+                        onTriggered: AppController.snap_controller.takeSnap()
+                    }
                     GlassMenuItem {
                         text: "Refresh"
                         iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")

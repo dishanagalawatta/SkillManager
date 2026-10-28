@@ -795,7 +795,8 @@ def test_controller_cleanup_flushes_posthog(controller):
 
 
 def test_client_formats_order(controller):
-    assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+    """The bar ships with two selectors; two more slots are opt-in."""
+    assert controller.clientFormats == ["Plain Text", "Gemini CLI"]
 
 
 def test_client_format_change_syncs_model_filters(qapp, controller):

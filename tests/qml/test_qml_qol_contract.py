@@ -610,8 +610,11 @@ def test_updates_view_responsive_layout_contract():
     assert "id: uv_pages" in updates_qml
     for tab in ("Installed", "Discover", "Project Sync"):
         assert f'label: "{tab}"' in updates_qml, f"the {tab} tab must exist"
-    assert "iconOnlyMode: uv_packagesHeader.width < 340" in updates_qml
-    assert "iconOnlyMode: uv_projectsHeader.width < 320" in updates_qml
+    # The page switcher lives inside the Hub bar, next to the actions that
+    # change with the selected tab.
+    bar_start = updates_qml.index('objectName: "uv_bar"')
+    assert updates_qml.index("id: uv_tabs") > bar_start
+    assert updates_qml.index("uv_pages.currentIndex === 2") > bar_start
 
 
 def test_main_window_shortcuts_are_window_scoped_not_application_scoped():

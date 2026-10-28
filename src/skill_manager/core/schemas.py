@@ -161,7 +161,7 @@ class AppConfig(BaseSettings):
     temporary_snaps: bool = False
     diagnostic_logging: bool = False
     top_bar_clients: list[str] = Field(
-        default_factory=lambda: ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        default_factory=lambda: ["Plain Text", "Gemini CLI"]
     )
 
     @field_validator("project_aliases", "shortcuts", mode="before")
@@ -176,6 +176,26 @@ class AppConfig(BaseSettings):
             return float(value)
         except (ValueError, TypeError):
             return 1.0
+
+    @field_validator("top_bar_clients", mode="before")
+    @classmethod
+    def _normalise_top_bar_clients(cls, value: Any) -> list[str]:
+        """Keep 2-4 top-bar selectors.
+
+        The shipped default used to list four formats; an untouched config
+        still holds exactly that list and trims to the current two, while a
+        list the user actually edited is preserved up to the four-slot limit.
+        """
+        default = ["Plain Text", "Gemini CLI"]
+        legacy_default = ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        if not isinstance(value, list):
+            return list(default)
+        cleaned = [str(item) for item in value if str(item).strip()]
+        if cleaned == legacy_default:
+            return list(default)
+        if len(cleaned) < 2:
+            return list(default)
+        return cleaned[:4]
 
     @classmethod
     def from_legacy(cls, data: dict[str, Any]) -> AppConfig:

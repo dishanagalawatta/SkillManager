@@ -816,7 +816,11 @@ Item {
                             GlassMenu {
                                 id: qcv_clientFormatMenu
                                 Repeater {
-                                    model: AppController.clientFormats
+                                    // Every configured format stays reachable, even
+                                    // when the bar only shows a subset of them.
+                                    model: AppController.config_controller
+                                        ? AppController.config_controller.availableClientFormats
+                                        : AppController.clientFormats
                                     delegate: GlassMenuItem {
                                         text: modelData
                                         iconSource: AppController.ui_controller.getLogoSource(modelData)

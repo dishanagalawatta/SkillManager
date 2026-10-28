@@ -121,9 +121,7 @@ class ProjectsMixin:
 
     @Property(list, notify=clientFormatsChanged)
     def topBarClients(self):  # type: ignore[reportRedeclaration]
-        return self.config.get(
-            "top_bar_clients", ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
-        )
+        return self.config.get("top_bar_clients", ["Plain Text", "Gemini CLI"])
 
     @topBarClients.setter  # type: ignore[func-attr]
     def topBarClients(self, value):

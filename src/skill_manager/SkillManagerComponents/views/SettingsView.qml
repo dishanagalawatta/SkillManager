@@ -13,6 +13,39 @@ Item {
     // which leaves currentIndex at -1 and hides every StackLayout child.
     property int settingsTab: 0
 
+    // ── Top-bar client selectors ─────────────────────────────────────
+    // The bar always shows at least two client formats and accepts at most
+    // four; the two defaults cannot be removed from the settings list.
+    function _setTopBarClient(index, format) {
+        if (!AppController.config_controller || !format) return
+        var arr = AppController.config_controller.topBarClients.slice()
+        if (index < 0 || index >= arr.length) return
+        arr[index] = format
+        AppController.config_controller.topBarClients = arr
+    }
+
+    function _addTopBarClient() {
+        if (!AppController.config_controller) return
+        var arr = AppController.config_controller.topBarClients.slice()
+        if (arr.length >= 4) return
+        var available = AppController.config_controller.availableClientFormats
+        var next = ""
+        for (var i = 0; i < available.length; i++) {
+            if (arr.indexOf(available[i]) === -1) { next = available[i]; break }
+        }
+        if (next === "") next = available[arr.length % available.length]
+        arr.push(next)
+        AppController.config_controller.topBarClients = arr
+    }
+
+    function _removeTopBarClient(index) {
+        if (!AppController.config_controller) return
+        var arr = AppController.config_controller.topBarClients.slice()
+        if (index < 2 || index >= arr.length) return
+        arr.splice(index, 1)
+        AppController.config_controller.topBarClients = arr
+    }
+
     component SettingsRow: RowLayout {
         id: sr
         property string titleText
@@ -174,6 +207,7 @@ Item {
 
             // Settings Content (General)
             SmoothScrollView {
+                objectName: "settingsScroll"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
@@ -284,7 +318,7 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 8
-                                    
+
                                     Text {
                                         text: "Top Bar Clients"
                                         font.family: Theme.fontFamily
@@ -292,78 +326,58 @@ Item {
                                         font.pixelSize: Theme.sizeBody
                                     }
 
-                                    RowLayout {
+                                    Text {
                                         Layout.fillWidth: true
-                                        spacing: 8
-                                        
-                                        GlassDropdown {
+                                        text: "The client formats shown as buttons in the Workbench bar. "
+                                            + "Two are shown by default - add up to two more."
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.sizeCaption
+                                        color: Theme.secondaryLabel
+                                        wrapMode: Text.WordWrap
+                                    }
+
+                                    // One dropdown per configured selector. The two
+                                    // default selectors are permanent; the optional
+                                    // ones can be removed again.
+                                    Repeater {
+                                        model: AppController.config_controller ? AppController.config_controller.topBarClients : []
+
+                                        delegate: RowLayout {
+                                            id: topClientRow
+                                            required property var modelData
+                                            required property int index
                                             Layout.fillWidth: true
-                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 0) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[0])) : 0
-                                            onActivated: (index) => {
-                                                if (AppController.config_controller) {
-                                                    var arr = [];
-                                                    var current = AppController.config_controller.topBarClients;
-                                                    var available = AppController.config_controller.availableClientFormats;
-                                                    for (var i = 0; i < 4; i++) {
-                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                                    }
-                                                    arr[0] = model[index];
-                                                    AppController.config_controller.topBarClients = arr;
-                                                }
+                                            spacing: 8
+
+                                            GlassDropdown {
+                                                Layout.fillWidth: true
+                                                model: AppController.config_controller
+                                                    ? AppController.config_controller.availableClientFormats : []
+                                                currentIndex: Math.max(0, model.indexOf(topClientRow.modelData))
+                                                onActivated: (index) => sv_root._setTopBarClient(topClientRow.index, model[index])
+                                            }
+
+                                            IconButton {
+                                                visible: topClientRow.index >= 2
+                                                buttonSize: 28
+                                                iconSize: 12
+                                                iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
+                                                // Circular plate icon: no resting outline (see IconButton.showRing).
+                                                showRing: false
+                                                tooltipText: "Remove this selector"
+                                                accessibleName: "Remove top bar selector " + (topClientRow.index + 1)
+                                                onClicked: (mouse) => sv_root._removeTopBarClient(topClientRow.index)
                                             }
                                         }
-                                        GlassDropdown {
-                                            Layout.fillWidth: true
-                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 1) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[1])) : 1
-                                            onActivated: (index) => {
-                                                if (AppController.config_controller) {
-                                                    var arr = [];
-                                                    var current = AppController.config_controller.topBarClients;
-                                                    var available = AppController.config_controller.availableClientFormats;
-                                                    for (var i = 0; i < 4; i++) {
-                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                                    }
-                                                    arr[1] = model[index];
-                                                    AppController.config_controller.topBarClients = arr;
-                                                }
-                                            }
-                                        }
-                                        GlassDropdown {
-                                            Layout.fillWidth: true
-                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 2) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[2])) : 2
-                                            onActivated: (index) => {
-                                                if (AppController.config_controller) {
-                                                    var arr = [];
-                                                    var current = AppController.config_controller.topBarClients;
-                                                    var available = AppController.config_controller.availableClientFormats;
-                                                    for (var i = 0; i < 4; i++) {
-                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                                    }
-                                                    arr[2] = model[index];
-                                                    AppController.config_controller.topBarClients = arr;
-                                                }
-                                            }
-                                        }
-                                        GlassDropdown {
-                                            Layout.fillWidth: true
-                                            model: AppController.config_controller ? AppController.config_controller.availableClientFormats : []
-                                            currentIndex: (AppController.config_controller && AppController.config_controller.topBarClients.length > 3) ? Math.max(0, model.indexOf(AppController.config_controller.topBarClients[3])) : 3
-                                            onActivated: (index) => {
-                                                if (AppController.config_controller) {
-                                                    var arr = [];
-                                                    var current = AppController.config_controller.topBarClients;
-                                                    var available = AppController.config_controller.availableClientFormats;
-                                                    for (var i = 0; i < 4; i++) {
-                                                        arr.push(i < current.length ? current[i] : available[i % available.length]);
-                                                    }
-                                                    arr[3] = model[index];
-                                                    AppController.config_controller.topBarClients = arr;
-                                                }
-                                            }
-                                        }
+                                    }
+
+                                    ActionButton {
+                                        objectName: "addTopBarClientBtn"
+                                        visible: (AppController.config_controller ? AppController.config_controller.topBarClients.length : 2) < 4
+                                        labelText: "+ Add selector"
+                                        role: "secondary"
+                                        tooltipText: "Show one more client format in the Workbench bar"
+                                        onClicked: (mouse) => sv_root._addTopBarClient()
                                     }
                                 }
 
@@ -406,7 +420,7 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Auto-minimize on Quick Copy"
+                                    titleText: "Auto-minimize on Workbench"
                                     GlassSwitch {
                                         checked: AppController.config_controller ? AppController.config_controller.autoMinimizeOnQuickCopy : false
                                         onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoMinimizeOnQuickCopy = checked
@@ -414,7 +428,7 @@ Item {
                                 }
                                 Separator {}
                                 SettingsRow {
-                                    titleText: "Auto-select Snap in Quick Copy"
+                                    titleText: "Auto-select Snap in Workbench"
                                     GlassSwitch {
                                         checked: AppController.config_controller ? AppController.config_controller.autoSelectSnapInQuickCopy : false
                                         onCheckedChanged: if (AppController.config_controller) AppController.config_controller.autoSelectSnapInQuickCopy = checked
@@ -441,19 +455,21 @@ Item {
                                     titleText: "Startup View"
                                     GlassDropdown {
                                         width: 170
-                                        // The view key stays "Updates" — only the label
-                                        // was renamed to "Packages".
-                                        model: ["Last Selected", "Library", "QuickCopy", "Packages", "Settings"]
+                                        // View keys stay "QuickCopy"/"Updates" — only
+                                        // the labels were renamed to Workbench/Hub.
+                                        model: ["Last Selected", "Library", "Workbench", "Hub", "Settings"]
                                         currentIndex: {
                                             let view = AppController.ui_controller ? AppController.ui_controller.startupView : "Library"
-                                            let idx = model.indexOf(view)
-                                            if (idx === -1 && view === "Updates") idx = model.indexOf("Packages")
-                                            return Math.max(0, idx)
+                                            if (view === "Quick Copy") view = "QuickCopy"
+                                            if (view === "Updates") view = "Hub"
+                                            return Math.max(0, model.indexOf(view))
                                         }
                                         onActivated: (index) => {
                                             if (!AppController.ui_controller) return
                                             let label = model[index]
-                                            AppController.ui_controller.setStartupView(label === "Packages" ? "Updates" : label)
+                                            if (label === "Workbench") label = "QuickCopy"
+                                            if (label === "Hub") label = "Updates"
+                                            AppController.ui_controller.setStartupView(label)
                                         }
                                     }
                                 }
