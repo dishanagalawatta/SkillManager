@@ -310,3 +310,14 @@ class PipelineMixin:
         return (
             skill.section_name or self._engine.get_section(skill)
         ) in self.state.collapsed_categories
+
+    def _is_collapsed_row(self, skill: Skill) -> bool:
+        """True when the row is a collapsed header sentinel, not a skill row.
+
+        ``build_visible_rows`` keeps exactly one representative row per
+        collapsed group so the header can still be rendered.  That row is a
+        real :class:`Skill`, but it must never be selected or counted as a
+        visible skill — its delegate is drawn at height 0 (collapsed main) or
+        as a bare sub-header (collapsed section).
+        """
+        return self._is_main_collapsed(skill) or self._is_sub_collapsed(skill)
