@@ -1898,7 +1898,7 @@ wheels = [
 
 [[package]]
 name = "skill-manager"
-version = "2.13.4"
+version = "2.14.0"
 source = { editable = "." }
 dependencies = [
     { name = "apscheduler" },
