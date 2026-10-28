@@ -12,6 +12,9 @@ class CommandCreateResult:
     ok: bool
     message: str
     path: Path | None = None
+    needs_conflict_resolution: bool = False
+    conflicting_path: Path | None = None
+    suggested_rename: str | None = None
 
 
 @dataclass(frozen=True)
@@ -177,7 +180,21 @@ def create_custom_command_file(
     project_paths: list[str],
     project_aliases: dict[str, str] | None = None,
     created_on: date | None = None,
+    on_conflict: str | None = None,
 ) -> CommandCreateResult:
+    """Create a command file, resolving an existing identical name explicitly.
+
+    The Library looks global but commands are stored per project, so "add
+    command" always targets one canonical project.  Returning a bare error
+    when that project already has the name left the user with a dialog that
+    closed and lost their input — and told them a *global* command could not
+    be created twice.  Instead:
+
+    - identical content is a no-op success,
+    - a different file with the same name is reported as
+      ``needs_conflict_resolution`` (overwrite / rename / cancel), mirroring
+      :func:`update_custom_command_file`.
+    """
     if not name:
         return CommandCreateResult(False, "Error: Command name is required")
 
@@ -196,19 +213,37 @@ def create_custom_command_file(
     project_root = project_root_for_project(project_path)
     commands_dir = project_root / ".agents" / "commands"
     file_path = commands_dir / filename
+    new_content = build_command_content(name, body, category, created_on)
+
     if file_path.exists():
-        return CommandCreateResult(False, f"Error: Command {filename} already exists", file_path)
+        try:
+            existing_content = file_path.read_text(encoding="utf-8-sig")
+        except OSError:
+            existing_content = None
+        if existing_content == new_content:
+            return CommandCreateResult(True, f"Already up to date: {filename}", file_path)
+        if not on_conflict:
+            return CommandCreateResult(
+                False,
+                f"Command {filename} already exists",
+                file_path,
+                needs_conflict_resolution=True,
+                conflicting_path=file_path,
+                suggested_rename=_next_non_conflicting(commands_dir, filename),
+            )
+        if on_conflict == "cancel":
+            return CommandCreateResult(False, "Cancelled by user", file_path)
+        if on_conflict == "rename":
+            file_path = commands_dir / _next_non_conflicting(commands_dir, filename)
+        # "overwrite" → keep file_path; write_text replaces it
 
     try:
         commands_dir.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(
-            build_command_content(name, body, category, created_on),
-            encoding="utf-8",
-        )
+        file_path.write_text(new_content, encoding="utf-8")
     except Exception as exc:
         return CommandCreateResult(False, f"Error creating command: {exc}", file_path)
 
-    return CommandCreateResult(True, f"Created command: {filename}", file_path)
+    return CommandCreateResult(True, f"Created command: {file_path.name}", file_path)
 
 
 def find_command_holder_projects(

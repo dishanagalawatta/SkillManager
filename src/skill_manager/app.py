@@ -164,6 +164,7 @@ class AppController(AppControllerProxyMixin, QObject):
     # Command update signals (cross-controller notification)
     commandUpdateConflict = Signal(str, str, str)  # oldPath, conflictPath, suggestedRename
     commandUpdateCompleted = Signal(str, str)  # oldPath, newPath
+    commandCreateConflict = Signal(str, str)  # conflictPath, suggestedRename
     commandSkillsCarryPrompt = Signal(str, str, str)
     commandSkillsCarryBatchPrompt = Signal(str)
     commandCopyExistingDetected = Signal(str, str, str)  # project, commandPathsJson, existingJson

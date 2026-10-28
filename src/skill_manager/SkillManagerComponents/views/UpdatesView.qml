@@ -58,7 +58,13 @@ Item {
         cleanup()
     }
 
-    Component.onCompleted: {
+    /*!
+        Re-attach the list models after the view was cached and hidden.
+
+        Views are created once and kept alive (see ``Main.qml``); leaving a view
+        runs \l cleanup so its models are detached, and re-entering calls this.
+    */
+    function activate() {
         var p = AppController.updatePackages
         if (p) {
             uv_packagesList.model = p
@@ -69,6 +75,11 @@ Item {
             uv_projectsList.model = proj
             uv_projectsList.cacheBuffer = Math.max(uv_projectsList.height * 2, 1000)
         }
+        uv_catalogList.model = updatesRoot.uv_filteredCatalog()
+    }
+
+    Component.onCompleted: {
+        activate()
     }
 
     Connections {
@@ -139,177 +150,199 @@ Item {
 
 
 
-        // Bulk Action Bar (Redesigned as Pebble Bar)
+        // Hub bar: the page switcher plus the actions of the active page.
+        // The right-hand controls swap with the tab (installed → package
+        // actions, discover → catalog search, sync → add project) so every
+        // page keeps its controls in one predictable place.
         GlassPill {
+            id: uv_bar
+            objectName: "uv_bar"
             Layout.fillWidth: true
             Layout.preferredHeight: 48
             radius: 24
-            
+
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 4
-                anchors.leftMargin: 16
+                anchors.leftMargin: 8
                 anchors.rightMargin: 8
-                spacing: 12
-                
+                spacing: 8
+
+                // Page switcher: Installed / Discover / Project Sync
                 RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-                    Text {
-                        text: "Packages"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: Font.Bold
-                        color: Theme.label
-                    }
-                    Rectangle {
-                        width: 1
-                        height: 12
-                        color: Theme.separator
-                        visible: updatesRoot.width >= 420
-                    }
-                    // Status summary: how many packages are installed, how
-                    // many are outdated and how many could not be checked.
-                    Rectangle {
-                        Layout.preferredWidth: uv_installedCountText.implicitWidth + 16
-                        Layout.preferredHeight: 22
-                        radius: 11
-                        color: Theme.glassHover
-                        border.color: Theme.glassBorder
-                        border.width: 1
-                        visible: updatesRoot.width >= 380
+                    id: uv_tabs
+                    spacing: 4
 
-                        Text {
-                            id: uv_installedCountText
-                            anchors.centerIn: parent
-                            text: (AppController.updatePackages ? AppController.updatePackages.length : 0) + " installed"
-                            color: Theme.secondaryLabel
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
-                        }
-                    }
-                    Rectangle {
-                        Layout.preferredWidth: uv_outdatedCountText.implicitWidth + 16
-                        Layout.preferredHeight: 22
-                        radius: 11
-                        color: Theme.alpha(Theme.accent, 0.12)
-                        border.color: Theme.alpha(Theme.accent, 0.3)
-                        border.width: 1
-                        visible: updatesRoot.width >= 420
+                    Repeater {
+                        model: [
+                            { key: "installed", label: "Installed" },
+                            { key: "discover", label: "Discover" },
+                            { key: "sync", label: "Project Sync" }
+                        ]
 
-                        Text {
-                            id: uv_outdatedCountText
-                            anchors.centerIn: parent
-                            text: AppController.isLoading
-                                ? "Checking..."
-                                : (AppController.statsOutdated + " outdated")
-                            color: AppController.isLoading ? Theme.accent : Theme.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.sizeCaption
+                        delegate: Rectangle {
+                            id: uv_tab
+                            required property var modelData
+                            required property int index
+                            readonly property bool selected: uv_pages.currentIndex === uv_tab.index
+
+                            Layout.preferredWidth: uv_tabText.implicitWidth + 28
+                            Layout.preferredHeight: 32
+                            radius: 20
+                            color: selected ? Theme.glassActive : "transparent"
+                            border.color: selected ? Theme.accent : "transparent"
+                            border.width: selected ? 1 : 0
+                            activeFocusOnTab: true
+
+                            Accessible.role: Accessible.PageTab
+                            Accessible.checkable: true
+                            Accessible.checked: selected
+                            Accessible.name: modelData.label + " tab"
+
+                            Text {
+                                id: uv_tabText
+                                anchors.centerIn: parent
+                                text: uv_tab.modelData.label
+                                color: uv_tab.selected ? Theme.label : Theme.secondaryLabel
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.sizeBody
+                                font.weight: uv_tab.selected ? Font.DemiBold : Font.Medium
+                            }
+
+                            TapHandler {
+                                onTapped: uv_pages.currentIndex = uv_tab.index
+                            }
+                            Keys.onPressed: (event) => {
+                                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return) {
+                                    uv_pages.currentIndex = uv_tab.index
+                                    event.accepted = true
+                                }
+                            }
                         }
-                    }
-                    // "0 updates" is not the same as "0 packages checked":
-                    // say so when a remote could not be reached.
-                    Text {
-                        text: "· " + AppController.statsUnchecked + " unchecked"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeCaption
-                        color: Theme.warning
-                        visible: updatesRoot.width >= 480 && AppController.statsUnchecked > 0
                     }
                 }
 
+                // Status summary: how many packages are installed and how many
+                // are outdated. Global to the view, so it stays visible on the
+                // two package-oriented pages and folds away when space runs out.
+                Rectangle {
+                    Layout.preferredWidth: uv_installedCountText.implicitWidth + 16
+                    Layout.preferredHeight: 22
+                    radius: 11
+                    color: Theme.glassHover
+                    border.color: Theme.glassBorder
+                    border.width: 1
+                    visible: uv_pages.currentIndex !== 1 && updatesRoot.width >= 760
+
+                    Text {
+                        id: uv_installedCountText
+                        anchors.centerIn: parent
+                        text: (AppController.updatePackages ? AppController.updatePackages.length : 0) + " installed"
+                        color: Theme.secondaryLabel
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeCaption
+                    }
+                }
+                Rectangle {
+                    Layout.preferredWidth: uv_outdatedCountText.implicitWidth + 16
+                    Layout.preferredHeight: 22
+                    radius: 11
+                    color: Theme.alpha(Theme.accent, 0.12)
+                    border.color: Theme.alpha(Theme.accent, 0.3)
+                    border.width: 1
+                    visible: uv_pages.currentIndex !== 1 && updatesRoot.width >= 860
+
+                    Text {
+                        id: uv_outdatedCountText
+                        anchors.centerIn: parent
+                        text: AppController.isLoading
+                            ? "Checking..."
+                            : (AppController.statsOutdated + " outdated")
+                        color: Theme.accent
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.sizeCaption
+                    }
+                }
+
+                Text {
+                    text: "· " + AppController.statsUnchecked + " unchecked"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.sizeCaption
+                    color: Theme.warning
+                    visible: uv_pages.currentIndex !== 1 && updatesRoot.width >= 960
+                        && AppController.statsUnchecked > 0
+                }
+
+                Item { Layout.fillWidth: true }
+
+                // --- Installed page actions ---
                 RowLayout {
                     spacing: 8
+                    visible: uv_pages.currentIndex === 0
 
-                    ActionButton {
+                    IconButton {
                         objectName: "addCustomPackageBtn"
-                        labelText: "+ Add Custom Package"
+                        buttonSize: 32
                         iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
-                        role: "secondary"
-                        tooltipText: "Add a package from a repository, an npx command or a script"
+                        tooltipText: "Add a custom package"
+                        accessibleName: "Add a custom package"
                         onClicked: (mouse) => {
                             uv_packageEditDialog.editIndex = -1
                             uv_packageEditDialog.open()
                         }
+                        Layout.alignment: Qt.AlignVCenter
                     }
 
-                    ActionButton {
+                    IconButton {
                         objectName: "scanUpdatesBtn"
-                        labelText: "Check for Updates"
-                        role: "secondary"
-                        tooltipText: enabled ? "Check configured projects for available skill updates." : "Update scan is already running."
+                        buttonSize: 32
+                        iconSource: AppController.ui_controller.getAssetUri("ui/refresh-icon.svg")
+                        tooltipText: enabled ? "Check configured projects for skill updates" : "Update scan is already running"
+                        accessibleName: "Check for updates"
                         enabled: !AppController.isLoading
                         onClicked: (mouse) => AppController.update_controller.scanForUpdates()
+                        Layout.alignment: Qt.AlignVCenter
                     }
 
                     ActionButton {
                         property bool hasPendingUpdates: AppController.statsOutdated > 0
                         labelText: hasPendingUpdates ? "Sync All" : "Up to Date"
                         role: hasPendingUpdates ? "primary" : "secondary"
-                        tooltipText: enabled ? "Update every package currently marked outdated." : "Already up to date"
+                        tooltipText: enabled ? "Update every package currently marked outdated" : "Already up to date"
                         enabled: !AppController.isLoading && hasPendingUpdates
                         onClicked: (mouse) => AppController.update_controller.updateAllOutdated()
+                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
-            }
-        }
 
-
-        // Page switcher: Installed / Discover / Project Sync
-        RowLayout {
-            id: uv_tabs
-            Layout.fillWidth: true
-            spacing: 0
-
-            Repeater {
-                model: [
-                    { key: "installed", label: "Installed" },
-                    { key: "discover", label: "Discover" },
-                    { key: "sync", label: "Project Sync" }
-                ]
-
-                delegate: Rectangle {
-                    id: uv_tab
-                    required property var modelData
-                    required property int index
-                    readonly property bool selected: uv_pages.currentIndex === uv_tab.index
-
-                    Layout.preferredWidth: uv_tabText.implicitWidth + 32
-                    Layout.preferredHeight: 34
-                    radius: Theme.radiusButton
-                    color: selected ? Theme.glassActive : "transparent"
-                    border.color: selected ? Theme.accent : Theme.glassBorder
-                    border.width: 1
-                    activeFocusOnTab: true
-
-                    Accessible.role: Accessible.PageTab
-                    Accessible.checked: selected
-                    Accessible.name: modelData.label + " tab"
-
-                    Text {
-                        id: uv_tabText
-                        anchors.centerIn: parent
-                        text: uv_tab.modelData.label
-                        color: uv_tab.selected ? Theme.label : Theme.secondaryLabel
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.sizeBody
-                        font.weight: uv_tab.selected ? Font.DemiBold : Font.Medium
-                    }
-
-                    TapHandler {
-                        onTapped: uv_pages.currentIndex = uv_tab.index
-                    }
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return) {
-                            uv_pages.currentIndex = uv_tab.index
-                            event.accepted = true
-                        }
+                // --- Discover page action: catalog search ---
+                GlassSearchInput {
+                    objectName: "uv_catalogSearch"
+                    visible: uv_pages.currentIndex === 1
+                    Layout.preferredWidth: Math.min(260, updatesRoot.width * 0.34)
+                    Layout.alignment: Qt.AlignVCenter
+                    placeholderText: "Search catalog…"
+                    text: updatesRoot.uv_catalogQuery
+                    onDebouncedTextChanged: (text) => {
+                        updatesRoot.uv_catalogQuery = text
+                        uv_catalogList.model = updatesRoot.uv_filteredCatalog()
                     }
                 }
-            }
 
-            Item { Layout.fillWidth: true }
+                // --- Project Sync page action ---
+                ActionButton {
+                    objectName: "uv_addProjectBtn"
+                    visible: uv_pages.currentIndex === 2
+                    labelText: "Add Project"
+                    role: "secondary"
+                    tooltipText: "Track another project's skill folders"
+                    onClicked: (mouse) => {
+                        uv_folderPicker.mode = "project"
+                        uv_folderPicker.open()
+                    }
+                    Layout.alignment: Qt.AlignVCenter
+                }
+            }
         }
 
         // Pages: Installed packages / Curated catalog / Project sync
@@ -346,20 +379,6 @@ Item {
                                 color: Theme.label
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
-                            }
-                            RowLayout {
-                                spacing: 6
-                                ActionButton {
-                                    labelText: "Folder"
-                                    iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
-                                    iconOnlyMode: uv_packagesHeader.width < 340
-                                    role: "secondary"
-                                    tooltipText: "Add Folder"
-                                    onClicked: (mouse) => {
-                                        uv_folderPicker.mode = "package"
-                                        uv_folderPicker.open()
-                                    }
-                                }
                             }
                         }
 
@@ -607,22 +626,6 @@ Item {
                                 color: Theme.label
                                 elide: Text.ElideRight
                             }
-
-                            Item { Layout.fillWidth: true }
-
-                            GlassSearchInput {
-                                id: uv_catalogSearch
-                                // Bound to the view width, not the row width:
-                                // a child sized from its layout parent causes a
-                                // recursive rearrange.
-                                Layout.preferredWidth: Math.min(220, updatesRoot.width * 0.25)
-                                placeholderText: "Search packages..."
-                                Accessible.name: "Search the package catalog"
-                                onDebouncedTextChanged: (text) => {
-                                    updatesRoot.uv_catalogQuery = text
-                                    uv_catalogList.model = updatesRoot.uv_filteredCatalog()
-                                }
-                            }
                         }
 
                         Text {
@@ -836,17 +839,6 @@ Item {
                                 color: Theme.label
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
-                            }
-                            ActionButton {
-                                labelText: "Add Project"
-                                iconSource: AppController.ui_controller.getAssetUri("ui/plus-icon.svg")
-                                iconOnlyMode: uv_projectsHeader.width < 320
-                                role: "secondary"
-                                tooltipText: "Add Project"
-                                onClicked: (mouse) => {
-                                    uv_folderPicker.mode = "project"
-                                    uv_folderPicker.open()
-                                }
                             }
                         }
 

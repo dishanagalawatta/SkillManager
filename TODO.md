@@ -24,34 +24,24 @@
 
 ### Done
 
-* **Compact list rows are the permanent default** — the "Normal" row mode, its
-  Settings toggle and the `compact_list_rows` config key are gone. The row
-  metrics live in the `Theme.row*` tokens. (`feat(ui): make compact list rows
-  the permanent default`)
-* **Unified custom command workflow** — the Library owns the canonical
-  command; the create/edit dialog has no project selector, and deployment goes
-  through the Library's copy flow, which asks before replacing an existing
-  project command. (`feat(commands): unify the custom command
-  create/edit/deploy workflow`)
-* **Per-project task list** — a collapsible panel in Quick Copy holds the task
-  list of the active project, with a quick-add field, priorities, filters and
-  a "copy for agent" action. (`feat(tasks): add a per-project task list to
-  Quick Copy`)
-* **Packages view with a curated catalog** — "Updates" is now "Packages" (the
-  view key stays "Updates"), with Installed / Discover / Project Sync tabs
-  and a curated catalog of ready-to-install skill collections.
-  (`feat(packages): add a curated catalog and rename Updates to Packages`)
+* [X] Drop the unnecessary outer circle around the close circular button — `eb333a6`
+* [X] Top bar client selector defaults to two entries, with Settings able to add up to two more (max four) — `ebee87b`
+* [X] Move Installed / Discover / Project Sync into a bar above the panel, with the actions in that bar swapping to match the active tab — `ebee87b`
+* [X] Snap is now an icon button next to Refresh; "Quick Copy" renamed to **Workbench** and "Packages" to **Hub** — `ebee87b`
+* [X] Collapsing all then expanding one category no longer expands its parent categories — `e915f5d`
+* [X] Commands share one common icon instead of the category icon — `f298dde`
+* [X] Adding an existing command from the Library no longer errors (asks before reusing the name) — `48c4146`
+* [X] Tasks are written inline in the task list box: multi-line notes, bullet/sub-task continuation, image paste/drop, priority pill, per-project drafts, `Ctrl+Enter` to add — `715a8e1`
+* [X] UI snappiness: views are created once and kept alive (`cleanup()`/`activate()`), task state read through an inode/mtime cache — Workbench return 484 ms → 62–106 ms, Hub 317 ms → 68 ms, `get_tasks` 1.29 ms → 0.042 ms — `d6a90d5`
+* [X] `portal_hotkeys.py` no longer burns CPU in the background — `5cdc0eb`
 
 ### To Do (Ready for Pickup)
-
-> Nothing queued right now — add the next task here.
 
 ### In Progress
 
 ---
 
 ## 4. Bug Tracker
-
 
 ---
 

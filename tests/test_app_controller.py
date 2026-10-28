@@ -377,9 +377,71 @@ def test_controller_create_custom_command_delegates(controller, temp_dir):
             message="Created command: Deploy.md",
             path=project_path / ".agents" / "commands" / "Deploy.md",
         )
-        controller.createCustomCommand("Deploy", "body", "Ops")
+        created = controller.createCustomCommand("Deploy", "body", "Ops")
 
-    assert controller.statusMessage.startswith("Created command in")
+    assert created == str(project_path / ".agents" / "commands" / "Deploy.md")
+    # The core message already names the file; it is not wrapped in a
+    # project-specific sentence any more (commands are not project-scoped in
+    # the UI).
+    assert controller.statusMessage == "Created command: Deploy.md"
+
+
+def test_controller_create_custom_command_reports_conflict(controller, temp_dir):
+    """A name clash must reach the dialog instead of closing it with an error."""
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+    controller._projects = [str(project_path)]
+    conflicts = []
+    controller.commandCreateConflict.connect(
+        lambda conflict_path, suggested: conflicts.append((conflict_path, suggested))
+    )
+
+    with (
+        patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None),
+    ):
+        from skill_manager.core.commands import CommandCreateResult
+
+        existing = project_path / ".agents" / "commands" / "Deploy.md"
+        mock_create.return_value = CommandCreateResult(
+            ok=False,
+            message="Command Deploy.md already exists",
+            path=existing,
+            needs_conflict_resolution=True,
+            conflicting_path=existing,
+            suggested_rename="Deploy-1.md",
+        )
+        created = controller.createCustomCommand("Deploy", "body", "Ops")
+
+    assert created == ""
+    assert conflicts == [(str(existing), "Deploy-1.md")]
+
+
+def test_controller_create_custom_command_forwards_the_conflict_choice(controller, temp_dir):
+    """The QML -> AppController -> OpsController hop must not drop arguments.
+
+    ``AppController.createCustomCommand`` is a passthrough; when it still
+    declared three parameters the dialog's overwrite/rename choice was
+    silently discarded and the conflict dialog reappeared forever.
+    """
+    project_path = temp_dir / "proj"
+    project_path.mkdir(parents=True, exist_ok=True)
+    controller._projects = [str(project_path)]
+
+    with (
+        patch("skill_manager.core.commands.create_custom_command_file") as mock_create,
+        patch("skill_manager.core.discovery.DiscoveryService.discover_single", return_value=None),
+    ):
+        from skill_manager.core.commands import CommandCreateResult
+
+        mock_create.return_value = CommandCreateResult(
+            ok=True,
+            message="Created command: Deploy-1.md",
+            path=project_path / ".agents" / "commands" / "Deploy-1.md",
+        )
+        controller.createCustomCommand("Deploy", "body", "Ops", "rename")
+
+    assert mock_create.call_args.kwargs["on_conflict"] == "rename"
 
 
 def test_controller_config_and_update_source_slots(controller):
@@ -733,7 +795,8 @@ def test_controller_cleanup_flushes_posthog(controller):
 
 
 def test_client_formats_order(controller):
-    assert controller.clientFormats == ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+    """The bar ships with two selectors; two more slots are opt-in."""
+    assert controller.clientFormats == ["Plain Text", "Gemini CLI"]
 
 
 def test_client_format_change_syncs_model_filters(qapp, controller):

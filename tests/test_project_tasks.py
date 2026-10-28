@@ -347,3 +347,212 @@ def test_controller_without_an_active_project_rejects_tasks(task_controller):
 
     assert controller.addProjectTask("", "No project", "medium", "") is False
     assert task_store.get_tasks(str(proj)) == []
+
+
+# ── attachments ───────────────────────────────────────────────────────────
+
+
+def _fake_image(directory: Path, name: str = "shot.png") -> Path:
+    path = directory / name
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 64)
+    return path
+
+
+def test_store_attachment_copies_into_the_app_data_store(tmp_path):
+    proj = _project(tmp_path, "projA")
+    source = _fake_image(tmp_path)
+
+    stored = task_store.store_attachment(str(proj), str(source))
+
+    assert stored, "an image must be stored"
+    assert Path(stored).is_file()
+    assert Path(stored).read_bytes() == source.read_bytes()
+    assert task_store.attachments_root() in Path(stored).parents
+    assert source.exists(), "the original file must not be moved"
+    # The project tree is never touched.
+    assert list(proj.iterdir()) == []
+
+
+def test_store_attachment_accepts_a_file_url(tmp_path):
+    """QML hands us ``file:///…`` URLs from the dialog and drag-and-drop."""
+    proj = _project(tmp_path, "projA")
+    source = _fake_image(tmp_path)
+
+    stored = task_store.store_attachment(str(proj), source.as_uri())
+    assert stored and Path(stored).is_file()
+
+
+def test_store_attachment_rejects_non_images(tmp_path):
+    proj = _project(tmp_path, "projA")
+    doc = tmp_path / "notes.txt"
+    doc.write_text("hi", encoding="utf-8")
+
+    assert task_store.store_attachment(str(proj), str(doc)) == ""
+    assert task_store.store_attachment(str(proj), str(tmp_path / "missing.png")) == ""
+    assert task_store.store_attachment("", str(_fake_image(tmp_path))) == ""
+
+
+def test_store_attachment_bytes_for_a_pasted_screenshot(tmp_path):
+    proj = _project(tmp_path, "projA")
+
+    stored = task_store.store_attachment_bytes(str(proj), b"\x89PNG-data", ".png")
+    assert stored and Path(stored).suffix == ".png"
+    assert Path(stored).read_bytes() == b"\x89PNG-data"
+    assert task_store.store_attachment_bytes(str(proj), b"", ".png") == ""
+
+
+def test_add_task_persists_attachments(tmp_path):
+    proj = _project(tmp_path, "projA")
+    stored = task_store.store_attachment(str(proj), str(_fake_image(tmp_path)))
+
+    record = task_store.add_task(str(proj), "With a shot", attachments=[stored, ""])
+    assert record is not None
+    assert record.attachments == [stored]
+
+    reloaded = task_store.get_tasks(str(proj))[0]
+    assert reloaded.attachments == [stored]
+
+
+def test_update_task_drops_removed_attachments_from_disk(tmp_path):
+    proj = _project(tmp_path, "projA")
+    keep = task_store.store_attachment(str(proj), str(_fake_image(tmp_path, "a.png")))
+    drop = task_store.store_attachment(str(proj), str(_fake_image(tmp_path, "b.png")))
+    record = task_store.add_task(str(proj), "Two shots", attachments=[keep, drop])
+    assert record is not None
+
+    updated = task_store.update_task(str(proj), record.id, attachments=[keep])
+    assert updated is not None
+    assert updated.attachments == [keep]
+    assert Path(keep).exists()
+    assert not Path(drop).exists(), "an unlinked attachment must not linger"
+
+
+def test_delete_task_removes_its_attachments(tmp_path):
+    proj = _project(tmp_path, "projA")
+    stored = task_store.store_attachment(str(proj), str(_fake_image(tmp_path)))
+    record = task_store.add_task(str(proj), "Temporary", attachments=[stored])
+    assert record is not None
+
+    assert task_store.delete_task(str(proj), record.id) is True
+    assert not Path(stored).exists()
+
+
+def test_clear_completed_removes_attachments_of_completed_tasks(tmp_path):
+    proj = _project(tmp_path, "projA")
+    done_shot = task_store.store_attachment(str(proj), str(_fake_image(tmp_path, "done.png")))
+    open_shot = task_store.store_attachment(str(proj), str(_fake_image(tmp_path, "open.png")))
+    done = task_store.add_task(str(proj), "Done", attachments=[done_shot])
+    task_store.add_task(str(proj), "Open", attachments=[open_shot])
+    assert done is not None
+    task_store.toggle_task(str(proj), done.id)
+
+    assert task_store.clear_completed_tasks(str(proj)) == 1
+    assert not Path(done_shot).exists()
+    assert Path(open_shot).exists()
+
+
+def test_attachments_outside_the_store_are_never_deleted(tmp_path):
+    """A task record is user data; it must not be able to delete arbitrary files."""
+    proj = _project(tmp_path, "projA")
+    outside = _fake_image(tmp_path, "precious.png")
+
+    record = task_store.add_task(str(proj), "Sneaky", attachments=[str(outside)])
+    assert record is not None
+    assert task_store.delete_task(str(proj), record.id) is True
+    assert outside.exists()
+
+
+def test_controller_attachment_flow(task_controller):
+    controller, app, proj = task_controller
+    source = _fake_image(Path(app._projects[0]).parent)
+
+    stored = controller.attachTaskImage(str(proj), str(source))
+    assert stored, "the controller must store the attachment"
+
+    assert (
+        controller.addProjectTask(str(proj), "Ship it", "high", "with a screenshot", [stored])
+        is True
+    )
+    task = controller.currentProjectTasks[0]
+    assert task["attachments"] == [stored]
+
+    task_id = task["id"]
+    assert controller.copyTaskAsPrompt(str(proj), task_id) is True
+    text = app.clipboard_service.copy_text.call_args[0][0]
+    assert stored in text
+
+
+def test_controller_attach_rejects_non_images(task_controller):
+    controller, _app, proj = task_controller
+    doc = Path(proj).parent / "notes.txt"
+    doc.write_text("hi", encoding="utf-8")
+
+    assert controller.attachTaskImage(str(proj), str(doc)) == ""
+    # No project selected -> nothing can be stored.
+    assert controller.attachTaskImage("", str(doc)) == ""
+
+
+def test_controller_clipboard_image_is_optional(task_controller):
+    """A text-only clipboard must return "" instead of raising."""
+    controller, _app, proj = task_controller
+    assert controller.attachClipboardImage(str(proj)) == ""
+
+
+# ── read caching ──────────────────────────────────────────────────────────
+
+
+def _count_reads(monkeypatch):
+    """Record every read of the tasks JSON file."""
+    reads: list = []
+    original = Path.read_bytes
+
+    def counting(self):
+        reads.append(self)
+        return original(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting)
+    return reads
+
+
+def test_repeated_reads_hit_the_cache(tmp_path, monkeypatch):
+    """QML re-reads the task state constantly; the file must be parsed once."""
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+    reads = _count_reads(monkeypatch)
+
+    for _ in range(25):
+        task_store.get_tasks(str(proj))
+        task_store.counts_for_project(str(proj))
+
+    assert reads == [], "the state should be served from the cache"
+
+
+def test_external_writes_invalidate_the_cache(tmp_path):
+    """Another process (or the MCP server) writing the file must be seen."""
+    import json
+
+    import skill_manager.core.config as config_mod
+
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+    key = task_store.project_task_key(str(proj))
+    assert task_store.get_tasks(str(proj))[0].title == "One"
+
+    path = config_mod.resolve_data_file("project_tasks.json")
+    payload = json.loads(path.read_bytes())
+    payload["projects"][key].append({"id": "external", "title": "From elsewhere", "order": 1})
+    path.write_bytes(json.dumps(payload).encode("utf-8"))
+
+    titles = [record.title for record in task_store.get_tasks(str(proj))]
+    assert titles == ["One", "From elsewhere"]
+
+
+def test_mutations_return_a_copy_not_the_cache(tmp_path):
+    """A failed write must not leave the cache holding unsaved changes."""
+    proj = _project(tmp_path, "projA")
+    task_store.add_task(str(proj), "One")
+
+    cached = task_store.load_state()
+    copy = cached.model_copy(deep=True)
+    copy.projects["/unrelated"] = []
+    assert "/unrelated" not in task_store.load_state().projects

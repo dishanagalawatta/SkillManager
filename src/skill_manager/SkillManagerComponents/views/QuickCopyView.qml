@@ -180,6 +180,23 @@ Item {
         qcv_skillList.model = null
     }
 
+    /*!
+        Re-attach the list model after the view was cached and hidden.
+
+        Views are created once and kept alive (see ``Main.qml``); leaving a view
+        runs \l cleanup so its model is detached, and re-entering calls this.
+    */
+    function activate() {
+        var m = AppController.quickCopyModel
+        if (!m) return
+        qcv_skillList.model = m
+        if (!m.incubating) {
+            qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
+        } else {
+            qcv_skillList.cacheBuffer = 0
+        }
+    }
+
     Component.onDestruction: {
         cleanup()
     }
@@ -187,15 +204,7 @@ Item {
     Component.onCompleted: {
         // Mode is handled by AppController currentView
         // Update top bar search input if needed, handled globally
-        var m = AppController.quickCopyModel
-        if (m) {
-            qcv_skillList.model = m
-            if (!m.incubating) {
-                qcv_skillList.cacheBuffer = Math.max(qcv_skillList.height * 2, 1000)
-            } else {
-                qcv_skillList.cacheBuffer = 0
-            }
-        }
+        activate()
     }
 
     Connections {
@@ -816,7 +825,11 @@ Item {
                             GlassMenu {
                                 id: qcv_clientFormatMenu
                                 Repeater {
-                                    model: AppController.clientFormats
+                                    // Every configured format stays reachable, even
+                                    // when the bar only shows a subset of them.
+                                    model: AppController.config_controller
+                                        ? AppController.config_controller.availableClientFormats
+                                        : AppController.clientFormats
                                     delegate: GlassMenuItem {
                                         text: modelData
                                         iconSource: AppController.ui_controller.getLogoSource(modelData)
@@ -936,18 +949,22 @@ Item {
                     }
                 }
             }
-
-            // Per-project task panel
-            ProjectTasksPanel {
-                id: qcv_tasksPanel
-                objectName: "projectTasksPanel"
-                Layout.preferredWidth: 340
-                Layout.fillHeight: true
-                visible: AppController.ui_controller.tasksPanelOpen
-                projectPath: qcv_root._activeProjectPath
-                projectName: AppController.currentProject
-            }
         }
+    }
+
+    // ── Per-project task panel ───────────────────────────────────
+    // Same shell and behaviour as the inspector side panels: right-anchored
+    // overlay, resizable, closable, width persisted. Hosting it as an overlay
+    // keeps the skill list at full width instead of squeezing it.
+    ProjectTasksPanel {
+        id: qcv_tasksPanel
+        objectName: "projectTasksPanel"
+        anchors.fill: parent
+        topMargin: qcv_headerRow.height + qcv_mainLayout.spacing
+        open: AppController.ui_controller.tasksPanelOpen
+        projectPath: qcv_root._activeProjectPath
+        projectName: AppController.currentProject
+        z: 9
     }
 
     // ── Shared Inspector Overlay ─────────────────────────────────

@@ -27,6 +27,7 @@ Window {
 
     Component.onCompleted: {
         _enableTrackingTimer.start()
+        viewLoader.show(window.currentView)
         AppController.logDiagnostic("INFO", "window_state",
             "Component.onCompleted: window configured at (" + window.x + ", " + window.y + "), size=" + window.width + "x" + window.height)
     }
@@ -49,12 +50,11 @@ Window {
             viewLoader.item.cleanup()
         }
         
-        // Clear the viewLoader upon application shutdown and quit Qt loop.
+        // Drop every cached view upon application shutdown and quit Qt loop.
         // Delay context destruction to next event loop tick so incubators cleanly abort.
         Qt.callLater(() => {
             if (viewLoader) {
-                viewLoader.sourceComponent = null
-                viewLoader.source = ""
+                viewLoader.reset()
             }
             Qt.quit()
         })
@@ -138,7 +138,12 @@ Window {
     }
 
     property string currentView: AppController.ui_controller.currentView
-    onCurrentViewChanged: AppController.ui_controller.currentView = currentView
+    onCurrentViewChanged: {
+        AppController.ui_controller.currentView = currentView
+        // Cached views: first visit creates the view, every later visit is a
+        // visibility flip (~instant) instead of a rebuild.
+        if (viewLoader) viewLoader.show(currentView)
+    }
 
     // Window state for auto-minimize on snap
     property bool wasMaximized: false
@@ -191,16 +196,14 @@ Window {
     }
 
     function navigateTo(view) {
-        let source = "views/" + view.replace(" ", "") + "View.qml"
-        if (viewLoader.source.toString().indexOf(source) === -1) {
-            if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
-                viewLoader.item.cleanup()
-            }
-            AppController.ui_controller.currentView = view
-            viewTransitionTimer.pendingSource = ""
-            viewTransitionTimer.pendingView = view
-            viewTransitionTimer.start()
+        if (viewLoader.isShowing(view)) return
+        if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
+            viewLoader.item.cleanup()
         }
+        AppController.ui_controller.currentView = view
+        viewTransitionTimer.pendingSource = ""
+        viewTransitionTimer.pendingView = view
+        viewTransitionTimer.start()
     }
 
     function focusCurrentSearch() {
@@ -270,8 +273,10 @@ Window {
                 window.currentView = pendingView
                 pendingView = ""
             } else if (pendingSource !== "") {
-                viewLoader.source = pendingSource
+                // Kept for callers that only know a source path; the cached
+                // host addresses views by name.
                 pendingSource = ""
+                viewLoader.show(window.currentView)
             }
         }
     }
@@ -380,14 +385,9 @@ Window {
                 onNavigationChanged: (view) => {
                     if (!view.startsWith("Category:")) {
                         window.navigateTo(view)
-                    } else if (viewLoader.source.toString().indexOf("QuickCopyView.qml") === -1 && 
-                               viewLoader.source.toString().indexOf("LibraryView.qml") === -1) {
-                        if (viewLoader.item && typeof viewLoader.item.cleanup === "function") {
-                            viewLoader.item.cleanup()
-                        }
-                        viewTransitionTimer.pendingView = ""
-                        viewTransitionTimer.pendingSource = "views/QuickCopyView.qml"
-                        viewTransitionTimer.start()
+                    } else if (window.currentView !== "QuickCopy" && window.currentView !== "Library") {
+                        // A category click from Hub/Settings lands on Workbench.
+                        window.navigateTo("QuickCopy")
                     }
                 }
             }
@@ -396,12 +396,90 @@ Window {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                Loader {
+                // Views are created on first visit and then kept alive: building
+                // QuickCopyView costs ~0.5 s of frame work, and that rebuild was
+                // the lag felt when flipping between Workbench and Library.
+                // Leaving a view still runs its cleanup() (models are detached);
+                // re-entering re-attaches them through activate().
+                Item {
                     id: viewLoader
                     objectName: "viewLoader"
                     anchors.fill: parent
                     anchors.margins: 16
-                    source: "views/" + window.currentView.replace(" ", "") + "View.qml"
+
+                    readonly property var views: ({
+                        "QuickCopy": workbenchView,
+                        "Library": libraryView,
+                        "Updates": hubView,
+                        "Settings": settingsView
+                    })
+
+                    readonly property var currentLoader: viewLoader.views[window.currentView] || null
+                    readonly property Item item: (viewLoader.currentLoader && viewLoader.currentLoader.status === Loader.Ready)
+                        ? viewLoader.currentLoader.item : null
+
+                    function isShowing(view) {
+                        var loader = viewLoader.views[view]
+                        return !!loader && loader.visible && loader.status === Loader.Ready
+                    }
+
+                    function show(view) {
+                        var target = viewLoader.views[view]
+                        if (!target) {
+                            AppController.logDiagnostic("WARN", "view_nav",
+                                "no cached view for " + view)
+                            return
+                        }
+                        for (var name in viewLoader.views) {
+                            var loader = viewLoader.views[name]
+                            if (!loader) continue
+                            if (loader === target) {
+                                if (loader.status === Loader.Null) {
+                                    loader.source = "views/" + name + "View.qml"
+                                } else if (loader.item && typeof loader.item.activate === "function") {
+                                    loader.item.activate()
+                                }
+                                loader.visible = true
+                            } else {
+                                loader.visible = false
+                            }
+                        }
+                    }
+
+                    function reset() {
+                        for (var name in viewLoader.views) {
+                            var loader = viewLoader.views[name]
+                            if (!loader) continue
+                            if (loader.item && typeof loader.item.cleanup === "function") {
+                                loader.item.cleanup()
+                            }
+                            loader.source = ""
+                        }
+                    }
+
+                    Loader {
+                        id: workbenchView
+                        anchors.fill: parent
+                        visible: false
+                    }
+
+                    Loader {
+                        id: libraryView
+                        anchors.fill: parent
+                        visible: false
+                    }
+
+                    Loader {
+                        id: hubView
+                        anchors.fill: parent
+                        visible: false
+                    }
+
+                    Loader {
+                        id: settingsView
+                        anchors.fill: parent
+                        visible: false
+                    }
                 }
             }
         }

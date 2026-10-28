@@ -29,6 +29,11 @@ Item {
     // Provided by SkillModel to avoid per-row previous-item lookups during scrolling.
     property bool isFirstInSub: model && model.isFirstInSubcategory !== undefined ? model.isFirstInSubcategory : false
 
+    // Commands are grouped by their own frontmatter category, so the section
+    // header would otherwise paint that *category's* emoji on top of a command
+    // group. Commands share one icon instead.
+    readonly property bool isCommandSection: !!(model && model.isCommand)
+
     function formatFileUrl(p) {
         if (!p) return "";
         if (p.startsWith("file://")) return p;
@@ -107,7 +112,34 @@ Item {
                     }
                 }
                 
+                // Shared command glyph; the Text below stays for skill sections,
+                // which legitimately show their category emoji.
+                Item {
+                    visible: root.isCommandSection
+                    Layout.preferredWidth: 14
+                    Layout.preferredHeight: 14
+                    Layout.alignment: Qt.AlignVCenter
+                    opacity: root.isSubCollapsed ? 0.6 : 1.0
+
+                    Image {
+                        id: subCatCommandIcon
+                        anchors.fill: parent
+                        source: AppController.ui_controller.getAssetUri("ui/command-icon.svg")
+                        sourceSize.width: 40
+                        sourceSize.height: 40
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+
+                    ColorOverlay {
+                        anchors.fill: subCatCommandIcon
+                        source: subCatCommandIcon
+                        color: Theme.accent
+                    }
+                }
+
                 Text {
+                    visible: !root.isCommandSection
                     text: root.subCat ? AppController.getCategoryEmoji(root.subCat) : ""
                     font.pixelSize: 14
                     opacity: root.isSubCollapsed ? 0.6 : 1.0

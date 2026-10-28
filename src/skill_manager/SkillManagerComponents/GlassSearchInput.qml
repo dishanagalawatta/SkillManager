@@ -50,6 +50,8 @@ TextField {
         iconSize: 14
         iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
         role: "ghost"
+        // Circular plate icon: no resting outline (see IconButton.showRing).
+        showRing: false
         tooltipText: "Clear search"
         visible: rootSearchField.text !== ""
 

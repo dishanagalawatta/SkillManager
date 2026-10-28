@@ -233,9 +233,9 @@ class AppControllerProxyMixin:
     def notify_command_updated(self, old_path: str, new_path: str) -> None:
         self.commandUpdateCompleted.emit(old_path, new_path)
 
-    @Slot(str, str, str, result=str)
-    def createCustomCommand(self, n, b, cat) -> str:
-        return str(self.ops.createCustomCommand(n, b, cat))
+    @Slot(str, str, str, str, result=str)
+    def createCustomCommand(self, n, b, cat, on_conflict="") -> str:
+        return str(self.ops.createCustomCommand(n, b, cat, on_conflict))
 
     @Slot(str, result=str)
     def getCommandEmoji(self, path: str) -> str:
@@ -296,11 +296,16 @@ class AppControllerProxyMixin:
 
     # ── Per-project task list ───────────────────────────────────────────
 
-    @Slot(str, str, str, str, result=bool)
+    @Slot(str, str, str, str, "QVariantList", result=bool)
     def addProjectTask(
-        self, project_path: str, title: str, priority: str, description: str
+        self,
+        project_path: str,
+        title: str,
+        priority: str,
+        description: str,
+        attachments: list | None = None,
     ) -> bool:
-        return self.tasks.addProjectTask(project_path, title, priority, description)
+        return self.tasks.addProjectTask(project_path, title, priority, description, attachments)
 
     @Slot(str, str, result=bool)
     def toggleProjectTask(self, project_path: str, task_id: str) -> bool:

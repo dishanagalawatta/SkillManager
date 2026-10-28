@@ -349,6 +349,43 @@ def test_skill_model_expansion_logic(qapp, skill_list):
     assert model.isAllExpanded is True
 
 
+def test_collapse_all_also_collapses_sections(qapp):
+    """Expanding a category after "collapse all" must not open its sections.
+
+    Section keys that are absent from the collapsed set read as expanded, so
+    ``collapseAll`` has to record both key shapes.
+    """
+    model = SkillModel()
+    model.setSkills(
+        [
+            {"name": "A1", "category": "Dev", "local_path": "/a1"},
+            {"name": "A2", "category": "Dev", "local_path": "/a2"},
+            {"name": "B1", "category": "Ops", "local_path": "/b1"},
+        ]
+    )
+
+    model.collapseAll()
+    assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Dev") is True
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Ops") is True
+
+    # Expand only the main category: every section stays collapsed, so each
+    # section shows its header row and nothing else.
+    model.toggleCategory("⚙️ System & Workflow")
+
+    assert model.isCategoryCollapsed("⚙️ System & Workflow") is False
+    assert model.isCategoryCollapsed("⚙️ System & Workflow|Dev") is True
+    assert model.rowCount() == 2
+    assert model.data(model.index(0, 0), SkillModel.IsSubCollapsedRole) is True
+    assert model.data(model.index(1, 0), SkillModel.IsSubCollapsedRole) is True
+
+    # Expanding one section reveals exactly that section's rows.
+    model.toggleCategory("⚙️ System & Workflow|Dev")
+    assert model.rowCount() == 3
+    assert model.data(model.index(0, 0), SkillModel.IsSubCollapsedRole) is False
+    assert model.data(model.index(2, 0), SkillModel.IsSubCollapsedRole) is True
+
+
 def test_skill_model_collapsed_main_category_keeps_only_header_sentinel(qapp):
     model = SkillModel()
     model.setSkills(

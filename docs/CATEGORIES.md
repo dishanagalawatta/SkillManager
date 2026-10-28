@@ -11,7 +11,7 @@ The Skill Manager utilizes a standard emoji-based visual identification system. 
 ### Emoji Resolution
 Every category is mapped to a specific emoji. These emojis are used in:
 - **Library View**: Section headers and skill list items.
-- **Quick Copy View**: Sidebar category icons.
+- **Workbench View**: Sidebar category icons.
 - **Search Results**: Immediate visual context for found skills.
 
 Logic is managed via `get_category_emoji()` in `src/skill_manager/core/categories.py`.

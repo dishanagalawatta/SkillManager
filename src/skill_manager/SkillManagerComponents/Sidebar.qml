@@ -112,11 +112,11 @@ Rectangle {
         // Main Navigation
         SidebarButton {
             iconSource: AppController.ui_controller.getAssetUri("ui/lightning-icon.svg")
-            labelText: "Quick Copy"
+            labelText: "Workbench"
             collapsed: root.isCollapsed
             active: root.currentView === "Quick Copy"
             onClicked: (mouse) => { 
-                console.log("Sidebar: Quick Copy clicked")
+                console.log("Sidebar: Workbench clicked")
                 root.currentView = "Quick Copy"; 
                 root.navigationChanged("Quick Copy") 
             }
@@ -135,7 +135,7 @@ Rectangle {
 
         SidebarButton {
             iconSource: AppController.ui_controller.getAssetUri("ui/folder-sync-icon.svg")
-            labelText: "Packages"
+            labelText: "Hub"
             collapsed: root.isCollapsed
             active: root.currentView === "Updates"
             onClicked: (mouse) => { root.currentView = "Updates"; root.navigationChanged("Updates") }

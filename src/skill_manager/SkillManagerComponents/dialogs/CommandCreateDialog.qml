@@ -377,7 +377,7 @@ Dialog {
                         body: cmdBodyInput.text,
                         category: editCategoryValue
                     }
-                    root.awaitingConflictResolution = editMode
+                    root.awaitingConflictResolution = true
                     if (editMode) {
                         AppController.updateCustomCommandFull(
                             root.pendingArgs.localPath,
@@ -387,14 +387,24 @@ Dialog {
                             ""
                         )
                         AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
-                    } else {
-                        let newPath = AppController.createCustomCommand(
-                            root.pendingArgs.name,
-                            root.pendingArgs.body,
-                            root.pendingArgs.category
-                        )
-                        AppController.setCommandEmoji(newPath, root.pendingEmoji)
+                        root.accept()
+                        return
                     }
+                    let newPath = AppController.createCustomCommand(
+                        root.pendingArgs.name,
+                        root.pendingArgs.body,
+                        root.pendingArgs.category,
+                        ""
+                    )
+                    if (newPath === "") {
+                        // A name clash opens the conflict dialog; any other
+                        // failure is reported in the status bar. Keep this
+                        // dialog open either way so the typed name and body
+                        // are not thrown away.
+                        return
+                    }
+                    AppController.setCommandEmoji(newPath, root.pendingEmoji)
+                    root.awaitingConflictResolution = false
                     root.accept()
                 }
 
@@ -440,14 +450,21 @@ Dialog {
         property string conflictPath: ""
         property string suggestedRename: ""
 
+        /** Basename of the file that is already on disk. */
+        readonly property string conflictName: conflictPath.split("/").pop()
+
         onRejected: {
-            AppController.updateCustomCommandFull(
-                root.pendingArgs.localPath,
-                root.pendingArgs.name,
-                root.pendingArgs.body,
-                root.pendingArgs.category,
-                "cancel"
-            )
+            // A create conflict has not written anything yet, so there is
+            // nothing to cancel; an update conflict must tell the controller.
+            if (root.editMode) {
+                AppController.updateCustomCommandFull(
+                    root.pendingArgs.localPath,
+                    root.pendingArgs.name,
+                    root.pendingArgs.body,
+                    root.pendingArgs.category,
+                    "cancel"
+                )
+            }
             conflictDialog.close()
             root.awaitingConflictResolution = false
             root.reject()
@@ -495,7 +512,9 @@ Dialog {
                         }
 
                         Text {
-                            text: "A file named <b>" + conflictDialog.suggestedRename + "</b> already exists in the target location."
+                            text: "A file named <b>" + conflictDialog.conflictName + "</b> already exists in the target location. "
+                                  + "Overwrite it, or keep both by renaming the new file to <b>"
+                                  + conflictDialog.suggestedRename + "</b>."
                             textFormat: Text.StyledText
                             wrapMode: Text.Wrap
                             font.family: Theme.fontFamily
@@ -552,14 +571,25 @@ Dialog {
                     Layout.preferredWidth: 100
                     buttonHeight: 36
                     onClicked: {
-                        AppController.updateCustomCommandFull(
-                            root.pendingArgs.localPath,
-                            root.pendingArgs.name,
-                            root.pendingArgs.body,
-                            root.pendingArgs.category,
-                            "overwrite"
-                        )
-                        AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
+                        if (root.editMode) {
+                            AppController.updateCustomCommandFull(
+                                root.pendingArgs.localPath,
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.category,
+                                "overwrite"
+                            )
+                            AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
+                        } else {
+                            let overwritten = AppController.createCustomCommand(
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.category,
+                                "overwrite"
+                            )
+                            if (overwritten === "") return
+                            AppController.setCommandEmoji(overwritten, root.pendingEmoji)
+                        }
                         conflictDialog.accept()
                         root.awaitingConflictResolution = false
                         root.accept()
@@ -574,14 +604,25 @@ Dialog {
                     Layout.preferredWidth: implicitWidth
                     buttonHeight: 36
                     onClicked: {
-                        AppController.updateCustomCommandFull(
-                            root.pendingArgs.localPath,
-                            root.pendingArgs.name,
-                            root.pendingArgs.body,
-                            root.pendingArgs.category,
-                            "rename"
-                        )
-                        AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
+                        if (root.editMode) {
+                            AppController.updateCustomCommandFull(
+                                root.pendingArgs.localPath,
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.category,
+                                "rename"
+                            )
+                            AppController.setCommandEmoji(root.pendingArgs.localPath, root.pendingEmoji)
+                        } else {
+                            let renamed = AppController.createCustomCommand(
+                                root.pendingArgs.name,
+                                root.pendingArgs.body,
+                                root.pendingArgs.category,
+                                "rename"
+                            )
+                            if (renamed === "") return
+                            AppController.setCommandEmoji(renamed, root.pendingEmoji)
+                        }
                         conflictDialog.accept()
                         root.awaitingConflictResolution = false
                         root.accept()
@@ -605,6 +646,14 @@ Dialog {
                 root.editCategoryValue = root.pendingArgs.category
                 root.open()
             }
+            conflictDialog.open()
+        }
+        function onCommandCreateConflict(conflictPath, suggestedRename) {
+            // Only the dialog that issued the create may react: the flag is
+            // set on click, and a modal dialog is the visible one.
+            if (!root.visible || root.editMode || !root.awaitingConflictResolution) return
+            conflictDialog.conflictPath = conflictPath
+            conflictDialog.suggestedRename = suggestedRename
             conflictDialog.open()
         }
         function onCommandUpdateCompleted(oldPath, newPath) {

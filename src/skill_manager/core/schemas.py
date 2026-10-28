@@ -160,9 +160,7 @@ class AppConfig(BaseSettings):
     auto_copy_snap_client_format: bool = False
     temporary_snaps: bool = False
     diagnostic_logging: bool = False
-    top_bar_clients: list[str] = Field(
-        default_factory=lambda: ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
-    )
+    top_bar_clients: list[str] = Field(default_factory=lambda: ["Plain Text", "Gemini CLI"])
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod
@@ -176,6 +174,26 @@ class AppConfig(BaseSettings):
             return float(value)
         except (ValueError, TypeError):
             return 1.0
+
+    @field_validator("top_bar_clients", mode="before")
+    @classmethod
+    def _normalise_top_bar_clients(cls, value: Any) -> list[str]:
+        """Keep 2-4 top-bar selectors.
+
+        The shipped default used to list four formats; an untouched config
+        still holds exactly that list and trims to the current two, while a
+        list the user actually edited is preserved up to the four-slot limit.
+        """
+        default = ["Plain Text", "Gemini CLI"]
+        legacy_default = ["Plain Text", "Gemini CLI", "Antigravity", "Codex"]
+        if not isinstance(value, list):
+            return list(default)
+        cleaned = [str(item) for item in value if str(item).strip()]
+        if cleaned == legacy_default:
+            return list(default)
+        if len(cleaned) < 2:
+            return list(default)
+        return cleaned[:4]
 
     @classmethod
     def from_legacy(cls, data: dict[str, Any]) -> AppConfig:
@@ -411,6 +429,10 @@ class UIStateRecord(BaseModel):
     reduced_motion: bool = False
     telemetry_enabled: bool = True
     inspector_width: int = Field(default=0, ge=0)
+    # Per-panel width overrides, keyed by a stable string such as
+    # "quickcopy.tasks". A missing key means "use the panel's own preferred
+    # width"; the controller clamps whatever gets written here.
+    panel_widths: dict[str, int] = Field(default_factory=dict)
     # The per-project task panel in Quick Copy is collapsible; its open
     # state is remembered per user.
     tasks_panel_open: bool = False
@@ -442,6 +464,9 @@ class ProjectTaskRecord(BaseModel):
     completed: bool = False
     priority: Literal["low", "medium", "high"] = "medium"
     linked_skills: list[str] = Field(default_factory=list)
+    #: Absolute paths of images attached to the task. Files live under the
+    #: app-data ``task_attachments`` store, never in the project tree.
+    attachments: list[str] = Field(default_factory=list)
     created_at: float = 0.0
     updated_at: float = 0.0
     order: int = 0

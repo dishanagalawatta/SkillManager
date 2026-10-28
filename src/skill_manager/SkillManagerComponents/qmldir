@@ -51,3 +51,8 @@ InspectorMetadataRow 1.0 InspectorMetadataRow.qml
 InspectorActionBar 1.0 InspectorActionBar.qml
 InspectorEmptyState 1.0 InspectorEmptyState.qml
 UpdateToast 1.0 UpdateToast.qml
+PanelResizeHandle 1.0 PanelResizeHandle.qml
+SidePanel 1.0 SidePanel.qml
+SegmentedFilter 1.0 SegmentedFilter.qml
+TaskItem 1.0 TaskItem.qml
+TaskComposer 1.0 TaskComposer.qml

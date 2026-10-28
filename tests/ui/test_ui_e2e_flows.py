@@ -117,7 +117,7 @@ def test_ui_comprehensive_flow(qtbot, qml_engine, app_controller, setup_controll
 
     # --- 3. Quick Copy Flow ---
     # Go to Quick Copy
-    nav_qc = root.findChild(QQuickItem, "navQuickCopy")
+    nav_qc = root.findChild(QQuickItem, "navWorkbench")
     nav_qc.clicked.emit()
     qapp.processEvents()
     qtbot.wait(100)

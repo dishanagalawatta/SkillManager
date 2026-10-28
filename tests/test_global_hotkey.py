@@ -340,7 +340,11 @@ class TestPortalBackend:
         args = popen.call_args[0][0]
         assert args[0] == "/usr/bin/python3"
         assert args[1].endswith("portal_hotkeys.py")
-        thread_cls.assert_called_once()
+        # One reader for stdout events, one drainer for stderr diagnostics:
+        # an unread stderr pipe fills up and blocks the helper forever.
+        assert thread_cls.call_count == 2
+        names = sorted(call.kwargs["name"] for call in thread_cls.call_args_list)
+        assert names == ["portal-hotkey-reader", "portal-hotkey-stderr"]
         assert backend._started is True
 
     def test_start_returns_false_when_no_portal_python(self):

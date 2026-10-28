@@ -232,7 +232,7 @@ ScrollView {
             groupTitle: "Navigate"
 
             ShortcutRow {
-                titleText: "Quick Copy View"
+                titleText: "Workbench"
                 actionKey: "quick_copy_view"
                 sequenceBinding: AppController.config_controller ? AppController.config_controller.shortcutQuickCopyView : ""
                 isEnabledBinding: AppController.config_controller ? AppController.config_controller.shortcutQuickCopyViewEnabled : false
@@ -388,7 +388,7 @@ ScrollView {
                     // Empty state
                     Text {
                         visible: !AppController.customCollections || AppController.customCollections.length === 0
-                        text: "No collections yet. Create one in Quick Copy view."
+                        text: "No collections yet. Create one in the Workbench."
                         font.family: Theme.fontFamily
                         color: Theme.secondaryLabel
                         font.pixelSize: Theme.sizeCaption

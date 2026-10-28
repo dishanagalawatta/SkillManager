@@ -13,6 +13,13 @@ Button {
     property int buttonSize: 32
     property int iconSize: 15
     property color customIconColor: "transparent"
+    /*!
+        Draw the resting outline. Set to false when \l iconSource is itself a
+        circular plate (e.g. ``close-icon.svg``), otherwise the icon's own
+        circle plus this outline read as two concentric rings. Focus is still
+        advertised — the focus ring is drawn regardless.
+    */
+    property bool showRing: true
 
     Layout.preferredWidth: buttonSize
     Layout.preferredHeight: buttonSize
@@ -84,6 +91,7 @@ Button {
         }
         border.color: {
             if (control.visualFocus) return Theme.accent
+            if (!control.showRing) return "transparent"
             if (!control.enabled) return Theme.glassBorder
             if (control.role === "primary") return "transparent"
             if (control.role === "primary-outline") return Theme.accent
@@ -91,7 +99,9 @@ Button {
             if (control.role === "ghost") return control.hovered || control.down ? Theme.glassBorder : "transparent"
             return control.hovered || control.down ? Theme.separator : Theme.glassBorder
         }
-        border.width: control.visualFocus ? 2 : (control.role === "primary" || control.role === "ghost" ? 0 : 1)
+        border.width: control.visualFocus
+                      ? 2
+                      : (control.showRing && control.role !== "primary" && control.role !== "ghost" ? 1 : 0)
         opacity: control.enabled ? 1.0 : 0.65
     }
 
