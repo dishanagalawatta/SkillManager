@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -71,6 +72,7 @@ def _make_helper(**attrs) -> ph._PortalHelper:
     helper._shortcuts = {}
     helper._requested_ids = []
     helper._stdin_buf = b""
+    helper._quitting = False
     helper.events = []
     helper._emit = helper.events.append
     for key, value in attrs.items():
@@ -397,6 +399,73 @@ class TestTeardown:
         assert result is _fake_glib.SOURCE_REMOVE
         assert helper.create_timed_out is False
         assert helper.events == []
+
+
+class TestNoBusyLoopOnDeadPipes:
+    """Regression: nine helpers once burned 40-70% CPU each after the app died.
+
+    Root cause was the stdin watch: with ``GLib.IO_IN`` alone a pipe whose
+    writer is gone stays permanently "ready" without ever being dispatched,
+    so GLib spun in ``ppoll`` instead of delivering EOF.  The quit path made
+    it worse — writing the ``exiting`` event to the dead stdout raised
+    ``BrokenPipeError``, which escaped the callback before ``loop.quit()``.
+    """
+
+    @staticmethod
+    def _source() -> str:
+        return Path(ph.__file__).read_text(encoding="utf-8")
+
+    def test_stdin_watch_includes_hangup_conditions(self):
+        assert "GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR" in self._source()
+
+    def test_emit_swallows_a_closed_stdout(self):
+        helper = _make_helper()
+        # _make_helper() replaces the instance's _emit with a recorder, so
+        # call the real implementation through the class.
+        emit = ph._PortalHelper._emit
+        with patch.object(ph.sys, "stdout", MagicMock()) as stdout:
+            stdout.write.side_effect = BrokenPipeError()
+            assert emit(helper, {"event": "ready"}) is False
+
+    def test_quit_still_stops_the_loop_when_stdout_is_gone(self):
+        helper = _make_helper()
+        helper._emit = MagicMock(side_effect=BrokenPipeError())
+        helper._quit()
+        helper.loop.quit.assert_called_once()
+
+    def test_quit_is_idempotent(self):
+        helper = _make_helper()
+        helper._quit()
+        helper._quit()
+        assert helper.events == [{"event": "exiting"}]
+        helper.loop.quit.assert_called_once()
+
+    def test_stdin_eof_removes_the_source_even_if_quit_raises(self):
+        helper = _make_helper()
+        helper._quit = MagicMock(side_effect=BrokenPipeError())
+        with (
+            patch.object(ph.sys, "stdin", MagicMock(fileno=MagicMock(return_value=5))),
+            patch("os.read", return_value=b""),
+        ):
+            result = helper._on_stdin_readable(None, None)
+        assert result is _fake_glib.SOURCE_REMOVE
+
+    def test_reader_stops_after_quit(self):
+        helper = _make_helper(_quitting=True)
+        with (
+            patch.object(ph.sys, "stdin", MagicMock(fileno=MagicMock(return_value=5))),
+            patch("os.read") as read,
+        ):
+            result = helper._on_stdin_readable(None, None)
+        assert result is _fake_glib.SOURCE_REMOVE
+        read.assert_not_called()
+
+    def test_helper_asks_to_die_with_its_parent(self):
+        """A killed app must not leave a portal session behind."""
+        source = self._source()
+        assert "def _die_with_parent() -> None:" in source
+        assert "prctl(1, int(signal.SIGTERM), 0, 0, 0)" in source
+        assert "    _die_with_parent()\n    helper = _PortalHelper()" in source
 
 
 class TestRegistryRegistration:

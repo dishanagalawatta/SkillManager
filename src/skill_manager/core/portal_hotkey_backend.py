@@ -13,6 +13,7 @@ lifetime.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -43,6 +44,7 @@ class PortalHotkeyBackend(QObject):
         super().__init__(parent)
         self._proc: subprocess.Popen | None = None
         self._reader_thread: threading.Thread | None = None
+        self._stderr_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._shortcut_ids: dict[int, str] = {}  # hotkey_id -> portal shortcut id
         self._started = False
@@ -82,6 +84,13 @@ class PortalHotkeyBackend(QObject):
             target=self._read_events, name="portal-hotkey-reader", daemon=True
         )
         self._reader_thread.start()
+        # The helper logs every activation to stderr. Nobody reading that
+        # pipe fills its 64 KiB kernel buffer and blocks the helper forever,
+        # killing hotkeys until the app restarts.
+        self._stderr_thread = threading.Thread(
+            target=self._drain_stderr, name="portal-hotkey-stderr", daemon=True
+        )
+        self._stderr_thread.start()
         self._started = True
         return True
 
@@ -122,17 +131,33 @@ class PortalHotkeyBackend(QObject):
 
     def stop(self) -> None:
         """Close the portal session and terminate the helper subprocess."""
-        if self._proc is None:
+        proc = self._proc
+        if proc is None:
             return
         self._send({"cmd": "quit"})
         try:
-            self._proc.wait(timeout=PORTAL_HELPER_STOP_TIMEOUT)
+            proc.wait(timeout=PORTAL_HELPER_STOP_TIMEOUT)
         except subprocess.TimeoutExpired:
-            self._proc.terminate()
+            proc.terminate()
             try:
-                self._proc.wait(timeout=PORTAL_HELPER_STOP_TIMEOUT)
+                proc.wait(timeout=PORTAL_HELPER_STOP_TIMEOUT)
             except subprocess.TimeoutExpired:
-                self._proc.kill()
+                proc.kill()
+                try:
+                    proc.wait(timeout=PORTAL_HELPER_STOP_TIMEOUT)
+                except subprocess.TimeoutExpired:
+                    logger.error("Portal hotkey helper %s survived SIGKILL", proc.pid)
+        # EOF the pipes so the reader threads finish instead of lingering on
+        # a dead process, and so the helper can never outlive us.
+        for stream in (proc.stdin, proc.stdout, proc.stderr):
+            with contextlib.suppress(Exception):
+                if stream is not None:
+                    stream.close()
+        for thread in (self._reader_thread, self._stderr_thread):
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=PORTAL_HELPER_STOP_TIMEOUT)
+        self._reader_thread = None
+        self._stderr_thread = None
         self._proc = None
         self._started = False
 
@@ -147,8 +172,10 @@ class PortalHotkeyBackend(QObject):
 
     def _read_events(self) -> None:
         """Read JSON events from the helper's stdout and forward activations."""
-        assert self._proc is not None and self._proc.stdout is not None
-        for line in self._proc.stdout:
+        proc = self._proc
+        if proc is None or proc.stdout is None:
+            return
+        for line in proc.stdout:
             line = line.strip()
             if not line:
                 continue
@@ -158,6 +185,16 @@ class PortalHotkeyBackend(QObject):
                 logger.warning("Malformed event from portal hotkey helper: %r", line)
                 continue
             self._handle_event(event)
+
+    def _drain_stderr(self) -> None:
+        """Keep the helper's stderr pipe empty; its diagnostics are debug-only."""
+        proc = self._proc
+        if proc is None or proc.stderr is None:
+            return
+        for line in proc.stderr:
+            line = line.rstrip()
+            if line:
+                logger.debug("[portal hotkey helper] %s", line)
 
     def _handle_event(self, event: dict) -> None:
         kind = event.get("event")

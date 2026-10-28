@@ -41,8 +41,10 @@ Environment:
     interaction — mirrors the portal_capture.py precedent.
 """
 
+import contextlib
 import json
 import os
+import signal
 import sys
 import uuid
 
@@ -80,6 +82,16 @@ APP_ID = "skill-manager"
 CREATE_TIMEOUT_SECONDS = 10
 
 
+def _log(message: str) -> None:
+    """Diagnostic line on stderr, dropped when the parent is already gone.
+
+    A raising stderr write inside a GLib callback kills the rest of the
+    callback (including ``loop.quit()``), so diagnostics must never raise.
+    """
+    with contextlib.suppress(BrokenPipeError, OSError, ValueError):
+        print(message, file=sys.stderr, flush=True)
+
+
 def _token() -> str:
     """Portal handle token — must match ``^[a-z_][a-z0-9_]*$``."""
     return "sm_" + uuid.uuid4().hex[:12]
@@ -87,6 +99,10 @@ def _token() -> str:
 
 class _PortalHelper:
     """State machine for the GlobalShortcuts portal session."""
+
+    # Class-level defaults so a partially constructed instance (tests build
+    # these without __init__) still answers teardown questions.
+    _quitting: bool = False
 
     def __init__(self) -> None:
         self.loop = GLib.MainLoop()
@@ -111,6 +127,7 @@ class _PortalHelper:
         # id -> {"description": str|None, "preferred_trigger": str|None}
         self._requested_ids: list[str] = []
         self._stdin_buf = b""
+        self._quitting = False
 
         self.bus.add_signal_receiver(
             self._on_response,
@@ -131,7 +148,15 @@ class _PortalHelper:
             dbus_interface=GS_IFACE,
             bus_name=BUS_NAME,
         )
-        GLib.io_add_watch(sys.stdin.fileno(), GLib.IO_IN, self._on_stdin_readable)
+        # HUP/ERR must be in the mask. With IO_IN alone, a pipe whose writer
+        # has gone away is permanently "ready" but never *dispatched*, so
+        # GLib spins in ppoll at ~70% CPU per orphaned helper instead of
+        # delivering EOF to the callback.
+        GLib.io_add_watch(
+            sys.stdin.fileno(),
+            GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR,
+            self._on_stdin_readable,
+        )
 
     # ------------------------------------------------------ portal identity
     def register_app_id(self) -> None:
@@ -150,32 +175,55 @@ class _PortalHelper:
             registry = dbus.Interface(self.bus.get_object(BUS_NAME, PORTAL_PATH), REGISTRY_IFACE)
             registry.Register(APP_ID, dbus.Dictionary({}, signature="sv"))
         except Exception as exc:  # best-effort registration, never fatal
-            print(f"   !! Registry.Register({APP_ID}) failed: {exc}", file=sys.stderr)
+            _log(f"   !! Registry.Register({APP_ID}) failed: {exc}")
         else:
-            print(f"   -> Registry.Register({APP_ID})", file=sys.stderr)
+            _log(f"   -> Registry.Register({APP_ID})")
 
     # ------------------------------------------------------------ events
-    def _emit(self, event: dict) -> None:
-        print(json.dumps(event), flush=True)
+    def _emit(self, event: dict) -> bool:
+        """Write one JSON event, tolerating a parent that has already gone.
+
+        The parent owns the read end of our stdout. If it exits or crashes,
+        ``print`` raises ``BrokenPipeError``; letting that escape a GLib
+        callback also skips the ``SOURCE_REMOVE`` / ``loop.quit()`` work
+        behind it and leaves the helper running forever.
+
+        Returns True when the event reached the parent.
+        """
+        try:
+            print(json.dumps(event), flush=True)
+        except (BrokenPipeError, OSError, ValueError):
+            return False
+        return True
 
     def _emit_error(self, message: str) -> None:
         self._emit({"event": "error", "message": message})
 
     # -------------------------------------------------------- stdin reader
     def _on_stdin_readable(self, _source: object, _condition: object) -> bool:
-        """Read raw bytes so partial lines never block the GLib loop."""
+        """Read raw bytes so partial lines never block the GLib loop.
+
+        Always removes the source: once the pipe is closed (the app exited)
+        or unreadable, there is nothing left to watch, and re-returning
+        CONTINUE would re-arm a watch that fires forever.
+        """
+        if self._quitting:
+            return GLib.SOURCE_REMOVE
         try:
             chunk = os.read(sys.stdin.fileno(), 4096)
         except OSError:
             chunk = b""
         if not chunk:  # parent closed the pipe
-            self._quit()
+            # Teardown must never skip SOURCE_REMOVE: this source stays
+            # readable at EOF, so a raising callback here busy-loops GLib.
+            with contextlib.suppress(Exception):
+                self._quit()
             return GLib.SOURCE_REMOVE
         self._stdin_buf += chunk
         while b"\n" in self._stdin_buf:
             line, self._stdin_buf = self._stdin_buf.split(b"\n", 1)
             self._handle_command(line.decode("utf-8", "replace").strip())
-        return GLib.SOURCE_CONTINUE
+        return GLib.SOURCE_REMOVE if self._quitting else GLib.SOURCE_CONTINUE
 
     def _handle_command(self, line: str) -> None:
         if not line:
@@ -230,7 +278,7 @@ class _PortalHelper:
             self._close_session()
             return
         if self.session_handle is not None and self.session_used:
-            print("   -> session recreated for shortcut change", file=sys.stderr)
+            _log("   -> session recreated for shortcut change")
             self._close_session()
             self._start_create_session()
             return
@@ -245,7 +293,7 @@ class _PortalHelper:
         """Issue CreateSession with fresh tokens and (re)arm the timeout."""
         self.creating = True
         self._arm_create_timeout()
-        print("   -> CreateSession (handle_token + session_handle_token)", file=sys.stderr)
+        _log("   -> CreateSession (handle_token + session_handle_token)")
         self.gs_iface.CreateSession(
             dbus.Dictionary(
                 {
@@ -283,7 +331,7 @@ class _PortalHelper:
                 session_obj = self.bus.get_object(BUS_NAME, dbus.ObjectPath(self.session_handle))
                 dbus.Interface(session_obj, SESSION_IFACE).Close()
             except Exception as exc:  # best-effort close
-                print(f"   !! session close failed: {exc}", file=sys.stderr)
+                _log(f"   !! session close failed: {exc}")
         self.session_handle = None
         self.create_req_path = None
         self.bind_req_path = None
@@ -324,10 +372,7 @@ class _PortalHelper:
             ],
             signature="(sa{sv})",
         )
-        print(
-            f"   -> BindShortcuts ({', '.join(self._shortcuts)})",
-            file=sys.stderr,
-        )
+        _log(f"   -> BindShortcuts ({', '.join(self._shortcuts)})")
         self._requested_ids = list(self._shortcuts)
         self.gs_iface.BindShortcuts(
             dbus.ObjectPath(self.session_handle),
@@ -350,7 +395,7 @@ class _PortalHelper:
     def _on_bind_error(self, error: Exception) -> None:
         self.binding = False
         self._emit({"event": "bind_failed", "ids": self._requested_ids, "code": -1})
-        print(f"   !! BindShortcuts error: {error}", file=sys.stderr)
+        _log(f"   !! BindShortcuts error: {error}")
         if self.rebind_pending:
             self._pump_bind()
 
@@ -363,7 +408,7 @@ class _PortalHelper:
                 session = results.get("session_handle")
                 if session:
                     self.session_handle = str(session)
-                    print(f"   -> session: {self.session_handle}", file=sys.stderr)
+                    _log(f"   -> session: {self.session_handle}")
                     self._emit({"event": "ready", "session": self.session_handle})
                     self._pump_bind()
             else:
@@ -382,7 +427,7 @@ class _PortalHelper:
                         "code": int(response),
                     }
                 )
-                print(f"   !! bind response code={response}", file=sys.stderr)
+                _log(f"   !! bind response code={response}")
             if self.rebind_pending:
                 self._pump_bind()
 
@@ -406,7 +451,7 @@ class _PortalHelper:
         timestamp: int,
         options: dict,
     ) -> None:
-        print(f"   -> Activated {shortcut_id}", file=sys.stderr)
+        _log(f"   -> Activated {shortcut_id}")
         event = {
             "event": "activated",
             "id": str(shortcut_id),
@@ -433,12 +478,52 @@ class _PortalHelper:
 
     # ------------------------------------------------------------- teardown
     def _quit(self) -> None:
-        self._emit({"event": "exiting"})
-        self._close_session()
-        self.loop.quit()
+        """Close the session and stop the loop, whatever the pipes are doing.
+
+        Every step is best-effort: a dead stdout must not keep the process
+        alive (that is how orphaned helpers used to pin a CPU core), and a
+        slow/failing portal Close must not delay our exit either.
+        """
+        if self._quitting:
+            return
+        self._quitting = True
+        # Even a raising emit must not keep the process alive.
+        with contextlib.suppress(Exception):
+            self._emit({"event": "exiting"})
+        try:
+            self._close_session()
+        except Exception as exc:  # noqa: BLE001 — teardown must finish
+            _log(f"   !! session close failed: {exc}")
+        finally:
+            self.loop.quit()
+
+
+def _die_with_parent() -> None:
+    """Ask the kernel to SIGTERM us when the app that spawned us exits.
+
+    EOF on stdin is the primary exit signal, but the pipe's write end can
+    outlive the app (a crash handler, a launcher, a re-parenting shell can
+    all hold a duplicate). Without this a killed app leaves the helper and
+    its portal session behind for the rest of the login session.
+    """
+    if not sys.platform.startswith("linux"):
+        return
+    parent = os.getppid()
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        # PR_SET_PDEATHSIG = 1
+        libc.prctl(1, int(signal.SIGTERM), 0, 0, 0)
+    except Exception:  # noqa: BLE001 — best effort on non-glibc systems
+        return
+    # prctl() is not retroactive: the parent may have died in between.
+    if os.getppid() != parent:
+        sys.exit(0)
 
 
 def _main() -> None:
+    _die_with_parent()
     helper = _PortalHelper()
     # Unsandboxed apps must claim an app id BEFORE any portal method call,
     # otherwise the GlobalShortcuts portal rejects CreateSession with
