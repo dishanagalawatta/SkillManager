@@ -41,11 +41,22 @@ class CollapseMixin:
 
     @Slot()
     def collapseAll(self):
-        sections = {
-            (s.main_category_name or self._engine.get_main_category(s))
-            for s in self._all_filtered_skills
-        }
-        self.state.collapsed_categories.update(sections)
+        """Collapse every main category **and** every section inside it.
+
+        Only recording main-category keys would look correct until the user
+        expands one category: ``build_visible_rows`` treats any key that is
+        absent from the set as *expanded*, so every ``"Main|Sub"`` section
+        would spring open at once.  Recording both key shapes keeps a newly
+        expanded category's sections collapsed.
+
+        The keys are derived from the unfiltered list on purpose: a category
+        hidden by the current search/filter must still be collapsed when the
+        filter is cleared.
+        """
+        collapsed = self.state.collapsed_categories
+        for skill in self._all_skills:
+            collapsed.add(skill.main_category_name or self._engine.get_main_category(skill))
+            collapsed.add(skill.section_name or self._engine.get_section(skill))
         self._save_collapsed()
         self.collapsedCategoriesChanged.emit()
         self._rebuild_visible_rows()
