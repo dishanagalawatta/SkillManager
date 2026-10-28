@@ -240,3 +240,24 @@ def test_panel_counts_match_the_rendered_rows():
     assert "readonly property int doneCount:" in panel
     assert "AppController.task_controller.activeTaskCount" not in panel
     assert "AppController.task_controller.completedTaskCount" not in panel
+
+
+# ── Close affordance ────────────────────────────────────────────────
+
+
+def test_plate_icon_close_buttons_do_not_draw_a_second_ring():
+    """``close-icon.svg`` is itself a filled circle.
+
+    ``IconButton`` used to draw its resting border unconditionally, so every
+    close button rendered two concentric circles: the icon's plate plus the
+    button outline. ``showRing`` lets a plate icon stand alone.
+    """
+    icon_button = _strip_comments(_read("IconButton.qml"))
+
+    assert "property bool showRing: true" in icon_button
+    assert "!control.showRing" in icon_button
+
+    for path in ("SidePanel.qml", "TopBar.qml", "GlassSearchInput.qml"):
+        assert "showRing: false" in _strip_comments(_read(path)), (
+            f"{path} draws a ring around a circular close plate"
+        )

@@ -302,20 +302,15 @@ Rectangle {
             }
 
             IconButton {
-                id: topSearchCloseBtn
                 objectName: "topSearchCloseBtn"
                 visible: root.searchExpanded
                 buttonSize: 28
+                // Circular plate icon: no resting outline (see IconButton.showRing).
+                showRing: false
                 iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
                 tooltipText: "Close search"
                 role: "ghost"
                 Layout.alignment: Qt.AlignVCenter
-                background: Rectangle {
-                    radius: 14
-                    color: topSearchCloseBtn.hovered ? Theme.glassHover : "transparent"
-                    border.color: Theme.alpha(Theme.label, 0.15)
-                    border.width: 1
-                }
                 onClicked: (mouse) => root.collapseSearch()
             }
         }

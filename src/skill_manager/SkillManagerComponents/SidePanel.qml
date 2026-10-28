@@ -160,7 +160,10 @@ Item {
                     objectName: "sidePanelClose"
                     visible: root.showClose
                     buttonSize: 28
-                    iconSize: 14
+                    iconSize: 18
+                    // The icon is a circular plate; a resting outline would
+                    // draw a second ring around it.
+                    showRing: false
                     iconSource: AppController.ui_controller.getAssetUri("ui/close-icon.svg")
                     tooltipText: root.title !== "" ? ("Close " + root.title) : "Close panel"
                     onClicked: root.closeRequested()
