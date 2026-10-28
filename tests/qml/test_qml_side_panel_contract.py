@@ -211,10 +211,22 @@ def test_panel_drops_an_edit_in_flight_when_the_project_changes():
     """An edit buffer must never be saved into a different project."""
     panel = _strip_comments(_read("views", "ProjectTasksPanel.qml"))
 
-    assert 'onProjectPathChanged: root.editingId = ""' in panel
+    assert "onProjectPathChanged: {" in panel
+    assert 'root.editingId = ""' in panel
     assert "onOpenChanged:" in panel
     # The delegate only enters edit mode for the row the panel is editing.
     assert 'root.editingId !== "" && root.editingId === modelData.id' in panel
+
+
+def test_panel_keeps_a_draft_per_project():
+    """A half-written task follows its project, not the panel."""
+    panel = _strip_comments(_read("views", "ProjectTasksPanel.qml"))
+
+    assert "property var _drafts: ({})" in panel
+    assert "function _saveDraft(projectPath)" in panel
+    assert "function _loadDraft(projectPath)" in panel
+    assert "root._saveDraft(root._draftKey)" in panel
+    assert "root._loadDraft(root.projectPath)" in panel
 
 
 def test_panel_guards_against_a_null_task_list():

@@ -148,6 +148,7 @@ def step1_setup():
     controller._projects = [str(proj)]
     controller._config.set("sources", [str(proj)])
     controller._config.set("projects", [str(proj)])
+    controller.setCurrentProject(proj.name)
     controller.addProjectTask(str(proj), "Verify the new Hub bar", "high", "Tabs and actions.")
     controller.addProjectTask(str(proj), "Check the composer", "medium", "")
     _log("SETUP", f"injected project {proj}")
@@ -157,12 +158,68 @@ def step1_setup():
 
 def step2_workbench():
     window.navigateTo("QuickCopy")
+    label = controller.config_controller.getProjectLabel(controller._projects[0])
+    controller.setCurrentProject(label)
+    _log(
+        "PROJECT",
+        f"current={controller.currentProject!r} "
+        f"path={controller.config_controller.getProjectPath(label)!r}",
+    )
     QTimer.singleShot(3500, step3_capture_workbench)
 
 
 def step3_capture_workbench():
     _capture("todo_topbar_workbench.png")
+    _log("PANEL", "opening the tasks panel")
+    controller.ui_controller.setTasksPanelOpen(True)
+    QTimer.singleShot(2000, step3b_draft_composer)
+
+
+def step3b_draft_composer():
+    """Type a multi-line draft and attach an image, then capture the composer."""
+    proof = SCRATCH / "attachments"
+    proof.mkdir(parents=True, exist_ok=True)
+    shot = proof / "composer-proof.png"
+    from PySide6.QtGui import QColor, QImage
+
+    image = QImage(240, 160, QImage.Format.Format_RGB32)
+    image.fill(QColor("#3B82F6"))
+    image.save(str(shot))
+
+    stored = controller.tasks.attachTaskImage(str(controller._projects[0]), str(shot))
+    if stored:
+        # Also attach one to a stored task so the row thumbnails are exercised.
+        from skill_manager.core import tasks as task_store
+
+        records = task_store.get_tasks(str(controller._projects[0]))
+        if records:
+            task_store.update_task(
+                str(controller._projects[0]), records[0].id, attachments=[stored]
+            )
+            controller.tasks.refresh()
+
+    editor = window.findChild(QObject, "taskComposerEditor")
+    composer = window.findChild(QObject, "taskComposer")
+    if editor is None or composer is None:
+        _log("COMPOSER", f"not found (editor={editor}, composer={composer})")
+    else:
+        editor.setProperty(
+            "text",
+            "Make the task panel feel fast\n"
+            "Notes on what to check:\n"
+            "- panel opens without a hitch\n"
+            "- attachments render as thumbnails\n",
+        )
+        if stored:
+            composer.setProperty("attachments", [stored])
+        _log("COMPOSER", f"draft set, attachments={[stored] if stored else []}")
+    QTimer.singleShot(1500, step3c_capture_tasks)
+
+
+def step3c_capture_tasks():
+    _capture("todo_tasks_composer.png")
     _log("NAV", "navigating to Hub")
+    controller.ui_controller.setTasksPanelOpen(False)
     window.navigateTo("Updates")
     QTimer.singleShot(3500, step4_capture_hub)
 

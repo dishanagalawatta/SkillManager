@@ -160,9 +160,7 @@ class AppConfig(BaseSettings):
     auto_copy_snap_client_format: bool = False
     temporary_snaps: bool = False
     diagnostic_logging: bool = False
-    top_bar_clients: list[str] = Field(
-        default_factory=lambda: ["Plain Text", "Gemini CLI"]
-    )
+    top_bar_clients: list[str] = Field(default_factory=lambda: ["Plain Text", "Gemini CLI"])
 
     @field_validator("project_aliases", "shortcuts", mode="before")
     @classmethod
@@ -466,6 +464,9 @@ class ProjectTaskRecord(BaseModel):
     completed: bool = False
     priority: Literal["low", "medium", "high"] = "medium"
     linked_skills: list[str] = Field(default_factory=list)
+    #: Absolute paths of images attached to the task. Files live under the
+    #: app-data ``task_attachments`` store, never in the project tree.
+    attachments: list[str] = Field(default_factory=list)
     created_at: float = 0.0
     updated_at: float = 0.0
     order: int = 0

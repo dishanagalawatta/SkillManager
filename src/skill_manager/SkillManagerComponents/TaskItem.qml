@@ -30,6 +30,9 @@ Item {
     readonly property string taskDescription: root.task ? (root.task.description || "") : ""
     readonly property bool completed: root.task ? root.task.completed === true : false
     readonly property string priority: root.task ? (root.task.priority || "medium") : "medium"
+    readonly property var attachments:
+        (root.task && root.task.attachments && typeof root.task.attachments.length === "number")
+            ? root.task.attachments : []
 
     signal toggled(string taskId)
     signal editRequested(string taskId)
@@ -215,6 +218,46 @@ Item {
             color: Theme.secondaryLabel
             wrapMode: Text.WordWrap
             visible: root.taskDescription !== "" && !root.editing
+        }
+
+        // Attached images — thumbnails double as "open in the image viewer".
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 26
+            spacing: 4
+            visible: root.attachments.length > 0 && !root.editing
+
+            Repeater {
+                model: root.attachments
+
+                delegate: Rectangle {
+                    required property var modelData
+                    required property int index
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    radius: 6
+                    color: Theme.glassPill
+                    border.color: Theme.glassBorder
+                    border.width: 1
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        source: modelData ? ("file://" + modelData) : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                    }
+
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        onTapped: AppController.openPath(modelData)
+                    }
+                }
+            }
+
+            Item { Layout.fillWidth: true }
         }
 
         TextArea {

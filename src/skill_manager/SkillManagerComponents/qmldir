@@ -55,3 +55,4 @@ PanelResizeHandle 1.0 PanelResizeHandle.qml
 SidePanel 1.0 SidePanel.qml
 SegmentedFilter 1.0 SegmentedFilter.qml
 TaskItem 1.0 TaskItem.qml
+TaskComposer 1.0 TaskComposer.qml

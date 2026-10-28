@@ -28,6 +28,7 @@ def _panel_surface() -> str:
         for part in (
             Path("views", "ProjectTasksPanel.qml"),
             Path("TaskItem.qml"),
+            Path("TaskComposer.qml"),
             Path("SegmentedFilter.qml"),
         )
     )
@@ -69,7 +70,7 @@ def test_quick_copy_can_toggle_the_panel():
 
 
 def test_panel_exposes_the_required_actions():
-    """Title, counters, quick-add, filters, carry and clear-done are present."""
+    """Title, counters, composer, filters and clear-done are present."""
     panel = _read("views", "ProjectTasksPanel.qml")
 
     # Title + counters
@@ -80,11 +81,11 @@ def test_panel_exposes_the_required_actions():
     assert '{ key: "all", label: "All" }' in panel
     assert '{ key: "active", label: "Active" }' in panel
     assert '{ key: "done", label: "Done" }' in panel
-    # Quick add
-    assert "Add a task... (Enter to add)" in panel
+    # The inline composer replaces the old one-line quick-add pill.
+    assert "TaskComposer {" in panel
+    assert "onSubmitted:" in panel
     assert "AppController.addProjectTask(" in panel
-    # Priority picker
-    assert "root.pendingPriority" in panel
+    assert "AppController.addProjectTask(\n" in panel
     # Clear done
     assert "AppController.clearCompletedProjectTasks(" in panel
     # Row actions (wired by the panel, rendered by TaskItem)
@@ -95,6 +96,16 @@ def test_panel_exposes_the_required_actions():
     assert "AppController.copyTaskAsPrompt(" in panel
     assert "saveRequested" in surface
     assert "editRequested" in surface
+
+
+def test_panel_drops_the_separate_quick_add_pill():
+    """Typing happens in the list box itself, not in a detached field."""
+    panel = _read("views", "ProjectTasksPanel.qml")
+
+    assert "Add a task... (Enter to add)" not in panel
+    assert "TextField {" not in panel
+    assert "addInput" not in panel
+    assert "pendingPriority" not in panel
 
 
 def test_panel_is_accessible():

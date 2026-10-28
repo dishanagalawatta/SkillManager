@@ -12,8 +12,8 @@
  * The panel renders inside the shared ``SidePanel`` shell, so it is a
  * right-anchored, resizable, closable overlay with a persisted width — the
  * same behaviour as the inspector side panels. Only the body is task-specific:
- * the filter tabs (``SegmentedFilter``), the quick-add row and the task rows
- * (``TaskItem``).
+ * the filter tabs (``SegmentedFilter``), the task rows (``TaskItem``) and the
+ * inline ``TaskComposer`` footer that replaces the old one-line quick-add pill.
  *
  * The panel lists the tasks of ONE project. An empty project path means
  * "no project selected" and renders the "select a project" empty state.
@@ -32,8 +32,13 @@ SidePanel {
     property string projectName: ""
     property var tasks: AppController.task_controller.currentProjectTasks
     property string filter: "all" // all | active | done
-    property string pendingPriority: "medium"
     property string editingId: ""
+
+    // Drafts are kept per project so switching project (or closing the panel)
+    // never throws away a half-written task, and never leaks it into another
+    // project either.
+    property var _drafts: ({})
+    property string _draftKey: ""
 
     // ── Derived ──────────────────────────────────────────────────────
     // `tasks` comes from the controller as a loose `var`; a null while the
@@ -73,7 +78,12 @@ SidePanel {
     // An edit in flight belongs to the project that started it. Switching
     // project (or closing the panel) drops the buffer instead of letting it
     // be written into a different project's task list.
-    onProjectPathChanged: root.editingId = ""
+    onProjectPathChanged: {
+        root.editingId = ""
+        if (root._draftKey !== "") root._saveDraft(root._draftKey)
+        root._draftKey = root.projectPath
+        root._loadDraft(root.projectPath)
+    }
     onOpenChanged: {
         if (!root.open) root.editingId = ""
     }
@@ -107,88 +117,7 @@ SidePanel {
         }
     }
 
-    // ── Quick-add row ────────────────────────────────────────────────
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 8
-
-        TextField {
-            id: addInput
-            Layout.fillWidth: true
-            placeholderText: root.projectPath === ""
-                ? "Select a project to add tasks"
-                : "Add a task... (Enter to add)"
-            enabled: root.projectPath !== ""
-            Accessible.role: Accessible.EditableText
-            Accessible.name: "Add a task"
-            selectByMouse: true
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.sizeBody
-            color: Theme.label
-            placeholderTextColor: Theme.secondaryLabel
-            leftPadding: 12
-            rightPadding: 12
-            topPadding: 8
-            bottomPadding: 8
-            background: Rectangle {
-                radius: Theme.radiusField
-                color: parent.activeFocus ? Theme.glassActive : Theme.glassHover
-                border.color: parent.activeFocus ? Theme.accent : Theme.glassBorder
-                border.width: parent.activeFocus ? 2 : 1
-            }
-            onAccepted: root._addTask()
-        }
-
-        // Priority selector — tap or Space/Return cycles low -> medium -> high
-        Rectangle {
-            id: priorityPill
-            Layout.preferredWidth: priorityText.implicitWidth + 20
-            Layout.preferredHeight: 30
-            radius: 15
-            color: priorityHover.hovered || priorityPill.activeFocus
-                ? Theme.glassHover : "transparent"
-            border.color: Theme.glassBorder
-            border.width: 1
-            activeFocusOnTab: true
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Priority: " + root.pendingPriority
-
-            Text {
-                id: priorityText
-                anchors.centerIn: parent
-                text: root.pendingPriority === "low" ? "Low"
-                    : root.pendingPriority === "high" ? "High" : "Med"
-                color: root.pendingPriority === "high" ? Theme.danger
-                    : root.pendingPriority === "low" ? Theme.secondaryLabel : Theme.accent
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.sizeCaption
-                font.weight: Font.Medium
-            }
-
-            HoverHandler {
-                id: priorityHover
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            function cyclePriority() {
-                root.pendingPriority = root.pendingPriority === "low" ? "medium"
-                    : root.pendingPriority === "medium" ? "high" : "low"
-            }
-
-            TapHandler {
-                onTapped: priorityPill.cyclePriority()
-            }
-            Keys.onPressed: (event) => {
-                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return) {
-                    priorityPill.cyclePriority()
-                    event.accepted = true
-                }
-            }
-        }
-    }
-
-    // ── Task list ────────────────────────────────────────────────────
+    // ── Task list + inline composer ──────────────────────────────────
     Rectangle {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -202,6 +131,7 @@ SidePanel {
             id: taskList
             anchors.fill: parent
             anchors.margins: 6
+            anchors.bottomMargin: composer.visible ? composer.height + 12 : 6
             clip: true
             spacing: 4
             model: root.visibleTasks
@@ -222,7 +152,7 @@ SidePanel {
                         : root.filter === "done"
                             ? "No completed tasks yet."
                             : root._taskList.length === 0
-                                ? "No tasks yet — add your first one above."
+                                ? "No tasks yet — write the first one below."
                                 : "Nothing to show in this filter."
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.sizeBody
@@ -254,13 +184,58 @@ SidePanel {
                 }
             }
         }
+
+        // The composer sits where the task will land: a footer inside the
+        // same box as the list, not a detached pill above it.
+        TaskComposer {
+            id: composer
+            objectName: "taskComposer"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 6
+            visible: root.projectPath !== ""
+            projectPath: root.projectPath
+
+            onSubmitted: (title, notes, priority, attachments) => {
+                var added = AppController.addProjectTask(
+                    root.projectPath, title, priority, notes, attachments)
+                if (!added) return
+                root._drafts[root.projectPath] = null
+                composer.reset()
+                composer.focusEditor()
+            }
+            onCancelled: {
+                composer.reset()
+                root._drafts[root.projectPath] = null
+                composer.focusEditor()
+            }
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
-    function _addTask() {
-        var title = addInput.text.trim()
-        if (title === "" || root.projectPath === "") return
-        AppController.addProjectTask(root.projectPath, title, root.pendingPriority, "")
-        addInput.text = ""
+    function _saveDraft(projectPath) {
+        if (!projectPath || !composer) return
+        var draft = {
+            text: composer.text,
+            priority: composer.priority,
+            attachments: (composer.attachments || []).slice()
+        }
+        if (draft.text.trim() === "" && draft.attachments.length === 0) {
+            root._drafts[projectPath] = null
+            return
+        }
+        root._drafts[projectPath] = draft
+    }
+
+    function _loadDraft(projectPath) {
+        if (!composer) return
+        composer.reset()
+        if (!projectPath) return
+        var draft = root._drafts[projectPath]
+        if (!draft) return
+        composer.text = draft.text || ""
+        composer.priority = draft.priority || "medium"
+        composer.attachments = (draft.attachments || []).slice()
     }
 }

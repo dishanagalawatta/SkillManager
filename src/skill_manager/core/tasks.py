@@ -12,12 +12,15 @@ path was stored with a different case or separator.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
+import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
-from skill_manager.core.config import DATA_DIR, resolve_data_file
+from skill_manager.core.config import DATA_DIR, get_app_data_dir, resolve_data_file
 from skill_manager.core.copier import canonical_key
 from skill_manager.core.persistence import _atomic_write_json
 from skill_manager.core.schemas import ProjectTaskRecord, ProjectTasksState
@@ -29,9 +32,118 @@ PROJECT_TASKS_FILENAME = "project_tasks.json"
 
 PRIORITIES = ("low", "medium", "high")
 
+#: Attachments are images only — a task note is not a file manager.
+ATTACHMENTS_DIRNAME = "task_attachments"
+IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"})
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
 
 def _tasks_file() -> Path:
     return resolve_data_file(PROJECT_TASKS_FILENAME)
+
+
+def attachments_root() -> Path:
+    """Directory holding every task attachment, one subtree per project."""
+    return get_app_data_dir() / ATTACHMENTS_DIRNAME
+
+
+def _attachment_dir(project_path: str | Path) -> Path | None:
+    """Per-project attachment directory, derived from the canonical key.
+
+    The key is an absolute path, so it is hashed instead of used verbatim:
+    that keeps the directory name filesystem-safe on every platform and
+    stable across case/separator differences. ``None`` means "no project".
+    """
+    key = project_task_key(project_path)
+    if not key:
+        return None
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return attachments_root() / digest
+
+
+def _source_path(source: Any) -> Path | None:
+    """Turn a QML file URL (``file:///…``) or plain path into a local path."""
+    raw = str(source or "").strip()
+    if not raw:
+        return None
+    if raw.startswith("file:"):
+        raw = unquote(urlparse(raw).path)
+        # Windows file URLs arrive as /C:/dir/file.png.
+        if len(raw) > 2 and raw[0] == "/" and raw[2] == ":":
+            raw = raw[1:]
+    try:
+        return Path(raw).expanduser()
+    except (OSError, ValueError):
+        return None
+
+
+def _store_bytes(project_path: str | Path, data: bytes, suffix: str) -> str:
+    clean_suffix = ("." + str(suffix or "").lstrip(".")).lower()
+    if clean_suffix not in IMAGE_SUFFIXES or not data:
+        return ""
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        logger.warning("Task attachment rejected: %d bytes is over the limit", len(data))
+        return ""
+    target_dir = _attachment_dir(project_path)
+    if target_dir is None:
+        return ""
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / f"{uuid.uuid4().hex[:12]}{clean_suffix}"
+        target.write_bytes(data)
+    except OSError as exc:
+        logger.warning("Could not store task attachment: %s", exc)
+        return ""
+    return str(target)
+
+
+def store_attachment(project_path: str | Path, source: Any) -> str:
+    """Copy an image *source* into the task attachment store.
+
+    Returns the stored path, or ``""`` when the source is missing, not an
+    image, or cannot be copied.
+    """
+    path = _source_path(source)
+    if path is None or not path.is_file():
+        return ""
+    suffix = path.suffix.lower()
+    if suffix not in IMAGE_SUFFIXES:
+        return ""
+    try:
+        if path.stat().st_size > MAX_ATTACHMENT_BYTES:
+            logger.warning("Task attachment rejected: %s is over the size limit", path)
+            return ""
+        data = path.read_bytes()
+    except OSError as exc:
+        logger.warning("Could not read task attachment %s: %s", path, exc)
+        return ""
+    return _store_bytes(project_path, data, suffix)
+
+
+def store_attachment_bytes(project_path: str | Path, data: bytes, suffix: str = ".png") -> str:
+    """Store in-memory image bytes (e.g. a pasted screenshot)."""
+    return _store_bytes(project_path, data, suffix)
+
+
+def _remove_attachment_files(paths: list[str] | None) -> None:
+    """Delete attachment files, but only ones that live in the store."""
+    root = attachments_root()
+    try:
+        root_resolved = root.resolve()
+    except OSError:
+        return
+    for raw in paths or []:
+        candidate = _source_path(raw)
+        if candidate is None:
+            continue
+        try:
+            candidate.resolve().relative_to(root_resolved)
+        except (OSError, ValueError):
+            continue
+        try:
+            candidate.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("Could not delete task attachment %s: %s", candidate, exc)
 
 
 def project_task_key(project_path: str | Path) -> str:
@@ -112,12 +224,23 @@ def _ordered(records: list[ProjectTaskRecord]) -> list[ProjectTaskRecord]:
     return ordered
 
 
+def _clean_attachments(attachments: Any) -> list[str]:
+    """Normalise an attachment list from QML (a JS array or ``None``)."""
+    cleaned: list[str] = []
+    for raw in attachments or []:
+        text = str(raw or "").strip()
+        if text:
+            cleaned.append(text)
+    return cleaned
+
+
 def add_task(
     project_path: str | Path,
     title: str,
     priority: str = "medium",
     description: str = "",
     linked_skills: list[str] | None = None,
+    attachments: list[str] | None = None,
 ) -> ProjectTaskRecord | None:
     """Create a task in *project_path* and persist it."""
     key = project_task_key(project_path)
@@ -134,6 +257,7 @@ def add_task(
         description=description or "",
         priority=priority,
         linked_skills=list(linked_skills or []),
+        attachments=_clean_attachments(attachments),
         created_at=now,
         updated_at=now,
     )
@@ -155,15 +279,17 @@ def update_task(
     description: str | None = None,
     priority: str | None = None,
     linked_skills: list[str] | None = None,
+    attachments: list[str] | None = None,
 ) -> ProjectTaskRecord | None:
     """Update a task's fields. ``None`` arguments leave the field untouched."""
     key = project_task_key(project_path)
     if not key:
         return None
     found: ProjectTaskRecord | None = None
+    dropped: list[str] = []
 
     def _apply(state: ProjectTasksState) -> None:
-        nonlocal found
+        nonlocal found, dropped
         for record in state.projects.get(key, []):
             if record.id != task_id:
                 continue
@@ -177,11 +303,17 @@ def update_task(
                 record.priority = priority
             if linked_skills is not None:
                 record.linked_skills = list(linked_skills)
+            if attachments is not None:
+                cleaned = _clean_attachments(attachments)
+                dropped = [path for path in record.attachments if path not in cleaned]
+                record.attachments = cleaned
             record.updated_at = time.time()
             found = record
             break
 
     _mutate(_apply)
+    # Removed attachments should not linger on disk forever.
+    _remove_attachment_files(dropped)
     return found
 
 
@@ -211,16 +343,21 @@ def delete_task(project_path: str | Path, task_id: str) -> bool:
     if not key:
         return False
     removed = False
+    orphaned: list[str] = []
 
     def _apply(state: ProjectTasksState) -> None:
-        nonlocal removed
+        nonlocal removed, orphaned
         records = state.projects.get(key, [])
         kept = [record for record in records if record.id != task_id]
         removed = len(kept) != len(records)
         if removed:
+            gone = [record for record in records if record.id == task_id]
+            orphaned = [path for record in gone for path in record.attachments]
             state.projects[key] = _ordered(kept)
 
     _mutate(_apply)
+    if removed:
+        _remove_attachment_files(orphaned)
     return removed
 
 
@@ -230,16 +367,22 @@ def clear_completed_tasks(project_path: str | Path) -> int:
     if not key:
         return 0
     removed_count = 0
+    orphaned: list[str] = []
 
     def _apply(state: ProjectTasksState) -> None:
-        nonlocal removed_count
+        nonlocal removed_count, orphaned
         records = state.projects.get(key, [])
         kept = [record for record in records if not record.completed]
         removed_count = len(records) - len(kept)
         if removed_count:
+            orphaned = [
+                path for record in records if record.completed for path in record.attachments
+            ]
             state.projects[key] = _ordered(kept)
 
     _mutate(_apply)
+    if removed_count:
+        _remove_attachment_files(orphaned)
     return removed_count
 
 
@@ -294,10 +437,14 @@ def records_to_dicts(records: list[ProjectTaskRecord]) -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "ATTACHMENTS_DIRNAME",
     "DATA_DIR",
+    "IMAGE_SUFFIXES",
+    "MAX_ATTACHMENT_BYTES",
     "PRIORITIES",
     "PROJECT_TASKS_FILENAME",
     "add_task",
+    "attachments_root",
     "clear_completed_tasks",
     "counts_for_project",
     "delete_task",
@@ -307,6 +454,8 @@ __all__ = [
     "records_to_dicts",
     "reorder_tasks",
     "save_state",
+    "store_attachment",
+    "store_attachment_bytes",
     "toggle_task",
     "update_task",
 ]

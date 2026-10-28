@@ -296,11 +296,16 @@ class AppControllerProxyMixin:
 
     # ── Per-project task list ───────────────────────────────────────────
 
-    @Slot(str, str, str, str, result=bool)
+    @Slot(str, str, str, str, "QVariantList", result=bool)
     def addProjectTask(
-        self, project_path: str, title: str, priority: str, description: str
+        self,
+        project_path: str,
+        title: str,
+        priority: str,
+        description: str,
+        attachments: list | None = None,
     ) -> bool:
-        return self.tasks.addProjectTask(project_path, title, priority, description)
+        return self.tasks.addProjectTask(project_path, title, priority, description, attachments)
 
     @Slot(str, str, result=bool)
     def toggleProjectTask(self, project_path: str, task_id: str) -> bool:

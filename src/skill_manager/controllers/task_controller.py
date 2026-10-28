@@ -145,13 +145,14 @@ class TaskController(QObject):
 
     # ── Slots ────────────────────────────────────────────────────────
 
-    @Slot(str, str, str, str, result=bool)
+    @Slot(str, str, str, str, "QVariantList", result=bool)
     def addProjectTask(
         self,
         project_path: str,
         title: str,
         priority: str = "medium",
         description: str = "",
+        attachments: list[str] | None = None,
     ) -> bool:
         """Add a task to *project_path* (empty path = the active project)."""
         path = self._project_path(project_path)
@@ -163,11 +164,50 @@ class TaskController(QObject):
             title,
             priority=priority,
             description=description,
+            attachments=attachments,
         )
         if record is None:
             return False
         self._emit()
         return True
+
+    @Slot(str, str, result=str)
+    def attachTaskImage(self, project_path: str, source_url: str) -> str:
+        """Copy an image file into the task attachment store.
+
+        Returns the stored path, or ``""`` when the file is not an image
+        (the composer then tells the user instead of silently dropping it).
+        """
+        path = self._project_path(project_path)
+        if not path:
+            return ""
+        return task_store.store_attachment(path, source_url)
+
+    @Slot(str, result=str)
+    def attachClipboardImage(self, project_path: str) -> str:
+        """Store an image currently on the clipboard (e.g. a screenshot)."""
+        path = self._project_path(project_path)
+        if not path:
+            return ""
+        try:
+            from PySide6.QtCore import QBuffer, QByteArray
+            from PySide6.QtGui import QGuiApplication
+
+            clipboard = QGuiApplication.clipboard()
+            image = clipboard.image() if clipboard is not None else None
+            if image is None or image.isNull():
+                return ""
+            data = QByteArray()
+            buffer = QBuffer(data)
+            buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+            saved = image.save(buffer, "PNG")
+            buffer.close()
+            if not saved:
+                return ""
+            return task_store.store_attachment_bytes(path, bytes(data), ".png")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Task controller: clipboard image unavailable: %s", exc)
+            return ""
 
     @Slot(str, str, result=bool)
     def toggleProjectTask(self, project_path: str, task_id: str) -> bool:
@@ -273,6 +313,10 @@ class TaskController(QObject):
         lines = [record.title]
         if record.description:
             lines.append(record.description)
+        if record.attachments:
+            lines.append("")
+            lines.append("Attachments:")
+            lines.extend(f"- {path}" for path in record.attachments)
         if references:
             lines.append("")
             lines.extend(references)
