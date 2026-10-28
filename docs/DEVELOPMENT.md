@@ -83,7 +83,7 @@ After dependency or migration work, run the automated checks first, then launch 
 
 - Library loads saved sources and discovered skills.
 - Search filters skills without UI errors.
-- Quick Copy can select skills and copy references.
+- The Workbench can select skills and copy references.
 - Archive and star actions update the list state.
 - Copy to project completes for a test project folder.
 - Update check handles the latest-release request without blocking the UI.

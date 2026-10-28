@@ -249,7 +249,7 @@ When packages run tools such as `npx skills add <package>` or `npx skills update
 
 #### Package Deletion & Storage Cleanup Lifecycle
 
-When a package is removed from the Packages view (view key stays `updates`), `UpdateController.removeUpdatePackage(index)` coordinates with `delete_package_storage()` to execute a multi-tier cleanup with strict safety guards:
+When a package is removed from the Hub (view key stays `updates`), `UpdateController.removeUpdatePackage(index)` coordinates with `delete_package_storage()` to execute a multi-tier cleanup with strict safety guards:
 
 ```mermaid
 flowchart TD
@@ -342,7 +342,7 @@ sequenceDiagram
 
 #### Per-Project Task List
 
-Quick Copy carries a collapsible task panel for the **active** project.
+The Workbench carries a collapsible task panel for the **active** project.
 
 - **Persistence** — `core/tasks.py` stores the lists in
   `DATA_DIR / "project_tasks.json"` through the same atomic write +
@@ -509,7 +509,7 @@ On Linux (Wayland and X11), Qt's `QClipboard` selection data source can be destr
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as QML View (QuickCopy / Library)
+    participant UI as QML View (Workbench / Library)
     participant Ops as OpsController / ClipboardMixin
     participant Svc as ClipboardService
     participant Linux as Linux Native Helper (linux.py)
@@ -668,7 +668,7 @@ flowchart LR
 - Update checks always run: startup scan (~2s after launch) + 6h periodic re-scan via `QtScheduler` (`skill-package-auto-scan` job).
 - Each scan force-refreshes `latest_version` (npm/git/commands), then `recalculateStats()` sets the header count to the number of outdated **packages** (`current_version != latest_version`) — a 1:1 match with the per-package Update buttons. Skill content drift stays in `_update_results` as inspector detail and never arms the header.
 - **On**: outdated packages install in the background via `updateNow()`; completion fires an `autoUpdateFinished` toast popup (bottom-right).
-- **Off**: an `updatesAvailable` toast popup (bottom-right) with an **Update** button appears whenever updates are found — clicking it opens the Packages view and starts Update All.
+- **Off**: an `updatesAvailable` toast popup (bottom-right) with an **Update** button appears whenever updates are found — clicking it opens the Hub and starts Update All.
 - Both `updateNow` and `runPackageUpdate` recalculate stats in their finalize step, so the header count drops to 0 (and Update All disables) the moment promoted versions land — no follow-up scan required.
 
 ```mermaid
@@ -679,7 +679,7 @@ flowchart LR
     Stats -->|> 0, auto on| Auto[updateNow<br/>background]
     Auto --> DoneToast[toast: finished]
     Stats -->|> 0, auto off| ActionToast[toast + Update button]
-    ActionToast -->|click| Packages[Packages view<br/>+ updateAllOutdated]
+    ActionToast -->|click| Hub[Hub view<br/>+ updateAllOutdated]
     Timer[6h scheduler] --> Scan
 ```
 
@@ -819,7 +819,7 @@ sequenceDiagram
     autonumber
     participant DC as DiscoveryController
     participant Model as SkillModel
-    participant QML as QuickCopy / Library QML View
+    participant QML as Workbench / Library QML View
     participant QtEngine as Qt Quick Delegate Incubator
 
     DC->>Model: replacePreparedState(prepared)

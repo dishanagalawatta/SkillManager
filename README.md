@@ -30,10 +30,10 @@
 | Capability | What it gives you |
 | --- | --- |
 | **[Central Library & Inspector](#central-library--inspector)** | Search, filter, inspect, star, archive, and deploy thousands of skills from one place. |
-| **[Quick Copy & Format Switcher](#quick-copy--format-switcher)** | Copy references in your agent's exact syntax, with project cycling and automatic dependency carry. |
+| **[Workbench & Format Switcher](#workbench--format-switcher)** | Copy references in your agent's exact syntax, with project cycling and automatic dependency carry. |
 | **[Surgical Git Synchronization](#surgical-git-synchronization)** | See exactly which skills are stale in which repository, then sync only those. |
 | **[Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents)** | Hotkey capture, color-redact PII, save into the active project, paste into your terminal. |
-| **[Packages & Automatic Sync](#packages--automatic-sync)** | Install curated skill packages with one click, track updates, and hear about new SkillManager releases. |
+| **[Hub & Automatic Sync](#hub--automatic-sync)** | Install curated skill packages with one click, track updates, and hear about new SkillManager releases. |
 | **[MCP Automation Bridge](#mcp-automation-bridge)** | Drive the library, screenshots, and UI inspection from an AI agent over stdio MCP. |
 | **[Accessibility & Comfort](#accessibility--comfort)** | Screen-reader semantics, full keyboard operation, reduced motion, compact rows, and themes. |
 
@@ -50,7 +50,7 @@ However, managing agent skills and multimodal context across multiple project re
 | ❌**Skill Drift:** Improved prompts in one repo stay trapped there; other repos run stale skills.                                                                            | ✅**Central Library & Surgical Sync:** One unified source of truth. Updates propagate across repos in milliseconds.                                                                                                          |
 | ❌**Package Drift:** GitHub, NPX, and script-based skill packs go stale silently, and checking each one by hand doesn't scale.                                               | ✅**Background Updates:** Version checks run at startup and every 6 hours, install in the background, and a toast tells you when a new SkillManager release is out.                                                              |
 | ❌**Manual Copy-Paste Overhead:** Manually copying `.agents/skills/` folders and forgetting required dependencies.                                                         | ✅**1-Click Multi-Deploy:** Deploy single skills, custom collections, or `.md` commands to multiple projects simultaneously.                                                                                               |
-| ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Quick Copy Companion:** Copy ready-to-paste references formatted for your active agent in a click (`Ctrl+C` on a focused skill, or the **Copy Reference** button).                                                                                              |
+| ❌**Context Switching:** Digging through nested directories to find the exact skill reference syntax for your current IDE.                                                   | ✅**Workbench Companion:** Copy ready-to-paste references formatted for your active agent in a click (`Ctrl+C` on a focused skill, or the **Copy Reference** button).                                                                                              |
 | ❌**Clumsy Multimodal Context for Terminal Agents:** Taking a screenshot, saving to Desktop, moving it into the repo, finding the path, and hoping no API keys were exposed. | ✅**Snap to Project & PII Redaction:** Hotkey snips, color-redacts sensitive tokens, auto-saves directly to `<project>/.agents/screenshots/`, and copies a client-formatted reference for instant `Ctrl+V` into your TUI/CLI agent. |
 
 ---
@@ -118,15 +118,15 @@ Get productive in 4 straightforward steps:
 ```mermaid
 flowchart LR
     A["1. Launch App\n(from your launcher)"] --> B["2. Connect Sources\n(Git repo or local skills)"]
-    B --> C["3. Deploy / Quick Copy\n(1-Click to Project)"]
+    B --> C["3. Deploy / Workbench\n(1-Click to Project)"]
     C --> D["4. Supercharge Agent\n(Claude, Cursor, Antigravity)"]
 ```
 
 1. **Launch SkillManager**: Open the app from your application launcher. (Note: the global hotkey `Ctrl+Shift+S` does not launch the app — it captures a screenshot; see [Snap to Project](#snap-to-project-instant-visual-context-for-tui--terminal-agents).)
-2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into **Packages**), connect your central skills Git repository and local project folders.
+2. **Add Your Skill Sources**: In **Settings** (or by dragging a folder into the **Hub**), connect your central skills Git repository and local project folders.
 3. **Deploy or Copy Reference**:
    - In **Library**, select skills and click **Copy to Projects** to install them.
-   - In **Quick Copy**, click **Copy Reference** next to any skill to paste it formatted directly into your active prompt.
+   - In the **Workbench**, click **Copy Reference** next to any skill to paste it formatted directly into your active prompt.
 4. **Code with Supercharged Agents**: Your AI coding agent loads the exact specialized skill instructions on demand.
 
 ---
@@ -148,12 +148,12 @@ Manage thousands of agent skills with instant fuzzy search, automatic category d
 
 ---
 
-### Quick Copy & Format Switcher
+### Workbench & Format Switcher
 
 Your daily companion during active development sessions.
 
 <p align="center">
-  <img src="assets/readme/SkillManager_QuickCopy.png" alt="SkillManager Quick Copy View" width="95%" style="border-radius: 8px;" />
+  <img src="assets/readme/SkillManager_QuickCopy.png" alt="SkillManager Workbench View" width="95%" style="border-radius: 8px;" />
 </p>
 
 - **1-Click Reference Copying**: Copies syntax tailored to your active agent format (`@.agents/skills/my-skill/SKILL.md`, `/command`, or Plaintext).
@@ -189,20 +189,20 @@ flowchart LR
 - **Client-Formatted Path on the Clipboard**: Snaps are copied in your active client format — the relative path (e.g. `.agents/screenshots/Screenshot_20260819_190000.png`), or the `@`-prefixed form for **Gemini CLI** (`@.agents/screenshots/…`). Turn on **Copy Snap in Client Format** in **Settings** to always copy the path rather than the image.
 - **1-Keystroke Terminal Prompting**: Switch to your terminal/TUI coding platform and press `Ctrl+V`. The AI agent immediately has direct filesystem access to read the image—zero file hunting or dragging needed.
 - **Pixel-Level Color PII Redaction**: Isolate and scrub specific pixel colors (passwords, tokens, customer names) before saving, ensuring private data never leaks to LLMs.
-- **Library & Quick Copy Integration**: All captured snaps are automatically indexed under the **Snaps** category for quick recall and cross-project reuse.
+- **Library & Workbench Integration**: All captured snaps are automatically indexed under the **Snaps** category for quick recall and cross-project reuse.
 
 ---
 
-### Packages & Automatic Sync
+### Hub & Automatic Sync
 
 Keeping a fleet of repositories current shouldn't mean remembering which skill changed where.
 
 - **Curated catalog**: Install popular skill collections (Vercel Skills, Anthropic Skills, Agentic Awesome Skills, …) with one click, or open them pre-filled to adjust the target directory first. Already-installed packages are badged **Installed ✓**.
 - **Version-aware skill packages**: Track NPX packages, GitHub/GitLab repositories, and custom scripts. Versions are auto-detected from NPM and upstream tags, with live validation while you type.
-- **Background updates**: Checks run at startup and every six hours. With **Auto Update** on, outdated packages install automatically and a bottom-right toast confirms it; with it off, the toast offers an **Update** button that opens the Packages view and starts Sync All.
+- **Background updates**: Checks run at startup and every six hours. With **Auto Update** on, outdated packages install automatically and a bottom-right toast confirms it; with it off, the toast offers an **Update** button that opens the Hub and starts Sync All.
 - **Honest counts**: The "N outdated" badge matches the per-package buttons one-to-one, and **Sync All** flips to **Up to Date** as the new versions land.
 - **Surgical project sync**: Compares version fingerprints across your library and every linked project, updates only what is stale, and links matching project skills to their package automatically.
-- **Clean removal**: Deleting a package removes its storage, clone cache, lockfiles, inventory, and the corresponding skills from the Library and Quick Copy — no orphans left behind.
+- **Clean removal**: Deleting a package removes its storage, clone cache, lockfiles, inventory, and the corresponding skills from the Library and Workbench — no orphans left behind.
 - **Release notices**: SkillManager checks GitHub Releases shortly after launch and once a day, and shows a **View Release** toast when a newer version exists. Installation stays manual and explicit.
 
 ---
@@ -260,16 +260,16 @@ All shortcuts can be re-mapped in **Settings**:
 | Shortcut (Default)    | Action                                            | Context              |
 | --------------------- | ------------------------------------------------- | -------------------- |
 | `Ctrl+Shift+S`      | **Snap to Project & Color Redact (Global)** | Global Desktop / App |
-| `Ctrl+F`            | **Focus Search Bar**                        | Library & Quick Copy |
+| `Ctrl+F`            | **Focus Search Bar**                        | Library & Workbench  |
 | `Ctrl+C`            | **Copy Formatted Reference**                | Focused Skill        |
 | `Ctrl+A`            | **Select All Visible Skills**               | Library View         |
-| `Esc`               | **Clear Selection**                         | Library & Quick Copy |
+| `Esc`               | **Clear Selection**                         | Library & Workbench  |
 | `Delete`            | **Delete Selected Skills**                  | Library View         |
 | `Ctrl+E`            | **Expand All Groups**                       | Library View         |
 | `Ctrl+Shift+E`      | **Collapse All Groups**                     | Library View         |
 | `Home`              | **Jump to Top of List**                     | All Views            |
-| `Alt+1` / `Alt+2` | **Switch between Quick Copy & Library**     | Global in App        |
-| `Alt+3` / `Alt+4` | **Switch between Updates & Settings**       | Global in App        |
+| `Alt+1` / `Alt+2` | **Switch between Workbench & Library**      | Global in App        |
+| `Alt+3` / `Alt+4` | **Switch between Hub & Settings**           | Global in App        |
 | `Ctrl+T`            | **Toggle Dark / Light Theme**               | Global in App        |
 | `Ctrl+Shift+X`      | **Archive Selected Skills**                 | Library View         |
 | `F5`                | **Trigger Manual Cache Refresh**            | All Views            |

@@ -60,14 +60,14 @@ a property on `AppController` and is independently testable.
 | Property | Type | Read-only | Notes |
 |----------|------|-----------|-------|
 | `skillModel` | `QAbstractListModel` | yes | Source-of-truth skill list. Drives Library + QuickCopy views. |
-| `quickCopyModel` | `QAbstractListModel` | yes | Filtered / sorted for Quick Copy. |
+| `quickCopyModel` | `QAbstractListModel` | yes | Filtered / sorted for the Workbench. |
 | `updateSources` | `QAbstractListModel` | yes | Configured update sources. |
 | `projects` | `QAbstractListModel` | yes | Project aliases. |
 | `isLoading` | `bool` | yes | True during initial load or sync. |
 | `statusMessage` | `str` | yes | Human-readable status text. |
 | `selectedSkill` | `QVariant` | yes | Currently selected skill entity, or `None`. |
 | `selectedSource` | `QVariant` | yes | Currently selected source. |
-| `currentProject` | `str` | yes | Currently selected project label; drives the Quick Copy filter. |
+| `currentProject` | `str` | yes | Currently selected project label; drives the Workbench filter. |
 | `lastProject` | `str` | yes | Previously selected project label. The top-bar cycle button toggles between this and `currentProject`. Persisted across restarts. |
 
 ## 4. Q_INVOKABLE / Slot Surface (selected)

@@ -80,7 +80,7 @@ IconButton {
 
 ### Side Panels (ADR-0047)
 
-Every right-hand panel — skill/command/image inspectors, the Quick Copy task
+Every right-hand panel — skill/command/image inspectors, the Workbench task
 list — is built on **`SidePanel.qml`** and must not re-implement the shell.
 
 ```qml
@@ -204,7 +204,7 @@ Background Threads
 - Background refresh with cooperative cancellation (generation counter)
 - `isLoading` flag managed by `DiscoveryController`, not UI
 
-### 7. Quick Copy System
+### 7. Workbench System
 
 - Drag skills to project targets
 - Merge/overwrite conflict resolution
