@@ -1,7 +1,7 @@
 ---
 name: conductor-manage
 description: "Manage track lifecycle: archive, restore, delete, rename, and cleanup"
-risk: unknown
+risk: critical
 source: community
 date_added: "2026-02-27"
 ---
@@ -23,6 +23,9 @@ Manage the complete track lifecycle including archiving, restoring, deleting, re
 - The task is unrelated to Conductor track management
 
 ## Instructions
+
+- Detailed path/transaction safeguards in the playbook apply to every mutation. Preserve prior status and unknown metadata fields; restoration must not falsely complete an abandoned track.
+- Preview the exact affected paths and preserve unrelated staged work; do not use broad staging or assume a failed multi-file operation rolled back.
 
 - Verify `conductor/` structure and required files before proceeding.
 - Determine the operation mode from arguments or interactive prompts.
