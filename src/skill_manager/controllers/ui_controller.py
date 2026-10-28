@@ -478,8 +478,10 @@ class UIController(BaseController):
     def selectAllVisibleSkills(self):
         """Selects all skills currently visible in the active model."""
         self.app.skillModel.selectAll()
+        # ``selectAll`` skips rows hidden behind collapsed headers, so report
+        # the collapse-aware count rather than the filtered one.
         count = getattr(
-            self.app.skillModel, "filteredSelectedCount", self.app.skillModel.selectedCount
+            self.app.skillModel, "visibleSelectedCount", self.app.skillModel.selectedCount
         )
         self.app._set_status(f"Selected {count} visible skills")
 

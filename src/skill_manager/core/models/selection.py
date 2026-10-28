@@ -91,9 +91,13 @@ class SelectionMixin:
         self._cached_filtered_selected = sum(1 for p in self._selected_ids if p in filtered_paths)
 
         # --- visible (collapse-aware) ---
-        self._cached_visible_selectable = sum(1 for s in self._filtered_skills if s.local_path)
+        # Collapsed groups contribute one sentinel row each, which renders a
+        # header rather than a skill; it is not selectable (see
+        # ``toggleSelection``) and must not inflate the "select all" total.
+        visible_skills = [s for s in self._filtered_skills if not self._is_collapsed_row(s)]
+        self._cached_visible_selectable = sum(1 for s in visible_skills if s.local_path)
         self._cached_visible_selected = sum(
-            1 for s in self._filtered_skills if s.local_path and s.local_path in self._selected_ids
+            1 for s in visible_skills if s.local_path and s.local_path in self._selected_ids
         )
         self._cached_total_selectable = len(self._all_filtered_skills)
 
@@ -122,7 +126,7 @@ class SelectionMixin:
         if 0 <= row < len(self._filtered_skills):
             skill = self._filtered_skills[row]
             path = skill.local_path
-            if not path or self._is_main_collapsed(skill) or self._is_sub_collapsed(skill):
+            if not path or self._is_collapsed_row(skill):
                 return
             if path in self._selected_ids:
                 self._selected_ids.pop(path, None)
@@ -146,8 +150,14 @@ class SelectionMixin:
 
     @Slot()
     def selectAll(self):
-        for skill in self._all_filtered_skills:
-            if skill.local_path:
+        """Select every skill the user can actually see.
+
+        Collapsed groups are skipped: their single sentinel row only renders
+        a header, and selecting the hidden skills behind it would make a
+        later copy/delete action act on rows the user never saw.
+        """
+        for skill in self._filtered_skills:
+            if skill.local_path and not self._is_collapsed_row(skill):
                 self._selected_ids[skill.local_path] = None
         self._emit_selection_data_changed()
         self._update_selection_counts()

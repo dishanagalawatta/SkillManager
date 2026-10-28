@@ -349,41 +349,123 @@ def test_skill_model_expansion_logic(qapp, skill_list):
     assert model.isAllExpanded is True
 
 
-def test_collapse_all_also_collapses_sections(qapp):
-    """Expanding a category after "collapse all" must not open its sections.
+MAIN_A = "⚙️ System & Workflow"
+MAIN_B = "📈 Business & Operations"
 
-    Section keys that are absent from the collapsed set read as expanded, so
-    ``collapseAll`` has to record both key shapes.
-    """
+
+def _collapse_fixture_model():
+    """Four skills spread over two main categories and three sections."""
     model = SkillModel()
     model.setSkills(
         [
-            {"name": "A1", "category": "Dev", "local_path": "/a1"},
-            {"name": "A2", "category": "Dev", "local_path": "/a2"},
-            {"name": "B1", "category": "Ops", "local_path": "/b1"},
+            {"name": "A1", "category": "Dev", "main_category": MAIN_A, "local_path": "/a1"},
+            {"name": "A2", "category": "Dev", "main_category": MAIN_A, "local_path": "/a2"},
+            {"name": "B1", "category": "Ops", "main_category": MAIN_A, "local_path": "/b1"},
+            {"name": "M1", "category": "Marketing", "main_category": MAIN_B, "local_path": "/m1"},
         ]
     )
+    return model
+
+
+def test_collapse_all_then_expand_reveals_skills(qapp):
+    """Collapse All must be reversible from a category header.
+
+    Regression: ``collapseAll`` also recorded every ``"Main|Sub"`` section
+    key.  Since an absent key reads as expanded, expanding a category showed
+    only still-collapsed section headers — the skills never came back, and
+    the state was persisted across restarts.
+    """
+    model = _collapse_fixture_model()
 
     model.collapseAll()
-    assert model.isCategoryCollapsed("⚙️ System & Workflow") is True
-    assert model.isCategoryCollapsed("⚙️ System & Workflow|Dev") is True
-    assert model.isCategoryCollapsed("⚙️ System & Workflow|Ops") is True
+    assert set(model.collapsedCategories) == {MAIN_A, MAIN_B}
+    assert model.rowCount() == 2  # one sentinel row per collapsed category
 
-    # Expand only the main category: every section stays collapsed, so each
-    # section shows its header row and nothing else.
-    model.toggleCategory("⚙️ System & Workflow")
+    model.toggleCategory(MAIN_A)
 
-    assert model.isCategoryCollapsed("⚙️ System & Workflow") is False
-    assert model.isCategoryCollapsed("⚙️ System & Workflow|Dev") is True
+    assert model.isCategoryCollapsed(MAIN_A) is False
+    assert model.rowCount() == 4  # 3 skills of MAIN_A + MAIN_B sentinel
+    assert model.isCategoryCollapsed(f"{MAIN_A}|Dev") is False
+    assert model.isCategoryCollapsed(f"{MAIN_A}|Ops") is False
+    assert model.visibleSelectableCount == 3
+    collapsed_rows = sum(
+        1
+        for row in range(model.rowCount())
+        if model.data(model.index(row, 0), SkillModel.IsCollapsedRole)
+    )
+    assert collapsed_rows == 1  # only MAIN_B's sentinel row
+
+
+def test_collapse_all_preserves_user_section_collapse(qapp):
+    """Section state is an independent level and survives Collapse All."""
+    model = _collapse_fixture_model()
+    model.toggleCategory(f"{MAIN_A}|Dev")
+
+    model.collapseAll()
+    model.toggleCategory(MAIN_A)
+
+    # Dev stays collapsed (its own header row), Ops is expanded again.
+    assert model.isCategoryCollapsed(f"{MAIN_A}|Dev") is True
+    assert model.rowCount() == 3  # Dev header + B1 + MAIN_B sentinel
+    assert model.visibleSelectableCount == 1
+
+
+def test_collapse_all_covers_filtered_out_categories(qapp):
+    """Collapse All derives its keys from the unfiltered skill list."""
+    model = _collapse_fixture_model()
+    model.categoryFilter = "Marketing"  # only MAIN_B is visible
+
+    model.collapseAll()
+    model.categoryFilter = ""
+
+    assert set(model.collapsedCategories) == {MAIN_A, MAIN_B}
     assert model.rowCount() == 2
-    assert model.data(model.index(0, 0), SkillModel.IsSubCollapsedRole) is True
-    assert model.data(model.index(1, 0), SkillModel.IsSubCollapsedRole) is True
 
-    # Expanding one section reveals exactly that section's rows.
-    model.toggleCategory("⚙️ System & Workflow|Dev")
-    assert model.rowCount() == 3
-    assert model.data(model.index(0, 0), SkillModel.IsSubCollapsedRole) is False
-    assert model.data(model.index(2, 0), SkillModel.IsSubCollapsedRole) is True
+
+def test_section_toggle_never_toggles_parent_category(qapp):
+    model = _collapse_fixture_model()
+
+    model.toggleCategory(f"{MAIN_A}|Dev")
+
+    assert model.isCategoryCollapsed(f"{MAIN_A}|Dev") is True
+    assert model.isCategoryCollapsed(MAIN_A) is False
+    assert model.rowCount() == 3  # Dev header + B1 + M1
+
+
+def test_select_all_skips_rows_hidden_by_collapse(qapp):
+    """Select All must only touch rows the user can actually see.
+
+    The sentinel row of a collapsed group renders a header, not a skill; it
+    is also rejected by ``toggleSelection``.  Selecting the hidden skills it
+    stands for would let copy/delete act on invisible rows.
+    """
+    model = _collapse_fixture_model()
+
+    model.collapseAll()
+    model.selectAll()
+    assert model.selectedCount == 0
+    assert model.visibleSelectableCount == 0
+
+    model.toggleCategory(MAIN_A)
+    assert model.visibleSelectedCount == 0
+    assert model.visibleSelectableCount == 3
+
+    model.selectAll()
+    assert set(model.getSelectedPaths()) == {"/a1", "/a2", "/b1"}
+    assert model.visibleSelectedCount == 3
+    assert model.visibleSelectedCount == model.visibleSelectableCount
+
+
+def test_collapsed_section_sentinel_is_not_visible_selectable(qapp):
+    model = _collapse_fixture_model()
+    model.toggleCategory(f"{MAIN_A}|Dev")
+
+    assert model.rowCount() == 3  # Dev header + B1 + M1
+    assert model.visibleSelectableCount == 2
+
+    model.selectAll()
+    assert set(model.getSelectedPaths()) == {"/b1", "/m1"}
+    assert model.visibleSelectedCount == 2
 
 
 def test_skill_model_collapsed_main_category_keeps_only_header_sentinel(qapp):
