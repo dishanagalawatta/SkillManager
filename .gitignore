@@ -93,3 +93,8 @@ shutdown_diag.log
 # from the repository history on 2026-10-19 — see docs/SECURITY.md.
 *.pfx
 *.p12
+
+# ─── Local TODO Screenshots ─────────────────────────────────────
+# Pasted reference images for notebook-style TODO items. Local only: an
+# untracked file here made `scripts/release.py` abort on a dirty tree.
+image/TODO/
