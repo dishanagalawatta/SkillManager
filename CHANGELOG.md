@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.15.1] - 2026-10-30
+
+### Changed
+- Commands are marked with 📜 instead of ⚡. The list rows, the command section header and the Create/Edit Command dialog share one default, and the emoji picker now offers 📜 as its first tile and as the "Reset to Default" target; ⚡ remains available as an ordinary choice.
+- The default lives in one place (`DEFAULT_COMMAND_EMOJI`), mirrored by `Theme.commandEmoji` for QML, so a single edit changes every command surface. The old bolt SVG asset is gone.
+
 ## [2.15.0] - 2026-10-29
 
 ### Added
