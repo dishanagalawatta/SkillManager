@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.15.0] - 2026-10-29
+
+### Added
+- Verified in-app self-update: Settings → About and the Updates hub now share one update card with **Download & Install**, progress, cancel and error states, and the update toast offers **Update Now** next to **View Release** ([ADR-0050](docs/adr/ADR-0050-verified-in-app-self-update.md)).
+- Release assets are picked per install kind (AppImage, `.deb`, Windows installer, with architecture tokens) and checked against the release `SHA256SUMS`. A release without a matching checksum is refused instead of installed.
+- AppImage updates replace the running file atomically and relaunch it. A `.deb` install hands off to a detached helper that waits for exit and then runs `pkexec` plus `apt-get`/`dpkg`. Windows runs the Inno Setup installer silently. Source checkouts stay non-updatable.
+
+### Fixed
+- **View Release** did nothing because `UpdateToast.qml` bound to the `AppController` singleton without `import App 1.0`, so both handlers raised `ReferenceError`.
+- External links now open through `utils/external_url.py`, which runs `gio`/`xdg-open` with a repaired environment. Packaged builds exported a bundled `LD_LIBRARY_PATH`; the host `gio` then died with `undefined symbol: g_unix_mount_entry_get_options` while `QDesktopServices.openUrl` still reported success.
+- The `SHA256SUMS` download now follows GitHub's asset redirect (HTTP 302), which previously made every install unverifiable.
+- The generated `/bin/sh` update helper quotes paths with `Path.as_posix()`, so it stays valid POSIX even when produced on Windows.
+
+### Changed
+- The app-update tests now exercise the Linux opener chain and POSIX shell helper on any host, so the Windows CI job covers them too.
+
 ## [2.14.0] - 2026-10-28
 
 ### Changes
