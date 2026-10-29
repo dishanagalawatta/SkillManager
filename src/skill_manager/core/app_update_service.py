@@ -314,10 +314,22 @@ def _update_log_path() -> Path:
     return base / "update-install.log"
 
 
+def _sh_path(path: Path | str) -> str:
+    """Quote a path for a POSIX shell script.
+
+    The helpers this module generates are ``/bin/sh`` and ``cmd.exe`` scripts,
+    and the build that produces them can differ from the one that runs them
+    (tests exercise the ``sh`` helpers on Windows CI). ``as_posix`` keeps the
+    emitted script valid POSIX even when the generating host is Windows, where
+    ``str(Path('/opt/x'))`` would become ``\\opt\\x``.
+    """
+    return shlex.quote(Path(path).as_posix())
+
+
 def _script_header(log_path: Path) -> str:
     return (
         "#!/bin/sh\n"
-        f"LOG={shlex.quote(str(log_path))}\n"
+        f"LOG={_sh_path(log_path)}\n"
         'mkdir -p "$(dirname "$LOG")" 2>/dev/null || true\n'
         'log() { echo "$(date -Is 2>/dev/null) $*" >> "$LOG" 2>/dev/null || true; }\n'
     )
@@ -336,13 +348,11 @@ def build_deb_helper_script(
     log_path = log_path or _update_log_path()
     if Path(package_tool).name.startswith("apt"):
         install_cmd = (
-            f"{shlex.quote(pkexec)} env DEBIAN_FRONTEND=noninteractive "
-            f"{shlex.quote(package_tool)} install -y --allow-downgrades {shlex.quote(str(deb_path))}"
+            f"{_sh_path(pkexec)} env DEBIAN_FRONTEND=noninteractive "
+            f"{_sh_path(package_tool)} install -y --allow-downgrades {_sh_path(deb_path)}"
         )
     else:
-        install_cmd = (
-            f"{shlex.quote(pkexec)} {shlex.quote(package_tool)} -i {shlex.quote(str(deb_path))}"
-        )
+        install_cmd = f"{_sh_path(pkexec)} {_sh_path(package_tool)} -i {_sh_path(deb_path)}"
 
     return (
         _script_header(log_path)
@@ -353,12 +363,12 @@ def build_deb_helper_script(
         + "  [ $i -gt 200 ] && break\n"
         + "  sleep 0.3\n"
         + "done\n"
-        + f"log 'Installing {deb_path.name}'\n"
+        + f"log Installing {_sh_path(deb_path.name)}\n"
         + f'{install_cmd} >> "$LOG" 2>&1\n'
         + "rc=$?\n"
         + 'log "Installer exit code: $rc"\n'
-        + f"if [ -x {shlex.quote(str(executable))} ]; then\n"
-        + f'  nohup {shlex.quote(str(executable))} >> "$LOG" 2>&1 &\n'
+        + f"if [ -x {_sh_path(executable)} ]; then\n"
+        + f'  nohup {_sh_path(executable)} >> "$LOG" 2>&1 &\n'
         + "fi\n"
         + "exit $rc\n"
     )

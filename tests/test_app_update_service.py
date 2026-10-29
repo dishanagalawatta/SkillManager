@@ -1,6 +1,7 @@
 """Tests for the download / verify / install half of app self-updates."""
 
 import hashlib
+import os
 from pathlib import Path
 from threading import Event
 from unittest.mock import MagicMock, patch
@@ -291,6 +292,20 @@ class TestInstallerScripts:
         assert "[ -x /opt/SkillManager/SkillManager ]" in script
         assert "nohup /opt/SkillManager/SkillManager" in script
 
+    def test_deb_helper_emits_posix_paths_only(self):
+        """A /bin/sh script must never carry host-specific backslashes."""
+        script = build_deb_helper_script(
+            deb_path=Path("/tmp/updates/skill manager.deb"),
+            pid=4321,
+            executable=Path("/opt/SkillManager/SkillManager"),
+            pkexec="/usr/bin/pkexec",
+            package_tool="/usr/bin/apt-get",
+            log_path=Path("/tmp/update.log"),
+        )
+        assert "\\" not in script
+        assert "'/tmp/updates/skill manager.deb'" in script
+        assert "/opt/SkillManager/SkillManager" in script
+
     def test_deb_helper_uses_dpkg_when_apt_is_absent(self, tmp_path):
         script = build_deb_helper_script(
             deb_path=tmp_path / "app.deb",
@@ -331,7 +346,9 @@ class TestApplyUpdate:
         assert result.quit_required is True
         assert result.relaunch_argv == (str(target),)
         assert target.read_text(encoding="utf-8") == "new"
-        assert target.stat().st_mode & 0o111
+        if os.name != "nt":
+            # Windows reports every regular file as 0o666; the exec bit is POSIX-only.
+            assert target.stat().st_mode & 0o111
         assert not downloaded.exists()
 
     def test_unsupported_context_refuses(self, tmp_path):
