@@ -42,7 +42,7 @@ To prevent `AppController` from becoming a "God Object," responsibilities are di
 | `DiscoveryController` | `discovery_controller.py` | Filesystem scanning, project discovery, prepared-state pipeline |
 | `ScreenshotController` | `screenshot_controller.py` | Screen capture, region selection, PII redaction |
 | `ImageInspectorController` | `image_inspector_controller.py` | Color isolation, pixel inspection |
-| `AppUpdateController` | `app_update_controller.py` | App release checks (automatic launch/daily + manual) via GitHub Releases API |
+| `AppUpdateController` | `app_update_controller.py` | App release checks (automatic launch/daily + manual), consent-gated download, checksum verification and installer hand-off |
 
 ### Registration & Meta-Object Signal Inheritance
 
@@ -87,6 +87,7 @@ QML consumers reach it via `import App 1.0` or the `appController` context prope
 |---------|--------|---------|
 | `DiscoveryService` | `discovery.py` | Filesystem scanning → model population |
 | `UpdateService` | `update_service.py` | Version comparison, surgical file updates, exact-match project-skill ownership linking |
+| `AppUpdateService` | `app_update_service.py` | Install-kind detection, checksum-verified download, AppImage/`.deb`/Windows installer execution |
 | `ConfigManager` | `config.py` | JSON-based `config.json` persistence |
 | `SkillFolderWatcher` | `file_watch.py` | Watchdog-based filesystem monitoring |
 | `BackgroundTaskRunner` | `utils/task_runner.py` | Concurrent background task execution |
@@ -483,6 +484,7 @@ flowchart TD
 | `task_runner.py` | `BackgroundTaskRunner` — async operations with Future tracking |
 | `clipboard_service.py` | Cross-platform verified dual-write clipboard service (ADR-0024) |
 | `linux.py` | Linux shell, active Wayland/X11 clipboard (`wl-copy`/`xclip`/`xsel`), and input automation |
+| `external_url.py` | Environment-sanitized `gio`/`xdg-open` launch with a real success/failure result (ADR-0050) |
 | `win32.py` | Windows shell, clipboard, and UI automation utilities |
 | `input_guard.py` | Injection safety guard enforcing test/offscreen isolation |
 
@@ -647,19 +649,28 @@ Versions are bumped manually; GitHub Actions only builds tagged releases:
 ### Application Updates
 
 - `AppUpdateController` checks the GitHub Releases API automatically ~4s after launch and then daily (`startAutoCheck`), plus on demand from Settings.
-- A newer version emits `appUpdateAvailable`, rendered by `UpdateToast` with a **View Release** action (see [ADR-0044](adr/ADR-0044-automatic-app-release-checks.md)).
-- Users download and install updates manually from the Releases page — the app never self-installs ([ADR-0010](adr/ADR-0010-drop-tuf.md)).
+- A newer version emits `appUpdateAvailable`, rendered by `UpdateToast` with **View Release** (always) and **Update Now** (when this build can install itself). The same lifecycle is rendered by `AppUpdateCard` in Settings → About and the Updates hub (see [ADR-0044](adr/ADR-0044-automatic-app-release-checks.md), [ADR-0050](adr/ADR-0050-verified-in-app-self-update.md)).
+- Installation is **consent-gated**: nothing is downloaded until the user clicks. The artifact is checked against the release `SHA256SUMS`, written to a `.part` file, and only moved into place when the digest matches.
+- `View Release` does not trust `QDesktopServices` on Linux: it launches `gio`/`xdg-open` with `utils.linux.get_clean_env()` so the packaged `LD_LIBRARY_PATH` cannot break the host opener (the repair established in [ADR-0024](adr/ADR-0024-dual-write-clipboard-verification.md)), and reports a real failure.
 - Only packaged builds (`sys.frozen`) check on startup; a source checkout skips it without marking the check as done, so Settings cannot report "Up to Date" for a check that never ran.
 
 ```mermaid
 flowchart LR
     Boot[App start] -->|4s, packaged only| Check[GET /releases/latest]
     Boot -->|daily timer| Check
-    Settings[Settings: Check for Updates] --> Check
-    Check -->|tag newer than __version__| Toast[toast: App update available<br/>View Release]
+    Settings[Settings / Updates hub] --> Check
+    Check -->|tag newer than __version__| Toast[toast + AppUpdateCard<br/>View Release / Update Now]
     Check -->|same or older| UpToDate[status: Up to date<br/>button stays enabled]
     Check -->|dev build skipped| Skipped[no result recorded]
-    Toast -->|click| Releases[GitHub Releases page<br/>manual download and install]
+    Toast -->|View Release| Opener[clean-env gio / xdg-open]
+    Opener --> Releases[GitHub Releases page]
+    Toast -->|Update Now| Manifest[SHA256SUMS<br/>asset + digest]
+    Manifest --> Download[Download to .part]
+    Download -->|digest matches| Install{Install kind}
+    Download -->|mismatch / missing| Error[install_error in the card]
+    Install -->|AppImage| Replace[atomic os.replace + relaunch]
+    Install -->|.deb| Deb[pkexec + apt-get/dpkg<br/>after app exits]
+    Install -->|Windows| Exe[Inno Setup /SILENT<br/>after app exits]
 ```
 
 ### Skill Package Auto-Update

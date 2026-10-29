@@ -1,0 +1,9 @@
+{
+  "slug": "app_self_update_20261029",
+  "title": "In-app application update download and install",
+  "status": "active",
+  "owner": "@DIKKA",
+  "created": "2026-10-29",
+  "description": "Make app-release notifications actionable: reliable View Release with sanitized external URL launching, plus one-click download, checksum verification and install for AppImage, .deb and the Windows installer.",
+  "related_adrs": ["ADR-0050"]
+}

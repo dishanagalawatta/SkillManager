@@ -1,11 +1,20 @@
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from skill_manager.controllers.app_update_controller import AppUpdateController
-from skill_manager.core.release_check_service import RELEASES_PAGE
+from skill_manager.core.release_check_service import RELEASES_PAGE, ReleaseInfo
 from skill_manager.utils.task_runner import SynchronousTaskRunner
+
+
+def _release(version: str) -> ReleaseInfo:
+    return ReleaseInfo(
+        version=version,
+        tag_name=f"v{version}",
+        page_url=f"{RELEASES_PAGE}/tag/v{version}",
+    )
 
 
 @pytest.mark.usefixtures("setup_qml_style")
@@ -142,16 +151,16 @@ class TestCheckForUpdates:
         """Manual check submits check_latest_release to the task runner."""
         controller = AppUpdateController(mock_app_mock_runner)
         with patch(
-            "skill_manager.controllers.app_update_controller.check_latest_release"
+            "skill_manager.controllers.app_update_controller.fetch_latest_release"
         ) as mock_check:
-            mock_check.return_value = ("1.6.0", None)
+            mock_check.return_value = (_release("1.6.0"), None)
             controller.checkForUpdates(manual=True)
             mock_app_mock_runner.task_runner.submit.assert_called_once()
 
     def test_manual_check_sets_status_message(self, mock_app_mock_runner):
         """Manual check calls _set_status."""
         controller = AppUpdateController(mock_app_mock_runner)
-        with patch("skill_manager.controllers.app_update_controller.check_latest_release"):
+        with patch("skill_manager.controllers.app_update_controller.fetch_latest_release"):
             controller.checkForUpdates(manual=True)
             mock_app_mock_runner._set_status.assert_called_with("Checking for app updates...")
 
@@ -177,7 +186,7 @@ class TestCheckForUpdates:
         """When sys.frozen is True, auto-check still submits."""
         with patch.object(sys, "frozen", True, create=True):
             controller = AppUpdateController(mock_app_mock_runner)
-            with patch("skill_manager.controllers.app_update_controller.check_latest_release"):
+            with patch("skill_manager.controllers.app_update_controller.fetch_latest_release"):
                 controller.checkForUpdates(manual=False)
                 mock_app_mock_runner.task_runner.submit.assert_called_once()
 
@@ -229,8 +238,8 @@ class TestCheckForUpdates:
         """Full flow: real runner invokes callback, covers on_checked lines 110-111."""
         controller = AppUpdateController(mock_app_sync_runner)
         with patch(
-            "skill_manager.controllers.app_update_controller.check_latest_release",
-            return_value=("9.9.9", None),
+            "skill_manager.controllers.app_update_controller.fetch_latest_release",
+            return_value=(_release("9.9.9"), None),
         ):
             controller.checkForUpdates(manual=True)
 
@@ -336,9 +345,172 @@ class TestOnUpdatesChecked:
 class TestOpenReleasesPage:
     def test_opens_releases_page(self, controller):
         with patch(
-            "skill_manager.controllers.app_update_controller.QDesktopServices"
-        ) as mock_desktop:
-            controller.openReleasesPage()
-            mock_desktop.openUrl.assert_called_once()
+            "skill_manager.controllers.app_update_controller.open_external_url",
+            return_value=(True, ""),
+        ) as mock_open:
+            assert controller.openReleasesPage() is True
+            mock_open.assert_called_once_with(RELEASES_PAGE)
+
+    def test_falls_back_to_qt_when_host_opener_fails(self, controller):
+        with (
+            patch(
+                "skill_manager.controllers.app_update_controller.open_external_url",
+                return_value=(False, "no opener"),
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.QDesktopServices"
+            ) as mock_desktop,
+        ):
+            mock_desktop.openUrl.return_value = True
+            assert controller.openReleasesPage() is True
             url_arg = mock_desktop.openUrl.call_args[0][0]
             assert str(url_arg.toString()) == RELEASES_PAGE
+
+    def test_reports_failure_when_every_opener_fails(self, controller):
+        with (
+            patch(
+                "skill_manager.controllers.app_update_controller.open_external_url",
+                return_value=(False, "no opener"),
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.QDesktopServices"
+            ) as mock_desktop,
+        ):
+            mock_desktop.openUrl.return_value = False
+            assert controller.openReleasesPage() is False
+        controller.app._set_status.assert_called_with("Could not open the release page: no opener")
+
+
+# --- download & install orchestration ---
+
+
+class TestDownloadAndInstall:
+    @staticmethod
+    def _arm(controller, *, supported=True, kind="appimage", available=True):
+        from skill_manager.core.app_update_service import InstallContext, InstallKind
+
+        install_kind = InstallKind(kind)
+        controller._context = InstallContext(
+            install_kind,
+            target=Path("/tmp/SkillManager.AppImage"),
+            executable=Path("/tmp/SkillManager.AppImage"),
+            supported=supported,
+            reason="" if supported else "no pkexec",
+        )
+        controller.state.update_available = available
+        controller.state.latest_version = "9.9.9"
+        controller._release = _release("9.9.9")
+
+    def test_unsupported_build_reports_reason_and_never_submits(self, mock_app_mock_runner):
+        controller = AppUpdateController(mock_app_mock_runner)
+        self._arm(controller, supported=False, kind="source")
+
+        controller.downloadAndInstallUpdate()
+
+        assert controller.installError == "no pkexec"
+        mock_app_mock_runner.task_runner.submit.assert_not_called()
+        mock_app_mock_runner._set_status.assert_called_with("Update failed: no pkexec")
+
+    def test_no_update_available_is_reported(self, mock_app_mock_runner):
+        controller = AppUpdateController(mock_app_mock_runner)
+        self._arm(controller, available=False)
+
+        controller.downloadAndInstallUpdate()
+
+        mock_app_mock_runner.task_runner.submit.assert_not_called()
+        mock_app_mock_runner._set_status.assert_called_with("No SkillManager update is available.")
+
+    def test_successful_download_applies_the_update(self, mock_app_sync_runner, tmp_path):
+        from skill_manager.core.app_update_service import InstallResult
+        from skill_manager.core.release_check_service import ReleaseAsset
+
+        controller = AppUpdateController(mock_app_sync_runner)
+        self._arm(controller)
+        asset = ReleaseAsset(name="SkillManager.AppImage", url="https://github.com/x/y")
+
+        with (
+            patch(
+                "skill_manager.controllers.app_update_controller.select_update_asset",
+                return_value=asset,
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.expected_checksum",
+                return_value="a" * 64,
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.download_destination",
+                return_value=tmp_path / "download",
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.download_asset",
+                return_value=tmp_path / "download",
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.apply_update",
+                return_value=InstallResult(True, quit_required=False),
+            ) as apply,
+        ):
+            controller.downloadAndInstallUpdate()
+
+        assert controller.isDownloading is False
+        assert controller.installError == ""
+        assert controller.state.download_progress == 100
+        assert controller.state.downloaded_path == str(tmp_path / "download")
+        apply.assert_called_once()
+        mock_app_sync_runner._set_status.assert_any_call(
+            "Installing update — SkillManager will restart..."
+        )
+
+    def test_download_failure_is_shown(self, mock_app_sync_runner, tmp_path):
+        from skill_manager.core.app_update_service import UpdateDownloadError
+        from skill_manager.core.release_check_service import ReleaseAsset
+
+        controller = AppUpdateController(mock_app_sync_runner)
+        self._arm(controller)
+        asset = ReleaseAsset(name="SkillManager.AppImage", url="https://github.com/x/y")
+
+        with (
+            patch(
+                "skill_manager.controllers.app_update_controller.select_update_asset",
+                return_value=asset,
+            ),
+            patch(
+                "skill_manager.controllers.app_update_controller.expected_checksum",
+                side_effect=UpdateDownloadError("Cannot verify the update: no manifest"),
+            ),
+            patch("skill_manager.controllers.app_update_controller.apply_update") as apply,
+        ):
+            controller.downloadAndInstallUpdate()
+
+        assert controller.isDownloading is False
+        assert "Cannot verify" in controller.installError
+        apply.assert_not_called()
+        mock_app_sync_runner._set_status.assert_any_call(
+            "Update download failed: Cannot verify the update: no manifest"
+        )
+
+    def test_cancel_stops_an_in_flight_download(self, mock_app_mock_runner):
+        controller = AppUpdateController(mock_app_mock_runner)
+        self._arm(controller)
+        controller.state.is_downloading = True
+
+        controller.cancelUpdateDownload()
+
+        assert controller.isDownloading is False
+        assert controller.downloadProgress == 0
+        mock_app_mock_runner._set_status.assert_called_with("Update download cancelled.")
+
+    def test_progress_is_clamped_and_reported(self, controller):
+        controller.state.is_downloading = True
+        controller._set_download_progress(50, 200)
+        assert controller.downloadProgress == 25
+        assert controller.downloadedBytes == 50
+        assert controller.downloadTotalBytes == 200
+
+        controller._set_download_progress(300, 200)
+        assert controller.downloadProgress == 100
+
+    def test_progress_is_ignored_after_cancel(self, controller):
+        controller.state.is_downloading = False
+        controller._set_download_progress(10, 100)
+        assert controller.downloadProgress == 0

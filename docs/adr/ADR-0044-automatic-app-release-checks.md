@@ -3,6 +3,10 @@
 > Status: **Accepted**
 > Date: 2026-10-20
 > Owner: @DIKKA
+>
+> **Update 2026-10-29:** the automatic check and toast described here stand.
+> ADR-0050 supersedes the "installation stays manual" clause with a
+> consent-gated, checksum-verified in-app installer.
 
 ## Context
 
