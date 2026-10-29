@@ -7,6 +7,7 @@ from typing import Any
 import orjson
 from platformdirs import user_data_dir
 
+from skill_manager.core.categories import DEFAULT_COMMAND_EMOJI
 from skill_manager.core.diagnostics import (
     CATEGORY_CONFIG_MIGRATION,
     get_diagnostic_logger,
@@ -322,23 +323,24 @@ class ConfigManager:
         self.save()
 
     def get_command_emoji(self, local_path: str) -> str:
-        """Return the emoji override for a command, or the default ``⚡``."""
+        """Return the emoji override for a command, or the default ``📜``."""
         overrides = self.data.get("command_emoji_overrides", {})
         if not isinstance(overrides, dict):
-            return "⚡"
+            return DEFAULT_COMMAND_EMOJI
         normalized = os.path.normpath(local_path)
-        return overrides.get(normalized, "⚡")
+        return overrides.get(normalized, DEFAULT_COMMAND_EMOJI)
 
     def set_command_emoji(self, local_path: str, emoji: str) -> None:
         """Store (or clear) an emoji override for a command.
 
-        An ``emoji`` of ``""`` or ``"⚡"`` clears any existing override.
+        An ``emoji`` of ``""`` or the default ``📜`` clears any existing
+        override, so picking the default from the picker resets the row.
         """
         overrides = self.data.get("command_emoji_overrides", {})
         if not isinstance(overrides, dict):
             overrides = {}
         normalized = os.path.normpath(local_path)
-        if emoji in ("", "⚡"):
+        if emoji in ("", DEFAULT_COMMAND_EMOJI):
             overrides.pop(normalized, None)
         else:
             overrides[normalized] = emoji

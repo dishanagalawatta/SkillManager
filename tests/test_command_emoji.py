@@ -2,27 +2,36 @@
 
 The feature stores an emoji override for commands in app config (NOT in the
 command's .md file).  QML reads ``model.emoji`` (mapped to ``EmojiRole``) for
-command rows; ``SkillItem.qml`` falls back to ``"⚡"`` when ``model.emoji`` is
-falsy.  The default command emoji is ``"⚡"``.
+command rows; ``SkillItem.qml`` falls back to ``Theme.commandEmoji`` when
+``model.emoji`` is falsy.  The default command emoji is ``"📜"``, defined once
+in ``core/categories.py`` and mirrored by ``Theme.qml``.
 
 Covers:
   * ``ConfigManager`` emoji override + recents API
   * ``SkillModel.EmojiRole`` resolution in ``data()`` / ``roleNames()``
   * ``AppController`` emoji slots
+  * QML wiring against the shared default
 """
 
 import os
+import re
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from PySide6.QtTest import QSignalSpy
 
 from skill_manager.app import AppController
+from skill_manager.core.categories import DEFAULT_COMMAND_EMOJI
 from skill_manager.core.models.entities import Skill
 from skill_manager.core.models.qt_model import SkillModel
 from skill_manager.utils.task_runner import SynchronousTaskRunner
 
-DEFAULT_EMOJI = "⚡"
+DEFAULT_EMOJI = DEFAULT_COMMAND_EMOJI
+
+QML_DIR = (
+    Path(__file__).resolve().parent.parent / "src" / "skill_manager" / "SkillManagerComponents"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -243,3 +252,38 @@ def test_controller_emoji_recents_round_trip(emoji_controller):
     recents = emoji_controller.getEmojiRecents()
     assert recents[0] == "🚀"
     assert "🔥" in recents
+
+
+# ---------------------------------------------------------------------------
+# 4. QML wiring
+# ---------------------------------------------------------------------------
+
+
+def test_default_command_emoji_is_the_scroll():
+    assert DEFAULT_COMMAND_EMOJI == "📜"
+
+
+def test_theme_matches_backend_default():
+    """Theme.commandEmoji must not drift from DEFAULT_COMMAND_EMOJI."""
+    theme = (QML_DIR / "Theme.qml").read_text(encoding="utf-8")
+    match = re.search(r'readonly property string commandEmoji:\s*"([^"]+)"', theme)
+    assert match, "Theme.qml must declare commandEmoji"
+    assert match.group(1) == DEFAULT_COMMAND_EMOJI
+
+
+def test_command_rows_and_picker_use_the_theme_default():
+    skill_item = (QML_DIR / "SkillItem.qml").read_text(encoding="utf-8")
+    picker = (QML_DIR / "EmojiPicker.qml").read_text(encoding="utf-8")
+    dialog = (QML_DIR / "dialogs" / "CommandCreateDialog.qml").read_text(encoding="utf-8")
+
+    assert "model.emoji || Theme.commandEmoji" in skill_item
+    assert 'Default: " + Theme.commandEmoji' in picker
+    assert "root.emojiSelected(Theme.commandEmoji)" in picker
+    assert "property string pendingEmoji: Theme.commandEmoji" in dialog
+    assert "{ emoji: Theme.commandEmoji, name:" in picker
+    # No hardcoded zap fallback left behind for the command default. The picker
+    # still offers ⚡ as an ordinary choice, but never as its default.
+    for name, text in (("SkillItem", skill_item), ("CommandCreateDialog", dialog)):
+        assert '"⚡"' not in text, f"{name} still hardcodes the old default"
+        assert "\\u26A1" not in text, f"{name} still hardcodes the old default"
+    assert 'emojiSelected("' not in picker

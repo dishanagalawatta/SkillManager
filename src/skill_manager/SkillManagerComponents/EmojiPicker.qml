@@ -71,7 +71,8 @@ Popup {
 
     // --- Emoji Dataset ---
     readonly property var emojiData: [
-        { emoji: "⚡", name: "zap default" },
+        { emoji: Theme.commandEmoji, name: "scroll default command" },
+        { emoji: "⚡", name: "zap lightning" },
         { emoji: "🚀", name: "rocket launch ship" },
         { emoji: "🔥", name: "fire flame hot" },
         { emoji: "💡", name: "lightbulb idea" },
@@ -354,7 +355,7 @@ Popup {
             spacing: 8
 
             Text {
-                text: "Default: ⚡"
+                text: "Default: " + Theme.commandEmoji
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.sizeMetadata
                 color: Theme.secondaryLabel
@@ -365,8 +366,8 @@ Popup {
                 text: "Reset to Default"
                 role: "secondary"
                 onClicked: {
-                    root.emojiSelected("⚡")
-                    AppController.addEmojiRecent("⚡")
+                    root.emojiSelected(Theme.commandEmoji)
+                    AppController.addEmojiRecent(Theme.commandEmoji)
                     root.close()
                 }
             }
