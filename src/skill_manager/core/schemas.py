@@ -402,6 +402,18 @@ class AppUpdateState(BaseModel):
     current_version: str = ""
     latest_version: str = ""
     error: str | None = None
+    # In-app download / install lifecycle. Kept on the same state object so
+    # QML has one source of truth for every app-update surface.
+    is_downloading: bool = False
+    download_progress: int = 0  # 0-100
+    downloaded_bytes: int = 0
+    download_total_bytes: int = 0
+    downloaded_path: str = ""
+    install_error: str | None = None
+    install_kind: str = ""
+    self_update_supported: bool = False
+    self_update_reason: str = ""
+    install_in_progress: bool = False
 
 
 class SnapParams(BaseModel):
