@@ -98,6 +98,8 @@ SHARED_COMPONENTS = [
     "Theme.qml",
     "TopBar.qml",
     "TopBarButton.qml",
+    "UpdateToast.qml",
+    "AppUpdateCard.qml",
     "views/DiagnosticsPane.qml",
 ]
 

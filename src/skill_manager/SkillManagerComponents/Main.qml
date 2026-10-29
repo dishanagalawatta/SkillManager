@@ -587,7 +587,7 @@ Window {
             function onAppUpdateAvailable(version) {
                 updateToast.show(
                     "App update available",
-                    "SkillManager v" + version + " is ready to download.",
+                    "SkillManager v" + version + " is available.",
                     true,
                     "release"
                 )

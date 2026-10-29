@@ -741,44 +741,18 @@ Item {
                                         font.weight: Font.Bold
                                         color: Theme.label
                                     }
-                                    Text {
-                                        text: "Version " + AppController.app_update_controller.currentVersion
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.sizeBody
-                                        color: Theme.secondaryLabel
-                                    }
                                 }
 
                                 Item {
                                     Layout.fillWidth: true
                                 }
+                            }
 
-                                RowLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-
-                                    ActionButton {
-                                        id: updateNowBtn
-                                        visible: !AppController.app_update_controller.isCheckingForUpdates
-                                        labelText: {
-                                            if (AppController.app_update_controller.updateAvailable) return "Update Available"
-                                            if (AppController.app_update_controller.hasCheckedForUpdates) return "Up to Date"
-                                            return "Check for Updates"
-                                        }
-                                        role: (AppController.app_update_controller.updateAvailable) ? "primary" : "secondary"
-                                        // Stay clickable after an up-to-date result: the
-                                        // automatic check now runs on launch, so locking the
-                                        // button would leave no way to re-check by hand.
-                                        enabled: !AppController.app_update_controller.isCheckingForUpdates
-                                        onClicked: (mouse) => {
-                                            if (AppController.app_update_controller.updateAvailable) {
-                                                AppController.app_update_controller.openReleasesPage()
-                                            } else {
-                                                AppController.app_update_controller.checkForUpdates(true)
-                                            }
-                                        }
-                                    }
-                                }
+                            // Application update lifecycle: check, download,
+                            // verify and install all live on the controller.
+                            AppUpdateCard {
+                                objectName: "settingsAppUpdateCard"
+                                compact: true
                             }
 
                             Rectangle {

@@ -733,9 +733,17 @@ def test_update_toast_contract():
 
     assert 'objectName: "updateToast"' in toast
     assert 'objectName: "updateToastActionBtn"' in toast
-    assert 'labelText: root.actionMode === "release" ? "View Release" : "Update"' in toast
+    # The action handlers bind to the AppController singleton, which must be
+    # imported per QML file; without it they throw ReferenceError at click.
+    assert "import App 1.0" in toast
+    # Release mode offers both paths: install in place ("Update Now") and the
+    # release page ("View Release"); package mode keeps its single action.
+    assert 'objectName: "updateToastViewReleaseBtn"' in toast
+    assert 'labelText: root.actionMode === "release" ? "Update Now" : "Update"' in toast
+    assert 'labelText: "View Release"' in toast
     assert 'window.navigateTo("Updates")' in toast
     assert "AppController.update_controller.updateAllOutdated()" in toast
+    assert "AppController.app_update_controller.downloadAndInstallUpdate()" in toast
     assert "AppController.app_update_controller.openReleasesPage()" in toast
     assert "UpdateToast 1.0 UpdateToast.qml" in qmldir
     # Host wiring in Main.qml: instance + both signal handlers.
@@ -744,6 +752,33 @@ def test_update_toast_contract():
     assert "function onAutoUpdateFinished(updated, failed)" in main
     # Automatic app-release check is announced through the same toast.
     assert "function onAppUpdateAvailable(version)" in main
+
+
+def test_app_update_card_is_shared_by_settings_and_updates():
+    """The in-app updater lives in one component so both hosts stay truthful."""
+    card = (QML_DIR / "AppUpdateCard.qml").read_text(encoding="utf-8")
+    settings = (QML_DIR / "views" / "SettingsView.qml").read_text(encoding="utf-8")
+    updates = (QML_DIR / "views" / "UpdatesView.qml").read_text(encoding="utf-8")
+    qmldir = (QML_DIR / "qmldir").read_text(encoding="utf-8")
+
+    assert "AppUpdateCard 1.0 AppUpdateCard.qml" in qmldir
+    # Bindings evaluate at load time, so the singleton import is mandatory.
+    assert "import App 1.0" in card
+    assert "AppUpdateCard {" in settings
+    assert "AppUpdateCard {" in updates
+
+    # Primary action downloads + verifies + installs; the release page is
+    # always reachable even when self-install is unsupported.
+    assert "root.controller.downloadAndInstallUpdate()" in card
+    assert "root.controller.openReleasesPage()" in card
+    assert 'objectName: "appUpdateInstallBtn"' in card
+    assert 'objectName: "appUpdateReleaseBtn"' in card
+    # Unsupported builds explain why instead of offering a dead button.
+    assert "root.controller.selfUpdateReason" in card
+    assert "root.supported || root.downloading || root.installing" in card
+    # Progress + failure surfaces exist.
+    assert 'objectName: "appUpdateProgressText"' in card
+    assert 'objectName: "appUpdateErrorText"' in card
 
 
 def test_packages_view_distinguishes_unchecked_from_up_to_date():

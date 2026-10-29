@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import App 1.0
 
 // Bottom-right transient notification for skill package auto-update events.
 //
@@ -89,19 +90,38 @@ Rectangle {
                 onClicked: (mouse) => root.hide()
             }
 
+            // Release notifications offer both paths: install in place when
+            // this build supports it, otherwise the release page is the
+            // primary (and only) action.
+            ActionButton {
+                objectName: "updateToastViewReleaseBtn"
+                visible: root.showAction && root.actionMode === "release"
+                labelText: "View Release"
+                role: "secondary"
+                buttonHeight: 28
+                tooltipText: "Open the SkillManager release page"
+                onClicked: (mouse) => {
+                    root.hide()
+                    AppController.app_update_controller.openReleasesPage()
+                }
+            }
+
             ActionButton {
                 objectName: "updateToastActionBtn"
                 visible: root.showAction
-                labelText: root.actionMode === "release" ? "View Release" : "Update"
+                    && (root.actionMode !== "release"
+                        || AppController.app_update_controller.selfUpdateSupported)
+                labelText: root.actionMode === "release" ? "Update Now" : "Update"
                 role: "primary"
                 buttonHeight: 28
                 tooltipText: root.actionMode === "release"
-                             ? "Open the SkillManager release page"
+                             ? "Download, verify and install SkillManager v"
+                                 + AppController.app_update_controller.latestVersion
                              : "Open Updates and install all package updates"
                 onClicked: (mouse) => {
                     root.hide()
                     if (root.actionMode === "release") {
-                        AppController.app_update_controller.openReleasesPage()
+                        AppController.app_update_controller.downloadAndInstallUpdate()
                     } else {
                         window.navigateTo("Updates")
                         AppController.update_controller.updateAllOutdated()

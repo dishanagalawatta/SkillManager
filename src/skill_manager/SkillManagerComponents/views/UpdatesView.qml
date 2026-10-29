@@ -150,6 +150,17 @@ Item {
 
 
 
+        // Application (SkillManager itself) updates. Hidden until there is
+        // something actionable so the package workflow keeps the full height.
+        AppUpdateCard {
+            objectName: "updatesAppUpdateCard"
+            compact: true
+            visible: AppController.app_update_controller.updateAvailable
+                || AppController.app_update_controller.isDownloading
+                || AppController.app_update_controller.installInProgress
+                || AppController.app_update_controller.installError !== ""
+        }
+
         // Hub bar: the page switcher plus the actions of the active page.
         // The right-hand controls swap with the tab (installed → package
         // actions, discover → catalog search, sync → add project) so every
