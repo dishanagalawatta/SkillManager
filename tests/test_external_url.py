@@ -47,6 +47,11 @@ def _completed(returncode=0, stderr=b""):
 
 
 class TestOpenLinux:
+    @pytest.fixture(autouse=True)
+    def _force_linux(self, monkeypatch):
+        """Exercise the Linux opener chain on any host (CI runs Windows)."""
+        monkeypatch.setattr("skill_manager.utils.external_url.sys.platform", "linux")
+
     def test_uses_gio_open_with_clean_env(self):
         with (
             patch(
