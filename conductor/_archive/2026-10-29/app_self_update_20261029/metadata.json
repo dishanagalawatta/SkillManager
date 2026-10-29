@@ -1,9 +1,13 @@
 {
   "slug": "app_self_update_20261029",
   "title": "In-app application update download and install",
-  "status": "active",
+  "status": "completed",
   "owner": "@DIKKA",
   "created": "2026-10-29",
   "description": "Make app-release notifications actionable: reliable View Release with sanitized external URL launching, plus one-click download, checksum verification and install for AppImage, .deb and the Windows installer.",
-  "related_adrs": ["ADR-0050"]
+  "related_adrs": [
+    "ADR-0050"
+  ],
+  "completed": "2026-10-29",
+  "notes": "Archived 2026-10-29 after the feature merged as PR #37 and shipped in v2.15.0. Regression coverage lives in tests/test_app_update_service.py, tests/test_external_url.py, tests/test_release_check_service.py and tests/ui/test_ui_update_flow.py on main."
 }
