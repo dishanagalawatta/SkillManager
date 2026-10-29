@@ -16,6 +16,7 @@ from typing import cast
 from PySide6.QtCore import Slot
 
 from skill_manager.bootstrap import logger
+from skill_manager.core.categories import DEFAULT_COMMAND_EMOJI
 from skill_manager.core.diagnostics import get_diagnostic_logger
 from skill_manager.core.models import SkillModel
 
@@ -243,7 +244,7 @@ class AppControllerProxyMixin:
 
     @Slot(str, str)
     def setCommandEmoji(self, path: str, emoji: str) -> None:
-        if emoji in ("", "⚡"):
+        if emoji in ("", DEFAULT_COMMAND_EMOJI):
             self._config.clear_command_emoji(path)
         else:
             self._config.set_command_emoji(path, emoji)

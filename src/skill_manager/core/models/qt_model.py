@@ -12,6 +12,7 @@ from PySide6.QtCore import (
     QTimer,
 )
 
+from skill_manager.core.categories import DEFAULT_COMMAND_EMOJI
 from skill_manager.core.models.collapse import CollapseMixin
 from skill_manager.core.models.entities import FilterState, Skill
 from skill_manager.core.models.filter_engine import FilterEngine
@@ -223,7 +224,7 @@ class SkillModel(
             if not skill.is_command:
                 return None
             if self._config is None:
-                return "⚡"
+                return DEFAULT_COMMAND_EMOJI
             return self._config.get_command_emoji(skill.local_path)
 
         return None

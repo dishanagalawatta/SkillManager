@@ -1,5 +1,10 @@
 from functools import lru_cache
 
+# Default icon for a custom command row. Overridable per command from the
+# emoji picker; ``Theme.qml`` mirrors this value for QML (see
+# tests/test_command_emoji.py::test_theme_matches_backend_default).
+DEFAULT_COMMAND_EMOJI = "📜"
+
 CATEGORY_EMOJI_MAP = {
     "AI": "🧠",
     "Agents": "🤖",
@@ -83,7 +88,7 @@ CATEGORY_EMOJI_MAP = {
     "Uncategorized": "📁",
     "Starred": "⭐",
     "Collections": "📦",
-    "Custom Commands": "⚡",
+    "Custom Commands": DEFAULT_COMMAND_EMOJI,
 }
 
 

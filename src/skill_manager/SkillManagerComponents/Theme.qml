@@ -93,6 +93,11 @@ QtObject {
     // Alias kept for guidance/hint copy that reads better at body-adjacent size.
     readonly property real sizeSubtext: sizeCaption
 
+    // --- Glyphs ---
+    // Default icon for a custom command row; mirrors DEFAULT_COMMAND_EMOJI in
+    // core/categories.py (a QML contract test keeps the two in sync).
+    readonly property string commandEmoji: "📜"
+
     function alpha(colorVal, opacity) {
         var c = Qt.color(colorVal)
         return Qt.rgba(c.r, c.g, c.b, opacity)

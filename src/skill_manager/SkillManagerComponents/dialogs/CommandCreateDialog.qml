@@ -45,7 +45,7 @@ Dialog {
     property string orphanCategory: ""
     property bool awaitingConflictResolution: false
     property var pendingArgs: ({})
-    property string pendingEmoji: "\u26A1"
+    property string pendingEmoji: Theme.commandEmoji
 
     function openWithContext() {
         editMode = false
@@ -53,7 +53,7 @@ Dialog {
         editCategoryValue = ""
         orphanCategory = ""
         awaitingConflictResolution = false
-        pendingEmoji = "\u26A1"
+        pendingEmoji = Theme.commandEmoji
         cmdNameInput.text = ""
         cmdBodyInput.text = ""
         open()
@@ -168,7 +168,7 @@ Dialog {
                             font.pixelSize: Theme.sizeCaption
                             font.weight: Font.Medium
                             color: resetEmojiHover.hovered ? Theme.accent : Theme.secondaryLabel
-                            visible: root.pendingEmoji !== "\u26A1"
+                            visible: root.pendingEmoji !== Theme.commandEmoji
 
                             HoverHandler {
                                 id: resetEmojiHover
@@ -176,7 +176,7 @@ Dialog {
                             }
 
                             TapHandler {
-                                onTapped: root.pendingEmoji = "\u26A1"
+                                onTapped: root.pendingEmoji = Theme.commandEmoji
                             }
                         }
                     }
@@ -432,7 +432,7 @@ Dialog {
         parent: Overlay.overlay
         onEmojiSelected: (e) => {
             root.pendingEmoji = e
-            if (e !== "\u26A1") AppController.addEmojiRecent(e)
+            if (e !== Theme.commandEmoji) AppController.addEmojiRecent(e)
             emojiPicker.close()
         }
     }

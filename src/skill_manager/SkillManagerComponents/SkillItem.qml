@@ -114,28 +114,12 @@ Item {
                 
                 // Shared command glyph; the Text below stays for skill sections,
                 // which legitimately show their category emoji.
-                Item {
+                Text {
                     visible: root.isCommandSection
-                    Layout.preferredWidth: 14
-                    Layout.preferredHeight: 14
-                    Layout.alignment: Qt.AlignVCenter
+                    text: Theme.commandEmoji
+                    font.pixelSize: 14
                     opacity: root.isSubCollapsed ? 0.6 : 1.0
-
-                    Image {
-                        id: subCatCommandIcon
-                        anchors.fill: parent
-                        source: AppController.ui_controller.getAssetUri("ui/command-icon.svg")
-                        sourceSize.width: 40
-                        sourceSize.height: 40
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                    }
-
-                    ColorOverlay {
-                        anchors.fill: subCatCommandIcon
-                        source: subCatCommandIcon
-                        color: Theme.accent
-                    }
+                    Layout.alignment: Qt.AlignVCenter
                 }
 
                 Text {
@@ -412,7 +396,7 @@ Item {
                             text: {
                                 if (!model) return ""
                                 if (model.isCollection) return "📦"
-                                if (model.isCommand) return model.emoji || "⚡"
+                                if (model.isCommand) return model.emoji || Theme.commandEmoji
                                 if (model.isSnap) return "🖼️"
                                 return AppController.getCategoryEmoji(model.category)
                             }

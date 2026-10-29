@@ -30,7 +30,6 @@ mappings = {
     "solar:moon-broken": ["moon-icon.svg"],
     "solar:add-circle-broken": ["check-icon.svg"],
     "solar:trash-bin-trash-bold-duotone": ["delete-icon.svg"],
-    "solar:bolt-bold-duotone": ["command-icon.svg"],
     "solar:notebook-minimalistic-bold-duotone": ["library-icon.svg"],
 }
 
