@@ -39,9 +39,26 @@ curl -fsSL https://raw.githubusercontent.com/dishanagalawatta/SkillManager/main/
 
 > **In-app notice.** Packaged builds from v2.13.1 on check GitHub Releases
 > themselves — about four seconds after launch and then once a day — and show an
-> "App update available" popup with **View Release**. The popup only links to the
-> download page: installation stays manual, either with the command above or by
-> opening the release asset for your platform.
+> "App update available" popup. Packaged builds that include this updater
+> (v2.15.0 and later) offer **Update Now** in the popup, in **Settings → About**
+> and in the **Updates** hub: the app downloads the artifact for your install
+> type, verifies it against the release `SHA256SUMS`, installs it and restarts.
+> **View Release** still opens the download page. Nothing downloads in the
+> background — the download starts only when you click.
+
+#### In-app update behaviour by install type
+
+| Your install | What **Update Now** does | Requirements |
+|--------------|--------------------------|--------------|
+| AppImage (`~/.local/bin/skill-manager`) | Replaces the AppImage atomically in place, then relaunches it | The AppImage's directory must be writable |
+| `.deb` (`/opt/SkillManager`) | Detached helper installs the new package after the app exits, then relaunches it | `pkexec` + polkit authorization; `apt-get` or `dpkg` |
+| Windows installer (`SkillManager_Setup.exe`) | Runs the new installer silently after the app exits, then relaunches it | None (installer is unsigned until SignPath is live) |
+| Source checkout | Not supported — the card points at `scripts/update-local.sh` and the release page | — |
+
+If any requirement is missing, the card explains why and keeps **View Release**
+available. Update installs are logged to the app data directory
+(`update-install.log`) so a failed privileged step can be diagnosed after the
+app exits.
 
 > **Switching package types (AppImage → deb):** If the previous installation was an AppImage
 > (or any other user-level binary at `~/.local/bin/skill-manager`), the updater installs the

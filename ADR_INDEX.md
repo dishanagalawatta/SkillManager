@@ -44,6 +44,7 @@
 | [ADR-0047](docs/adr/ADR-0047-common-side-panel-shell.md) | Common Side-Panel Shell with Swappable Content | Accepted | 2026-10-28 | @DIKKA |
 | [ADR-0048](docs/adr/ADR-0048-cached-view-host.md) | Cached View Host (create once, flip visibility) | Accepted | 2026-10-28 | @DIKKA |
 | [ADR-0049](docs/adr/ADR-0049-inline-task-composer.md) | Inline Task Composer with Image Attachments | Accepted | 2026-10-28 | @DIKKA |
+| [ADR-0050](docs/adr/ADR-0050-verified-in-app-self-update.md) | Verified, Consent-Gated In-App Self-Update | Accepted | 2026-10-29 | @DIKKA |
 
 
 ## Template
