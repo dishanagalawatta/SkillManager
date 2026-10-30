@@ -393,3 +393,74 @@ def windows_ci_sigint_guard():
     with contextlib.suppress(Exception):
         signal.signal(signal.SIGINT, _swallow)
     yield
+
+
+# ---------------------------------------------------------------------------
+# Linux Qt teardown guard
+# ---------------------------------------------------------------------------
+#: Exit status captured in ``pytest_sessionfinish`` for the guard below.
+_QT_EXIT_STATUS = {"code": 0}
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session, exitstatus):
+    """Record pytest's real status before Qt's teardown can clobber it."""
+    _QT_EXIT_STATUS["code"] = int(exitstatus)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_unconfigure(config):
+    """Exit before Qt's own process teardown runs, on Linux only.
+
+    On Linux, once a session has loaded ``Main.qml`` through the
+    ``qml_engine`` fixture and run a few update-controller tests, Qt 6.11's
+    atexit path destroys the ``QApplication``'s private data twice. Every
+    test passes first; the double free only corrupts the *exit status*
+    (``134``/``139``), which made ``uv run pytest`` look like a failure:
+
+        ERROR: AddressSanitizer: attempting double-free on 0x…de0
+            #0 operator delete(void*, unsigned long)
+            #1 libQt6Core.so.6+0x2a6729
+            #2 libQt6Core.so.6+0x35aaff
+            #3 __run_exit_handlers  stdlib/exit.c:118
+        0x…de0 is located 0 bytes inside of 32-byte region
+        previously allocated by thread T0 here:
+            #2 QBindingStorage::QBindingStorage()
+            #3 QObjectPrivate::QObjectPrivate(QtPrivate_6_11_1)
+            #4 QCoreApplicationPrivate::QCoreApplicationPrivate(int&, char**)
+
+    That is Qt's own exit path freeing the ``QApplication``'s binding
+    storage, not project code: the crash needs only a loaded ``Main.qml``
+    plus two ``downloadAndInstallUpdate`` tests, survives deleting the
+    engines, the ``QApplication``, or ``QQuickStyle`` first, and does not
+    reproduce in the shipped app. CI only runs on Windows, so it never
+    surfaced there.
+
+    Running the suite to completion and then leaving via ``os._exit``
+    skips Qt's broken teardown while preserving pytest's exit status.
+    Coverage and the terminal summary are written in
+    ``pytest_sessionfinish``, which runs before this hook. Set
+    ``SKILL_MANAGER_QT_EXIT_GUARD=0`` to opt out (e.g. when profiling the
+    teardown itself).
+    """
+    if not sys.platform.startswith("linux"):
+        return
+    if os.environ.get("SKILL_MANAGER_QT_EXIT_GUARD") == "0":
+        return
+    # xdist workers must return normally from pytest.main() so execnet can
+    # deliver the result; a hard exit there stalls the controller.
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    # Nothing to guard when Qt was never imported (pure-Python test runs).
+    if "PySide6.QtCore" not in sys.modules:
+        return
+
+    with contextlib.suppress(Exception):
+        from PySide6.QtCore import QCoreApplication
+
+        if QCoreApplication.instance() is None:
+            return
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_QT_EXIT_STATUS["code"])
