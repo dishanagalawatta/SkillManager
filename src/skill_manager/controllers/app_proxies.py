@@ -11,7 +11,8 @@ inherited slots, keeping every QML call site unchanged.
 methods (see the same pattern in ``app.py``).
 """
 
-from typing import cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Slot
 
@@ -20,9 +21,34 @@ from skill_manager.core.categories import DEFAULT_COMMAND_EMOJI
 from skill_manager.core.diagnostics import get_diagnostic_logger
 from skill_manager.core.models import SkillModel
 
+if TYPE_CHECKING:
+    from skill_manager.controllers.config_controller import ConfigController
+    from skill_manager.controllers.ops_controller import OpsController
+    from skill_manager.controllers.task_controller import TaskController
+    from skill_manager.controllers.ui_controller import UIController
+    from skill_manager.controllers.update_controller import UpdateController
+    from skill_manager.core.config import ConfigManager
+
 
 class AppControllerProxyMixin:
     """QML-facing proxy slots that delegate to the sub-controllers."""
+
+    # Members owned by the composed ``AppController`` (see ``app.py``). This
+    # mixin is only ever a base of that class, but a bare mixin cannot see its
+    # host's attributes — pyright reported 92 "Cannot access attribute" errors
+    # here. These annotations describe the contract and vanish at runtime.
+    if TYPE_CHECKING:
+        ui: UIController
+        ops: OpsController
+        updates: UpdateController
+        tasks: TaskController
+        config_mgr: ConfigController
+        _config: ConfigManager
+        skillModel: SkillModel
+        loadInitialData: Callable[[], Any]
+        # Qt signal declared on AppController (``Signal(...)``); typed loosely
+        # because a signal object is not a plain attribute.
+        commandUpdateCompleted: Any
 
     # --- Proxy Slots (Temporary for QML compatibility) ---
 
