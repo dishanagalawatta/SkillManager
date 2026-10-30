@@ -103,3 +103,9 @@ image/TODO/
 # scripts/agent-sudo reads a machine-specific keyring entry, so it is local
 # to this checkout and must never be committed.
 scripts/agent-sudo
+
+# ─── Machine-local agent policy ─────────────────────────────────
+# Records a permission granted on one specific machine (privileged installs).
+# AGENTS.md is the portable, committed policy and points here for install
+# tasks only. Never commit this file.
+AGENTS.local.md

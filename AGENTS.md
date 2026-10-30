@@ -127,6 +127,16 @@
 - Never use `ThreadPoolExecutor` for heavy work (use `joblib.Parallel`)
 - Never block the main thread with I/O or computation
 
+## Privileged Installs
+
+Prefer root-free installs — `~/.local/bin`, `pipx`, or a venv. Never invoke
+`sudo` on your own initiative: anything beyond installing, upgrading or
+uninstalling SkillManager needs explicit per-action approval.
+
+Machine-local policy, if this checkout has one, lives in `AGENTS.local.md`
+(gitignored, untracked) and applies **only** to those install tasks. Read it
+for an install; ignore it for everything else.
+
 ## Quick Reference
 
 | Task | Command |
