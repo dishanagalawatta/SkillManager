@@ -98,3 +98,8 @@ shutdown_diag.log
 # Pasted reference images for notebook-style TODO items. Local only: an
 # untracked file here made `scripts/release.py` abort on a dirty tree.
 image/TODO/
+
+# ─── Local agent helper ─────────────────────────────────────────
+# scripts/agent-sudo reads a machine-specific keyring entry, so it is local
+# to this checkout and must never be committed.
+scripts/agent-sudo
