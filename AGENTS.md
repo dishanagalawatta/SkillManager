@@ -134,8 +134,9 @@ Prefer root-free installs — `~/.local/bin`, `pipx`, or a venv. Never invoke
 uninstalling SkillManager needs explicit per-action approval.
 
 Machine-local policy, if this checkout has one, lives in `AGENTS.local.md`
-(gitignored, untracked) and applies **only** to those install tasks. Read it
-for an install; ignore it for everything else.
+(gitignored, untracked, and auto-loaded through `instructions` in
+`opencode.jsonc`). It applies **only** to those install tasks; ignore it for
+everything else. Other agent tools should read that file for an install.
 
 ## Quick Reference
 
