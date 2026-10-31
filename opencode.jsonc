@@ -1,5 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  // Machine-local policy, auto-loaded every session. AGENTS.md is the
+  // committed, portable policy; AGENTS.local.md is gitignored and records a
+  // permission granted on one machine (privileged installs). Absent in a
+  // fresh clone — the loader skips missing instruction files, so that is
+  // harmless.
+  "instructions": ["AGENTS.local.md"],
   "mcp": {
     "skillmanager": {
       "type": "local",
